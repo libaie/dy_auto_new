@@ -52,7 +52,7 @@ var uiOperator = {
       return null;
     }
 
-    var strategies = selector.strategies.sort(function (a, b) {
+    var strategies = selector.strategies.slice().sort(function (a, b) {
       return a.priority - b.priority;
     });
 
@@ -88,6 +88,11 @@ var uiOperator = {
         return desc(strategy.value).findOnce();
       case "className":
         return className(strategy.value).findOnce();
+      case "package":
+        if (currentPackage() === strategy.value) {
+          return { isPackage: true, packageName: strategy.value };
+        }
+        return null;
       case "coordinate":
         // 坐标点击不返回控件对象，返回一个模拟对象
         var x = Math.round(strategy.x_percent * device.width);

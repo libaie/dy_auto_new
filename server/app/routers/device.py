@@ -1,7 +1,8 @@
 """Device-facing API — poll, report, heartbeat, selectors."""
-from fastapi import APIRouter, HTTPException, Query, Depends
+from fastapi import APIRouter, HTTPException, Query, Depends, UploadFile, File as FastAPIFile
 from typing import Optional
 from sqlalchemy.orm import Session
+import io
 
 from app.models import TaskResultReport, PollResponse
 from app.database import get_db
@@ -71,3 +72,42 @@ def get_selectors(
         "selectors": selectors,
         "changed": True,
     }
+
+
+@router.get("/script-version")
+def script_version(
+    _: None = Depends(verify_device_secret),
+):
+    from app.services.script_service import script_service
+    return {"version": script_service.get_version()}
+
+
+@router.get("/script-download")
+def script_download(
+    _: None = Depends(verify_device_secret),
+):
+    from app.services.script_service import script_service
+    from fastapi.responses import Response
+    data = script_service.download_script()
+    if data is None:
+        raise HTTPException(status_code=404, detail="No script available")
+    return Response(
+        content=data,
+        media_type="application/zip",
+        headers={"Content-Disposition": "attachment; filename=device-script.zip"},
+    )
+
+
+@router.post("/script-upload")
+async def script_upload(
+    file: UploadFile = FastAPIFile(...),
+    _: None = Depends(verify_device_secret),
+):
+    from app.services.script_service import script_service
+    if not file.filename.endswith(".zip"):
+        raise HTTPException(status_code=400, detail="Only .zip files accepted")
+    content = await file.read()
+    if len(content) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large (max 10MB)")
+    new_version = script_service.upload_script(io.BytesIO(content))
+    return {"version": new_version, "size": len(content)}

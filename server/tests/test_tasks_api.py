@@ -1,0 +1,95 @@
+"""Tests for task creation API -- template resolution."""
+import pytest
+from unittest.mock import patch, AsyncMock
+from fastapi.testclient import TestClient
+from app.main import app
+from app.services.content_service import content_service
+
+client = TestClient(app)
+
+
+class TestTaskCreationWithTemplate:
+    """Tests for template resolution during task creation."""
+
+    def test_create_task_with_template_resolves_content(self, db):
+        """Task created with content_template_id gets content injected."""
+        tpl = content_service.create_template(
+            db, name="create-test", body="关于{keyword}的评论",
+            category="comment", variables=["keyword"],
+        )
+
+        with patch("app.services.content_service.ContentService.generate_from_template",
+                    new_callable=AsyncMock, return_value="AI生成的评论"):
+            resp = client.post("/api/tasks", json={
+                "type": "search_comment",
+                "account_id": "acc-001",
+                "params": {
+                    "keyword": "美食",
+                    "count": 3,
+                    "content_template_id": tpl.id,
+                },
+            })
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["params"]["content"] == "AI生成的评论"
+            assert "content_template_id" in data["params"]  # preserved for reference
+
+    def test_create_task_without_template_unchanged(self):
+        """Task without content_template_id keeps params as-is."""
+        resp = client.post("/api/tasks", json={
+            "type": "search_comment",
+            "account_id": "acc-001",
+            "params": {"keyword": "美食", "count": 3, "content": "静态内容"},
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["params"]["content"] == "静态内容"
+
+    def test_create_task_template_not_found_stores_without_content(self, db):
+        """If template doesn't exist, task is created without content (no crash)."""
+        resp = client.post("/api/tasks", json={
+            "type": "search_comment",
+            "account_id": "acc-001",
+            "params": {
+                "keyword": "美食",
+                "content_template_id": "nonexistent-template",
+            },
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "content" not in data["params"] or data["params"]["content"] is None
+
+    def test_create_task_ai_failure_stores_without_content(self, db):
+        """If AI generation fails, task is created without content (no crash)."""
+        tpl = content_service.create_template(
+            db, name="fail-test", body="测试内容",
+            category="comment",
+        )
+
+        with patch("app.services.content_service.ContentService.generate_from_template",
+                    new_callable=AsyncMock, side_effect=RuntimeError("AI API failed")):
+            resp = client.post("/api/tasks", json={
+                "type": "search_comment",
+                "account_id": "acc-001",
+                "params": {"keyword": "美食", "content_template_id": tpl.id},
+            })
+            assert resp.status_code == 200  # task still created
+            data = resp.json()
+            assert "content" not in data["params"] or data["params"]["content"] is None
+
+    def test_nurture_task_skips_template_resolution(self, db):
+        """Nurture tasks don't use content -- skip AI generation."""
+        tpl = content_service.create_template(
+            db, name="nurture-test", body="不相关",
+            category="comment",
+        )
+
+        with patch("app.services.content_service.ContentService.generate_from_template",
+                    new_callable=AsyncMock) as mock_gen:
+            resp = client.post("/api/tasks", json={
+                "type": "nurture",
+                "account_id": "acc-001",
+                "params": {"duration": 30, "content_template_id": tpl.id},
+            })
+            assert resp.status_code == 200
+            mock_gen.assert_not_called()  # AI never called for nurture tasks

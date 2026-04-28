@@ -1,8 +1,11 @@
 """Seed database from YAML config files. Idempotent — safe to run multiple times."""
+from pathlib import Path
+
+import yaml
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal, init_db
-from app.db_models import Account, UISelector
+from app.db_models import Account, SensitiveWord, UISelector
 from app.config import load_accounts_config, load_selectors_config
 
 
@@ -55,6 +58,24 @@ def seed_selectors(db: Session) -> tuple[int, int]:
     return added, updated
 
 
+def seed_sensitive_words(db: Session) -> int:
+    """Load default sensitive words from YAML config."""
+    words_path = Path(__file__).parent.parent / "config" / "sensitive_words.yaml"
+    if not words_path.exists():
+        return 0
+    with open(words_path, encoding="utf-8") as f:
+        data = yaml.safe_load(f)
+    words = data.get("words", [])
+    added = 0
+    for word in words:
+        existing = db.query(SensitiveWord).filter(SensitiveWord.word == word).first()
+        if not existing:
+            db.add(SensitiveWord(word=word))
+            added += 1
+    db.commit()
+    return added
+
+
 def seed_all():
     """Run all seed operations. Call at startup."""
     init_db()
@@ -62,7 +83,8 @@ def seed_all():
     try:
         acc_count = seed_accounts(db)
         sel_added, sel_updated = seed_selectors(db)
-        print(f"Seed complete: {acc_count} accounts added, {sel_added} selectors added, {sel_updated} selectors updated")
+        words_added = seed_sensitive_words(db)
+        print(f"Seed complete: {acc_count} accounts added, {sel_added} selectors added, {sel_updated} selectors updated, {words_added} sensitive words added")
     finally:
         db.close()
 

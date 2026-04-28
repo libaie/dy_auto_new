@@ -100,3 +100,17 @@ class RiskReport(BaseModel):
     detail: dict[str, Any] = Field(default_factory=dict)
     device_id: str = ""
     timestamp: str = ""
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class LoginResponse(BaseModel):
+    token: str
+    expires_in: int  # seconds
+
+
+class AdminUser(BaseModel):
+    username: str

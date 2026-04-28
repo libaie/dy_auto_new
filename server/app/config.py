@@ -18,6 +18,12 @@ PORT = int(os.getenv("PORT", "8000"))
 DEBUG = os.getenv("DEBUG", "true").lower() == "true"
 DEVICE_SECRET = os.getenv("DEVICE_SECRET", "change-me-to-a-random-string")
 
+# Admin 认证
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
+JWT_SECRET = os.getenv("JWT_SECRET", "change-me-jwt-secret-key")
+JWT_EXPIRE_HOURS = int(os.getenv("JWT_EXPIRE_HOURS", "24"))
+
 
 def _load_yaml(filename: str) -> dict[str, Any]:
     """加载 YAML 配置文件"""

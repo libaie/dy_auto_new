@@ -30,6 +30,15 @@ var config = {
 
   // 日志级别: "debug", "info", "warn", "error"
   logLevel: "info",
+
+  // 网络配置
+  network: {
+    requestTimeout: 10000,
+    maxRetries: 3,
+    retryBaseDelay: 2000,
+    retryMaxDelay: 30000,
+    offlineQueueMax: 100,
+  },
 };
 
 // 生成或读取设备 ID

@@ -149,7 +149,9 @@ def report_risk(
     """Device reports risk control detection. Marks account as risk_controlled."""
     from app.db_models import Account
     account = db.query(Account).filter(Account.id == report.account_id).first()
-    if account and account.status == "active":
+    if not account:
+        return {"status": "ignored", "account_status": "unknown"}
+    if account.status == "active":
         account.status = "risk_controlled"
         db.commit()
-    return {"status": "acknowledged", "account_status": "risk_controlled"}
+    return {"status": "acknowledged", "account_status": account.status}

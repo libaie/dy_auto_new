@@ -145,7 +145,7 @@ var antiDetect = {
 
     // 滑动距离越长，速度越快
     var distance = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
-    var speedFactor = Math.min(1.5, distance / 500);
+    var speedFactor = Math.max(0.5, Math.min(1.5, distance / 500));
 
     var path = bezier.generateSwipePath(startX, startY, endX, endY);
     logger.debug(TAG, "Enhanced swipe: " + path.length + " points, speed=" + speedFactor.toFixed(2));
@@ -175,7 +175,7 @@ var antiDetect = {
   randomClickOffset: function (centerX, centerY, radius) {
     radius = radius || 10;
     var angle = Math.random() * Math.PI * 2;
-    var r = Math.random() * radius;
+    var r = radius * Math.sqrt(Math.random());
     return {
       x: Math.round(centerX + r * Math.cos(angle)),
       y: Math.round(centerY + r * Math.sin(angle)),

@@ -66,9 +66,12 @@ def test_risk_report_marks_account(client):
 
 
 def test_risk_report_unknown_account(client):
-    """Risk report with unknown account should not error."""
+    """Risk report with unknown account should return ignored status."""
     response = client.post("/api/device/risk-report", json={
         "account_id": "nonexistent",
         "risk_type": "captcha",
     })
     assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "ignored"
+    assert data["account_status"] == "unknown"

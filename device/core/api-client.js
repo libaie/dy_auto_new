@@ -28,7 +28,7 @@ var apiClient = {
 
     config.proxy = proxyConfig;
     logger.info(TAG, "Proxy configured: " + proxyConfig.type + "://" +
-      proxyConfig.host + ":" + proxyConfig.port);
+      proxyConfig.host + ":" + proxyConfig.port + " (auth=" + (proxyConfig.username ? "yes" : "no") + ")");
   },
 
   /**
@@ -41,7 +41,9 @@ var apiClient = {
     var proxy = config.proxy;
     var proxyUrl = proxy.type + "://" + proxy.host + ":" + proxy.port;
     if (proxy.username) {
-      proxyUrl = proxy.type + "://" + proxy.username + ":" + proxy.password +
+      var encUser = encodeURIComponent(proxy.username);
+      var encPass = encodeURIComponent(proxy.password || "");
+      proxyUrl = proxy.type + "://" + encUser + ":" + encPass +
         "@" + proxy.host + ":" + proxy.port;
     }
     return { proxy: proxyUrl };

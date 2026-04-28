@@ -126,6 +126,29 @@ class TaskService:
             query = query.filter(DBTask.status == status.value)
         return query.count()
 
+    def cancel_task(self, db: Session, task_id: str):
+        """Cancel a pending or running task."""
+        task = db.query(DBTask).filter(DBTask.id == task_id).first()
+        if not task:
+            raise ValueError(f"Task {task_id} not found")
+        if task.status in (TaskStatus.COMPLETED.value, TaskStatus.CANCELLED.value):
+            raise ValueError(f"Cannot cancel task in status: {task.status}")
+        task.status = TaskStatus.CANCELLED.value
+        task.completed_at = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(task)
+        return task
+
+    def check_cancelled_running(self, db: Session, device_id: str):
+        """Check if device has a running task that was cancelled."""
+        task = (
+            db.query(DBTask)
+            .filter(DBTask.device_id == device_id, DBTask.status == TaskStatus.CANCELLED.value)
+            .order_by(DBTask.created_at.desc())
+            .first()
+        )
+        return task
+
 
 # Module-level singleton — services are stateless, DB sessions come from get_db
 task_service = TaskService()

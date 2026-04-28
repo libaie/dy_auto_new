@@ -22,9 +22,17 @@ def poll_tasks(
     task = task_service.get_pending_task(db, device_id)
     version = selector_service.get_version(db)
 
+    from app.services.device_service import device_service
+    device_info = device_service.get_device_status(db, device_id)
+    proxy = device_info.get("proxy_config") if device_info else None
+
+    cancelled_task = task_service.check_cancelled_running(db, device_id)
+
     return PollResponse(
         task=task,
         selectors_version=version,
+        proxy=proxy,
+        cancelled_task_id=cancelled_task.id if cancelled_task else None,
     )
 
 

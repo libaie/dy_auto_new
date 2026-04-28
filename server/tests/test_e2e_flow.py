@@ -94,3 +94,44 @@ def test_list_tasks_with_status_filter():
 def test_get_nonexistent_task():
     resp = client.get("/api/tasks/nonexistent-id", headers=HEADERS)
     assert resp.status_code == 404
+
+
+def test_cancel_task():
+    create_resp = client.post("/api/tasks", json={
+        "type": "nurture", "account_id": "acc-001", "params": {"duration": 5},
+    }, headers=HEADERS)
+    task_id = create_resp.json()["id"]
+    cancel_resp = client.post(f"/api/tasks/{task_id}/cancel", headers=HEADERS)
+    assert cancel_resp.status_code == 200
+    assert cancel_resp.json()["status"] == "cancelled"
+
+
+def test_cancel_nonexistent_task():
+    resp = client.post("/api/tasks/nonexistent-id/cancel", headers=HEADERS)
+    assert resp.status_code == 404
+
+
+def test_cancel_completed_task_returns_400():
+    create_resp = client.post("/api/tasks", json={
+        "type": "nurture", "account_id": "acc-001", "params": {"duration": 5},
+    }, headers=HEADERS)
+    task_id = create_resp.json()["id"]
+    client.get("/api/device/poll", params={"device_id": "dev-cancel-e2e"}, headers=HEADERS)
+    client.post("/api/device/report", json={
+        "task_id": task_id, "status": "completed", "result": {"success_count": 1},
+    }, headers=HEADERS)
+    cancel_resp = client.post(f"/api/tasks/{task_id}/cancel", headers=HEADERS)
+    assert cancel_resp.status_code == 400
+
+
+def test_poll_returns_cancelled_task_id():
+    create_resp = client.post("/api/tasks", json={
+        "type": "nurture", "account_id": "acc-001", "params": {"duration": 5},
+    }, headers=HEADERS)
+    task_id = create_resp.json()["id"]
+    client.get("/api/device/poll", params={"device_id": "dev-cancel-poll"}, headers=HEADERS)
+    client.post(f"/api/tasks/{task_id}/cancel", headers=HEADERS)
+    poll_resp = client.get("/api/device/poll",
+        params={"device_id": "dev-cancel-poll"}, headers=HEADERS)
+    assert poll_resp.status_code == 200
+    assert poll_resp.json().get("cancelled_task_id") == task_id

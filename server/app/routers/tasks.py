@@ -51,3 +51,18 @@ def get_task(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     return task
+
+
+@router.post("/{task_id}/cancel")
+def cancel_task(
+    task_id: str,
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_device_secret),
+):
+    try:
+        task = task_service.cancel_task(db=db, task_id=task_id)
+    except ValueError as e:
+        if "not found" in str(e):
+            raise HTTPException(status_code=404, detail="Task not found")
+        raise HTTPException(status_code=400, detail=str(e))
+    return task

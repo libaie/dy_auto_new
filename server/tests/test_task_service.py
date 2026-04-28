@@ -94,3 +94,43 @@ def test_count_tasks(db):
     pending_count = task_service.count_tasks(db, status=TaskStatus.PENDING)
     assert pending_count >= 0
     assert pending_count <= total
+
+
+def test_cancel_pending_task(db):
+    task = task_service.create_task(db, TaskType.NURTURE, "acc-001", {"duration": 5})
+    cancelled = task_service.cancel_task(db, task.id)
+    assert cancelled.status == TaskStatus.CANCELLED
+
+
+def test_cancel_running_task(db):
+    task = task_service.create_task(db, TaskType.NURTURE, "acc-001", {"duration": 5})
+    task_service.get_pending_task(db, "dev-001")
+    cancelled = task_service.cancel_task(db, task.id)
+    assert cancelled.status == TaskStatus.CANCELLED
+
+
+def test_cancel_completed_task_fails(db):
+    task = task_service.create_task(db, TaskType.NURTURE, "acc-001", {"duration": 5})
+    task_service.get_pending_task(db, "dev-001")
+    task_service.report_result(db, task.id, TaskStatus.COMPLETED, {"success_count": 1})
+    with pytest.raises(ValueError, match="Cannot cancel"):
+        task_service.cancel_task(db, task.id)
+
+
+def test_cancel_nonexistent_task(db):
+    with pytest.raises(ValueError, match="not found"):
+        task_service.cancel_task(db, "nonexistent-id")
+
+
+def test_check_cancelled_running(db):
+    task = task_service.create_task(db, TaskType.NURTURE, "acc-001", {"duration": 5})
+    task_service.get_pending_task(db, "dev-cancel-check")
+    task_service.cancel_task(db, task.id)
+    result = task_service.check_cancelled_running(db, "dev-cancel-check")
+    assert result is not None
+    assert result.id == task.id
+
+
+def test_check_cancelled_running_none(db):
+    result = task_service.check_cancelled_running(db, "dev-no-cancel")
+    assert result is None

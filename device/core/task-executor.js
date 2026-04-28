@@ -11,11 +11,6 @@ var handlers = {
 };
 
 var taskExecutor = {
-  /**
-   * 执行单个任务
-   * @param {Object} task - 任务对象
-   * @returns {Object} { status, result }
-   */
   execute: function (task) {
     logger.info(TAG, "Executing task: " + task.id + " type=" + task.type);
 
@@ -25,8 +20,26 @@ var taskExecutor = {
       return { status: "failed", result: { error: "Unknown task type: " + task.type } };
     }
 
+    // 看门狗：任务最大执行时间 30 分钟
+    var TASK_TIMEOUT = 30 * 60 * 1000;
+    var startTime = Date.now();
+    var timedOut = false;
+
+    var watchdog = setInterval(function () {
+      if (Date.now() - startTime > TASK_TIMEOUT) {
+        logger.error(TAG, "Task " + task.id + " timed out after 30 minutes");
+        timedOut = true;
+      }
+    }, 10000);
+
     try {
       var result = handler.execute(task.params);
+      clearInterval(watchdog);
+
+      if (timedOut) {
+        return { status: "failed", result: { error: "Task execution timed out (30 min)" } };
+      }
+
       if (result.success) {
         logger.info(TAG, "Task " + task.id + " completed successfully");
         return { status: "completed", result: result.result };
@@ -35,6 +48,7 @@ var taskExecutor = {
         return { status: "failed", result: { error: result.error } };
       }
     } catch (e) {
+      clearInterval(watchdog);
       logger.error(TAG, "Task " + task.id + " threw exception: " + e.message);
       return { status: "failed", result: { error: e.message } };
     }

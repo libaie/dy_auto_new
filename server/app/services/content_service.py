@@ -141,7 +141,12 @@ class ContentService:
         return True
 
     def contains_sensitive(self, db: Session, text: str) -> bool:
-        """Check if text contains any sensitive word (uses cached word list)."""
+        """Check if text contains any sensitive word (uses cached word list).
+
+        Uses substring match (not word-boundary) — intentional for Douyin's
+        aggressive content policy. False positives trigger a retry, which is
+        acceptable since the AI prompt already avoids sensitive content.
+        """
         words = self._get_sensitive_words(db)
         return any(word in text for word in words)
 

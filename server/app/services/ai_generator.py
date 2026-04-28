@@ -84,7 +84,7 @@ class AiGeneratorService:
 
             return content
 
-        raise RuntimeError("AI generation failed: exhausted all retries")
+        raise RuntimeError("AI generation failed: exhausted all retries")  # pragma: no cover -- all exits above
 
     async def _call_api(self, user_prompt: str) -> str:
         """Call the AI API and return the generated text. Dispatches by AI_PROVIDER."""

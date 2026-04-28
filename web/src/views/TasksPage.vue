@@ -193,7 +193,7 @@ async function handleCreate() {
   try {
     await createTask({
       type: form.type,
-      account_id: Number(form.account_id),
+      account_id: form.account_id,
       params: parsedParams,
     })
     showCreateDialog.value = false

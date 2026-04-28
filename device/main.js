@@ -6,6 +6,7 @@ var taskExecutor = require("./core/task-executor");
 var logger = require("./utils/logger");
 var updateChecker = require("./core/update-checker");
 var crashRecovery = require("./core/crash-recovery");
+var antiDetect = require("./core/anti-detect");
 
 var TAG = "MAIN";
 
@@ -77,6 +78,15 @@ function main() {
         // 应用代理配置
         if (response.proxy) {
           apiClient.setProxy(response.proxy);
+        }
+
+        // 更新反检测配置（仅版本变化时）
+        if (response.anti_detect_config_version &&
+            response.anti_detect_config_version !== config.antiDetectVersion) {
+          if (response.anti_detect_config) {
+            antiDetect.updateFromServer(response.anti_detect_config);
+            config.antiDetectVersion = response.anti_detect_config_version;
+          }
         }
 
         // 检查选择器版本

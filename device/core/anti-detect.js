@@ -183,6 +183,24 @@ var antiDetect = {
   },
 
   /**
+   * 从服务端配置更新反检测参数
+   * @param {Object} serverConfig - 服务端下发的反检测配置
+   */
+  updateFromServer: function (serverConfig) {
+    if (!serverConfig) return;
+
+    if (serverConfig.delay_min !== undefined) settings.delayMin = serverConfig.delay_min;
+    if (serverConfig.delay_max !== undefined) settings.delayMax = serverConfig.delay_max;
+    if (serverConfig.rhythm_variation !== undefined) settings.rhythmVariation = serverConfig.rhythm_variation;
+    if (serverConfig.pause_probability !== undefined) settings.pauseProbability = serverConfig.pause_probability;
+    if (serverConfig.pause_min !== undefined) settings.pauseMin = serverConfig.pause_min;
+    if (serverConfig.pause_max !== undefined) settings.pauseMax = serverConfig.pause_max;
+    if (serverConfig.active_hours !== undefined) settings.activeHours = serverConfig.active_hours;
+
+    logger.info(TAG, "Anti-detect config updated from server");
+  },
+
+  /**
    * 包装一个操作，自动添加反检测行为
    * @param {string} actionName
    * @param {Function} actionFn - 实际操作函数

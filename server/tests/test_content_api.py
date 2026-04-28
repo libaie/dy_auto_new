@@ -138,3 +138,45 @@ class TestGenerateAPI:
             "context": {},
         })
         assert resp.status_code == 404
+
+
+class TestAuthRequired:
+    """Verify all content endpoints reject unauthenticated requests."""
+
+    def test_templates_create_requires_auth(self, real_auth):
+        resp = client.post("/api/content/templates", json={"name": "x", "body": "y"})
+        assert resp.status_code in (401, 403)
+
+    def test_templates_list_requires_auth(self, real_auth):
+        resp = client.get("/api/content/templates")
+        assert resp.status_code in (401, 403)
+
+    def test_template_get_requires_auth(self, real_auth):
+        resp = client.get("/api/content/templates/any-id")
+        assert resp.status_code in (401, 403)
+
+    def test_template_update_requires_auth(self, real_auth):
+        resp = client.put("/api/content/templates/any-id", json={"name": "x"})
+        assert resp.status_code in (401, 403)
+
+    def test_template_delete_requires_auth(self, real_auth):
+        resp = client.delete("/api/content/templates/any-id")
+        assert resp.status_code in (401, 403)
+
+    def test_sensitive_words_add_requires_auth(self, real_auth):
+        resp = client.post("/api/content/sensitive-words", json={"word": "test"})
+        assert resp.status_code in (401, 403)
+
+    def test_sensitive_words_list_requires_auth(self, real_auth):
+        resp = client.get("/api/content/sensitive-words")
+        assert resp.status_code in (401, 403)
+
+    def test_sensitive_words_delete_requires_auth(self, real_auth):
+        resp = client.delete("/api/content/sensitive-words/any-id")
+        assert resp.status_code in (401, 403)
+
+    def test_generate_requires_auth(self, real_auth):
+        resp = client.post("/api/content/generate", json={
+            "template_id": "any-id", "context": {},
+        })
+        assert resp.status_code in (401, 403)

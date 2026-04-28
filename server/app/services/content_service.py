@@ -1,15 +1,11 @@
 """Content template and sensitive word service -- DB-backed."""
 import re
-import time
 from typing import Optional
 
 from sqlalchemy.orm import Session
 
 from app.db_models import ContentTemplate as DBTemplate, SensitiveWord as DBWord
 from app.models import ContentTemplateResponse, SensitiveWordResponse
-
-# Sensitive word cache TTL in seconds
-_SENSITIVE_WORD_CACHE_TTL = 300  # 5 minutes
 
 
 def _db_template_to_response(tpl: DBTemplate) -> ContentTemplateResponse:
@@ -35,24 +31,6 @@ def _db_word_to_response(word: DBWord) -> SensitiveWordResponse:
 
 class ContentService:
     """Content template and sensitive word management."""
-
-    def __init__(self):
-        self._sensitive_words_cache: list[str] | None = None
-        self._sensitive_words_cache_time: float = 0
-
-    def _get_sensitive_words(self, db: Session) -> list[str]:
-        """Get sensitive words with in-memory cache (5 min TTL)."""
-        now = time.monotonic()
-        if self._sensitive_words_cache is not None and (now - self._sensitive_words_cache_time) < _SENSITIVE_WORD_CACHE_TTL:
-            return self._sensitive_words_cache
-        words = [w for (w,) in db.query(DBWord.word).all()]
-        self._sensitive_words_cache = words
-        self._sensitive_words_cache_time = now
-        return words
-
-    def invalidate_sensitive_word_cache(self):
-        """Call after adding/removing sensitive words to force refresh."""
-        self._sensitive_words_cache = None
 
     # --- Template CRUD ---
 
@@ -121,7 +99,6 @@ class ContentService:
         db.add(db_word)
         db.commit()
         db.refresh(db_word)
-        self.invalidate_sensitive_word_cache()
         return _db_word_to_response(db_word)
 
     def list_sensitive_words(
@@ -137,17 +114,17 @@ class ContentService:
             return False
         db.delete(word)
         db.commit()
-        self.invalidate_sensitive_word_cache()
         return True
 
     def contains_sensitive(self, db: Session, text: str) -> bool:
-        """Check if text contains any sensitive word (uses cached word list).
+        """Check if text contains any sensitive word.
 
+        Loads all words from DB on each call (no cache) to ensure freshness.
         Uses substring match (not word-boundary) — intentional for Douyin's
         aggressive content policy. False positives trigger a retry, which is
         acceptable since the AI prompt already avoids sensitive content.
         """
-        words = self._get_sensitive_words(db)
+        words = [w for (w,) in db.query(DBWord.word).all()]
         return any(word in text for word in words)
 
     # --- Variable Substitution ---

@@ -114,3 +114,49 @@ class LoginResponse(BaseModel):
 
 class AdminUser(BaseModel):
     username: str
+
+
+class ContentTemplateCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    category: str = Field(default="comment", pattern="^(comment|dm|reply)$")
+    body: str = Field(..., min_length=1)
+    variables: list[str] = Field(default_factory=list)
+
+
+class ContentTemplateUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    category: Optional[str] = Field(None, pattern="^(comment|dm|reply)$")
+    body: Optional[str] = Field(None, min_length=1)
+    variables: Optional[list[str]] = None
+    is_active: Optional[bool] = None
+
+
+class ContentTemplateResponse(BaseModel):
+    id: str
+    name: str
+    category: str
+    body: str
+    variables: list[str]
+    is_active: bool
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+
+class SensitiveWordCreate(BaseModel):
+    word: str = Field(..., min_length=1, max_length=100)
+
+
+class SensitiveWordResponse(BaseModel):
+    id: str
+    word: str
+    created_at: Optional[datetime] = None
+
+
+class GenerateRequest(BaseModel):
+    template_id: str
+    context: dict[str, Any] = Field(default_factory=dict)  # {"keyword": "...", "username": "...", "video_title": "..."}
+
+
+class GenerateResponse(BaseModel):
+    content: str
+    template_id: str

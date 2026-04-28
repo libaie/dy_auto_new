@@ -1,4 +1,6 @@
 import os
+import sys
+import warnings
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +25,34 @@ ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
 JWT_SECRET = os.getenv("JWT_SECRET", "change-me-jwt-secret-key")
 JWT_EXPIRE_HOURS = int(os.getenv("JWT_EXPIRE_HOURS", "24"))
+
+
+def _check_default_credentials():
+    """Check if default credentials are being used and warn/block."""
+    defaults_used = []
+    if DEVICE_SECRET == "change-me-to-a-random-string":
+        defaults_used.append("DEVICE_SECRET")
+    if ADMIN_PASSWORD == "admin123":
+        defaults_used.append("ADMIN_PASSWORD")
+    if JWT_SECRET == "change-me-jwt-secret-key":
+        defaults_used.append("JWT_SECRET")
+
+    if not defaults_used:
+        return
+
+    msg = (
+        f"WARNING: Using default credentials for: {', '.join(defaults_used)}. "
+        f"Set these environment variables before deploying to production."
+    )
+
+    if not DEBUG:
+        print(f"FATAL: {msg}", file=sys.stderr)
+        sys.exit(1)
+
+    warnings.warn(msg, stacklevel=2)
+
+
+_check_default_credentials()
 
 
 def _load_yaml(filename: str) -> dict[str, Any]:
@@ -94,3 +124,10 @@ ANTI_DETECT_CONFIG = {
         ],
     },
 }
+
+# AI Content Generation
+AI_API_KEY = os.getenv("AI_API_KEY", "")
+AI_BASE_URL = os.getenv("AI_BASE_URL", "https://api.anthropic.com")
+AI_MODEL = os.getenv("AI_MODEL", "claude-sonnet-4-20250514")
+AI_PROVIDER = os.getenv("AI_PROVIDER", "anthropic")  # anthropic or openai
+AI_MAX_RETRIES = int(os.getenv("AI_MAX_RETRIES", "3"))

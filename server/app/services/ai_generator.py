@@ -135,14 +135,24 @@ class AiGeneratorService:
 
     @staticmethod
     def _build_prompt(template_body: str, context: dict[str, Any]) -> str:
-        """Build the user prompt from template and context."""
+        """Build the user prompt from template and context.
+
+        Dynamically includes all context keys that have values,
+        rather than hardcoding specific field names.
+        """
         parts = [f"模板内容：{template_body}"]
-        if context.get("keyword"):
-            parts.append(f"搜索关键词：{context['keyword']}")
-        if context.get("username"):
-            parts.append(f"目标用户：{context['username']}")
-        if context.get("video_title"):
-            parts.append(f"视频标题：{context['video_title']}")
+
+        # Dynamic context — include all non-empty string values
+        key_labels = {
+            "keyword": "搜索关键词",
+            "username": "目标用户",
+            "video_title": "视频标题",
+        }
+        for key, value in context.items():
+            if isinstance(value, str) and value:
+                label = key_labels.get(key, key)
+                parts.append(f"{label}：{value}")
+
         parts.append("请根据以上信息生成一条自然的评论/私信内容。只输出内容本身。")
         return "\n".join(parts)
 

@@ -138,5 +138,39 @@ class ContentService:
             return context.get(key, match.group(0))
         return re.sub(r"\{(\w+)\}", replacer, body)
 
+    # --- Content Generation ---
+
+    async def generate_from_template(
+        self, db: Session, template_id: str, context: dict[str, str],
+    ) -> str:
+        """Generate content from a template. Shared by admin, device, and poll resolution.
+
+        Args:
+            db: Database session
+            template_id: Content template ID
+            context: Variable values for substitution (e.g., {"keyword": "美食"})
+
+        Returns:
+            Generated content string
+
+        Raises:
+            ValueError: If template not found
+            RuntimeError: If AI API not configured or all retries fail
+        """
+        tpl = self.get_template(db, template_id)
+        if not tpl:
+            raise ValueError(f"Template not found: {template_id}")
+
+        substituted = self.substitute_variables(tpl.body, context)
+
+        return await self._generate_content(db, substituted, context)
+
+    async def _generate_content(
+        self, db: Session, template_body: str, context: dict[str, str],
+    ) -> str:
+        """Delegate to the AI generator service."""
+        from app.services.ai_generator import ai_generator
+        return await ai_generator.generate(db, template_body, context)
+
 
 content_service = ContentService()

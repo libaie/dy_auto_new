@@ -109,3 +109,46 @@ class TestVariableSubstitution:
         body = "固定文本内容"
         result = content_service.substitute_variables(body, {"keyword": "test"})
         assert result == "固定文本内容"
+
+
+class TestGenerateFromTemplate:
+    """Tests for ContentService.generate_from_template shared helper."""
+
+    def test_generates_content_from_template(self, db):
+        """Happy path: template + context → generated content."""
+        from unittest.mock import patch, AsyncMock
+        tpl = content_service.create_template(
+            db, name="gen-test", body="关于{keyword}的评论",
+            category="comment", variables=["keyword"],
+        )
+        with patch("app.services.ai_generator.AI_API_KEY", "test-key"), \
+             patch.object(content_service, "_generate_content", new_callable=AsyncMock, return_value="好内容"):
+            import asyncio
+            result = asyncio.run(content_service.generate_from_template(
+                db, tpl.id, {"keyword": "美食"},
+            ))
+            assert result == "好内容"
+
+    def test_template_not_found_raises(self, db):
+        """Raises ValueError when template doesn't exist."""
+        import asyncio
+        with pytest.raises(ValueError, match="Template not found"):
+            asyncio.run(content_service.generate_from_template(db, "nonexistent", {}))
+
+    def test_substitutes_variables_before_generation(self, db):
+        """Variables are substituted before passing to AI."""
+        from unittest.mock import patch, AsyncMock
+        tpl = content_service.create_template(
+            db, name="subst-test", body="{keyword}很好吃",
+            category="comment", variables=["keyword"],
+        )
+        with patch("app.services.ai_generator.AI_API_KEY", "test-key"), \
+             patch.object(content_service, "_generate_content", new_callable=AsyncMock) as mock_gen:
+            mock_gen.return_value = "result"
+            import asyncio
+            asyncio.run(content_service.generate_from_template(
+                db, tpl.id, {"keyword": "火锅"},
+            ))
+            # Verify the substituted body was passed to AI
+            call_args = mock_gen.call_args
+            assert "火锅很好吃" in call_args[0][1]

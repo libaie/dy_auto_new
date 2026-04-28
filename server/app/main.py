@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 
 from app.database import get_db, init_db
 from app.seed import seed_all
-from app.routers import device, tasks, accounts, devices, auth
+from app.routers import device, tasks, accounts, devices, auth, selectors
 
 
 @asynccontextmanager
@@ -27,6 +27,7 @@ app.include_router(tasks.router)
 app.include_router(accounts.router)
 app.include_router(devices.router)
 app.include_router(auth.router)
+app.include_router(selectors.router)
 
 
 @app.get("/health")

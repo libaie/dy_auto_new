@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import (
     Column, String, Integer, DateTime, Text, Boolean,
-    JSON, ForeignKey,
+    JSON, ForeignKey, UniqueConstraint,
 )
 from sqlalchemy.orm import DeclarativeBase, relationship
 
@@ -84,3 +84,23 @@ class UISelector(Base):
     enabled = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+
+class DailyStats(Base):
+    __tablename__ = "daily_stats"
+    __table_args__ = (
+        UniqueConstraint("account_id", "date", name="uq_daily_stats_account_date"),
+    )
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    account_id = Column(String(36), ForeignKey("accounts.id"), nullable=False, index=True)
+    date = Column(String(10), nullable=False, index=True)  # YYYY-MM-DD
+    likes = Column(Integer, nullable=False, default=0)
+    comments = Column(Integer, nullable=False, default=0)
+    follows = Column(Integer, nullable=False, default=0)
+    dms = Column(Integer, nullable=False, default=0)
+    replies = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    account = relationship("Account")

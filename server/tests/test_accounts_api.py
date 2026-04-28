@@ -1,17 +1,10 @@
 """Account CRUD API tests."""
 from fastapi.testclient import TestClient
 from app.main import app
-from app.database import init_db, SessionLocal
-from app.db_models import Base, engine
 
 client = TestClient(app)
 SECRET = "change-me-to-a-random-string"
 HEADERS = {"X-Device-Secret": SECRET}
-
-
-def setup_module(module):
-    """Create tables before tests."""
-    Base.metadata.create_all(bind=engine)
 
 
 def test_create_account():

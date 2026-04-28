@@ -1,15 +1,10 @@
 """Device CRUD API tests."""
 from fastapi.testclient import TestClient
 from app.main import app
-from app.db_models import Base, engine
 
 client = TestClient(app)
 SECRET = "change-me-to-a-random-string"
 HEADERS = {"X-Device-Secret": SECRET}
-
-
-def setup_module(module):
-    Base.metadata.create_all(bind=engine)
 
 
 def test_create_device():

@@ -15,6 +15,7 @@ class DeviceCreateRequest(BaseModel):
     name: str
     ip: Optional[str] = None
     bound_account_id: Optional[str] = None
+    proxy_config: Optional[dict[str, Any]] = None
 
 
 class DeviceUpdateRequest(BaseModel):
@@ -49,6 +50,7 @@ def create_device(
         name=request.name,
         ip=request.ip,
         bound_account_id=request.bound_account_id,
+        proxy_config=request.proxy_config,
     )
     db.add(dev)
     db.commit()

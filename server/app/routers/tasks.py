@@ -20,7 +20,7 @@ router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 async def _maybe_resolve_template(db: Session, params: dict, task_type: str) -> dict:
     """If task has content_template_id and is a content-using type, generate content.
 
-    On any failure, returns params unchanged (task created without content).
+    On any failure, records error in params and returns unchanged (task created without content).
     """
     template_id = params.get("content_template_id")
     if not template_id:
@@ -31,13 +31,20 @@ async def _maybe_resolve_template(db: Session, params: dict, task_type: str) -> 
 
     try:
         from app.services.content_service import content_service
-        context = {k: v for k, v in params.items()
-                   if k not in ("content_template_id", "content", "count") and isinstance(v, str)}
+        tpl = content_service.get_template(db, template_id, check_active=True)
+        if not tpl:
+            raise ValueError(f"Template not found: {template_id}")
+        # Whitelist: only pass context keys that match template variables
+        if tpl.variables:
+            context = {k: v for k, v in params.items()
+                       if k in tpl.variables and isinstance(v, str)}
+        else:
+            context = {}
         content = await content_service.generate_from_template(db, template_id, context)
         params["content"] = content
     except Exception as e:
         logger.warning("Failed to resolve template %s at task creation: %s", template_id, e)
-        # Task created without content — handler will fail gracefully
+        params["_content_generation_error"] = str(e)
 
     return params
 

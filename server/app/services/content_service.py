@@ -49,8 +49,13 @@ class ContentService:
         db.refresh(tpl)
         return _db_template_to_response(tpl)
 
-    def get_template(self, db: Session, template_id: str) -> Optional[ContentTemplateResponse]:
-        tpl = db.query(DBTemplate).filter(DBTemplate.id == template_id).first()
+    def get_template(
+        self, db: Session, template_id: str, check_active: bool = False,
+    ) -> Optional[ContentTemplateResponse]:
+        q = db.query(DBTemplate).filter(DBTemplate.id == template_id)
+        if check_active:
+            q = q.filter(DBTemplate.is_active == True)
+        tpl = q.first()
         if not tpl:
             return None
         return _db_template_to_response(tpl)
@@ -157,7 +162,7 @@ class ContentService:
             ValueError: If template not found
             RuntimeError: If AI API not configured or all retries fail
         """
-        tpl = self.get_template(db, template_id)
+        tpl = self.get_template(db, template_id, check_active=True)
         if not tpl:
             raise ValueError(f"Template not found: {template_id}")
 

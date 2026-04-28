@@ -16,9 +16,11 @@ def test_script_version():
 
 
 def test_script_download_no_script():
-    """When no script uploaded, returns 404."""
+    """Download endpoint returns 200 (if script exists from prior test) or 404."""
     resp = client.get("/api/device/script-download", headers=HEADERS)
-    assert resp.status_code in (200, 404)
+    assert resp.status_code == 200 or resp.status_code == 404
+    if resp.status_code == 200:
+        assert len(resp.content) > 0
 
 
 def test_script_upload_and_download():
@@ -46,6 +48,15 @@ def test_script_version_requires_auth():
     assert resp.status_code == 401
 
 
+def test_script_upload_rejects_oversized():
+    """Files over 10MB should be rejected."""
+    big_content = b"x" * (10 * 1024 * 1024 + 1)
+    resp = client.post("/api/device/script-upload",
+        files={"file": ("big.zip", io.BytesIO(big_content), "application/zip")},
+        headers=HEADERS)
+    assert resp.status_code == 400
+
+
 def test_register_device():
     resp = client.post("/api/device/register", json={
         "device_id": "dev-register-test", "name": "Test Phone",
@@ -54,6 +65,8 @@ def test_register_device():
     assert resp.status_code == 200
     data = resp.json()
     assert data["device_id"] == "dev-register-test"
+    assert data["os_version"] == "Android 13"
+    assert data["app_version"] == "1.0.0"
     assert data["status"] == "online"
 
 
@@ -72,3 +85,19 @@ def test_heartbeat_updates_device():
         json={"device_id": "dev-hb-e2e"}, headers=HEADERS)
     assert resp.status_code == 200
     assert resp.json()["status"] == "ok"
+
+
+def test_poll_returns_proxy_config(db):
+    """Poll response includes proxy config for registered device."""
+    from app.db_models import Device
+    device = Device(id="dev-proxy-test", name="Proxy Device", status="online")
+    device.proxy_config = {"type": "http", "host": "proxy.test", "port": 8080}
+    db.add(device)
+    db.commit()
+
+    resp = client.get("/api/device/poll",
+        params={"device_id": "dev-proxy-test"}, headers=HEADERS)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data.get("proxy") is not None
+    assert data["proxy"]["host"] == "proxy.test"

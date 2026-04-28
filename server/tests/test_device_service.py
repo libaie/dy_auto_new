@@ -16,6 +16,8 @@ def test_register_existing_device_updates(db):
     device_service.register(db, "dev-reregister", "Old Name", "Android 12", "1.0.0")
     result = device_service.register(db, "dev-reregister", "New Name", "Android 13", "1.1.0")
     assert result["name"] == "New Name"
+    assert result["os_version"] == "Android 13"
+    assert result["app_version"] == "1.1.0"
 
 
 def test_update_heartbeat(db):

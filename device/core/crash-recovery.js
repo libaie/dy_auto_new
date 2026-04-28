@@ -48,7 +48,7 @@ var crashRecovery = {
 
   handleDialogs: function () {
     var dialogButtons = [
-      "知道了", "确定", "关闭", "取消", "重试",
+      "知道了", "确定", "关闭", "重试",
       "允许", "暂不", "稍后再说", "下次再说",
     ];
 

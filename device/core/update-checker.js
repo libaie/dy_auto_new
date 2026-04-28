@@ -60,6 +60,17 @@ var updateChecker = {
 
       $zip.extract(zipPath, tempDir);
 
+      // 验证关键文件存在
+      var criticalFiles = ["main.js", "config.js"];
+      for (var i = 0; i < criticalFiles.length; i++) {
+        if (!files.exists(tempDir + "/" + criticalFiles[i])) {
+          logger.error(TAG, "Update validation failed: missing " + criticalFiles[i]);
+          files.removeDir(tempDir);
+          files.remove(zipPath);
+          return false;
+        }
+      }
+
       var projectDir = files.cwd();
       this._copyDir(tempDir, projectDir);
 
@@ -72,6 +83,7 @@ var updateChecker = {
       return true;
     } catch (e) {
       logger.error(TAG, "Update failed: " + e.message);
+      try { files.removeDir(tempDir); } catch (ignore) {}
       return false;
     }
   },

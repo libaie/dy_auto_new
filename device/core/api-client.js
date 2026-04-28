@@ -25,6 +25,61 @@ var apiClient = {
   },
 
   /**
+   * 通用重试请求
+   * @param {string} method - "GET" 或 "POST"
+   * @param {string} url - 完整 URL
+   * @param {Object} opts - { body, timeout, parseJson, label }
+   * @returns {*} 解析后的 JSON 或原始 body，失败返回 null
+   */
+  _requestWithRetry: function (method, url, opts) {
+    var body = opts.body || null;
+    var timeout = opts.timeout || netConfig.requestTimeout;
+    var parseJson = opts.parseJson !== false;
+    var label = opts.label || method;
+
+    for (var attempt = 0; attempt <= netConfig.maxRetries; attempt++) {
+      try {
+        var reqOpts = {
+          headers: { "X-Device-Secret": config.deviceSecret },
+          timeout: timeout,
+        };
+        if (method === "POST") {
+          reqOpts.headers["Content-Type"] = "application/json";
+          reqOpts.body = JSON.stringify(body);
+        }
+
+        var response = method === "POST" ? http.post(url, reqOpts) : http.get(url, reqOpts);
+
+        if (response.statusCode === 200) {
+          this._markOnline();
+          return parseJson ? JSON.parse(response.body) : response.body;
+        }
+
+        if (response.statusCode >= 400 && response.statusCode < 500) {
+          logger.error(TAG, label + " client error: " + response.statusCode);
+          return null;
+        }
+
+        logger.warn(TAG, label + " server error: " + response.statusCode +
+          " (attempt " + (attempt + 1) + "/" + (netConfig.maxRetries + 1) + ")");
+      } catch (e) {
+        logger.warn(TAG, label + " network error: " + e.message +
+          " (attempt " + (attempt + 1) + "/" + (netConfig.maxRetries + 1) + ")");
+      }
+
+      if (attempt < netConfig.maxRetries) {
+        var delay = this._retryDelay(attempt);
+        logger.debug(TAG, "Retrying in " + Math.round(delay) + "ms...");
+        sleep(delay);
+      }
+    }
+
+    this._markOffline();
+    logger.error(TAG, label + " failed after all retries");
+    return null;
+  },
+
+  /**
    * 带重试的 HTTP GET
    */
   get: function (path, params) {
@@ -36,41 +91,7 @@ var apiClient = {
       }
       url += "?" + queryParts.join("&");
     }
-
-    for (var attempt = 0; attempt <= netConfig.maxRetries; attempt++) {
-      try {
-        var response = http.get(url, {
-          headers: { "X-Device-Secret": config.deviceSecret },
-          timeout: netConfig.requestTimeout,
-        });
-
-        if (response.statusCode === 200) {
-          this._markOnline();
-          return JSON.parse(response.body);
-        }
-
-        if (response.statusCode >= 400 && response.statusCode < 500) {
-          logger.error(TAG, "GET " + path + " client error: " + response.statusCode);
-          return null;
-        }
-
-        logger.warn(TAG, "GET " + path + " server error: " + response.statusCode +
-          " (attempt " + (attempt + 1) + "/" + (netConfig.maxRetries + 1) + ")");
-      } catch (e) {
-        logger.warn(TAG, "GET " + path + " network error: " + e.message +
-          " (attempt " + (attempt + 1) + "/" + (netConfig.maxRetries + 1) + ")");
-      }
-
-      if (attempt < netConfig.maxRetries) {
-        var delay = this._retryDelay(attempt);
-        logger.debug(TAG, "Retrying in " + Math.round(delay) + "ms...");
-        sleep(delay);
-      }
-    }
-
-    this._markOffline();
-    logger.error(TAG, "GET " + path + " failed after all retries");
-    return null;
+    return this._requestWithRetry("GET", url, { label: "GET " + path });
   },
 
   /**
@@ -78,73 +99,18 @@ var apiClient = {
    */
   post: function (path, body) {
     var url = config.serverUrl + path;
-
-    for (var attempt = 0; attempt <= netConfig.maxRetries; attempt++) {
-      try {
-        var response = http.post(url, {
-          headers: {
-            "Content-Type": "application/json",
-            "X-Device-Secret": config.deviceSecret,
-          },
-          body: JSON.stringify(body),
-          timeout: netConfig.requestTimeout,
-        });
-
-        if (response.statusCode === 200) {
-          this._markOnline();
-          return JSON.parse(response.body);
-        }
-
-        if (response.statusCode >= 400 && response.statusCode < 500) {
-          logger.error(TAG, "POST " + path + " client error: " + response.statusCode);
-          return null;
-        }
-
-        logger.warn(TAG, "POST " + path + " server error: " + response.statusCode +
-          " (attempt " + (attempt + 1) + "/" + (netConfig.maxRetries + 1) + ")");
-      } catch (e) {
-        logger.warn(TAG, "POST " + path + " network error: " + e.message +
-          " (attempt " + (attempt + 1) + "/" + (netConfig.maxRetries + 1) + ")");
-      }
-
-      if (attempt < netConfig.maxRetries) {
-        var delay = this._retryDelay(attempt);
-        logger.debug(TAG, "Retrying in " + Math.round(delay) + "ms...");
-        sleep(delay);
-      }
-    }
-
-    this._markOffline();
-    logger.error(TAG, "POST " + path + " failed after all retries");
-    return null;
+    return this._requestWithRetry("POST", url, { body: body, label: "POST " + path });
   },
 
   /**
    * 带重试的二进制下载
    */
   _downloadWithRetry: function (url) {
-    for (var attempt = 0; attempt <= netConfig.maxRetries; attempt++) {
-      try {
-        var response = http.get(url, {
-          headers: { "X-Device-Secret": config.deviceSecret },
-          timeout: 60000,
-        });
-        if (response.statusCode === 200) {
-          this._markOnline();
-          return response.body;
-        }
-        logger.warn(TAG, "Download server error: " + response.statusCode +
-          " (attempt " + (attempt + 1) + "/" + (netConfig.maxRetries + 1) + ")");
-      } catch (e) {
-        logger.warn(TAG, "Download network error: " + e.message +
-          " (attempt " + (attempt + 1) + "/" + (netConfig.maxRetries + 1) + ")");
-      }
-      if (attempt < netConfig.maxRetries) {
-        sleep(this._retryDelay(attempt));
-      }
-    }
-    this._markOffline();
-    return null;
+    return this._requestWithRetry("GET", url, {
+      timeout: 60000,
+      parseJson: false,
+      label: "Download",
+    });
   },
 
   /**
@@ -173,12 +139,18 @@ var apiClient = {
    * 刷新离线队列
    */
   _flushOfflineQueue: function () {
+    var MAX_FLUSH_RETRIES = 3;
     while (offlineQueue.length > 0) {
       var item = offlineQueue.shift();
       logger.info(TAG, "Flushing offline item: " + item.path);
       var result = this.post(item.path, item.body);
       if (!result) {
-        offlineQueue.unshift(item);
+        item.retries = (item.retries || 0) + 1;
+        if (item.retries >= MAX_FLUSH_RETRIES) {
+          logger.error(TAG, "Dropping offline item after " + MAX_FLUSH_RETRIES + " retries: " + item.path);
+        } else {
+          offlineQueue.unshift(item);
+        }
         break;
       }
     }
@@ -204,7 +176,7 @@ var apiClient = {
         offlineQueue.shift();
       }
       logger.info(TAG, "Queuing report for offline flush: " + taskId);
-      offlineQueue.push({ path: "/api/device/report", body: body });
+      offlineQueue.push({ path: "/api/device/report", body: body, retries: 0 });
     }
     return response;
   },

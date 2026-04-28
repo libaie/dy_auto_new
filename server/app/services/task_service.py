@@ -137,9 +137,9 @@ class TaskService:
         task.completed_at = datetime.now(timezone.utc)
         db.commit()
         db.refresh(task)
-        return task
+        return _db_task_to_pydantic(task)
 
-    def check_cancelled_running(self, db: Session, device_id: str):
+    def check_cancelled_running(self, db: Session, device_id: str) -> Optional[PydanticTask]:
         """Check if device has a running task that was cancelled."""
         task = (
             db.query(DBTask)
@@ -147,7 +147,7 @@ class TaskService:
             .order_by(DBTask.created_at.desc())
             .first()
         )
-        return task
+        return _db_task_to_pydantic(task) if task else None
 
 
 # Module-level singleton — services are stateless, DB sessions come from get_db

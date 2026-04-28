@@ -16,10 +16,12 @@ class DeviceService:
 
         if device:
             device.name = name
+            device.os_version = os_version
+            device.app_version = app_version
             device.status = "online"
             device.last_seen_at = now
         else:
-            device = Device(id=device_id, name=name, status="online", last_seen_at=now)
+            device = Device(id=device_id, name=name, os_version=os_version, app_version=app_version, status="online", last_seen_at=now)
             db.add(device)
 
         db.commit()
@@ -28,6 +30,8 @@ class DeviceService:
         return {
             "device_id": device.id,
             "name": device.name,
+            "os_version": device.os_version,
+            "app_version": device.app_version,
             "status": device.status,
         }
 
@@ -48,6 +52,8 @@ class DeviceService:
             "device_id": device.id,
             "name": device.name,
             "status": device.status,
+            "os_version": device.os_version,
+            "app_version": device.app_version,
             "last_seen_at": device.last_seen_at.isoformat() if device.last_seen_at else None,
             "proxy_config": device.proxy_config,
         }

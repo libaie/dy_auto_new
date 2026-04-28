@@ -44,6 +44,8 @@ class Device(Base):
     status = Column(String(20), nullable=False, default="offline")  # online, offline, maintenance
     bound_account_id = Column(String(36), ForeignKey("accounts.id"), nullable=True)
     proxy_config = Column(JSON, nullable=True)  # {"type":"http","host":"...","port":8080,"username":"...","password":"..."}
+    os_version = Column(String(50), nullable=True)
+    app_version = Column(String(20), nullable=True)
     last_seen_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))

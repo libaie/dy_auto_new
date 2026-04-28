@@ -1,28 +1,50 @@
-from typing import Any, Optional
+"""Selector management service — backed by SQLAlchemy database."""
+from typing import Optional
 
-from app.config import load_selectors_config
+from sqlalchemy.orm import Session
+
+from app.db_models import UISelector
 
 
 class SelectorService:
-    """选择器配置服务 — 从 YAML 加载，支持按 action_name 查询"""
+    """UI selector management — DB-backed."""
 
-    def __init__(self):
-        self._version: int = 0
-        self._selectors: dict[str, dict] = {}
-        self._load()
+    def get_all_selectors(self, db: Session) -> tuple[int, list[dict]]:
+        """Returns (version, selectors_list). Version is max version across all selectors."""
+        selectors = db.query(UISelector).filter(UISelector.enabled == True).all()
+        if not selectors:
+            return 0, []
+        version = max(s.version for s in selectors)
+        result = []
+        for s in selectors:
+            result.append({
+                "action_name": s.action_name,
+                "platform_version": s.platform_version,
+                "strategies": s.strategies,
+            })
+        return version, result
 
-    def _load(self):
-        version, selectors_list = load_selectors_config()
-        self._version = version
-        self._selectors = {s["action_name"]: s for s in selectors_list}
+    def get_selector(self, db: Session, action_name: str) -> Optional[dict]:
+        """Get a single selector by action_name."""
+        s = db.query(UISelector).filter(
+            UISelector.action_name == action_name,
+            UISelector.enabled == True,
+        ).first()
+        if not s:
+            return None
+        return {
+            "action_name": s.action_name,
+            "platform_version": s.platform_version,
+            "strategies": s.strategies,
+        }
 
-    def get_all_selectors(self) -> tuple[int, list[dict[str, Any]]]:
-        """返回 (version, selectors_list)"""
-        return self._version, list(self._selectors.values())
+    def get_version(self, db: Session) -> int:
+        """Get current selectors version."""
+        selectors = db.query(UISelector).filter(UISelector.enabled == True).all()
+        if not selectors:
+            return 0
+        return max(s.version for s in selectors)
 
-    def get_selector(self, action_name: str) -> Optional[dict[str, Any]]:
-        """按 action_name 获取单个选择器配置"""
-        return self._selectors.get(action_name)
 
-    def get_version(self) -> int:
-        return self._version
+# Module-level singleton — stateless, DB sessions injected per call
+selector_service = SelectorService()

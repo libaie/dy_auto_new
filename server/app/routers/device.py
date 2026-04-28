@@ -4,7 +4,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 import io
 
-from app.models import TaskResultReport, PollResponse
+from app.models import TaskResultReport, PollResponse, DeviceRegisterRequest
 from app.database import get_db
 from app.deps import verify_device_secret
 from app.services.task_service import task_service
@@ -50,10 +50,26 @@ def report_result(
 @router.post("/heartbeat")
 def heartbeat(
     body: dict,
+    db: Session = Depends(get_db),
     _: None = Depends(verify_device_secret),
 ):
     device_id = body.get("device_id", "")
+    from app.services.device_service import device_service
+    device_service.update_heartbeat(db, device_id)
     return {"status": "ok", "device_id": device_id}
+
+
+@router.post("/register")
+def register_device(
+    request: DeviceRegisterRequest,
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_device_secret),
+):
+    from app.services.device_service import device_service
+    return device_service.register(
+        db=db, device_id=request.device_id, name=request.name,
+        os_version=request.os_version, app_version=request.app_version,
+    )
 
 
 @router.get("/selectors")

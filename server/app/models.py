@@ -82,3 +82,10 @@ class PollResponse(BaseModel):
     task: Optional[Task] = None
     selectors_version: int = 1
     proxy: Optional[dict[str, Any]] = None
+
+
+class DeviceRegisterRequest(BaseModel):
+    device_id: str
+    name: str
+    os_version: str = ""
+    app_version: str = ""

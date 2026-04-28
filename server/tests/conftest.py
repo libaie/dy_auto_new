@@ -39,3 +39,12 @@ def test_db():
     yield test_engine
     app.dependency_overrides.clear()
     test_engine.dispose()
+
+
+@pytest.fixture
+def db():
+    """Get a test DB session from the conftest override."""
+    gen = app.dependency_overrides[get_db]()
+    session = next(gen)
+    yield session
+    gen.close()

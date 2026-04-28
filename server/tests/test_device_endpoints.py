@@ -44,3 +44,31 @@ def test_script_upload_rejects_non_zip():
 def test_script_version_requires_auth():
     resp = client.get("/api/device/script-version")
     assert resp.status_code == 401
+
+
+def test_register_device():
+    resp = client.post("/api/device/register", json={
+        "device_id": "dev-register-test", "name": "Test Phone",
+        "os_version": "Android 13", "app_version": "1.0.0",
+    }, headers=HEADERS)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["device_id"] == "dev-register-test"
+    assert data["status"] == "online"
+
+
+def test_register_device_requires_auth():
+    resp = client.post("/api/device/register", json={
+        "device_id": "dev-no-auth", "name": "Test",
+    })
+    assert resp.status_code == 401
+
+
+def test_heartbeat_updates_device():
+    client.post("/api/device/register", json={
+        "device_id": "dev-hb-e2e", "name": "HB Test",
+    }, headers=HEADERS)
+    resp = client.post("/api/device/heartbeat",
+        json={"device_id": "dev-hb-e2e"}, headers=HEADERS)
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "ok"

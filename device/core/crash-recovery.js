@@ -6,6 +6,13 @@ var crashRecovery = {
   _consecutiveFailures: 0,
   _maxConsecutiveFailures: 5,
 
+  /**
+   * 设置当前执行的账号 ID（由 task-executor 调用）
+   */
+  setAccountId: function (accountId) {
+    this._currentAccountId = accountId;
+  },
+
   ensureAppRunning: function () {
     if (currentPackage() === "com.ss.android.ugc.aweme") {
       this._consecutiveFailures = 0;
@@ -64,15 +71,38 @@ var crashRecovery = {
       } catch (e) { /* ignore */ }
     }
 
-    var riskKeywords = ["验证", "风控", "异常", "安全检查", "滑动"];
-    for (var j = 0; j < riskKeywords.length; j++) {
-      try {
-        var riskEl = textContains(riskKeywords[j]).findOnce();
-        if (riskEl) {
-          logger.warn(TAG, "Detected risk control dialog: " + riskKeywords[j]);
-          return "risk_controlled";
-        }
-      } catch (e) { /* ignore */ }
+    // 风控关键词检测
+    var riskPatterns = [
+      { keywords: ["验证", "安全验证", "滑动验证"], type: "captcha" },
+      { keywords: ["风控", "操作频繁", "请稍后再试"], type: "rate_limit" },
+      { keywords: ["异常", "账号异常", "登录异常"], type: "account_risk" },
+      { keywords: ["安全检查", "身份验证"], type: "security_check" },
+    ];
+
+    for (var j = 0; j < riskPatterns.length; j++) {
+      var pattern = riskPatterns[j];
+      for (var k = 0; k < pattern.keywords.length; k++) {
+        try {
+          var riskEl = textContains(pattern.keywords[k]).findOnce();
+          if (riskEl) {
+            logger.warn(TAG, "Risk detected: " + pattern.type + " (" + pattern.keywords[k] + ")");
+            // 上报服务端
+            if (this._currentAccountId) {
+              try {
+                var apiClient = require("./api-client");
+                apiClient.reportRiskControl(
+                  this._currentAccountId,
+                  pattern.type,
+                  { keyword: pattern.keywords[k] }
+                );
+              } catch (e) {
+                logger.warn(TAG, "Failed to report risk: " + e.message);
+              }
+            }
+            return "risk_controlled";
+          }
+        } catch (e) { /* ignore */ }
+      }
     }
 
     return false;

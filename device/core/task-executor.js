@@ -37,6 +37,11 @@ var taskExecutor = {
     }, 10000);
 
     try {
+      var crashRecovery = require("./crash-recovery");
+      if (task.account_id) {
+        crashRecovery.setAccountId(task.account_id);
+      }
+
       var result = handler.execute(task.params);
       clearInterval(watchdog);
 

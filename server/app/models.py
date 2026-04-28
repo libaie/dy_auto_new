@@ -90,3 +90,11 @@ class DeviceRegisterRequest(BaseModel):
     name: str
     os_version: str = ""
     app_version: str = ""
+
+
+class RiskReport(BaseModel):
+    account_id: str
+    risk_type: str  # captcha, rate_limit, account_risk, security_check
+    detail: dict[str, Any] = Field(default_factory=dict)
+    device_id: str = ""
+    timestamp: str = ""

@@ -4,7 +4,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 import io
 
-from app.models import TaskResultReport, PollResponse, DeviceRegisterRequest
+from app.models import TaskResultReport, PollResponse, DeviceRegisterRequest, RiskReport
 from app.database import get_db
 from app.deps import verify_device_secret
 from app.services.task_service import task_service
@@ -135,3 +135,18 @@ async def script_upload(
         raise HTTPException(status_code=400, detail="File too large (max 10MB)")
     new_version = script_service.upload_script(io.BytesIO(content))
     return {"version": new_version, "size": len(content)}
+
+
+@router.post("/risk-report")
+def report_risk(
+    report: RiskReport,
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_device_secret),
+):
+    """Device reports risk control detection. Marks account as risk_controlled."""
+    from app.db_models import Account
+    account = db.query(Account).filter(Account.id == report.account_id).first()
+    if account and account.status == "active":
+        account.status = "risk_controlled"
+        db.commit()
+    return {"status": "acknowledged", "account_status": "risk_controlled"}

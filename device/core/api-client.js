@@ -248,6 +248,22 @@ var apiClient = {
     return this.post("/api/device/register", deviceInfo);
   },
 
+  /**
+   * 上报风控检测结果
+   * @param {string} accountId - 账号 ID
+   * @param {string} riskType - 风控类型 (captcha, risk_control, verify)
+   * @param {Object} detail - 风控详情
+   */
+  reportRiskControl: function (accountId, riskType, detail) {
+    return this.post("/api/device/risk-report", {
+      account_id: accountId,
+      risk_type: riskType,
+      detail: detail || {},
+      device_id: config.deviceId,
+      timestamp: new Date().toISOString(),
+    });
+  },
+
   isOnline: function () {
     return isOnline;
   },

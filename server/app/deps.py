@@ -1,19 +1,17 @@
 """Shared FastAPI dependencies — auth, common utilities."""
-from fastapi import HTTPException, Header, Depends
+import jwt
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from app.config import DEVICE_SECRET
+from fastapi import HTTPException, Header, Depends
+
+from app.config import DEVICE_SECRET, JWT_SECRET, JWT_EXPIRE_HOURS
 
 
 def verify_device_secret(x_device_secret: Optional[str] = Header(None, alias="X-Device-Secret")):
     """FastAPI dependency — verifies X-Device-Secret header. Raises 401 if invalid."""
     if x_device_secret != DEVICE_SECRET:
         raise HTTPException(status_code=401, detail="Invalid device secret")
-
-
-import jwt
-from datetime import datetime, timedelta, timezone
-from app.config import JWT_SECRET, JWT_EXPIRE_HOURS
 
 
 def create_admin_token(username: str) -> str:

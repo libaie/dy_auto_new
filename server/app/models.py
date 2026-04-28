@@ -160,3 +160,13 @@ class GenerateRequest(BaseModel):
 class GenerateResponse(BaseModel):
     content: str
     template_id: str
+
+
+class DeviceGenerateRequest(BaseModel):
+    template_id: str
+    context: dict[str, str] = Field(default_factory=dict)
+
+
+class DeviceGenerateResponse(BaseModel):
+    content: str
+    template_id: str

@@ -4,7 +4,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 import io
 
-from app.models import TaskResultReport, PollResponse, DeviceRegisterRequest, RiskReport
+from app.models import TaskResultReport, PollResponse, DeviceRegisterRequest, RiskReport, DeviceGenerateRequest, DeviceGenerateResponse
 from app.database import get_db
 from app.deps import verify_device_secret
 from app.services.task_service import task_service
@@ -155,3 +155,26 @@ def report_risk(
         account.status = "risk_controlled"
         db.commit()
     return {"status": "acknowledged", "account_status": account.status}
+
+
+@router.post("/generate-content")
+async def generate_content(
+    request: DeviceGenerateRequest,
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_device_secret),
+):
+    """Generate content from a template on-demand."""
+    from app.services.content_service import content_service
+
+    try:
+        content = await content_service.generate_from_template(
+            db, request.template_id, request.context,
+        )
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Template not found")
+    except RuntimeError as e:
+        if "not configured" in str(e):
+            raise HTTPException(status_code=503, detail="AI service not configured")
+        raise HTTPException(status_code=502, detail=f"AI service error: {e}")
+
+    return DeviceGenerateResponse(content=content, template_id=request.template_id)

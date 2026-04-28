@@ -7,6 +7,7 @@ from sqlalchemy import update
 
 from app.db_models import Task as DBTask
 from app.models import TaskType, TaskStatus, Task as PydanticTask
+from app.services.stats_service import stats_service
 
 MAX_RETRIES = 3
 
@@ -58,29 +59,35 @@ class TaskService:
         return _db_task_to_pydantic(db_task)
 
     def get_pending_task(self, db: Session, device_id: str) -> Optional[PydanticTask]:
-        """Claim a pending task using optimistic locking (UPDATE ... WHERE status='pending')."""
-        # Find oldest pending task
-        db_task = db.query(DBTask).filter(
+        """Claim a pending task using optimistic locking, respecting daily quotas."""
+        # Find oldest pending tasks (get a few candidates for quota filtering)
+        candidates = db.query(DBTask).filter(
             DBTask.status == TaskStatus.PENDING.value,
-        ).order_by(DBTask.created_at.asc()).first()
+        ).order_by(DBTask.created_at.asc()).limit(10).all()
 
-        if not db_task:
+        if not candidates:
             return None
 
-        # Optimistic lock: atomically claim via UPDATE with WHERE clause
-        result = db.execute(
-            update(DBTask)
-            .where(DBTask.id == db_task.id, DBTask.status == TaskStatus.PENDING.value)
-            .values(status=TaskStatus.RUNNING.value, device_id=device_id, started_at=datetime.now(timezone.utc))
-        )
-        db.commit()
+        # Filter by daily quota
+        for db_task in candidates:
+            if stats_service.check_quota(db, db_task.account_id, db_task.type):
+                # Quota available — try to claim this task
+                result = db.execute(
+                    update(DBTask)
+                    .where(DBTask.id == db_task.id, DBTask.status == TaskStatus.PENDING.value)
+                    .values(status=TaskStatus.RUNNING.value, device_id=device_id, started_at=datetime.now(timezone.utc))
+                )
+                db.commit()
 
-        if result.rowcount == 0:
-            # Another device claimed it first — retry
-            return self.get_pending_task(db, device_id)
+                if result.rowcount == 0:
+                    # Another device claimed it — try next candidate
+                    continue
 
-        db.refresh(db_task)
-        return _db_task_to_pydantic(db_task)
+                db.refresh(db_task)
+                return _db_task_to_pydantic(db_task)
+
+        # All candidates are over quota — return None (tasks stay pending for next day)
+        return None
 
     def report_result(
         self,
@@ -98,6 +105,9 @@ class TaskService:
             db_task.status = TaskStatus.COMPLETED.value
             db_task.result = result
             db_task.completed_at = datetime.now(timezone.utc)
+            # Record operation count
+            success_count = (result or {}).get("success_count", 1)
+            stats_service.increment(db, db_task.account_id, db_task.type, count=success_count)
         elif status == TaskStatus.FAILED:
             db_task.retry_count += 1
             if db_task.retry_count >= MAX_RETRIES:

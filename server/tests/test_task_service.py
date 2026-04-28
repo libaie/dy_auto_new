@@ -134,3 +134,107 @@ def test_check_cancelled_running(db):
 def test_check_cancelled_running_none(db):
     result = task_service.check_cancelled_running(db, "dev-no-cancel")
     assert result is None
+
+
+def test_quota_blocks_task_assignment(db):
+    """When ALL pending tasks are over quota, get_pending_task returns None."""
+    from app.services.stats_service import stats_service
+    from app.db_models import Task as DBTask, Account
+
+    quota_account = "acc-quota-test"
+    # Create account first
+    account = Account(id=quota_account, nickname="quota-test", daily_limits={"likes": 50, "comments": 20, "follows": 20, "dms": 10, "replies": 15})
+    db.add(account)
+    db.commit()
+
+    # Exhaust likes quota (default 50)
+    stats_service.increment(db, quota_account, "search_like", count=50)
+
+    # Cancel all existing pending tasks to isolate this test
+    db.query(DBTask).filter(DBTask.status == TaskStatus.PENDING.value).update(
+        {"status": TaskStatus.CANCELLED.value}
+    )
+    db.commit()
+
+    # Create ONLY a search_like task for the quota-exhausted account
+    task_service.create_task(db, TaskType.SEARCH_LIKE, quota_account, {"keyword": "test"})
+
+    # Try to claim — should get None because the only pending task is over quota
+    claimed = task_service.get_pending_task(db, "dev-quota")
+    assert claimed is None
+
+    # Verify the task is still pending (not silently dropped)
+    remaining = db.query(DBTask).filter(DBTask.status == TaskStatus.PENDING.value).all()
+    assert len(remaining) == 1
+    assert remaining[0].account_id == quota_account
+
+
+def test_quota_allows_non_exhausted_tasks(db):
+    """Tasks of non-exhausted types should still be assignable."""
+    from app.services.stats_service import stats_service
+    from app.db_models import Task as DBTask, Account
+
+    quota_account2 = "acc-quota-test2"
+    # Create account first
+    account = Account(id=quota_account2, nickname="quota-test2", daily_limits={"likes": 50, "comments": 20, "follows": 20, "dms": 10, "replies": 15})
+    db.add(account)
+    db.commit()
+
+    stats_service.increment(db, quota_account2, "search_like", count=50)
+
+    # Cancel all existing pending tasks to isolate this test
+    db.query(DBTask).filter(DBTask.status == TaskStatus.PENDING.value).update(
+        {"status": TaskStatus.CANCELLED.value}
+    )
+    db.commit()
+
+    # Create a search_comment task (comment quota not exhausted)
+    task_service.create_task(db, TaskType.SEARCH_COMMENT, quota_account2, {"keyword": "test"})
+    claimed = task_service.get_pending_task(db, "dev-quota2")
+    assert claimed is not None
+    assert claimed.type == TaskType.SEARCH_COMMENT
+
+
+def test_report_completed_increments_stats(db):
+    """Completing a task should increment daily stats."""
+    from app.services.stats_service import stats_service
+    from app.db_models import Account
+
+    stats_account = "acc-stats-test"
+    # Create account first
+    account = Account(id=stats_account, nickname="stats-test", daily_limits={"likes": 50, "comments": 20, "follows": 20, "dms": 10, "replies": 15})
+    db.add(account)
+    db.commit()
+
+    task = task_service.create_task(db, TaskType.SEARCH_LIKE, stats_account, {"keyword": "test"})
+    task_service.get_pending_task(db, "dev-stats")
+
+    counts_before = stats_service.get_today_counts(db, stats_account)
+    task_service.report_result(db, task.id, TaskStatus.COMPLETED, {"success_count": 3})
+    counts_after = stats_service.get_today_counts(db, stats_account)
+
+    assert counts_after["likes"] - counts_before["likes"] == 3
+
+
+def test_all_candidates_over_quota_returns_none(db):
+    """When all 10+ candidates are over quota, returns None."""
+    from app.services.stats_service import stats_service
+    from app.db_models import Task as DBTask, Account
+
+    # Cancel all existing pending tasks
+    db.query(DBTask).filter(DBTask.status == TaskStatus.PENDING.value).update(
+        {"status": TaskStatus.CANCELLED.value}
+    )
+    db.commit()
+
+    # Create 12 tasks for quota-exhausted accounts
+    for i in range(12):
+        acc = f"acc-overquota-{i}"
+        account = Account(id=acc, nickname=f"overquota-{i}", daily_limits={"likes": 50, "comments": 20, "follows": 20, "dms": 10, "replies": 15})
+        db.add(account)
+        db.commit()
+        stats_service.increment(db, acc, "search_like", count=50)
+        task_service.create_task(db, TaskType.SEARCH_LIKE, acc, {"keyword": "test"})
+
+    claimed = task_service.get_pending_task(db, "dev-overquota")
+    assert claimed is None

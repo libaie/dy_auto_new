@@ -1,6 +1,5 @@
 // device/handlers/search-comment.js
 var SearchBaseHandler = require("./search-base");
-var antiDetect = require("../core/anti-detect");
 var logger = require("../utils/logger");
 
 var TAG = "SEARCH_COMMENT";

@@ -74,9 +74,6 @@ SearchBaseHandler.execute = function (params) {
       stats.success_count++;
     } else {
       stats.fail_count++;
-      // 互动失败时清理页面状态，确保回到搜索结果
-      this._goBack();
-      sleep(1000);
     }
 
     // 返回搜索结果列表

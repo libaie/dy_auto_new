@@ -1,6 +1,5 @@
 // device/handlers/search-dm.js
 var SearchBaseHandler = require("./search-base");
-var uiOperator = require("../core/ui-operator");
 var logger = require("../utils/logger");
 
 var TAG = "SEARCH_DM";

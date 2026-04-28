@@ -98,17 +98,115 @@ var antiDetect = {
   },
 
   /**
+   * 检查当前是否在活跃时间窗口内
+   * @returns {boolean}
+   */
+  isActiveHour: function () {
+    var hour = new Date().getHours();
+    var hours = settings.activeHours;
+    if (!hours) return true; // 未配置则不限制
+    return hour >= hours.start && hour < hours.end;
+  },
+
+  /**
+   * 获取当前时段的操作建议延迟倍率
+   * 高峰时段延迟短、低谷时段延迟长
+   * @returns {number} 倍率 (0.5 ~ 2.0)
+   */
+  getTimeMultiplier: function () {
+    var hour = new Date().getHours();
+    var hours = settings.activeHours;
+    if (!hours || !hours.peaks) return 1.0;
+
+    for (var i = 0; i < hours.peaks.length; i++) {
+      var peak = hours.peaks[i];
+      if (hour >= peak.start && hour < peak.end) {
+        // 高峰时段：权重越高，延迟越短
+        return Math.max(0.5, 1.0 - (peak.weight / 100));
+      }
+    }
+    // 非高峰时段：延迟稍长
+    return 1.5;
+  },
+
+  /**
+   * 增强的拟人滑动 — 带速度变化和微抖动
+   * @param {number} startX
+   * @param {number} startY
+   * @param {number} endX
+   * @param {number} endY
+   */
+  humanSwipeEnhanced: function (startX, startY, endX, endY) {
+    // 添加起点微抖动（手指按下时不完全静止）
+    var jitterX = Math.floor(Math.random() * 6 - 3);
+    var jitterY = Math.floor(Math.random() * 6 - 3);
+    startX += jitterX;
+    startY += jitterY;
+
+    // 滑动距离越长，速度越快
+    var distance = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
+    var speedFactor = Math.min(1.5, distance / 500);
+
+    var path = bezier.generateSwipePath(startX, startY, endX, endY);
+    logger.debug(TAG, "Enhanced swipe: " + path.length + " points, speed=" + speedFactor.toFixed(2));
+
+    var gesturePoints = path.map(function (p) {
+      return [p.x, p.y];
+    });
+
+    var totalDuration = path.reduce(function (sum, p) {
+      return sum + Math.round(p.duration / speedFactor);
+    }, 0);
+
+    var args = [totalDuration];
+    for (var i = 0; i < gesturePoints.length; i++) {
+      args.push(gesturePoints[i]);
+    }
+    gestures.apply(null, args);
+  },
+
+  /**
+   * 模拟随机点击偏移 — 不总是精确点击控件中心
+   * @param {number} centerX - 控件中心 X
+   * @param {number} centerY - 控件中心 Y
+   * @param {number} radius - 偏移半径（像素），默认 10
+   * @returns {{x: number, y: number}}
+   */
+  randomClickOffset: function (centerX, centerY, radius) {
+    radius = radius || 10;
+    var angle = Math.random() * Math.PI * 2;
+    var r = Math.random() * radius;
+    return {
+      x: Math.round(centerX + r * Math.cos(angle)),
+      y: Math.round(centerY + r * Math.sin(angle)),
+    };
+  },
+
+  /**
    * 包装一个操作，自动添加反检测行为
    * @param {string} actionName
    * @param {Function} actionFn - 实际操作函数
    * @returns {*} 操作返回值
    */
   wrapAction: function (actionName, actionFn) {
+    // 时间窗口检查
+    if (!this.isActiveHour()) {
+      logger.info(TAG, "Outside active hours, adding long delay");
+      sleep(Math.floor(Math.random() * 60000 + 30000)); // 30-90秒
+      return false;
+    }
+
+    var timeMultiplier = this.getTimeMultiplier();
     this.randomDelay(actionName);
+
+    // 概率跳过（低谷时段偶尔跳过操作，更像真人）
+    if (Math.random() < 0.05 * timeMultiplier) {
+      logger.info(TAG, "Skipping action (rhythm variation)");
+      return false;
+    }
+
     this.maybePause();
-
     var result = actionFn();
-
     this.postActionDelay();
     return result;
   },

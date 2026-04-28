@@ -26,6 +26,18 @@ var config = {
     // 随机停顿时长范围（毫秒）
     pauseMin: 5000,
     pauseMax: 15000,
+    // 操作时间窗口（24小时制，模拟真实用户活跃时段）
+    activeHours: {
+      start: 7,    // 早上7点开始
+      end: 23,     // 晚上11点结束
+      // 各时段权重（模拟早中晚高峰）
+      peaks: [
+        { start: 7, end: 9, weight: 20 },    // 早高峰
+        { start: 11, end: 13, weight: 25 },   // 午间
+        { start: 17, end: 20, weight: 30 },   // 晚高峰
+        { start: 20, end: 23, weight: 25 },   // 晚间
+      ],
+    },
   },
 
   // 代理配置（从服务端 poll 响应获取后动态设置）

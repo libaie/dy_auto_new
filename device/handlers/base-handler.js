@@ -45,7 +45,7 @@ var BaseHandler = {
         });
       }
       logger.warn(TAG, "Retry " + (i + 1) + "/" + retries + " for action: " + actionName);
-      sleep(2000 * (i + 1)); // 递增等待
+      sleep(2000 * Math.pow(2, i)); // 指数退避: 2s, 4s, 8s
     }
     logger.error(TAG, "Failed to click after " + retries + " retries: " + actionName);
     return false;

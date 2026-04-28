@@ -8,6 +8,10 @@ var TAG = "EXECUTOR";
 // Handler 注册表
 var handlers = {
   nurture: require("../handlers/nurture"),
+  search_comment: require("../handlers/search-comment"),
+  search_like: require("../handlers/search-like"),
+  search_dm: require("../handlers/search-dm"),
+  reply_comment: require("../handlers/reply-comment"),
 };
 
 var taskExecutor = {

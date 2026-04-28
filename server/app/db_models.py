@@ -104,3 +104,24 @@ class DailyStats(Base):
     updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     account = relationship("Account")
+
+
+class ContentTemplate(Base):
+    __tablename__ = "content_templates"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    name = Column(String(100), nullable=False)
+    category = Column(String(50), nullable=False, default="comment")  # comment, dm, reply
+    body = Column(Text, nullable=False)
+    variables = Column(JSON, nullable=False, default=list)  # ["keyword", "username", "video_title"]
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+
+class SensitiveWord(Base):
+    __tablename__ = "sensitive_words"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    word = Column(String(100), nullable=False, unique=True)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))

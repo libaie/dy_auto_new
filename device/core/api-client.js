@@ -98,7 +98,7 @@ var apiClient = {
    * 发送心跳
    */
   heartbeat: function () {
-    this.post("/api/device/heartbeat?device_id=" + config.deviceId, {});
+    return this.post("/api/device/heartbeat", { device_id: config.deviceId });
   },
 
   /**

@@ -4,6 +4,8 @@ var apiClient = require("./core/api-client");
 var selectorLoader = require("./core/selector-loader");
 var taskExecutor = require("./core/task-executor");
 var logger = require("./utils/logger");
+var updateChecker = require("./core/update-checker");
+var crashRecovery = require("./core/crash-recovery");
 
 var TAG = "MAIN";
 
@@ -11,10 +13,38 @@ var TAG = "MAIN";
  * 主循环
  */
 function main() {
-  logger.info(TAG, "=== 抖音自动化助手 MVP 启动 ===");
+  logger.info(TAG, "=== 抖音自动化助手 启动 ===");
   logger.info(TAG, "Device ID: " + config.deviceId);
   logger.info(TAG, "Server: " + config.serverUrl);
   logger.info(TAG, "Poll interval: " + config.pollInterval + "ms");
+
+  // 检查脚本更新（启动时检查一次）
+  try {
+    var updated = updateChecker.checkAndUpdate();
+    if (updated) {
+      logger.info(TAG, "Script updated, restart to use new version");
+    }
+  } catch (e) {
+    logger.warn(TAG, "Update check failed: " + e.message);
+  }
+
+  // 设备注册（首次启动或重启后）
+  try {
+    var deviceInfo = {
+      device_id: config.deviceId,
+      name: device.model + " (" + device.brand + ")",
+      os_version: device.release,
+      app_version: "1.0.0",
+    };
+    var regResult = apiClient.register(deviceInfo);
+    if (regResult) {
+      logger.info(TAG, "Device registered: " + JSON.stringify(regResult));
+    } else {
+      logger.warn(TAG, "Device registration failed, continuing anyway");
+    }
+  } catch (e) {
+    logger.warn(TAG, "Registration error: " + e.message);
+  }
 
   // 初始化选择器
   selectorLoader.init();
@@ -33,6 +63,13 @@ function main() {
 
   while (true) {
     try {
+      // 健康检查
+      if (!crashRecovery.healthCheck()) {
+        logger.warn(TAG, "Health check failed, skipping this cycle");
+        sleep(config.pollInterval);
+        continue;
+      }
+
       // 轮询任务
       var response = apiClient.poll();
 

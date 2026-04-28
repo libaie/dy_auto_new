@@ -4,7 +4,8 @@ from contextlib import asynccontextmanager
 
 from app.database import get_db, init_db
 from app.seed import seed_all
-from app.routers import device, tasks, accounts, devices, auth, selectors, stats
+from app.routers import device, tasks, accounts, devices, auth, selectors, stats, content
+from app.services.ai_generator import ai_generator
 
 
 @asynccontextmanager
@@ -14,6 +15,7 @@ async def lifespan(app: FastAPI):
     if get_db not in app.dependency_overrides:
         seed_all()
     yield
+    await ai_generator.aclose()
 
 
 app = FastAPI(
@@ -29,6 +31,7 @@ app.include_router(devices.router)
 app.include_router(auth.router)
 app.include_router(selectors.router)
 app.include_router(stats.router)
+app.include_router(content.router)
 
 
 @app.get("/health")

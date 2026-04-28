@@ -1,0 +1,65 @@
+# UI 选择器配置 — 抖音 UI 变更时在此修改
+# 策略类型: text(控件文本), id(控件ID), desc(内容描述), coordinate(坐标百分比)
+version: 1
+selectors:
+  - action_name: "open_app"
+    strategies:
+      - { type: "package", value: "com.ss.android.ugc.aweme", priority: 1 }
+
+  - action_name: "search_tab"
+    strategies:
+      - { type: "text", value: "搜索", priority: 1 }
+      - { type: "id", value: "com.ss.android.ugc.aweme:id/et_search_kw", priority: 2 }
+      - { type: "desc", value: "搜索", priority: 3 }
+
+  - action_name: "search_input"
+    strategies:
+      - { type: "id", value: "com.ss.android.ugc.aweme:id/et_search_kw", priority: 1 }
+      - { type: "className", value: "android.widget.EditText", priority: 2 }
+
+  - action_name: "search_button"
+    strategies:
+      - { type: "text", value: "搜索", priority: 1 }
+      - { type: "desc", value: "搜索", priority: 2 }
+
+  - action_name: "like_button"
+    strategies:
+      - { type: "text", value: "赞", priority: 1 }
+      - { type: "desc", value: "点赞", priority: 2 }
+      - { type: "id", value: "com.ss.android.ugc.aweme:id/like_icon", priority: 3 }
+
+  - action_name: "comment_input"
+    strategies:
+      - { type: "text", value: "善语结善缘，恶语伤人心", priority: 1 }
+      - { type: "id", value: "com.ss.android.ugc.aweme:id/comment_et", priority: 2 }
+      - { type: "desc", value: "评论", priority: 3 }
+
+  - action_name: "comment_submit"
+    strategies:
+      - { type: "text", value: "发送", priority: 1 }
+      - { type: "desc", value: "发送", priority: 2 }
+
+  - action_name: "follow_button"
+    strategies:
+      - { type: "text", value: "关注", priority: 1 }
+      - { type: "desc", value: "关注", priority: 2 }
+
+  - action_name: "profile_more"
+    strategies:
+      - { type: "desc", value: "更多", priority: 1 }
+      - { type: "id", value: "com.ss.android.ugc.aweme:id/detail_right_arrow", priority: 2 }
+
+  - action_name: "message_button"
+    strategies:
+      - { type: "text", value: "私信", priority: 1 }
+      - { type: "desc", value: "私信", priority: 2 }
+
+  - action_name: "dm_input"
+    strategies:
+      - { type: "id", value: "com.ss.android.ugc.aweme:id/et_input", priority: 1 }
+      - { type: "className", value: "android.widget.EditText", priority: 2 }
+
+  - action_name: "dm_send"
+    strategies:
+      - { type: "text", value: "发送", priority: 1 }
+      - { type: "desc", value: "发送", priority: 2 }

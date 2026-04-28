@@ -1,0 +1,26 @@
+# 任务模板 — 预定义常用任务配置
+task_templates:
+  - name: "养号30分钟"
+    type: "nurture"
+    params:
+      duration: 30
+      actions:
+        - type: "browse_feed"
+          weight: 70
+        - type: "like"
+          weight: 20
+        - type: "follow"
+          weight: 10
+
+  - name: "搜索关键词评论"
+    type: "search_comment"
+    params:
+      keyword: ""
+      count: 10
+      content_template_id: ""
+
+  - name: "搜索关键词点赞"
+    type: "search_like"
+    params:
+      keyword: ""
+      count: 20

@@ -67,3 +67,30 @@ def test_max_retries(db):
 def test_list_tasks(db):
     tasks = task_service.list_tasks(db)
     assert len(tasks) > 0
+
+
+def test_get_nonexistent_task(db):
+    task = task_service.get_task(db, "nonexistent-id")
+    assert task is None
+
+
+def test_report_result_nonexistent_task(db):
+    with pytest.raises(ValueError, match="not found"):
+        task_service.report_result(db, "nonexistent-id", TaskStatus.COMPLETED)
+
+
+def test_list_tasks_with_pagination(db):
+    tasks_page1 = task_service.list_tasks(db, skip=0, limit=2)
+    tasks_page2 = task_service.list_tasks(db, skip=2, limit=2)
+    assert len(tasks_page1) <= 2
+    # Pages should not overlap (if enough tasks exist)
+    if len(tasks_page1) == 2 and len(tasks_page2) > 0:
+        assert tasks_page1[0].id != tasks_page2[0].id
+
+
+def test_count_tasks(db):
+    total = task_service.count_tasks(db)
+    assert total > 0
+    pending_count = task_service.count_tasks(db, status=TaskStatus.PENDING)
+    assert pending_count >= 0
+    assert pending_count <= total

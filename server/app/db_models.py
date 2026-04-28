@@ -3,8 +3,8 @@ import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import (
-    Column, String, Integer, Float, DateTime, Text, Boolean,
-    JSON, ForeignKey, Enum as SAEnum, event,
+    Column, String, Integer, DateTime, Text, Boolean,
+    JSON, ForeignKey,
 )
 from sqlalchemy.orm import DeclarativeBase, relationship
 

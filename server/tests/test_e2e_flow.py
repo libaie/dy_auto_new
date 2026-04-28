@@ -70,3 +70,27 @@ def test_heartbeat():
     resp = client.post("/api/device/heartbeat", json={"device_id": "dev-test"}, headers=HEADERS)
     assert resp.status_code == 200
     assert resp.json()["status"] == "ok"
+
+
+def test_report_nonexistent_task():
+    resp = client.post("/api/device/report", json={
+        "task_id": "nonexistent-id",
+        "status": "completed",
+        "result": {},
+    }, headers=HEADERS)
+    assert resp.status_code == 404
+
+
+def test_list_tasks_with_status_filter():
+    resp = client.get("/api/tasks", params={"status": "pending"}, headers=HEADERS)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "tasks" in data
+    assert "total" in data
+    for task in data["tasks"]:
+        assert task["status"] == "pending"
+
+
+def test_get_nonexistent_task():
+    resp = client.get("/api/tasks/nonexistent-id", headers=HEADERS)
+    assert resp.status_code == 404

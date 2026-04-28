@@ -35,6 +35,7 @@ def list_tasks(
     db: Session = Depends(get_db),
     _: None = Depends(verify_device_secret),
 ):
+    limit = min(limit, 100)
     tasks = task_service.list_tasks(db=db, status=status, skip=skip, limit=limit)
     total = task_service.count_tasks(db=db, status=status)
     return {"tasks": tasks, "total": total}

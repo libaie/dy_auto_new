@@ -4,7 +4,6 @@ from pathlib import Path
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
-from contextlib import contextmanager
 
 from app.db_models import Base
 

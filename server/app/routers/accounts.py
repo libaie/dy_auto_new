@@ -67,6 +67,7 @@ def list_accounts(
     db: Session = Depends(get_db),
     _: None = Depends(verify_device_secret),
 ):
+    limit = min(limit, 100)
     total = db.query(Account).count()
     accounts = db.query(Account).order_by(Account.created_at.desc()).offset(skip).limit(limit).all()
     return {"accounts": [_account_to_dict(a) for a in accounts], "total": total}

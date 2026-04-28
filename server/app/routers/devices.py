@@ -65,6 +65,7 @@ def list_devices(
     db: Session = Depends(get_db),
     _: None = Depends(verify_device_secret),
 ):
+    limit = min(limit, 100)
     total = db.query(Device).count()
     devices = db.query(Device).order_by(Device.created_at.desc()).offset(skip).limit(limit).all()
     return {"devices": [_device_to_dict(d) for d in devices], "total": total}

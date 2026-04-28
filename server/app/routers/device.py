@@ -33,13 +33,16 @@ def report_result(
     db: Session = Depends(get_db),
     _: None = Depends(verify_device_secret),
 ):
-    task = task_service.report_result(
-        db=db,
-        task_id=report.task_id,
-        status=report.status,
-        result=report.result,
-        ui_snapshot=report.ui_snapshot,
-    )
+    try:
+        task = task_service.report_result(
+            db=db,
+            task_id=report.task_id,
+            status=report.status,
+            result=report.result,
+            ui_snapshot=report.ui_snapshot,
+        )
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Task not found")
     return task
 
 

@@ -29,19 +29,20 @@ def seed_accounts(db: Session) -> int:
     return added
 
 
-def seed_selectors(db: Session) -> int:
-    """Import selectors from selectors.yaml. Skips existing (by action_name + platform_version)."""
+def seed_selectors(db: Session) -> tuple[int, int]:
+    """Import selectors from selectors.yaml. Returns (added, updated) counts."""
     version, selectors = load_selectors_config()
     added = 0
+    updated = 0
     for sel in selectors:
         existing = db.query(UISelector).filter(
             UISelector.action_name == sel["action_name"],
             UISelector.platform_version == sel.get("platform_version", "default"),
         ).first()
         if existing:
-            # Update strategies and version if changed
             existing.strategies = sel["strategies"]
             existing.version = version
+            updated += 1
             continue
         db.add(UISelector(
             action_name=sel["action_name"],
@@ -51,7 +52,7 @@ def seed_selectors(db: Session) -> int:
         ))
         added += 1
     db.commit()
-    return added
+    return added, updated
 
 
 def seed_all():
@@ -60,8 +61,8 @@ def seed_all():
     db = SessionLocal()
     try:
         acc_count = seed_accounts(db)
-        sel_count = seed_selectors(db)
-        print(f"Seed complete: {acc_count} accounts added, {sel_count} selectors added")
+        sel_added, sel_updated = seed_selectors(db)
+        print(f"Seed complete: {acc_count} accounts added, {sel_added} selectors added, {sel_updated} selectors updated")
     finally:
         db.close()
 

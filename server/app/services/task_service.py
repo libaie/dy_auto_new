@@ -71,7 +71,7 @@ class TaskService:
         result = db.execute(
             update(DBTask)
             .where(DBTask.id == db_task.id, DBTask.status == TaskStatus.PENDING.value)
-            .values(status=TaskStatus.RUNNING.value, device_id=device_id, started_at=datetime.now())
+            .values(status=TaskStatus.RUNNING.value, device_id=device_id, started_at=datetime.now(timezone.utc))
         )
         db.commit()
 
@@ -97,13 +97,13 @@ class TaskService:
         if status == TaskStatus.COMPLETED:
             db_task.status = TaskStatus.COMPLETED.value
             db_task.result = result
-            db_task.completed_at = datetime.now()
+            db_task.completed_at = datetime.now(timezone.utc)
         elif status == TaskStatus.FAILED:
             db_task.retry_count += 1
             if db_task.retry_count >= MAX_RETRIES:
                 db_task.status = TaskStatus.FAILED.value
                 db_task.result = result
-                db_task.completed_at = datetime.now()
+                db_task.completed_at = datetime.now(timezone.utc)
             else:
                 db_task.status = TaskStatus.PENDING.value  # re-queue for retry
                 db_task.device_id = None

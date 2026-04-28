@@ -65,3 +65,26 @@ def load_tasks_from_file() -> list[dict[str, Any]]:
     import json
     with open(filepath, "r", encoding="utf-8") as f:
         return json.load(f)
+
+
+# 反检测默认配置（可通过环境变量覆盖）
+ANTI_DETECT_CONFIG_VERSION = 1  # 修改配置时递增此版本号
+
+ANTI_DETECT_CONFIG = {
+    "delay_min": 1000,
+    "delay_max": 5000,
+    "rhythm_variation": 0.3,
+    "pause_probability": 0.1,
+    "pause_min": 5000,
+    "pause_max": 15000,
+    "active_hours": {
+        "start": 7,
+        "end": 23,
+        "peaks": [
+            {"start": 7, "end": 9, "weight": 20},
+            {"start": 11, "end": 13, "weight": 25},
+            {"start": 17, "end": 20, "weight": 30},
+            {"start": 20, "end": 23, "weight": 25},
+        ],
+    },
+}

@@ -83,6 +83,8 @@ class PollResponse(BaseModel):
     selectors_version: int = 1
     proxy: Optional[dict[str, Any]] = None
     cancelled_task_id: Optional[str] = None
+    anti_detect_config: Optional[dict[str, Any]] = None
+    anti_detect_config_version: int = 1
 
 
 class DeviceRegisterRequest(BaseModel):

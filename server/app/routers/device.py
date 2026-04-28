@@ -8,6 +8,7 @@ from app.models import TaskResultReport, PollResponse, DeviceRegisterRequest, Ri
 from app.database import get_db
 from app.deps import verify_device_secret
 from app.services.task_service import task_service
+from app.config import ANTI_DETECT_CONFIG, ANTI_DETECT_CONFIG_VERSION
 from app.services.selector_service import selector_service
 
 router = APIRouter(prefix="/api/device", tags=["device"])
@@ -33,6 +34,8 @@ def poll_tasks(
         selectors_version=version,
         proxy=proxy,
         cancelled_task_id=cancelled_task.id if cancelled_task else None,
+        anti_detect_config=ANTI_DETECT_CONFIG,
+        anti_detect_config_version=ANTI_DETECT_CONFIG_VERSION,
     )
 
 

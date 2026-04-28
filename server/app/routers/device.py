@@ -157,7 +157,7 @@ def report_risk(
     return {"status": "acknowledged", "account_status": account.status}
 
 
-@router.post("/generate-content")
+@router.post("/generate-content", response_model=DeviceGenerateResponse)
 async def generate_content(
     request: DeviceGenerateRequest,
     db: Session = Depends(get_db),

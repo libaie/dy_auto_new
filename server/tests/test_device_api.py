@@ -56,6 +56,25 @@ def test_device_auth_required():
 class TestGenerateContent:
     """Tests for POST /api/device/generate-content."""
 
+    def test_generate_content_success(self, db):
+        """Happy path: returns generated content with correct shape."""
+        from unittest.mock import patch, AsyncMock
+        from app.services.content_service import content_service
+        tpl = content_service.create_template(
+            db, name="happy-test", body="关于{keyword}的评论",
+            category="comment", variables=["keyword"],
+        )
+        with patch("app.services.content_service.ContentService.generate_from_template",
+                    new_callable=AsyncMock, return_value="AI生成的好内容"):
+            resp = client.post("/api/device/generate-content", json={
+                "template_id": tpl.id,
+                "context": {"keyword": "美食"},
+            }, headers=HEADERS)
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["content"] == "AI生成的好内容"
+            assert data["template_id"] == tpl.id
+
     def test_generate_content_no_template(self):
         """Returns 404 when template doesn't exist."""
         resp = client.post("/api/device/generate-content", json={

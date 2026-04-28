@@ -74,6 +74,11 @@ function main() {
       var response = apiClient.poll();
 
       if (response) {
+        // 应用代理配置
+        if (response.proxy) {
+          apiClient.setProxy(response.proxy);
+        }
+
         // 检查选择器版本
         if (response.selectors_version) {
           selectorLoader.checkAndUpdate(response.selectors_version);

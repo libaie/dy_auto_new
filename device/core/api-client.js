@@ -16,6 +16,38 @@ var isOnline = true;
 
 var apiClient = {
   /**
+   * 应用代理配置到 HTTP 请求
+   * @param {Object} proxyConfig - { type, host, port, username, password }
+   */
+  setProxy: function (proxyConfig) {
+    if (!proxyConfig || !proxyConfig.host) {
+      logger.info(TAG, "No proxy configured");
+      config.proxy = null;
+      return;
+    }
+
+    config.proxy = proxyConfig;
+    logger.info(TAG, "Proxy configured: " + proxyConfig.type + "://" +
+      proxyConfig.host + ":" + proxyConfig.port);
+  },
+
+  /**
+   * 获取当前代理配置的 HTTP 选项
+   * @returns {Object} 适合 http.get/http.post 的选项
+   */
+  _getProxyOptions: function () {
+    if (!config.proxy) return {};
+
+    var proxy = config.proxy;
+    var proxyUrl = proxy.type + "://" + proxy.host + ":" + proxy.port;
+    if (proxy.username) {
+      proxyUrl = proxy.type + "://" + proxy.username + ":" + proxy.password +
+        "@" + proxy.host + ":" + proxy.port;
+    }
+    return { proxy: proxyUrl };
+  },
+
+  /**
    * 计算重试延迟（指数退避 + 抖动）
    */
   _retryDelay: function (attempt) {
@@ -43,6 +75,11 @@ var apiClient = {
           headers: { "X-Device-Secret": config.deviceSecret },
           timeout: timeout,
         };
+        // 合并代理配置
+        var proxyOpts = this._getProxyOptions();
+        for (var pk in proxyOpts) {
+          reqOpts[pk] = proxyOpts[pk];
+        }
         if (method === "POST") {
           reqOpts.headers["Content-Type"] = "application/json";
           reqOpts.body = JSON.stringify(body);

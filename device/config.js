@@ -28,6 +28,12 @@ var config = {
     pauseMax: 15000,
   },
 
+  // 代理配置（从服务端 poll 响应获取后动态设置）
+  proxy: null,  // { type: "http", host: "...", port: 8080, username: "...", password: "..." }
+
+  // 反检测配置版本（用于增量更新）
+  antiDetectVersion: 0,
+
   // 日志级别: "debug", "info", "warn", "error"
   logLevel: "info",
 

@@ -3,7 +3,8 @@ from fastapi import APIRouter, HTTPException
 
 from app.models import LoginRequest, LoginResponse
 from app.config import ADMIN_USERNAME, ADMIN_PASSWORD
-from app.deps import create_admin_token, JWT_EXPIRE_HOURS
+from app.deps import create_admin_token
+from app.config import JWT_EXPIRE_HOURS
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 

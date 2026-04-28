@@ -69,6 +69,8 @@ def test_delete_device():
 
 
 def test_auth_required():
+    from app.deps import verify_admin_token
+    app.dependency_overrides.pop(verify_admin_token, None)
     resp = client.get("/api/devices")
     assert resp.status_code == 401
 

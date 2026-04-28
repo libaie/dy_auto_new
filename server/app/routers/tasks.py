@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.models import TaskCreateRequest, TaskStatus
 from app.database import get_db
-from app.deps import verify_device_secret
+from app.deps import verify_admin_token
 from app.services.task_service import task_service
 
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
@@ -15,7 +15,7 @@ router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 def create_task(
     request: TaskCreateRequest,
     db: Session = Depends(get_db),
-    _: None = Depends(verify_device_secret),
+    _: str = Depends(verify_admin_token),
 ):
     task = task_service.create_task(
         db=db,
@@ -33,7 +33,7 @@ def list_tasks(
     skip: int = 0,
     limit: int = 50,
     db: Session = Depends(get_db),
-    _: None = Depends(verify_device_secret),
+    _: str = Depends(verify_admin_token),
 ):
     limit = min(limit, 100)
     tasks = task_service.list_tasks(db=db, status=status, skip=skip, limit=limit)
@@ -45,7 +45,7 @@ def list_tasks(
 def get_task(
     task_id: str,
     db: Session = Depends(get_db),
-    _: None = Depends(verify_device_secret),
+    _: str = Depends(verify_admin_token),
 ):
     task = task_service.get_task(db=db, task_id=task_id)
     if not task:
@@ -57,7 +57,7 @@ def get_task(
 def cancel_task(
     task_id: str,
     db: Session = Depends(get_db),
-    _: None = Depends(verify_device_secret),
+    _: str = Depends(verify_admin_token),
 ):
     try:
         task = task_service.cancel_task(db=db, task_id=task_id)

@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.db_models import Account
-from app.deps import verify_device_secret
+from app.deps import verify_admin_token
 
 router = APIRouter(prefix="/api/accounts", tags=["accounts"])
 
@@ -45,7 +45,7 @@ def _account_to_dict(acc: Account) -> dict:
 def create_account(
     request: AccountCreateRequest,
     db: Session = Depends(get_db),
-    _: None = Depends(verify_device_secret),
+    _: str = Depends(verify_admin_token),
 ):
     acc = Account(
         nickname=request.nickname,
@@ -65,7 +65,7 @@ def list_accounts(
     skip: int = 0,
     limit: int = 50,
     db: Session = Depends(get_db),
-    _: None = Depends(verify_device_secret),
+    _: str = Depends(verify_admin_token),
 ):
     limit = min(limit, 100)
     total = db.query(Account).count()
@@ -77,7 +77,7 @@ def list_accounts(
 def get_account(
     account_id: str,
     db: Session = Depends(get_db),
-    _: None = Depends(verify_device_secret),
+    _: str = Depends(verify_admin_token),
 ):
     acc = db.query(Account).filter(Account.id == account_id).first()
     if not acc:
@@ -90,7 +90,7 @@ def update_account(
     account_id: str,
     request: AccountUpdateRequest,
     db: Session = Depends(get_db),
-    _: None = Depends(verify_device_secret),
+    _: str = Depends(verify_admin_token),
 ):
     acc = db.query(Account).filter(Account.id == account_id).first()
     if not acc:
@@ -118,7 +118,7 @@ def update_account(
 def delete_account(
     account_id: str,
     db: Session = Depends(get_db),
-    _: None = Depends(verify_device_secret),
+    _: str = Depends(verify_admin_token),
 ):
     acc = db.query(Account).filter(Account.id == account_id).first()
     if not acc:

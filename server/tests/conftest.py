@@ -41,6 +41,15 @@ def test_db():
     test_engine.dispose()
 
 
+@pytest.fixture(autouse=True)
+def admin_auth_override():
+    """Override admin auth for all tests to pass without JWT."""
+    from app.deps import verify_admin_token
+    app.dependency_overrides[verify_admin_token] = lambda: "test-user"
+    yield
+    app.dependency_overrides.pop(verify_admin_token, None)
+
+
 @pytest.fixture
 def db():
     """Get a test DB session from the conftest override."""

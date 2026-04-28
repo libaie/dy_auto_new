@@ -2,7 +2,8 @@
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app
-from app.config import ADMIN_USERNAME, ADMIN_PASSWORD
+from app.config import ADMIN_USERNAME, ADMIN_PASSWORD, DEVICE_SECRET
+from app.deps import verify_admin_token
 
 
 @pytest.fixture
@@ -43,7 +44,6 @@ def test_expired_token_rejected(client):
     import jwt
     from datetime import datetime, timedelta, timezone
     from app.config import JWT_SECRET
-    from app.deps import verify_admin_token
     from fastapi import HTTPException
 
     # Create a token that expired 1 hour ago
@@ -63,23 +63,54 @@ def test_expired_token_rejected(client):
 
 def test_protected_endpoint_no_token(client):
     """Admin endpoints should require JWT token."""
+    # Remove the autouse override to test actual auth enforcement
+    app.dependency_overrides.pop(verify_admin_token, None)
     response = client.get("/api/accounts")
-    # Currently uses verify_device_secret, will change in Task 3
-    # For now just verify the login endpoint works
-    assert response.status_code in (401, 200)
+    assert response.status_code == 401
 
 
 def test_protected_endpoint_with_token(client):
     """Admin endpoints should accept valid JWT token."""
+    # Remove the autouse override so real auth runs
+    app.dependency_overrides.pop(verify_admin_token, None)
     login = client.post("/api/auth/login", json={
         "username": ADMIN_USERNAME,
         "password": ADMIN_PASSWORD,
     })
     token = login.json()["token"]
-
-    # After Task 3, this should work with Bearer token
     response = client.get("/api/accounts", headers={
         "Authorization": f"Bearer {token}",
     })
-    # May still return 401 until Task 3 switches auth — that's OK
-    assert response.status_code in (200, 401)
+    assert response.status_code == 200
+
+
+def test_accounts_requires_admin_token(client):
+    """Accounts CRUD should require admin JWT token."""
+    # Remove the autouse override to test actual auth enforcement
+    app.dependency_overrides.pop(verify_admin_token, None)
+    response = client.get("/api/accounts")
+    assert response.status_code == 401
+
+
+def test_devices_requires_admin_token(client):
+    """Devices CRUD should require admin JWT token."""
+    # Remove the autouse override to test actual auth enforcement
+    app.dependency_overrides.pop(verify_admin_token, None)
+    response = client.get("/api/devices")
+    assert response.status_code == 401
+
+
+def test_tasks_requires_admin_token(client):
+    """Tasks CRUD should require admin JWT token."""
+    # Remove the autouse override to test actual auth enforcement
+    app.dependency_overrides.pop(verify_admin_token, None)
+    response = client.get("/api/tasks")
+    assert response.status_code == 401
+
+
+def test_device_api_still_uses_secret(client):
+    """Device-facing endpoints should still use device secret, not JWT."""
+    response = client.get("/api/device/poll", params={"device_id": "test"}, headers={
+        "X-Device-Secret": DEVICE_SECRET,
+    })
+    assert response.status_code == 200

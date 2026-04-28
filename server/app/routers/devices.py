@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.db_models import Device
-from app.deps import verify_device_secret
+from app.deps import verify_admin_token
 
 router = APIRouter(prefix="/api/devices", tags=["devices"])
 
@@ -44,7 +44,7 @@ def _device_to_dict(dev: Device) -> dict:
 def create_device(
     request: DeviceCreateRequest,
     db: Session = Depends(get_db),
-    _: None = Depends(verify_device_secret),
+    _: str = Depends(verify_admin_token),
 ):
     dev = Device(
         name=request.name,
@@ -63,7 +63,7 @@ def list_devices(
     skip: int = 0,
     limit: int = 50,
     db: Session = Depends(get_db),
-    _: None = Depends(verify_device_secret),
+    _: str = Depends(verify_admin_token),
 ):
     limit = min(limit, 100)
     total = db.query(Device).count()
@@ -75,7 +75,7 @@ def list_devices(
 def get_device(
     device_id: str,
     db: Session = Depends(get_db),
-    _: None = Depends(verify_device_secret),
+    _: str = Depends(verify_admin_token),
 ):
     dev = db.query(Device).filter(Device.id == device_id).first()
     if not dev:
@@ -88,7 +88,7 @@ def update_device(
     device_id: str,
     request: DeviceUpdateRequest,
     db: Session = Depends(get_db),
-    _: None = Depends(verify_device_secret),
+    _: str = Depends(verify_admin_token),
 ):
     dev = db.query(Device).filter(Device.id == device_id).first()
     if not dev:
@@ -114,7 +114,7 @@ def update_device(
 def delete_device(
     device_id: str,
     db: Session = Depends(get_db),
-    _: None = Depends(verify_device_secret),
+    _: str = Depends(verify_admin_token),
 ):
     dev = db.query(Device).filter(Device.id == device_id).first()
     if not dev:

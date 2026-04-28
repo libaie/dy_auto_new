@@ -14,7 +14,6 @@ from app.models import (
 from app.database import get_db
 from app.deps import verify_admin_token
 from app.services.content_service import content_service
-from app.services.ai_generator import ai_generator
 
 router = APIRouter(prefix="/api/content", tags=["content"])
 
@@ -127,26 +126,17 @@ async def generate_content(
     db: Session = Depends(get_db),
     _: str = Depends(verify_admin_token),
 ):
-    tpl = content_service.get_template(db, request.template_id)
-    if not tpl:
-        raise HTTPException(status_code=404, detail="Template not found")
-
-    # Warn if context keys don't match template variables
-    if tpl.variables:
-        extra_keys = set(request.context.keys()) - set(tpl.variables)
-        if extra_keys:
-            logger.warning("Generate request has extra context keys not in template %s: %s", tpl.id, extra_keys)
-
-    # Substitute variables first
-    substituted = content_service.substitute_variables(tpl.body, request.context)
-
     try:
-        content = await ai_generator.generate(db, substituted, request.context)
+        content = await content_service.generate_from_template(
+            db, request.template_id, request.context,
+        )
+    except ValueError as e:
+        if "not found" in str(e):
+            raise HTTPException(status_code=404, detail="Template not found")
+        raise HTTPException(status_code=422, detail=str(e))
     except RuntimeError as e:
         if "not configured" in str(e):
             raise HTTPException(status_code=503, detail="AI service not configured. Set AI_API_KEY environment variable.")
         raise HTTPException(status_code=502, detail=f"AI service error: {e}")
-    except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
 
     return GenerateResponse(content=content, template_id=request.template_id)

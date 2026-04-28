@@ -170,8 +170,10 @@ async def generate_content(
         content = await content_service.generate_from_template(
             db, request.template_id, request.context,
         )
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Template not found")
+    except ValueError as e:
+        if "not found" in str(e):
+            raise HTTPException(status_code=404, detail="Template not found")
+        raise HTTPException(status_code=422, detail=str(e))
     except RuntimeError as e:
         if "not configured" in str(e):
             raise HTTPException(status_code=503, detail="AI service not configured")

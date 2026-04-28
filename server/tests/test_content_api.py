@@ -123,6 +123,21 @@ class TestSensitiveWordAPI:
 
 
 class TestGenerateAPI:
+    def test_generate_success(self, db):
+        """Happy path: admin generates content from template."""
+        from unittest.mock import patch, AsyncMock
+        tpl = _create_template(name="gen-happy", body="关于{keyword}的评论", variables=["keyword"])
+        with patch("app.services.content_service.ContentService.generate_from_template",
+                    new_callable=AsyncMock, return_value="好吃的内容"):
+            resp = client.post("/api/content/generate", json={
+                "template_id": tpl["id"],
+                "context": {"keyword": "美食"},
+            })
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["content"] == "好吃的内容"
+            assert data["template_id"] == tpl["id"]
+
     def test_generate_no_api_key(self):
         """Generate endpoint should return 503 when AI_API_KEY is not set."""
         tpl = _create_template(name="gen-test", body="关于{keyword}的评论", variables=["keyword"])

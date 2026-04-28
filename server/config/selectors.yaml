@@ -63,3 +63,14 @@ selectors:
     strategies:
       - { type: "text", value: "发送", priority: 1 }
       - { type: "desc", value: "发送", priority: 2 }
+
+  - action_name: "comment_reply_button"
+    strategies:
+      - { type: "text", value: "回复", priority: 1 }
+      - { type: "desc", value: "回复", priority: 2 }
+
+  - action_name: "video_author_avatar"
+    strategies:
+      - { type: "desc", value: "头像", priority: 1 }
+      - { type: "id", value: "com.ss.android.ugc.aweme:id/author_avatar", priority: 2 }
+      - { type: "coordinate", x_percent: 0.9, y_percent: 0.6, priority: 3 }

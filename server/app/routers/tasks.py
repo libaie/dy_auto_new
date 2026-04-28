@@ -1,9 +1,9 @@
-"""Minimal tasks router stub -- Task 7 will flesh this out."""
-from fastapi import APIRouter, HTTPException, Header
+"""Task management API -- create, list, get tasks."""
+from fastapi import APIRouter, HTTPException, Header, Query
 from typing import Optional
 
 from app.config import DEVICE_SECRET
-from app.models import TaskCreateRequest
+from app.models import TaskCreateRequest, TaskStatus
 from app.services.task_service import task_service
 
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
@@ -16,14 +16,36 @@ def _verify_device_secret(x_device_secret: Optional[str] = Header(None)):
 
 @router.post("")
 def create_task(
-    req: TaskCreateRequest,
-    x_device_secret: str = Header(..., alias="X-Device-Secret"),
+    request: TaskCreateRequest,
+    x_device_secret: Optional[str] = Header(None, alias="X-Device-Secret"),
 ):
     _verify_device_secret(x_device_secret)
     task = task_service.create_task(
-        task_type=req.type,
-        account_id=req.account_id,
-        params=req.params,
-        scheduled_at=req.scheduled_at,
+        task_type=request.type,
+        account_id=request.account_id,
+        params=request.params,
+        scheduled_at=request.scheduled_at,
     )
+    return task
+
+
+@router.get("")
+def list_tasks(
+    status: Optional[TaskStatus] = Query(None),
+    x_device_secret: Optional[str] = Header(None, alias="X-Device-Secret"),
+):
+    _verify_device_secret(x_device_secret)
+    tasks = task_service.list_tasks(status=status)
+    return {"tasks": tasks, "total": len(tasks)}
+
+
+@router.get("/{task_id}")
+def get_task(
+    task_id: str,
+    x_device_secret: Optional[str] = Header(None, alias="X-Device-Secret"),
+):
+    _verify_device_secret(x_device_secret)
+    task = task_service.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
     return task

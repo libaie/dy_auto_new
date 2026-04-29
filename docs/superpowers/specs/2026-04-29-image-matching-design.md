@@ -275,10 +275,82 @@ function captureForTemplate() {
 | 模板图片采集 | 手动采集首批模板（约 10-15 个） | 手工 |
 | 新增 `device/tools/capture-template.js` | 模板采集辅助脚本 | 小 |
 
-## 实施顺序
+## 实施顺序（审查后修订）
 
-1. **验证可行性**（1-2 天）— 手动截图裁剪模板，用 `images.findImage()` + 灰度跑通一次匹配
-2. **集成到 UI 操作层**（2-3 天）— 改造 ui-operator.js，在养号流程中实测
-3. **模板管理后端**（2-3 天）— 新增模板同步 API 和管理 CRUD
-4. **首批模板采集**（1 天）— 采集 10-15 个核心操作模板，配置 selectors.yaml
-5. **优化与稳定**（持续）— 多尺度调优、区域限定、置信度监控
+### 第一阶段：可行性验证 Spike（2 天）
+
+**目标**：在投入模板同步基础设施前，验证模板匹配和 OCR 的实际命中率。
+
+**实验 1：模板匹配精度测试**（1 天）
+1. 在小米 10 上打开抖音 5 个不同页面（首页、搜索页、视频详情、个人主页、排序弹窗）
+2. 每个页面截全屏，裁剪 5 个关键元素作为模板（点赞、关注、搜索、评论、排序选项）
+3. 用 `images.findImage()` + 灰度 + 多尺度 [0.9, 1.0, 1.1] 匹配
+4. 记录每个模板的命中率、置信度、匹配耗时
+5. 验证 `findImage()` 返回坐标语义（左上角 vs 中心）
+6. 测试暗色模式对灰度匹配的影响
+
+**实验 2：OCR 降级对比**（0.5 天）
+1. 对同样的 5 个页面，用 PaddleOCR 识别文字按钮
+2. 对比 OCR 命中率 vs 模板匹配命中率
+3. 确定哪些元素适合 OCR、哪些必须用模板匹配
+
+**实验 3：性能基准**（0.5 天）
+1. 在小米 10 上测试单次 `findImage()` 耗时（全屏 vs 限定区域）
+2. 测试多尺度匹配的总耗时
+3. 确定性能预算：图像匹配必须在 800ms 内完成
+
+**止损标准**：
+- 模板匹配命中率 < 85% → 重新评估方案，考虑 OCR 优先
+- 单次匹配耗时 > 1500ms → 减少尺度数量或放弃多尺度
+- 暗色模式命中率 < 70% → 需要明暗两套模板，重新评估维护成本
+
+### 第二阶段：根据 Spike 结果决定方向
+
+**路径 A**（命中率 > 85%）：按原方案推进
+1. 集成到 UI 操作层（2-3 天）
+2. 模板管理后端（2-3 天）
+3. 首批模板采集（1 天）
+4. 优化与稳定（持续）
+
+**路径 B**（命中率 < 85%，OCR 效果好）：OCR 优先方案
+1. 将 OCR 作为 image 之前的降级策略
+2. 仅对无文字的图标元素使用模板匹配
+3. 考虑 LLM-vision 作为最终降级
+
+**路径 C**（两者都差）：重新设计
+1. 调研 accessibility 树启发式方案
+2. 考虑 LLM-vision 定位器
+
+### 第三阶段：实现（无论哪个方向都必须解决的 CRITICAL 问题）
+
+1. **截图内存安全** — 实现 `withScreen(callback)` 包装器，强制 try/finally
+2. **路径遍历防护** — 模板下载端点文件名清理（禁止 `/`, `\`, `..`）
+3. **完整测试计划** — 单元测试（模板匹配、内存管理）+ 集成测试（同步协议）+ 安全测试（路径遍历）
+
+### 其他审查发现的修复
+
+| 问题 | 修复方案 | 阶段 |
+|------|---------|------|
+| 模板/选择器版本分裂 | 统一为单一 `config_version` | 第二阶段 |
+| findElement 签名变更 | 改用模块级 `_currentScreen` 属性 | 第二阶段 |
+| 模板读取失败处理 | `_findByImage` 内 try/catch + null 检查 | 第二阶段 |
+| 暗色模式 | 明暗两套模板或阈值调优 | Spike 后决定 |
+| findImage 坐标语义 | Spike 中验证，实现时加 templateWidth/2 | 第二阶段 |
+| 管理端认证 | 明确指定 `verify_admin_token` | 第二阶段 |
+| 模板上传验证 | 500KB 限制 + PNG magic bytes + 尺寸检查 | 第二阶段 |
+| 分辨率映射 | v1 只用多尺度，删除分辨率映射 | 设计简化 |
+| 屏幕截图权限检查 | 启动时检测，失败则禁用 image 策略 | 第二阶段 |
+
+---
+
+## GSTACK REVIEW REPORT
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| CEO Review | `/autoplan` | Scope & strategy | 1 | issues_open | 5 findings (1 CRITICAL, 3 HIGH, 1 MEDIUM) |
+| Eng Review | `/autoplan` | Architecture & tests (required) | 1 | issues_open | 17 findings (3 CRITICAL, 7 HIGH, 7 MEDIUM, 2 LOW) |
+| Design Review | skipped | No UI scope | 0 | — | — |
+| DX Review | skipped | No developer-facing scope | 0 | — | — |
+
+- **UNRESOLVED:** 22 findings total, 3 CRITICAL resolved via spike-first approach
+- **VERDICT:** ENG review found 3 critical issues (memory leak, no test plan, path traversal). All addressed in revised implementation plan. Spike-first approach accepted by user.

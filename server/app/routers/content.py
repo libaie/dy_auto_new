@@ -10,6 +10,7 @@ from app.models import (
     ContentTemplateCreate, ContentTemplateUpdate, ContentTemplateResponse,
     SensitiveWordCreate, SensitiveWordResponse,
     GenerateRequest, GenerateResponse,
+    KeywordMatrixRequest,
 )
 from app.database import get_db
 from app.deps import verify_admin_token
@@ -140,3 +141,18 @@ async def generate_content(
         raise HTTPException(status_code=502, detail=f"AI service error: {e}")
 
     return GenerateResponse(content=content, template_id=request.template_id)
+
+
+@router.post("/generate-keywords")
+async def generate_keywords(
+    request: KeywordMatrixRequest,
+    db: Session = Depends(get_db),
+    _: str = Depends(verify_admin_token),
+):
+    try:
+        keywords = await content_service.generate_keyword_matrix(request.keyword, request.count)
+    except RuntimeError as e:
+        if "not configured" in str(e):
+            raise HTTPException(status_code=503, detail="AI service not configured.")
+        raise HTTPException(status_code=502, detail=f"AI service error: {e}")
+    return {"keywords": keywords, "seed": request.keyword}

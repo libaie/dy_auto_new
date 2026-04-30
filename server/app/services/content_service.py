@@ -1,4 +1,5 @@
 """Content template and sensitive word service -- DB-backed."""
+import json
 import re
 from typing import Optional
 
@@ -176,6 +177,28 @@ class ContentService:
         """Delegate to the AI generator service."""
         from app.services.ai_generator import ai_generator
         return await ai_generator.generate(db, template_body, context)
+
+    # --- Keyword Matrix Generation ---
+
+    async def generate_keyword_matrix(self, keyword: str, count: int = 10) -> list[str]:
+        """Generate expanded keyword matrix from a seed keyword using AI."""
+        prompt = f"""基于关键词「{keyword}」，生成 {count} 个相关的抖音搜索关键词。
+要求：
+1. 包含同义词、长尾词、热门话题标签
+2. 适合抖音搜索场景
+3. 每个关键词 2-8 个字
+4. 只返回 JSON 数组格式，不要其他内容
+示例：["关键词1", "关键词2", "关键词3"]"""
+
+        from app.services.ai_generator import ai_generator
+        response = await ai_generator.generate(None, prompt, {})
+        try:
+            keywords = json.loads(response)
+            if isinstance(keywords, list):
+                return [str(k) for k in keywords][:count]
+        except (json.JSONDecodeError, TypeError):
+            pass
+        return [keyword]
 
 
 content_service = ContentService()

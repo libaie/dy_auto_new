@@ -93,3 +93,116 @@ class TestTaskCreationWithTemplate:
             })
             assert resp.status_code == 200
             mock_gen.assert_not_called()  # AI never called for nurture tasks
+
+
+class TestNurtureV2Params:
+    """Nurture V2 (sub_tasks) parameter validation."""
+
+    def test_create_nurture_v2_task(self):
+        resp = client.post("/api/tasks", json={
+            "type": "nurture",
+            "account_id": "acc-001",
+            "params": {
+                "sub_tasks": [
+                    {"type": "browse", "count": 5},
+                    {"type": "like", "count": 3},
+                ],
+                "completion_mode": "all",
+                "duration": 30,
+            },
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["params"]["sub_tasks"][0]["type"] == "browse"
+        assert data["params"]["completion_mode"] == "all"
+
+    def test_nurture_v2_empty_sub_tasks_rejected(self):
+        resp = client.post("/api/tasks", json={
+            "type": "nurture",
+            "account_id": "acc-001",
+            "params": {"sub_tasks": [], "duration": 30},
+        })
+        assert resp.status_code == 422
+
+    def test_nurture_v2_invalid_sub_task_type(self):
+        resp = client.post("/api/tasks", json={
+            "type": "nurture",
+            "account_id": "acc-001",
+            "params": {"sub_tasks": [{"type": "invalid_type", "count": 1}], "duration": 30},
+        })
+        assert resp.status_code == 422
+
+    def test_nurture_v2_count_exceeds_limit(self):
+        resp = client.post("/api/tasks", json={
+            "type": "nurture",
+            "account_id": "acc-001",
+            "params": {"sub_tasks": [{"type": "browse", "count": 200}], "duration": 30},
+        })
+        assert resp.status_code == 422
+
+    def test_nurture_v2_invalid_completion_mode(self):
+        resp = client.post("/api/tasks", json={
+            "type": "nurture",
+            "account_id": "acc-001",
+            "params": {"sub_tasks": [{"type": "browse", "count": 1}], "completion_mode": "invalid"},
+        })
+        assert resp.status_code == 422
+
+    def test_nurture_legacy_still_works(self):
+        resp = client.post("/api/tasks", json={
+            "type": "nurture",
+            "account_id": "acc-001",
+            "params": {"duration": 30},
+        })
+        assert resp.status_code == 200
+        assert resp.json()["params"]["duration"] == 30
+
+    def test_nurture_v2_with_content_template_id(self):
+        resp = client.post("/api/tasks", json={
+            "type": "nurture",
+            "account_id": "acc-001",
+            "params": {
+                "sub_tasks": [{"type": "comment", "count": 2, "content_template_id": "some-template-id"}],
+                "duration": 15,
+            },
+        })
+        assert resp.status_code == 200
+
+    def test_nurture_v2_duration_exceeds_limit(self):
+        resp = client.post("/api/tasks", json={
+            "type": "nurture",
+            "account_id": "acc-001",
+            "params": {"sub_tasks": [{"type": "browse", "count": 1}], "duration": 500},
+        })
+        assert resp.status_code == 422
+
+
+class TestChainTaskAssociation:
+    """Tasks created via chain should have chain_instance_id and step_order."""
+
+    def test_chain_task_has_instance_fields(self, db):
+        from app.db_models import Account, ChainTemplate, Task as DBTask
+        from app.services.chain_service import chain_service
+
+        existing = db.query(Account).filter(Account.id == "chain-task-acc").first()
+        if not existing:
+            db.add(Account(id="chain-task-acc", nickname="chain-task", daily_limits={
+                "likes": 50, "comments": 20, "follows": 20, "dms": 10, "replies": 15,
+            }))
+            db.commit()
+
+        tpl = ChainTemplate(name="chain-task-tpl", steps=[
+            {"step_order": 1, "type": "nurture", "params": {"duration": 5}},
+        ])
+        db.add(tpl)
+        db.commit()
+
+        chain_service.create_chain_instances(db, tpl.id, ["chain-task-acc"])
+
+        task = db.query(DBTask).filter(
+            DBTask.account_id == "chain-task-acc",
+            DBTask.chain_instance_id.isnot(None),
+        ).first()
+        assert task is not None
+        assert task.chain_instance_id is not None
+        assert task.step_order == 1

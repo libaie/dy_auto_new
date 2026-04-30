@@ -4,7 +4,8 @@ from fastapi import APIRouter, HTTPException, Query, Depends
 from typing import Optional
 from sqlalchemy.orm import Session
 
-from app.models import TaskCreateRequest, TaskStatus, TASK_PARAMS_VALIDATORS, KeywordMatrixRequest
+from pydantic import BaseModel
+from app.models import TaskCreateRequest, TaskStatus, TASK_PARAMS_VALIDATORS
 from app.database import get_db
 from app.db_models import Device
 from app.deps import verify_admin_token

@@ -41,3 +41,7 @@ export function generateContent(templateId, context) {
     context,
   })
 }
+
+export function generateKeywords(keyword, count = 10) {
+  return client.post('/content/generate-keywords', { keyword, count })
+}

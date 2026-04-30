@@ -48,13 +48,14 @@ class ChainService:
                 account_id=account_id,
                 current_step=1,
                 total_steps=total_steps,
-                status="running",
-                started_at=datetime.now(timezone.utc),
+                status="pending",
             )
             db.add(instance)
             db.flush()
 
             self._create_step_task(db, instance, 1, template)
+            instance.status = "running"
+            instance.started_at = datetime.now(timezone.utc)
             results["created"].append(account_id)
 
         db.commit()
@@ -97,6 +98,8 @@ class ChainService:
             else:
                 chain.current_step = next_step
                 chain.status = "running"
+                if not chain.started_at:
+                    chain.started_at = datetime.now(timezone.utc)
                 template = db.query(ChainTemplate).filter(ChainTemplate.id == chain.template_id).first()
                 if template:
                     self._create_step_task(db, chain, next_step, template)

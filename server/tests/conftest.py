@@ -55,6 +55,9 @@ def _isolate_test(test_db):
         session.query(model).delete()
     session.commit()
     session.close()
+    # Reset login rate limiter state (test_admin_auth.py fills it up)
+    from app.routers.auth import _failed_attempts
+    _failed_attempts.clear()
     yield
 
 

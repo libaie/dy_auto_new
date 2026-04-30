@@ -42,15 +42,47 @@ class Device(Base):
     name = Column(String(100), nullable=False)
     ip = Column(String(50), nullable=True)
     status = Column(String(20), nullable=False, default="offline")  # online, offline, maintenance
+    device_secret = Column(String(64), nullable=True, unique=True)  # per-device secret from pairing
     bound_account_id = Column(String(36), ForeignKey("accounts.id"), nullable=True)
     proxy_config = Column(JSON, nullable=True)  # {"type":"http","host":"...","port":8080,"username":"...","password":"..."}
     os_version = Column(String(50), nullable=True)
     app_version = Column(String(20), nullable=True)
+    screen_resolution = Column(String(30), nullable=True)  # e.g. "1080x2400"
+    sdk_version = Column(String(20), nullable=True)  # Android SDK version
+    total_memory = Column(Integer, nullable=True)  # total RAM in bytes
+    manufacturer = Column(String(50), nullable=True)  # e.g. "samsung"
+    product = Column(String(50), nullable=True)
+    device_model = Column(String(50), nullable=True)  # raw model string
+    hardware = Column(String(50), nullable=True)
+    display = Column(String(100), nullable=True)
     last_seen_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     tasks = relationship("Task", back_populates="device")
+
+
+class DevicePairRequest(Base):
+    __tablename__ = "device_pair_requests"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    pairing_token = Column(String(64), nullable=False, unique=True, index=True)
+    device_id = Column(String(36), nullable=False)        # device-generated ID
+    device_name = Column(String(100), nullable=False)     # device model name
+    os_version = Column(String(50), nullable=True)
+    app_version = Column(String(20), nullable=True)
+    screen_resolution = Column(String(30), nullable=True)
+    sdk_version = Column(String(20), nullable=True)
+    total_memory = Column(Integer, nullable=True)
+    manufacturer = Column(String(50), nullable=True)
+    product = Column(String(50), nullable=True)
+    device_model = Column(String(50), nullable=True)
+    hardware = Column(String(50), nullable=True)
+    display = Column(String(100), nullable=True)
+    status = Column(String(20), nullable=False, default="pending")  # pending, approved, rejected
+    device_secret = Column(String(64), nullable=True)     # generated on approval
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
 
 class Task(Base):
@@ -68,9 +100,12 @@ class Task(Base):
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    chain_instance_id = Column(String(36), ForeignKey("chain_instances.id"), nullable=True)
+    step_order = Column(Integer, nullable=True)
 
     account = relationship("Account", back_populates="tasks")
     device = relationship("Device", back_populates="tasks")
+    chain_instance = relationship("ChainInstance", back_populates="tasks")
 
 
 class UISelector(Base):
@@ -125,3 +160,61 @@ class SensitiveWord(Base):
     id = Column(String(36), primary_key=True, default=_uuid)
     word = Column(String(100), nullable=False, unique=True)
     created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+
+
+class AccountGroup(Base):
+    __tablename__ = "account_groups"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    name = Column(String(100), nullable=False, unique=True)
+    description = Column(String(500), nullable=True, default="")
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    members = relationship("AccountGroupMember", back_populates="group", cascade="all, delete-orphan")
+
+
+class AccountGroupMember(Base):
+    __tablename__ = "account_group_members"
+    __table_args__ = (
+        UniqueConstraint("group_id", "account_id", name="uq_group_account"),
+    )
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    group_id = Column(String(36), ForeignKey("account_groups.id", ondelete="CASCADE"), nullable=False)
+    account_id = Column(String(36), ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+
+    group = relationship("AccountGroup", back_populates="members")
+    account = relationship("Account")
+
+
+class ChainTemplate(Base):
+    __tablename__ = "chain_templates"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    name = Column(String(100), nullable=False)
+    description = Column(String(500), nullable=True, default="")
+    steps = Column(JSON, nullable=False)  # [{step_order, type, label, params}, ...]
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    instances = relationship("ChainInstance", back_populates="template")
+
+
+class ChainInstance(Base):
+    __tablename__ = "chain_instances"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    template_id = Column(String(36), ForeignKey("chain_templates.id"), nullable=False)
+    account_id = Column(String(36), ForeignKey("accounts.id"), nullable=False)
+    current_step = Column(Integer, nullable=False, default=1)
+    total_steps = Column(Integer, nullable=False)
+    status = Column(String(20), nullable=False, default="pending")  # pending, running, completed, failed, cancelled
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+
+    template = relationship("ChainTemplate", back_populates="instances")
+    account = relationship("Account")
+    tasks = relationship("Task", back_populates="chain_instance")

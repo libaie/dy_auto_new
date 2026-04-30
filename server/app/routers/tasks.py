@@ -4,8 +4,9 @@ from fastapi import APIRouter, HTTPException, Query, Depends
 from typing import Optional
 from sqlalchemy.orm import Session
 
-from app.models import TaskCreateRequest, TaskStatus
+from app.models import TaskCreateRequest, TaskStatus, TASK_PARAMS_VALIDATORS, KeywordMatrixRequest
 from app.database import get_db
+from app.db_models import Device
 from app.deps import verify_admin_token
 from app.services.task_service import task_service
 
@@ -55,14 +56,49 @@ async def create_task(
     db: Session = Depends(get_db),
     _: str = Depends(verify_admin_token),
 ):
-    params = await _maybe_resolve_template(db, dict(request.params), request.type.value)
+    # 校验任务参数
+    validator = TASK_PARAMS_VALIDATORS.get(request.type.value)
+    if validator:
+        try:
+            if isinstance(validator, type) and issubclass(validator, BaseModel):
+                # Pydantic model validator
+                validated = validator(**request.params)
+                params = validated.model_dump(exclude_none=True)
+            else:
+                # Function validator (e.g., nurture)
+                params = validator(request.params)
+        except Exception as e:
+            raise HTTPException(status_code=422, detail=f"参数校验失败: {e}")
+    else:
+        params = dict(request.params)
+
+    # Validate device_id if specified
+    device_id = request.device_id
+    if device_id:
+        device = db.query(Device).filter(Device.id == device_id).first()
+        if not device:
+            raise HTTPException(status_code=404, detail="设备不存在")
+        if device.bound_account_id and device.bound_account_id != request.account_id:
+            raise HTTPException(status_code=400, detail="该设备绑定的账号与任务账号不一致")
+
+    params = await _maybe_resolve_template(db, params, request.type.value)
     task = task_service.create_task(
         db=db,
         task_type=request.type,
         account_id=request.account_id,
         params=params,
         scheduled_at=request.scheduled_at,
+        device_id=device_id,
     )
+
+    # Push task to assigned device via WS
+    if task.device_id:
+        from app.ws_manager import pair_ws_manager
+        await pair_ws_manager.send_to_device(task.device_id, {
+            "event": "task",
+            "task": task.model_dump(mode="json"),
+        })
+
     return task
 
 
@@ -93,7 +129,7 @@ def get_task(
 
 
 @router.post("/{task_id}/cancel")
-def cancel_task(
+async def cancel_task(
     task_id: str,
     db: Session = Depends(get_db),
     _: str = Depends(verify_admin_token),
@@ -104,4 +140,13 @@ def cancel_task(
         if "not found" in str(e):
             raise HTTPException(status_code=404, detail="Task not found")
         raise HTTPException(status_code=400, detail=str(e))
+
+    # Push cancel to the device running this task (device_id is set when task is running)
+    if task.device_id:
+        from app.ws_manager import pair_ws_manager
+        await pair_ws_manager.send_to_device(task.device_id, {
+            "event": "cancel_task",
+            "task_id": task.id,
+        })
+
     return task

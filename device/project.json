@@ -1,0 +1,14 @@
+{
+  "name": "抖音自动化助手",
+  "packageName": "com.dy.auto",
+  "versionName": "1.0.0",
+  "versionCode": 1,
+  "main": "main.js",
+  "ignore": [
+    "node_modules",
+    ".git",
+    "test-*.js",
+    "spike/",
+    "*.log"
+  ]
+}

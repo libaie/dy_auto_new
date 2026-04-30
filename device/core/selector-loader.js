@@ -1,7 +1,7 @@
 var apiClient = require("./api-client");
 var logger = require("../utils/logger");
 
-var TAG = "SELECTOR";
+var TAG = "选择器";
 
 var selectorLoader = {
   _cache: {},       // action_name -> selector config
@@ -12,15 +12,15 @@ var selectorLoader = {
    * 初始化 — 从后端拉取全量选择器
    */
   init: function () {
-    logger.info(TAG, "Loading selectors from server...");
+    logger.info(TAG, "从服务端加载选择器...");
     var response = apiClient.fetchSelectors(0);
     if (response && response.selectors) {
       this._applySelectors(response.selectors);
       this._version = response.version;
       this._initialized = true;
-      logger.info(TAG, "Loaded " + Object.keys(this._cache).length + " selectors, version=" + this._version);
+      logger.info(TAG, "已加载 " + Object.keys(this._cache).length + " 个选择器, 版本=" + this._version);
     } else {
-      logger.warn(TAG, "Failed to load selectors, using empty cache");
+      logger.warn(TAG, "加载选择器失败，使用空缓存");
       this._initialized = true;
     }
   },
@@ -31,12 +31,12 @@ var selectorLoader = {
    */
   checkAndUpdate: function (serverVersion) {
     if (serverVersion > this._version) {
-      logger.info(TAG, "Selectors outdated (local=" + this._version + ", server=" + serverVersion + "), updating...");
+      logger.info(TAG, "选择器已过期 (本地=" + this._version + ", 服务端=" + serverVersion + "), 更新中...");
       var response = apiClient.fetchSelectors(this._version);
       if (response && response.changed && response.selectors) {
         this._applySelectors(response.selectors);
         this._version = response.version;
-        logger.info(TAG, "Selectors updated to version " + this._version);
+        logger.info(TAG, "选择器已更新至版本 " + this._version);
       }
     }
   },

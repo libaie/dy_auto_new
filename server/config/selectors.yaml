@@ -1,5 +1,6 @@
 # UI 选择器配置 — 抖音 UI 变更时在此修改
-# 策略类型: text(控件文本), id(控件ID), desc(内容描述), coordinate(坐标百分比)
+# 策略类型: text(控件文本), id(控件ID), desc(内容描述), className(类名), package(包名),
+#           coordinate(坐标百分比), image(以图找图, template=文件名, threshold=阈值)
 version: 1
 selectors:
   - action_name: "open_app"
@@ -9,18 +10,45 @@ selectors:
   - action_name: "search_tab"
     strategies:
       - { type: "text", value: "搜索", priority: 1 }
-      - { type: "id", value: "com.ss.android.ugc.aweme:id/et_search_kw", priority: 2 }
-      - { type: "desc", value: "搜索", priority: 3 }
+      - { type: "desc", value: "搜索", priority: 2 }
+      - { type: "id", value: "com.ss.android.ugc.aweme:id/content_container", priority: 3 }
 
   - action_name: "search_input"
     strategies:
-      - { type: "id", value: "com.ss.android.ugc.aweme:id/et_search_kw", priority: 1 }
-      - { type: "className", value: "android.widget.EditText", priority: 2 }
+      - { type: "className", value: "android.widget.EditText", priority: 1 }
 
   - action_name: "search_button"
     strategies:
       - { type: "text", value: "搜索", priority: 1 }
       - { type: "desc", value: "搜索", priority: 2 }
+
+  - action_name: "search_suggestion"
+    strategies:
+      - { type: "id", value: "recycler_view", priority: 1 }
+
+  - action_name: "video_tab"
+    strategies:
+      - { type: "id", value: "text1", priority: 1 }
+
+  - action_name: "sort_button"
+    strategies:
+      - { type: "id", value: "ivu", priority: 1 }
+
+  # 排序选项（弹出框内）
+  - action_name: "sort_latest"
+    strategies:
+      - { type: "text", value: "最新发布", priority: 1 }
+      - { type: "image", template: "sort_latest.png", threshold: 0.8, priority: 2 }
+
+  - action_name: "sort_most_liked"
+    strategies:
+      - { type: "text", value: "最多点赞", priority: 1 }
+      - { type: "image", template: "sort_most_liked.png", threshold: 0.8, priority: 2 }
+
+  - action_name: "sort_default"
+    strategies:
+      - { type: "text", value: "综合排序", priority: 1 }
+      - { type: "image", template: "sort_default.png", threshold: 0.8, priority: 2 }
 
   - action_name: "like_button"
     strategies:
@@ -74,3 +102,34 @@ selectors:
       - { type: "desc", value: "头像", priority: 1 }
       - { type: "id", value: "com.ss.android.ugc.aweme:id/author_avatar", priority: 2 }
       - { type: "coordinate", x_percent: 0.9, y_percent: 0.6, priority: 3 }
+
+  # 评论区选择器
+  - action_name: "comment_list"
+    strategies:
+      - { type: "id", value: "com.ss.android.ugc.aweme:id/comment_list", priority: 1 }
+      - { type: "className", value: "androidx.recyclerview.widget.RecyclerView", priority: 2 }
+
+  - action_name: "comment_text"
+    strategies:
+      - { type: "id", value: "com.ss.android.ugc.aweme:id/comment_text", priority: 1 }
+      - { type: "id", value: "com.ss.android.ugc.aweme:id/content", priority: 2 }
+
+  - action_name: "comment_author"
+    strategies:
+      - { type: "id", value: "com.ss.android.ugc.aweme:id/nickname", priority: 1 }
+      - { type: "id", value: "com.ss.android.ugc.aweme:id/user_name", priority: 2 }
+
+  - action_name: "comment_time"
+    strategies:
+      - { type: "id", value: "com.ss.android.ugc.aweme:id/create_time", priority: 1 }
+      - { type: "id", value: "com.ss.android.ugc.aweme:id/time", priority: 2 }
+
+  - action_name: "comment_like_count"
+    strategies:
+      - { type: "id", value: "com.ss.android.ugc.aweme:id/like_count", priority: 1 }
+
+  # 评论区作者头像（用于进入评论者主页）
+  - action_name: "comment_author_avatar"
+    strategies:
+      - { type: "id", value: "com.ss.android.ugc.aweme:id/avatar", priority: 1 }
+      - { type: "desc", value: "头像", priority: 2 }

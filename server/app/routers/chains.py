@@ -99,6 +99,16 @@ def update_template(
     if request.description is not None:
         tpl.description = request.description
     if request.steps is not None:
+        # Prevent modifying steps when active instances exist (template hot-update risk)
+        active = db.query(ChainInstance).filter(
+            ChainInstance.template_id == template_id,
+            ChainInstance.status.in_(["pending", "running"]),
+        ).count()
+        if active > 0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"该模板有 {active} 个活跃实例，无法修改步骤。请等待实例完成或取消后再修改。",
+            )
         orders = sorted(s.step_order for s in request.steps)
         if orders != list(range(1, len(request.steps) + 1)):
             raise HTTPException(status_code=422, detail="步骤序号必须从 1 连续递增")
@@ -146,7 +156,10 @@ async def create_instances(
     if not account_ids:
         raise HTTPException(status_code=422, detail="未指定任何账号")
 
-    results = chain_service.create_chain_instances(db, request.template_id, account_ids)
+    try:
+        results = chain_service.create_chain_instances(db, request.template_id, account_ids)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
     return {
         "created_count": len(results["created"]),
@@ -241,23 +254,24 @@ async def cancel_instance(
     if inst.status in ("completed", "cancelled"):
         raise HTTPException(status_code=400, detail=f"链实例已处于 {inst.status} 状态")
 
-    current_task = (
+    # Cancel ALL pending/running tasks for this chain instance
+    active_tasks = (
         db.query(DBTask)
         .filter(
             DBTask.chain_instance_id == instance_id,
             DBTask.status.in_(["pending", "running"]),
         )
-        .first()
+        .all()
     )
-    if current_task:
-        current_task.status = "cancelled"
-        current_task.completed_at = datetime.now(timezone.utc)
+    for task in active_tasks:
+        task.status = "cancelled"
+        task.completed_at = datetime.now(timezone.utc)
 
-        if current_task.device_id:
+        if task.device_id:
             from app.ws_manager import pair_ws_manager
-            await pair_ws_manager.send_to_device(current_task.device_id, {
+            await pair_ws_manager.send_to_device(task.device_id, {
                 "event": "cancel_task",
-                "task_id": current_task.id,
+                "task_id": task.id,
             })
 
     inst.status = "cancelled"
@@ -304,6 +318,6 @@ async def retry_instance(
     inst.completed_at = None
     db.commit()
 
-    chain_service._push_step_task(db, inst)
+    chain_service._safe_push_step_task(db, inst)
 
     return {"status": "retrying", "id": instance_id, "step": failed_task.step_order}

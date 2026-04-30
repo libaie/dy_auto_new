@@ -161,6 +161,13 @@ def add_members(
     group = db.query(AccountGroup).filter(AccountGroup.id == group_id).first()
     if not group:
         raise HTTPException(status_code=404, detail="分组不存在")
+    # Validate all account_ids exist before adding
+    existing_accounts = {
+        a.id for a in db.query(Account.id).filter(Account.id.in_(request.account_ids)).all()
+    }
+    invalid_ids = [aid for aid in request.account_ids if aid not in existing_accounts]
+    if invalid_ids:
+        raise HTTPException(status_code=400, detail=f"以下账号不存在: {', '.join(invalid_ids)}")
     added = []
     for account_id in request.account_ids:
         exists = db.query(AccountGroupMember).filter(

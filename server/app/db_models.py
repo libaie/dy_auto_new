@@ -206,8 +206,8 @@ class ChainInstance(Base):
     __tablename__ = "chain_instances"
 
     id = Column(String(36), primary_key=True, default=_uuid)
-    template_id = Column(String(36), ForeignKey("chain_templates.id"), nullable=False)
-    account_id = Column(String(36), ForeignKey("accounts.id"), nullable=False)
+    template_id = Column(String(36), ForeignKey("chain_templates.id", ondelete="RESTRICT"), nullable=False)
+    account_id = Column(String(36), ForeignKey("accounts.id", ondelete="RESTRICT"), nullable=False)
     current_step = Column(Integer, nullable=False, default=1)
     total_steps = Column(Integer, nullable=False)
     status = Column(String(20), nullable=False, default="pending")  # pending, running, completed, failed, cancelled

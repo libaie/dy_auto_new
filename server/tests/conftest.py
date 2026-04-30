@@ -42,12 +42,33 @@ def test_db():
 
 
 @pytest.fixture(autouse=True)
+def _rollback_after_test(test_db):
+    """Rollback any DB changes after each test for isolation."""
+    yield
+    # Create a session to rollback uncommitted changes
+    TestSession = sessionmaker(bind=test_db, autocommit=False, autoflush=False)
+    session = TestSession()
+    session.rollback()
+    session.close()
+
+
+@pytest.fixture(autouse=True)
 def admin_auth_override():
     """Override admin auth for all tests to pass without JWT."""
     from app.deps import verify_admin_token
     app.dependency_overrides[verify_admin_token] = lambda: "test-user"
     yield
     app.dependency_overrides.pop(verify_admin_token, None)
+
+
+@pytest.fixture
+def real_auth():
+    """Temporarily disable auth override to test real JWT authentication."""
+    from app.deps import verify_admin_token
+    saved = app.dependency_overrides.pop(verify_admin_token, None)
+    yield
+    if saved is not None:
+        app.dependency_overrides[verify_admin_token] = saved
 
 
 @pytest.fixture

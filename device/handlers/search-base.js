@@ -4,7 +4,7 @@ var uiOperator = require("../core/ui-operator");
 var antiDetect = require("../core/anti-detect");
 var logger = require("../utils/logger");
 
-var TAG = "SEARCH_BASE";
+var TAG = "搜索";
 
 /**
  * 搜索基类 — 所有搜索类 handler 继承此对象
@@ -18,57 +18,69 @@ var SearchBaseHandler = Object.create(BaseHandler);
  *   - keyword: string (搜索关键词)
  *   - count: number (操作数量)
  *   - content: string (可选，评论/私信内容)
+ *   - sort_by: string (可选，排序方式: "latest"|"most_liked")
  * @returns {Object} { success, result, error }
  */
 SearchBaseHandler.execute = function (params) {
   var keyword = params.keyword;
   var count = params.count || 5;
   var content = params.content || "";
+  var sortBy = params.sort_by || "";
 
   if (!keyword) {
-    return { success: false, error: "Missing keyword" };
+    return { success: false, error: "缺少关键词" };
   }
 
-  logger.info(TAG, "Searching: '" + keyword + "', count=" + count);
+  logger.info(TAG, "搜索: '" + keyword + "', 数量=" + count + ", 排序=" + sortBy);
 
   if (!this.ensureAppActive()) {
-    return { success: false, error: "Failed to open Douyin" };
+    return { success: false, error: "打开抖音失败" };
   }
 
   // 1. 进入搜索页
   if (!this._openSearch()) {
-    return { success: false, error: "Failed to open search" };
+    return { success: false, error: "打开搜索页失败" };
   }
 
   // 2. 输入关键词
   if (!this._inputKeyword(keyword)) {
-    return { success: false, error: "Failed to input keyword" };
+    return { success: false, error: "输入关键词失败" };
   }
 
-  // 3. 点击搜索按钮
-  if (!this._submitSearch()) {
-    return { success: false, error: "Failed to submit search" };
+  // 3. 点击联想词
+  if (!this._clickSuggestion(keyword)) {
+    // 联想词没找到，尝试直接搜索
+    if (!this._submitSearch()) {
+      return { success: false, error: "提交搜索失败" };
+    }
   }
 
-  // 等待搜索结果加载
   sleep(3000);
 
-  // 4. 逐个打开结果并互动
+  // 4. 点击"视频" tab
+  this._clickVideoTab();
+  sleep(2000);
+
+  // 5. 排序（如果指定）
+  if (sortBy) {
+    this._sortResults(sortBy);
+    sleep(2000);
+  }
+
+  // 6. 逐个打开结果并互动
   var stats = { success_count: 0, fail_count: 0, details: [] };
 
   for (var i = 0; i < count; i++) {
-    logger.info(TAG, "Processing result " + (i + 1) + "/" + count);
+    logger.info(TAG, "处理第 " + (i + 1) + "/" + count + " 个结果");
 
-    // 点击第 i 个搜索结果
     if (!this._clickSearchResult(i)) {
-      logger.warn(TAG, "Failed to click result " + (i + 1) + ", skipping");
+      logger.warn(TAG, "点击第 " + (i + 1) + " 个结果失败，跳过");
       stats.fail_count++;
       continue;
     }
 
-    sleep(2000); // 等待视频加载
+    sleep(2000);
 
-    // 子类实现的互动逻辑
     var interactResult = this._interactWithVideo(content, stats);
     if (interactResult) {
       stats.success_count++;
@@ -76,15 +88,13 @@ SearchBaseHandler.execute = function (params) {
       stats.fail_count++;
     }
 
-    // 返回搜索结果列表
     this._goBack();
     sleep(1500);
 
-    // 反检测随机停顿
     antiDetect.maybePause();
   }
 
-  logger.info(TAG, "Search complete. " + JSON.stringify(stats));
+  logger.info(TAG, "搜索完成. " + JSON.stringify(stats));
   return { success: true, result: stats };
 };
 
@@ -114,18 +124,137 @@ SearchBaseHandler._openSearch = function () {
 
 /**
  * 在搜索框输入关键词
+ * 使用 setText 直接设置（测试验证可用）
  */
 SearchBaseHandler._inputKeyword = function (keyword) {
-  var inputResult = this.safeInput("search_input", keyword);
-  if (inputResult) {
+  var editBox = className("EditText").findOnce();
+  if (!editBox) {
+    logger.warn(TAG, "搜索输入框未找到");
+    return false;
+  }
+  editBox.click();
+  sleep(300);
+  editBox.setText(keyword);
+  sleep(500);
+  logger.info(TAG, "输入关键词: '" + keyword + "'");
+  return true;
+};
+
+/**
+ * 点击联想词
+ * 在 recycler_view 中查找包含关键词的联想词并点击
+ */
+SearchBaseHandler._clickSuggestion = function (keyword) {
+  var rv = id("recycler_view").findOne(3000);
+  if (!rv) {
+    logger.warn(TAG, "联想词列表未找到");
+    return false;
+  }
+  var children = rv.children();
+  for (var i = 0; i < children.length; i++) {
+    var t = children[i].findOne(text(keyword));
+    if (t) {
+      logger.info(TAG, "点击联想词: '" + t.text() + "'");
+      t.parent().parent().click();
+      sleep(1000);
+      return true;
+    }
+  }
+  logger.warn(TAG, "未找到匹配联想词: '" + keyword + "'");
+  return false;
+};
+
+/**
+ * 点击"视频" tab
+ */
+SearchBaseHandler._clickVideoTab = function () {
+  try {
+    var vt = id("text1").className("android.widget.Button").text("视频").findOne(5000);
+    if (vt) {
+      vt.parent().parent().click();
+      logger.info(TAG, "点击视频标签");
+      return true;
+    }
+  } catch (e) {
+    logger.warn(TAG, "视频标签点击失败: " + e.message);
+  }
+  return false;
+};
+
+/**
+ * 点击排序选项
+ * 使用选择器系统（支持 text 和 image 策略）
+ * @param {string} sortBy - "latest" 或 "most_liked"
+ */
+SearchBaseHandler._sortResults = function (sortBy) {
+  // 点击排序按钮打开弹出框
+  var sortBtnClicked = this.safeClick("sort_button", 3);
+  if (!sortBtnClicked) {
+    logger.warn(TAG, "排序按钮未找到");
+    return false;
+  }
+  sleep(800);
+
+  // 使用选择器系统点击排序选项（自动尝试 text → image 策略）
+  var actionMap = {
+    "latest": "sort_latest",
+    "most_liked": "sort_most_liked",
+    "default": "sort_default",
+  };
+  var actionName = actionMap[sortBy] || actionMap["default"];
+
+  var clicked = this.safeClick(actionName, 3);
+  if (clicked) {
+    logger.info(TAG, "排序方式: " + sortBy);
     sleep(500);
+    // 关闭排序弹出框
+    this._closeSortPopup();
+    return true;
+  }
+
+  logger.warn(TAG, "点击排序选项失败: " + sortBy);
+  return false;
+};
+
+/**
+ * 关闭排序弹出框（再次点击排序按钮）
+ */
+SearchBaseHandler._closeSortPopup = function () {
+  var clicked = this.safeClick("sort_button", 2);
+  if (clicked) {
+    sleep(500);
+    logger.info(TAG, "排序弹窗已关闭");
     return true;
   }
   return false;
 };
 
 /**
- * 点击搜索按钮
+ * 搜索 → 排序 → 关闭弹出框 → 打开第一个视频
+ * @param {string} keyword
+ * @param {string} sortBy - "latest" 或 "most_liked"
+ * @returns {boolean}
+ */
+SearchBaseHandler.searchSortAndOpenFirstResult = function (keyword, sortBy) {
+  if (!this._openSearch()) return false;
+  if (!this._inputKeyword(keyword)) return false;
+  if (!this._clickSuggestion(keyword)) {
+    if (!this._submitSearch()) return false;
+  }
+  sleep(3000);
+  this._clickVideoTab();
+  sleep(2000);
+  if (sortBy) {
+    this._sortResults(sortBy);
+    sleep(1500);
+  }
+  if (!this._clickSearchResult(0)) return false;
+  sleep(2000);
+  return true;
+};
+
+/**
+ * 点击搜索按钮（备用）
  */
 SearchBaseHandler._submitSearch = function () {
   return this.safeClick("search_button", 3);
@@ -133,21 +262,14 @@ SearchBaseHandler._submitSearch = function () {
 
 /**
  * 点击第 index 个搜索结果
- * 搜索结果列表中，每个结果通常是一个可点击的卡片
  */
 SearchBaseHandler._clickSearchResult = function (index) {
-  // 搜索结果列表中，点击第 index 个结果
-  // 抖音搜索结果是垂直列表，每个结果占据大部分屏幕
-  // 使用滑动定位 + 点击的方式
   if (index > 0) {
-    // 先滑动到目标位置
     for (var i = 0; i < index; i++) {
       uiOperator.swipeUp();
       sleep(1000);
     }
   }
-
-  // 点击屏幕中间区域打开视频
   var x = Math.round(device.width * 0.5);
   var y = Math.round(device.height * 0.4);
   return click(x, y);
@@ -163,22 +285,17 @@ SearchBaseHandler._goBack = function () {
 
 /**
  * 搜索关键词并打开第一个结果视频
- * 供 ReplyCommentHandler 等不需要遍历多个结果的场景使用
- * @param {string} keyword - 搜索关键词
- * @returns {boolean} 是否成功打开视频
  */
 SearchBaseHandler.searchAndOpenFirstResult = function (keyword) {
   if (!this._openSearch()) return false;
-
   if (!this._inputKeyword(keyword)) return false;
-
-  if (!this._submitSearch()) return false;
-
+  if (!this._clickSuggestion(keyword)) {
+    if (!this._submitSearch()) return false;
+  }
   sleep(3000);
-
-  // 点击第一个结果
+  this._clickVideoTab();
+  sleep(2000);
   if (!this._clickSearchResult(0)) return false;
-
   sleep(2000);
   return true;
 };

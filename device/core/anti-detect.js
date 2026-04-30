@@ -1,9 +1,9 @@
 // device/core/anti-detect.js
-var config = require("../config");
+var config = global.__config || require("../config");
 var logger = require("../utils/logger");
 var bezier = require("../utils/bezier");
 
-var TAG = "ANTI_DETECT";
+var TAG = "反检测";
 var settings = config.antiDetect;
 
 var antiDetect = {
@@ -15,7 +15,7 @@ var antiDetect = {
     var delay = Math.floor(
       Math.random() * (settings.delayMax - settings.delayMin) + settings.delayMin
     );
-    logger.debug(TAG, "Delay " + delay + "ms before " + (actionName || "action"));
+    logger.debug(TAG, "操作前延迟 " + delay + "ms: " + (actionName || "操作"));
     sleep(delay);
   },
 
@@ -38,7 +38,7 @@ var antiDetect = {
       var pauseDuration = Math.floor(
         Math.random() * (settings.pauseMax - settings.pauseMin) + settings.pauseMin
       );
-      logger.info(TAG, "Random pause for " + Math.round(pauseDuration / 1000) + "s (simulating user distraction)");
+      logger.info(TAG, "随机停顿 " + Math.round(pauseDuration / 1000) + "秒（模拟用户走神）");
       sleep(pauseDuration);
       return true;
     }
@@ -54,7 +54,7 @@ var antiDetect = {
    */
   humanSwipe: function (startX, startY, endX, endY) {
     var path = bezier.generateSwipePath(startX, startY, endX, endY);
-    logger.debug(TAG, "Human swipe with " + path.length + " points");
+    logger.debug(TAG, "拟人滑动 " + path.length + " 个轨迹点");
 
     // 使用 gestures 模拟多点触控轨迹
     var gesturePoints = path.map(function (p) {
@@ -148,7 +148,7 @@ var antiDetect = {
     var speedFactor = Math.max(0.5, Math.min(1.5, distance / 500));
 
     var path = bezier.generateSwipePath(startX, startY, endX, endY);
-    logger.debug(TAG, "Enhanced swipe: " + path.length + " points, speed=" + speedFactor.toFixed(2));
+    logger.debug(TAG, "增强滑动: " + path.length + " 个轨迹点, 速度=" + speedFactor.toFixed(2));
 
     var gesturePoints = path.map(function (p) {
       return [p.x, p.y];
@@ -197,7 +197,7 @@ var antiDetect = {
     if (serverConfig.pause_max !== undefined) settings.pauseMax = serverConfig.pause_max;
     if (serverConfig.active_hours !== undefined) settings.activeHours = serverConfig.active_hours;
 
-    logger.info(TAG, "Anti-detect config updated from server");
+    logger.info(TAG, "反检测配置已从服务端更新");
   },
 
   /**
@@ -209,7 +209,7 @@ var antiDetect = {
   wrapAction: function (actionName, actionFn) {
     // 时间窗口检查
     if (!this.isActiveHour()) {
-      logger.info(TAG, "Outside active hours, adding long delay");
+      logger.info(TAG, "不在活跃时段，添加长延迟");
       sleep(Math.floor(Math.random() * 60000 + 30000)); // 30-90秒
       return false;
     }
@@ -219,7 +219,7 @@ var antiDetect = {
 
     // 概率跳过（低谷时段偶尔跳过操作，更像真人）
     if (Math.random() < 0.05 * timeMultiplier) {
-      logger.info(TAG, "Skipping action (rhythm variation)");
+      logger.info(TAG, "跳过操作（节奏波动）");
       return false;
     }
 

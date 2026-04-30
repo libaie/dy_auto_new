@@ -65,9 +65,10 @@ def test_register_device():
     assert resp.status_code == 200
     data = resp.json()
     assert data["device_id"] == "dev-register-test"
-    assert data["os_version"] == "Android 13"
-    assert data["app_version"] == "1.0.0"
     assert data["status"] == "online"
+    assert "config" in data
+    assert "poll_interval" in data["config"]
+    assert "anti_detect_config" in data["config"]
 
 
 def test_register_device_requires_auth():

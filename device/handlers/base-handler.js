@@ -3,7 +3,7 @@ var uiOperator = require("../core/ui-operator");
 var antiDetect = require("../core/anti-detect");
 var logger = require("../utils/logger");
 
-var TAG = "HANDLER";
+var TAG = "处理器";
 
 /**
  * Handler 基类 — 所有任务 handler 继承此对象
@@ -44,10 +44,10 @@ var BaseHandler = {
           return uiOperator.clickElement(element);
         });
       }
-      logger.warn(TAG, "Retry " + (i + 1) + "/" + retries + " for action: " + actionName);
+      logger.warn(TAG, "重试 " + (i + 1) + "/" + retries + " 操作: " + actionName);
       sleep(2000 * Math.pow(2, i)); // 指数退避: 2s, 4s, 8s
     }
-    logger.error(TAG, "Failed to click after " + retries + " retries: " + actionName);
+    logger.error(TAG, retries + " 次重试后仍失败: " + actionName);
     return false;
   },
 

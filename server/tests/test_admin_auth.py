@@ -61,18 +61,14 @@ def test_expired_token_rejected(client):
     assert "expired" in exc_info.value.detail.lower()
 
 
-def test_protected_endpoint_no_token(client):
+def test_protected_endpoint_no_token(client, real_auth):
     """Admin endpoints should require JWT token."""
-    # Remove the autouse override to test actual auth enforcement
-    app.dependency_overrides.pop(verify_admin_token, None)
     response = client.get("/api/accounts")
     assert response.status_code == 401
 
 
-def test_protected_endpoint_with_token(client):
+def test_protected_endpoint_with_token(client, real_auth):
     """Admin endpoints should accept valid JWT token."""
-    # Remove the autouse override so real auth runs
-    app.dependency_overrides.pop(verify_admin_token, None)
     login = client.post("/api/auth/login", json={
         "username": ADMIN_USERNAME,
         "password": ADMIN_PASSWORD,
@@ -84,26 +80,20 @@ def test_protected_endpoint_with_token(client):
     assert response.status_code == 200
 
 
-def test_accounts_requires_admin_token(client):
+def test_accounts_requires_admin_token(client, real_auth):
     """Accounts CRUD should require admin JWT token."""
-    # Remove the autouse override to test actual auth enforcement
-    app.dependency_overrides.pop(verify_admin_token, None)
     response = client.get("/api/accounts")
     assert response.status_code == 401
 
 
-def test_devices_requires_admin_token(client):
+def test_devices_requires_admin_token(client, real_auth):
     """Devices CRUD should require admin JWT token."""
-    # Remove the autouse override to test actual auth enforcement
-    app.dependency_overrides.pop(verify_admin_token, None)
     response = client.get("/api/devices")
     assert response.status_code == 401
 
 
-def test_tasks_requires_admin_token(client):
+def test_tasks_requires_admin_token(client, real_auth):
     """Tasks CRUD should require admin JWT token."""
-    # Remove the autouse override to test actual auth enforcement
-    app.dependency_overrides.pop(verify_admin_token, None)
     response = client.get("/api/tasks")
     assert response.status_code == 401
 
@@ -114,3 +104,27 @@ def test_device_api_still_uses_secret(client):
         "X-Device-Secret": DEVICE_SECRET,
     })
     assert response.status_code == 200
+
+
+def test_login_rate_limit(client, real_auth):
+    """Login endpoint should rate-limit after too many failed attempts."""
+    for _ in range(5):
+        client.post("/api/auth/login", json={
+            "username": ADMIN_USERNAME,
+            "password": "wrong",
+        })
+
+    # 6th attempt should be rate-limited
+    response = client.post("/api/auth/login", json={
+        "username": ADMIN_USERNAME,
+        "password": "wrong",
+    })
+    assert response.status_code == 429
+    assert "too many" in response.json()["detail"].lower()
+
+    # Successful login should also be blocked while rate-limited
+    response = client.post("/api/auth/login", json={
+        "username": ADMIN_USERNAME,
+        "password": ADMIN_PASSWORD,
+    })
+    assert response.status_code == 429

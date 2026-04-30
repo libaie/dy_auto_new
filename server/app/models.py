@@ -1,7 +1,7 @@
 from datetime import datetime
 from enum import Enum
 from typing import Any, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 import uuid
 
 
@@ -319,7 +319,7 @@ class AccountGroupMemberRequest(BaseModel):
 
 class ChainStep(BaseModel):
     step_order: int = Field(..., ge=1)
-    type: str = Field(..., min_length=1)
+    type: TaskType
     label: str = Field(default="", max_length=100)
     params: dict[str, Any] = Field(default_factory=dict)
 
@@ -349,6 +349,12 @@ class ChainInstanceCreateRequest(BaseModel):
     template_id: str
     account_ids: Optional[list[str]] = None
     group_ids: Optional[list[str]] = None
+
+    @model_validator(mode="after")
+    def check_at_least_one(self):
+        if not self.account_ids and not self.group_ids:
+            raise ValueError("account_ids 和 group_ids 至少提供一个")
+        return self
 
 
 class ChainInstanceResponse(BaseModel):

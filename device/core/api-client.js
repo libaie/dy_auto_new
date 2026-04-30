@@ -1,7 +1,9 @@
-var config = require("../config");
+// 使用 global.__config 确保与 main.js 共享同一 config 对象
+// 避免 require("./config") vs require("../config") 路径不一致导致多实例
+var config = global.__config || require("../config");
 var logger = require("../utils/logger");
 
-var TAG = "API";
+var TAG = "网络";
 var netConfig = config.network || {
   requestTimeout: 10000,
   maxRetries: 3,
@@ -15,20 +17,29 @@ var offlineQueue = [];
 var isOnline = true;
 
 var apiClient = {
+  _onAuthFailure: null,
+
+  /**
+   * 设置认证失败回调（401 时触发）
+   */
+  setAuthFailureHandler: function (callback) {
+    this._onAuthFailure = callback;
+  },
+
   /**
    * 应用代理配置到 HTTP 请求
    * @param {Object} proxyConfig - { type, host, port, username, password }
    */
   setProxy: function (proxyConfig) {
     if (!proxyConfig || !proxyConfig.host) {
-      logger.info(TAG, "No proxy configured");
+      logger.info(TAG, "未配置代理");
       config.proxy = null;
       return;
     }
 
     config.proxy = proxyConfig;
-    logger.info(TAG, "Proxy configured: " + proxyConfig.type + "://" +
-      proxyConfig.host + ":" + proxyConfig.port + " (auth=" + (proxyConfig.username ? "yes" : "no") + ")");
+    logger.info(TAG, "代理已配置: " + proxyConfig.type + "://" +
+      proxyConfig.host + ":" + proxyConfig.port + " (认证=" + (proxyConfig.username ? "是" : "否") + ")");
   },
 
   /**
@@ -65,6 +76,36 @@ var apiClient = {
    * @param {Object} opts - { body, timeout, parseJson, label }
    * @returns {*} 解析后的 JSON 或原始 body，失败返回 null
    */
+  /**
+   * 读取响应体为字符串（兼容 AutoJS6 的 Java ResponseBody 对象）
+   */
+  _readBody: function (response) {
+    var body = response.body;
+    if (typeof body === "string") return body;
+    try {
+      return body.string();
+    } catch (e) {
+      return String(body);
+    }
+  },
+
+  /**
+   * 读取响应体为字节数组（用于二进制下载）
+   */
+  _readBodyBytes: function (response) {
+    var body = response.body;
+    if (body instanceof Array) return body;
+    try {
+      return body.bytes();
+    } catch (e) {
+      try {
+        return body.string();
+      } catch (e2) {
+        return String(body);
+      }
+    }
+  },
+
   _requestWithRetry: function (method, url, opts) {
     var body = opts.body || null;
     var timeout = opts.timeout || netConfig.requestTimeout;
@@ -82,39 +123,51 @@ var apiClient = {
         for (var pk in proxyOpts) {
           reqOpts[pk] = proxyOpts[pk];
         }
-        if (method === "POST") {
-          reqOpts.headers["Content-Type"] = "application/json";
-          reqOpts.body = JSON.stringify(body);
-        }
 
-        var response = method === "POST" ? http.post(url, reqOpts) : http.get(url, reqOpts);
+        var response;
+        if (method === "POST") {
+          response = http.postJson(url, body, reqOpts);
+        } else {
+          response = http.get(url, reqOpts);
+        }
 
         if (response.statusCode === 200) {
           this._markOnline();
-          return parseJson ? JSON.parse(response.body) : response.body;
+          if (parseJson) {
+            return JSON.parse(this._readBody(response));
+          }
+          return this._readBodyBytes(response);
         }
 
-        if (response.statusCode >= 400 && response.statusCode < 500) {
-          logger.error(TAG, label + " client error: " + response.statusCode);
+        if (response.statusCode === 401) {
+          logger.error(TAG, label + " 认证失败(401)，设备可能已被删除");
+          if (this._onAuthFailure) {
+            this._onAuthFailure();
+          }
           return null;
         }
 
-        logger.warn(TAG, label + " server error: " + response.statusCode +
-          " (attempt " + (attempt + 1) + "/" + (netConfig.maxRetries + 1) + ")");
+        if (response.statusCode >= 400 && response.statusCode < 500) {
+          logger.error(TAG, label + " 客户端错误: " + response.statusCode);
+          return null;
+        }
+
+        logger.warn(TAG, label + " 服务端错误: " + response.statusCode +
+          " (第 " + (attempt + 1) + "/" + (netConfig.maxRetries + 1) + " 次尝试)");
       } catch (e) {
-        logger.warn(TAG, label + " network error: " + e.message +
-          " (attempt " + (attempt + 1) + "/" + (netConfig.maxRetries + 1) + ")");
+        logger.warn(TAG, label + " 网络错误: " + e.message +
+          " (第 " + (attempt + 1) + "/" + (netConfig.maxRetries + 1) + " 次尝试)");
       }
 
       if (attempt < netConfig.maxRetries) {
         var delay = this._retryDelay(attempt);
-        logger.debug(TAG, "Retrying in " + Math.round(delay) + "ms...");
+        logger.debug(TAG, "将在 " + Math.round(delay) + "ms 后重试...");
         sleep(delay);
       }
     }
 
     this._markOffline();
-    logger.error(TAG, label + " failed after all retries");
+    logger.error(TAG, label + " 所有重试均失败");
     return null;
   },
 
@@ -122,6 +175,10 @@ var apiClient = {
    * 带重试的 HTTP GET
    */
   get: function (path, params) {
+    if (!config.serverUrl) {
+      logger.error(TAG, "serverUrl 未设置，无法请求: " + path);
+      return null;
+    }
     var url = config.serverUrl + path;
     if (params) {
       var queryParts = [];
@@ -137,6 +194,10 @@ var apiClient = {
    * 带重试的 HTTP POST
    */
   post: function (path, body) {
+    if (!config.serverUrl) {
+      logger.error(TAG, "serverUrl 未设置，无法请求: " + path);
+      return null;
+    }
     var url = config.serverUrl + path;
     return this._requestWithRetry("POST", url, { body: body, label: "POST " + path });
   },
@@ -157,8 +218,8 @@ var apiClient = {
    */
   _markOnline: function () {
     if (!isOnline) {
-      logger.info(TAG, "Network recovered, flushing offline queue (" +
-        offlineQueue.length + " items)");
+      logger.info(TAG, "网络已恢复，刷新离线队列 (" +
+        offlineQueue.length + " 条)");
       isOnline = true;
       this._flushOfflineQueue();
     }
@@ -169,7 +230,7 @@ var apiClient = {
    */
   _markOffline: function () {
     if (isOnline) {
-      logger.warn(TAG, "Network appears offline");
+      logger.warn(TAG, "网络已离线");
       isOnline = false;
     }
   },
@@ -181,12 +242,12 @@ var apiClient = {
     var MAX_FLUSH_RETRIES = 3;
     while (offlineQueue.length > 0) {
       var item = offlineQueue.shift();
-      logger.info(TAG, "Flushing offline item: " + item.path);
+      logger.info(TAG, "刷新离线项: " + item.path);
       var result = this.post(item.path, item.body);
       if (!result) {
         item.retries = (item.retries || 0) + 1;
         if (item.retries >= MAX_FLUSH_RETRIES) {
-          logger.error(TAG, "Dropping offline item after " + MAX_FLUSH_RETRIES + " retries: " + item.path);
+          logger.error(TAG, "离线项 " + MAX_FLUSH_RETRIES + " 次重试后丢弃: " + item.path);
         } else {
           offlineQueue.unshift(item);
         }
@@ -211,10 +272,10 @@ var apiClient = {
     var response = this.post("/api/device/report", body);
     if (!response && !isOnline) {
       if (offlineQueue.length >= netConfig.offlineQueueMax) {
-        logger.warn(TAG, "Offline queue full, dropping oldest item");
+        logger.warn(TAG, "离线队列已满，丢弃最旧项");
         offlineQueue.shift();
       }
-      logger.info(TAG, "Queuing report for offline flush: " + taskId);
+      logger.info(TAG, "任务结果加入离线队列: " + taskId);
       offlineQueue.push({ path: "/api/device/report", body: body, retries: 0 });
     }
     return response;
@@ -242,7 +303,7 @@ var apiClient = {
       files.writeBytes(scriptDir + "/device-script.zip", body);
       return true;
     }
-    logger.error(TAG, "Script download failed after all retries");
+    logger.error(TAG, "脚本下载所有重试均失败");
     return false;
   },
 

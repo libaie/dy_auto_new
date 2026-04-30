@@ -51,7 +51,7 @@ def get_selector(
 
 
 @router.post("")
-def create_selector(
+async def create_selector(
     request: SelectorCreateRequest,
     db: Session = Depends(get_db),
     _: str = Depends(verify_admin_token),
@@ -64,11 +64,18 @@ def create_selector(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+    version = selector_service.get_version(db)
+    from app.ws_manager import pair_ws_manager
+    await pair_ws_manager.broadcast_to_devices({
+        "event": "selectors_updated",
+        "version": version,
+    })
     return sel
 
 
 @router.put("/{action_name}")
-def update_selector(
+async def update_selector(
     action_name: str,
     request: SelectorUpdateRequest,
     db: Session = Depends(get_db),
@@ -82,11 +89,18 @@ def update_selector(
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+    version = selector_service.get_version(db)
+    from app.ws_manager import pair_ws_manager
+    await pair_ws_manager.broadcast_to_devices({
+        "event": "selectors_updated",
+        "version": version,
+    })
     return sel
 
 
 @router.delete("/{action_name}")
-def delete_selector(
+async def delete_selector(
     action_name: str,
     db: Session = Depends(get_db),
     _: str = Depends(verify_admin_token),
@@ -94,11 +108,18 @@ def delete_selector(
     deleted = selector_service.delete_selector(db, action_name)
     if not deleted:
         raise HTTPException(status_code=404, detail="Selector not found")
+
+    version = selector_service.get_version(db)
+    from app.ws_manager import pair_ws_manager
+    await pair_ws_manager.broadcast_to_devices({
+        "event": "selectors_updated",
+        "version": version,
+    })
     return {"deleted": True, "action_name": action_name}
 
 
 @router.patch("/{action_name}/toggle")
-def toggle_selector(
+async def toggle_selector(
     action_name: str,
     request: SelectorToggleRequest,
     db: Session = Depends(get_db),
@@ -108,4 +129,11 @@ def toggle_selector(
         sel = selector_service.toggle_selector(db, action_name, request.enabled)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+    version = selector_service.get_version(db)
+    from app.ws_manager import pair_ws_manager
+    await pair_ws_manager.broadcast_to_devices({
+        "event": "selectors_updated",
+        "version": version,
+    })
     return sel

@@ -3,7 +3,7 @@ var apiClient = require("./api-client");
 var selectorLoader = require("./selector-loader");
 var logger = require("../utils/logger");
 
-var TAG = "EXECUTOR";
+var TAG = "任务执行";
 
 // Handler 注册表
 var handlers = {
@@ -15,23 +15,52 @@ var handlers = {
 };
 
 var taskExecutor = {
+  _currentTaskId: null,
+  _cancelled: false,
+
+  /**
+   * 标记当前任务为已取消
+   * @param {string} taskId
+   */
+  cancel: function (taskId) {
+    if (this._currentTaskId === taskId) {
+      this._cancelled = true;
+      logger.info(TAG, "任务取消标记已设置: " + taskId);
+    }
+  },
+
+  /**
+   * 当前任务是否已被取消
+   */
+  isCancelled: function () {
+    return this._cancelled;
+  },
+
   execute: function (task) {
-    logger.info(TAG, "Executing task: " + task.id + " type=" + task.type);
+    logger.info(TAG, "执行任务: " + task.id + " 类型=" + task.type);
 
     var handler = handlers[task.type];
     if (!handler) {
-      logger.error(TAG, "No handler for task type: " + task.type);
+      logger.error(TAG, "未找到任务类型处理器: " + task.type);
       return { status: "failed", result: { error: "Unknown task type: " + task.type } };
     }
 
-    // 看门狗：任务最大执行时间 30 分钟
+    this._currentTaskId = task.id;
+    this._cancelled = false;
+
+    // 看门狗：任务最大执行时间 30 分钟，同时检查取消标记
     var TASK_TIMEOUT = 30 * 60 * 1000;
     var startTime = Date.now();
     var timedOut = false;
+    var self = this;
 
     var watchdog = setInterval(function () {
+      if (self._cancelled) {
+        logger.info(TAG, "任务 " + task.id + " 已被取消");
+        return;
+      }
       if (Date.now() - startTime > TASK_TIMEOUT) {
-        logger.error(TAG, "Task " + task.id + " timed out after 30 minutes");
+        logger.error(TAG, "任务 " + task.id + " 执行超时（30分钟）");
         timedOut = true;
       }
     }, 10000);
@@ -45,20 +74,27 @@ var taskExecutor = {
       var result = handler.execute(task.params);
       clearInterval(watchdog);
 
+      this._currentTaskId = null;
+
+      if (this._cancelled) {
+        return { status: "cancelled", result: { error: "Task cancelled by server" } };
+      }
+
       if (timedOut) {
         return { status: "failed", result: { error: "Task execution timed out (30 min)" } };
       }
 
       if (result.success) {
-        logger.info(TAG, "Task " + task.id + " completed successfully");
+        logger.info(TAG, "任务 " + task.id + " 执行成功");
         return { status: "completed", result: result.result };
       } else {
-        logger.warn(TAG, "Task " + task.id + " failed: " + result.error);
+        logger.warn(TAG, "任务 " + task.id + " 执行失败: " + result.error);
         return { status: "failed", result: { error: result.error } };
       }
     } catch (e) {
       clearInterval(watchdog);
-      logger.error(TAG, "Task " + task.id + " threw exception: " + e.message);
+      this._currentTaskId = null;
+      logger.error(TAG, "任务 " + task.id + " 异常: " + e.message);
       return { status: "failed", result: { error: e.message } };
     }
   },

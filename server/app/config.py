@@ -125,9 +125,16 @@ ANTI_DETECT_CONFIG = {
     },
 }
 
-# AI Content Generation
+# 设备端配置（通过 register/poll 下发给设备）
+DEVICE_CONFIG = {
+    "poll_interval": int(os.getenv("DEVICE_POLL_INTERVAL", "10000")),
+    "heartbeat_interval": int(os.getenv("DEVICE_HEARTBEAT_INTERVAL", "60000")),
+    "log_level": os.getenv("DEVICE_LOG_LEVEL", "info"),
+}
+
+# AI Content Generation (DeepSeek / OpenAI 兼容格式)
 AI_API_KEY = os.getenv("AI_API_KEY", "")
-AI_BASE_URL = os.getenv("AI_BASE_URL", "https://api.anthropic.com")
-AI_MODEL = os.getenv("AI_MODEL", "claude-sonnet-4-20250514")
-AI_PROVIDER = os.getenv("AI_PROVIDER", "anthropic")  # anthropic or openai
+AI_BASE_URL = os.getenv("AI_BASE_URL", "https://api.deepseek.com")
+AI_MODEL = os.getenv("AI_MODEL", "deepseek-chat")
+AI_PROVIDER = os.getenv("AI_PROVIDER", "deepseek")  # deepseek / openai / anthropic
 AI_MAX_RETRIES = int(os.getenv("AI_MAX_RETRIES", "3"))

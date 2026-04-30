@@ -4,14 +4,34 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import HTTPException, Header, Depends
+from sqlalchemy.orm import Session
 
 from app.config import DEVICE_SECRET, JWT_SECRET, JWT_EXPIRE_HOURS
+from app.database import get_db
 
 
-def verify_device_secret(x_device_secret: Optional[str] = Header(None, alias="X-Device-Secret")):
-    """FastAPI dependency — verifies X-Device-Secret header. Raises 401 if invalid."""
-    if x_device_secret != DEVICE_SECRET:
-        raise HTTPException(status_code=401, detail="Invalid device secret")
+def verify_device_secret(
+    x_device_secret: Optional[str] = Header(None, alias="X-Device-Secret"),
+    db: Session = Depends(get_db),
+):
+    """FastAPI dependency — verifies X-Device-Secret header. Raises 401 if invalid.
+
+    Accepts either the global DEVICE_SECRET (master key) or a per-device secret.
+    """
+    if not x_device_secret:
+        raise HTTPException(status_code=401, detail="Missing device secret")
+
+    # Master secret — backward compatible
+    if x_device_secret == DEVICE_SECRET:
+        return
+
+    # Per-device secret
+    from app.db_models import Device
+    device = db.query(Device).filter(Device.device_secret == x_device_secret).first()
+    if device:
+        return
+
+    raise HTTPException(status_code=401, detail="Invalid device secret")
 
 
 def create_admin_token(username: str) -> str:

@@ -98,6 +98,7 @@ function addSubTask() {
 }
 
 function removeSubTask(index) {
+  if (subTasks.value.length <= 1) return // Keep at least one subtask
   subTasks.value.splice(index, 1)
 }
 
@@ -235,7 +236,10 @@ watch(() => form.account_id, () => {
 // --- Build params from form ---
 function buildParams() {
   if (form.type === 'nurture') {
-    if (nurtureMode.value === 'advanced' && subTasks.value.length > 0) {
+    if (nurtureMode.value === 'advanced') {
+      if (subTasks.value.length === 0) {
+        throw new Error('高级模式下至少需要一个子任务')
+      }
       return {
         sub_tasks: subTasks.value.map(st => ({
           type: st.type,

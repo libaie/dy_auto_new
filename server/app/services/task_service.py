@@ -3,9 +3,9 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy.orm import Session
-from sqlalchemy import update
+from sqlalchemy import update, or_, and_
 
-from app.db_models import Task as DBTask
+from app.db_models import Task as DBTask, Device as DBDevice
 from app.models import TaskType, TaskStatus, Task as PydanticTask
 from app.services.stats_service import stats_service
 
@@ -26,6 +26,8 @@ def _db_task_to_pydantic(task: DBTask) -> PydanticTask:
         completed_at=task.completed_at,
         result=task.result,
         retry_count=task.retry_count,
+        chain_instance_id=task.chain_instance_id,
+        step_order=task.step_order,
     )
 
 
@@ -39,10 +41,12 @@ class TaskService:
         account_id: str,
         params: dict,
         scheduled_at: Optional[datetime] = None,
+        device_id: Optional[str] = None,
     ) -> PydanticTask:
         db_task = DBTask(
             type=task_type.value,
             account_id=account_id,
+            device_id=device_id,
             params=params,
             status=TaskStatus.PENDING.value,
             scheduled_at=scheduled_at,
@@ -59,19 +63,47 @@ class TaskService:
         return _db_task_to_pydantic(db_task)
 
     def get_pending_task(self, db: Session, device_id: str) -> Optional[PydanticTask]:
-        """Claim a pending task using optimistic locking, respecting daily quotas."""
-        # Find oldest pending tasks (get a few candidates for quota filtering)
+        """Claim a pending task using optimistic locking, respecting daily quotas and device routing.
+
+        Routing rules:
+        - Directed task (task.device_id set) -> only that device can claim it
+        - Bound device (device.bound_account_id set) -> only tasks for that account
+        - Unbound device -> only tasks with no device_id AND whose account is not bound to any device
+        """
+        # 1. Look up the polling device's bound account
+        device = db.query(DBDevice).filter(DBDevice.id == device_id).first()
+        bound_account_id = device.bound_account_id if device else None
+
+        # 2. Build routing filter
+        if bound_account_id:
+            # Bound device: can claim directed tasks OR tasks for its bound account
+            route_filter = or_(
+                DBTask.device_id == device_id,
+                and_(DBTask.device_id.is_(None), DBTask.account_id == bound_account_id),
+            )
+        else:
+            # Unbound device: can claim directed tasks OR orphan tasks
+            # (tasks with no device_id whose account is not bound to any device)
+            bound_account_ids = db.query(DBDevice.bound_account_id).filter(
+                DBDevice.bound_account_id.isnot(None)
+            ).scalar_subquery()
+            route_filter = or_(
+                DBTask.device_id == device_id,
+                and_(DBTask.device_id.is_(None), ~DBTask.account_id.in_(bound_account_ids)),
+            )
+
+        # 3. Find candidate tasks with routing applied
         candidates = db.query(DBTask).filter(
             DBTask.status == TaskStatus.PENDING.value,
+            route_filter,
         ).order_by(DBTask.created_at.asc()).limit(10).all()
 
         if not candidates:
             return None
 
-        # Filter by daily quota
+        # 4. Filter by daily quota and claim via optimistic locking
         for db_task in candidates:
             if stats_service.check_quota(db, db_task.account_id, db_task.type):
-                # Quota available — try to claim this task
                 result = db.execute(
                     update(DBTask)
                     .where(DBTask.id == db_task.id, DBTask.status == TaskStatus.PENDING.value)
@@ -80,13 +112,11 @@ class TaskService:
                 db.commit()
 
                 if result.rowcount == 0:
-                    # Another device claimed it — try next candidate
                     continue
 
                 db.refresh(db_task)
                 return _db_task_to_pydantic(db_task)
 
-        # All candidates are over quota — return None (tasks stay pending for next day)
         return None
 
     def report_result(
@@ -100,6 +130,10 @@ class TaskService:
         db_task = db.query(DBTask).filter(DBTask.id == task_id).first()
         if not db_task:
             raise ValueError(f"Task {task_id} not found")
+
+        # Task already in terminal state — ignore late reports
+        if db_task.status in (TaskStatus.CANCELLED.value, TaskStatus.COMPLETED.value, TaskStatus.FAILED.value):
+            return _db_task_to_pydantic(db_task)
 
         if status == TaskStatus.COMPLETED:
             db_task.status = TaskStatus.COMPLETED.value
@@ -118,6 +152,11 @@ class TaskService:
                 db_task.status = TaskStatus.PENDING.value  # re-queue for retry
                 db_task.device_id = None
                 db_task.started_at = None
+
+        # Advance chain if this task is part of one
+        if db_task.chain_instance_id and db_task.status in ("completed", "failed"):
+            from app.services.chain_service import chain_service
+            chain_service.advance_chain(db, task_id, db_task.status, result)
 
         db.commit()
         db.refresh(db_task)

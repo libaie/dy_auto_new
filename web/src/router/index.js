@@ -23,6 +23,11 @@ const routes = [
         component: () => import('../views/AccountsPage.vue'),
       },
       {
+        path: 'account-groups',
+        name: 'AccountGroups',
+        component: () => import('../views/AccountGroupsPage.vue'),
+      },
+      {
         path: 'devices',
         name: 'Devices',
         component: () => import('../views/DevicesPage.vue'),
@@ -31,6 +36,16 @@ const routes = [
         path: 'tasks',
         name: 'Tasks',
         component: () => import('../views/TasksPage.vue'),
+      },
+      {
+        path: 'chain-templates',
+        name: 'ChainTemplates',
+        component: () => import('../views/ChainTemplatesPage.vue'),
+      },
+      {
+        path: 'chain-instances',
+        name: 'ChainInstances',
+        component: () => import('../views/ChainInstancesPage.vue'),
       },
       {
         path: 'selectors',

@@ -1,13 +1,18 @@
 """Shared test fixtures — uses a fresh in-memory SQLite DB per test session."""
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.db_models import Base
+from app.db_models import Base, Task, ChainInstance, DailyStats, AccountGroup, AccountGroupMember
 from app.database import get_db
 from app.main import app
 from app.seed import seed_accounts, seed_selectors
+
+# Tables to clean between tests (order matters for FK constraints)
+_CLEANUP_TABLES = [
+    Task, DailyStats, AccountGroupMember, AccountGroup, ChainInstance,
+]
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -42,14 +47,15 @@ def test_db():
 
 
 @pytest.fixture(autouse=True)
-def _rollback_after_test(test_db):
-    """Rollback any DB changes after each test for isolation."""
-    yield
-    # Create a session to rollback uncommitted changes
+def _isolate_test(test_db):
+    """Clean committed data before each test for full isolation."""
     TestSession = sessionmaker(bind=test_db, autocommit=False, autoflush=False)
     session = TestSession()
-    session.rollback()
+    for model in _CLEANUP_TABLES:
+        session.query(model).delete()
+    session.commit()
     session.close()
+    yield
 
 
 @pytest.fixture(autouse=True)

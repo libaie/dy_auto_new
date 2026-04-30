@@ -65,6 +65,7 @@ def test_max_retries(db):
 
 
 def test_list_tasks(db):
+    task_service.create_task(db, TaskType.NURTURE, "acc-001", {"duration": 5})
     tasks = task_service.list_tasks(db)
     assert len(tasks) > 0
 
@@ -80,6 +81,8 @@ def test_report_result_nonexistent_task(db):
 
 
 def test_list_tasks_with_pagination(db):
+    for i in range(4):
+        task_service.create_task(db, TaskType.NURTURE, "acc-001", {"duration": 5})
     tasks_page1 = task_service.list_tasks(db, skip=0, limit=2)
     tasks_page2 = task_service.list_tasks(db, skip=2, limit=2)
     assert len(tasks_page1) <= 2
@@ -89,6 +92,7 @@ def test_list_tasks_with_pagination(db):
 
 
 def test_count_tasks(db):
+    task_service.create_task(db, TaskType.NURTURE, "acc-001", {"duration": 5})
     total = task_service.count_tasks(db)
     assert total > 0
     pending_count = task_service.count_tasks(db, status=TaskStatus.PENDING)

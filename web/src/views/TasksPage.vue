@@ -92,6 +92,9 @@ const nurtureMode = ref('simple') // 'simple' or 'advanced'
 const subTasks = ref([{ type: 'browse', count: 10, content_template_id: '' }])
 const completionMode = ref('all')
 const maxDuration = ref(60)
+const nurtureKeywords = ref('')
+const nurtureKeywordMatrix = ref([])
+const nurtureKeywordGenerating = ref(false)
 
 const subTaskTypeOptions = [
   { value: 'browse', label: '浏览' },
@@ -249,6 +252,8 @@ function openCreateDialog() {
   selectionMode.value = 'single'
   selectedGroupIds.value = []
   createError.value = null
+  nurtureKeywords.value = ''
+  nurtureKeywordMatrix.value = []
   showCreateDialog.value = true
 }
 
@@ -267,7 +272,7 @@ function buildParams() {
       if (subTasks.value.length === 0) {
         throw new Error('高级模式下至少需要一个子任务')
       }
-      return {
+      const params = {
         sub_tasks: subTasks.value.map(st => ({
           type: st.type,
           count: st.count,
@@ -276,6 +281,12 @@ function buildParams() {
         completion_mode: completionMode.value,
         duration: maxDuration.value,
       }
+      // Include keywords if provided
+      const seeds = nurtureKeywords.value.split(/[,，\s]+/).map(s => s.trim()).filter(Boolean)
+      if (seeds.length > 0) {
+        params.keywords = seeds
+      }
+      return params
     }
     return {
       duration: form.duration,
@@ -392,6 +403,27 @@ async function handleCancel() {
     pageError.value = e.response?.data?.detail || '取消失败，请重试'
   } finally {
     cancelling.value = false
+  }
+}
+
+// --- Nurture keyword expansion ---
+async function expandNurtureKeywords() {
+  const seeds = nurtureKeywords.value.split(/[,，\s]+/).map(s => s.trim()).filter(Boolean)
+  if (seeds.length === 0) return
+  nurtureKeywordGenerating.value = true
+  try {
+    const allExpanded = []
+    for (const seed of seeds) {
+      const res = await generateKeywords(seed, 8)
+      allExpanded.push(...(res.data.keywords || []))
+    }
+    // Deduplicate
+    nurtureKeywordMatrix.value = [...new Set(allExpanded)]
+    toast.success(`已扩展 ${nurtureKeywordMatrix.value.length} 个关键词`)
+  } catch (e) {
+    toast.error('关键词扩展失败，请重试')
+  } finally {
+    nurtureKeywordGenerating.value = false
   }
 }
 
@@ -822,6 +854,36 @@ onMounted(() => {
                           <label class="block text-sm font-medium text-slate-300">最大时长（分钟） <TipIcon text="高级模式下整个养号任务的最大执行时间，超时自动停止" /></label>
                           <input v-model.number="maxDuration" type="number" min="1" max="240" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200" />
                         </div>
+                      </div>
+                    </div>
+
+                    <!-- 关键词过滤（可选） -->
+                    <div>
+                      <label class="block text-sm font-medium text-slate-300 mb-1">
+                        关键词过滤 <TipIcon text="输入种子关键词，AI 扩展为关键词矩阵。养号时只对匹配关键词的内容进行点赞/评论/关注，不匹配的内容直接跳过。留空则不限制" />
+                      </label>
+                      <div class="flex gap-2">
+                        <input
+                          v-model="nurtureKeywords"
+                          type="text"
+                          class="flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 placeholder-slate-500"
+                          placeholder="输入种子关键词，逗号分隔，如：养生,中医,食疗"
+                        />
+                        <button
+                          type="button"
+                          @click="expandNurtureKeywords"
+                          :disabled="nurtureKeywordGenerating || !nurtureKeywords.trim()"
+                          class="px-3 py-2 rounded-lg text-sm font-medium bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 disabled:opacity-50"
+                        >
+                          {{ nurtureKeywordGenerating ? '扩展中...' : 'AI 扩展' }}
+                        </button>
+                      </div>
+                      <div v-if="nurtureKeywordMatrix.length > 0" class="mt-2 flex flex-wrap gap-1.5">
+                        <span v-for="(kw, idx) in nurtureKeywordMatrix" :key="idx"
+                          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-purple-500/20 text-purple-300">
+                          {{ kw }}
+                          <button type="button" @click="nurtureKeywordMatrix.splice(idx, 1)" class="hover:text-purple-100">&times;</button>
+                        </span>
                       </div>
                     </div>
                   </template>

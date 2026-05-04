@@ -51,6 +51,45 @@ async def _maybe_resolve_template(db: Session, params: dict, task_type: str) -> 
     return params
 
 
+async def _maybe_expand_keywords(params: dict, task_type: str) -> dict:
+    """If nurture task has keywords (seed), expand them into keyword_matrix via AI."""
+    if task_type != "nurture":
+        return params
+
+    keywords = params.get("keywords")
+    if not keywords or not isinstance(keywords, list) or len(keywords) == 0:
+        return params
+
+    # Skip if keyword_matrix already provided
+    if params.get("keyword_matrix"):
+        return params
+
+    try:
+        from app.services.content_service import content_service
+        all_expanded = []
+        for seed in keywords:
+            seed = str(seed).strip()
+            if not seed:
+                continue
+            expanded = await content_service.generate_keyword_matrix(seed, 8)
+            all_expanded.extend(expanded)
+        # Deduplicate while preserving order
+        seen = set()
+        unique = []
+        for kw in all_expanded:
+            if kw not in seen:
+                seen.add(kw)
+                unique.append(kw)
+        params["keyword_matrix"] = unique
+        logger.info("Expanded %d seed keywords into %d matrix keywords", len(keywords), len(unique))
+    except Exception as e:
+        logger.warning("Failed to expand keywords for nurture task: %s", e)
+        # Fallback: use seed keywords as-is
+        params["keyword_matrix"] = [str(k).strip() for k in keywords if str(k).strip()]
+
+    return params
+
+
 @router.post("")
 async def create_task(
     request: TaskCreateRequest,
@@ -82,6 +121,7 @@ async def create_task(
         if device.bound_account_id and device.bound_account_id != request.account_id:
             raise HTTPException(status_code=400, detail="该设备绑定的账号与任务账号不一致")
 
+    params = await _maybe_expand_keywords(params, request.type.value)
     params = await _maybe_resolve_template(db, params, request.type.value)
     task = task_service.create_task(
         db=db,
@@ -159,6 +199,8 @@ async def batch_create_tasks(
 
     # Create a task per account (每账号独立解析模板，避免内容雷同)
     from app.ws_manager import pair_ws_manager
+    # Expand keywords once (shared across all accounts)
+    params = await _maybe_expand_keywords(params, request.type.value)
     created_tasks = []
     for account_id in account_ids:
         account_params = await _maybe_resolve_template(db, dict(params), request.type.value)

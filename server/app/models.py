@@ -410,6 +410,8 @@ class NurtureParamsV2(BaseModel):
     sub_tasks: list[NurtureSubTask] = Field(..., min_length=1)
     completion_mode: str = Field(default="all", pattern="^(all|any)$")
     duration: int = Field(default=60, ge=1, le=240, description="最大时长(分钟)")
+    keywords: Optional[list[str]] = Field(default=None, description="种子关键词，AI 扩展为关键词矩阵")
+    keyword_matrix: Optional[list[str]] = Field(default=None, description="AI 扩展后的关键词矩阵（自动生成）")
 
 
 # --- 关键词矩阵 ---

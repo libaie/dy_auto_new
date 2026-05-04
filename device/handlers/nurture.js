@@ -13,6 +13,7 @@ var TAG = "养号";
  *   - sub_tasks: Array<{ type: string, count: number, content_template_id?: string }>
  *   - completion_mode: "all" | "any"
  *   - duration: number (最大时长，分钟)
+ *   - keyword_matrix: string[] (可选，AI 扩展的关键词矩阵，用于内容语义过滤)
  * Legacy params:
  *   - duration: number (养号时长，分钟)
  *   - actions: Array<{ type: string, weight: number }>
@@ -34,7 +35,11 @@ NurtureHandler._executeV2 = function (params) {
   var maxDuration = (params.duration || 60) * 60 * 1000;
   var startTime = Date.now();
 
-  logger.info(TAG, "开始养号 V2, 子任务数=" + subTasks.length + ", 模式=" + completionMode);
+  // Store keyword matrix for content filtering
+  this._keywordMatrix = params.keyword_matrix || [];
+
+  logger.info(TAG, "开始养号 V2, 子任务数=" + subTasks.length + ", 模式=" + completionMode +
+    (this._keywordMatrix.length > 0 ? ", 关键词=" + this._keywordMatrix.length + "个" : ""));
 
   if (!this.ensureAppActive()) {
     return { success: false, error: "Failed to open Douyin" };
@@ -223,6 +228,52 @@ NurtureHandler._isAdContent = function () {
 };
 
 /**
+ * 检查当前视频内容是否与关键词矩阵相关
+ * 先做本地关键词匹配，匹配不到再用 AI 语义分析
+ * @param {string} videoText - 视频文本内容
+ * @returns {boolean} true=相关或无关键词过滤, false=不相关
+ */
+NurtureHandler._isKeywordRelevant = function (videoText) {
+  if (!this._keywordMatrix || this._keywordMatrix.length === 0) return true;
+  if (!videoText || videoText.length < 2) return true;
+
+  var t = videoText.toLowerCase();
+
+  // 本地关键词匹配 — 快速判断
+  for (var i = 0; i < this._keywordMatrix.length; i++) {
+    if (t.indexOf(this._keywordMatrix[i].toLowerCase()) !== -1) {
+      logger.debug(TAG, "本地命中关键词: " + this._keywordMatrix[i]);
+      return true;
+    }
+  }
+
+  // 本地未命中，用 AI 做语义分析
+  var keywords = this._keywordMatrix.join("、");
+  var prompt = "判断以下抖音视频内容是否与下列关键词相关。\n\n" +
+    "关键词：" + keywords + "\n\n" +
+    "内容：" + videoText.substring(0, 300) + "\n\n" +
+    "只回答一个JSON：{\"related\": true/false, \"reason\": \"简短原因\"}";
+
+  var content = aiAnalyzer._callAI(prompt, 100, 0.1);
+  if (!content) {
+    logger.warn(TAG, "关键词语义分析失败，默认放行");
+    return true;
+  }
+
+  try {
+    var jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      var data = JSON.parse(jsonMatch[0]);
+      logger.info(TAG, "关键词相关性: " + (data.related ? "相关" : "不相关") + " - " + (data.reason || ""));
+      return !!data.related;
+    }
+  } catch (e) {
+    logger.warn(TAG, "关键词语义分析解析失败: " + e.message);
+  }
+  return true;
+};
+
+/**
  * 评估当前视频内容质量 — 基于可见的互动数据
  * @returns {"high" | "medium" | "low"}
  */
@@ -323,6 +374,10 @@ NurtureHandler._likeCurrentVideo = function () {
     return;
   }
   var videoText = this._extractVideoText();
+  if (!this._isKeywordRelevant(videoText)) {
+    logger.info(TAG, "内容与关键词不相关，跳过点赞");
+    return;
+  }
   if (!aiAnalyzer.checkHealthRelevance(videoText)) {
     logger.info(TAG, "内容与大健康不相关，跳过点赞");
     return;
@@ -338,8 +393,12 @@ NurtureHandler._commentOnVideo = function (templateId) {
     logger.info(TAG, "广告内容，跳过评论");
     return;
   }
-  // 1. 提取视频内容，AI 生成评论
   var videoText = this._extractVideoText();
+  if (!this._isKeywordRelevant(videoText)) {
+    logger.info(TAG, "内容与关键词不相关，跳过评论");
+    return;
+  }
+  // 1. AI 生成评论
   var content = aiAnalyzer.generateVideoComment(videoText);
   if (!content) {
     logger.warn(TAG, "AI 生成评论失败，跳过评论");
@@ -391,6 +450,10 @@ NurtureHandler._followCurrentUser = function () {
     return;
   }
   var videoText = this._extractVideoText();
+  if (!this._isKeywordRelevant(videoText)) {
+    logger.info(TAG, "内容与关键词不相关，跳过关注");
+    return;
+  }
   if (!aiAnalyzer.checkHealthRelevance(videoText)) {
     logger.info(TAG, "内容与大健康不相关，跳过关注");
     return;

@@ -130,11 +130,9 @@ NurtureHandler._browseFeed = function () {
 };
 
 NurtureHandler._watchVideo = function () {
-  // 先检测是否是广告 — 广告快速划走
+  // 先检测是否是广告 — 广告直接跳过
   if (this._isAdContent()) {
-    var adTime = Math.floor(Math.random() * 1500 + 500);
-    logger.debug(TAG, "检测到广告，快速划走 " + adTime + "ms");
-    sleep(adTime);
+    logger.info(TAG, "检测到广告，直接跳过");
     return;
   }
 
@@ -194,18 +192,28 @@ NurtureHandler._humanDuration = function (min, max, median) {
 NurtureHandler._isAdContent = function () {
   try {
     // 常见广告标识文本
-    var adTexts = ["广告", "推广", "赞助", "购物", "立即购买", "查看详情"];
+    var adTexts = [
+      "广告", "推广", "赞助", "购物", "立即购买", "查看详情",
+      "立即下载", "免费领取", "限时优惠", "立即抢购", "点击购买",
+      "小黄车", "商品橱窗", "去购买", "马上抢",
+    ];
     for (var i = 0; i < adTexts.length; i++) {
       var el = textContains(adTexts[i]).findOnce();
       if (el) {
-        logger.debug(TAG, "发现广告标识: " + adTexts[i]);
+        logger.info(TAG, "发现广告标识: " + adTexts[i]);
         return true;
       }
     }
     // 检查是否在购物/商品页面（右下角有购物车图标）
     var shopBtn = desc("购物车").findOnce();
     if (shopBtn) {
-      logger.debug(TAG, "发现购物车标识，判定为广告");
+      logger.info(TAG, "发现购物车标识，判定为广告");
+      return true;
+    }
+    // 检查带货标签
+    var sellTags = descContains("购物车").findOnce();
+    if (sellTags) {
+      logger.info(TAG, "发现带货标签，判定为广告");
       return true;
     }
   } catch (e) {
@@ -310,6 +318,10 @@ NurtureHandler._ensureOnFeed = function () {
 };
 
 NurtureHandler._likeCurrentVideo = function () {
+  if (this._isAdContent()) {
+    logger.info(TAG, "广告内容，跳过点赞");
+    return;
+  }
   var videoText = this._extractVideoText();
   if (!aiAnalyzer.checkHealthRelevance(videoText)) {
     logger.info(TAG, "内容与大健康不相关，跳过点赞");
@@ -322,6 +334,10 @@ NurtureHandler._likeCurrentVideo = function () {
 };
 
 NurtureHandler._commentOnVideo = function (templateId) {
+  if (this._isAdContent()) {
+    logger.info(TAG, "广告内容，跳过评论");
+    return;
+  }
   // 1. 提取视频内容，AI 生成评论
   var videoText = this._extractVideoText();
   var content = aiAnalyzer.generateVideoComment(videoText);
@@ -370,6 +386,10 @@ NurtureHandler._commentOnVideo = function (templateId) {
 };
 
 NurtureHandler._followCurrentUser = function () {
+  if (this._isAdContent()) {
+    logger.info(TAG, "广告内容，跳过关注");
+    return;
+  }
   var videoText = this._extractVideoText();
   if (!aiAnalyzer.checkHealthRelevance(videoText)) {
     logger.info(TAG, "内容与大健康不相关，跳过关注");

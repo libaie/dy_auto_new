@@ -4,7 +4,7 @@ from typing import Any
 
 import httpx
 
-from app.config import AI_API_KEY, AI_BASE_URL, AI_MODEL, AI_PROVIDER, AI_MAX_RETRIES
+from app.config import AI_MAX_RETRIES
 from app.services.content_service import content_service
 
 logger = logging.getLogger(__name__)
@@ -51,7 +51,7 @@ class AiGeneratorService:
         """Generate content from template + context. Retries if sensitive words detected.
 
         Args:
-            db: SQLAlchemy session (for sensitive word lookup)
+            db: SQLAlchemy session (for sensitive word lookup and config)
             template_body: Template text with {variable} placeholders already substituted
             context: Additional context for the AI prompt
 
@@ -62,21 +62,23 @@ class AiGeneratorService:
             RuntimeError: If AI API is not configured or all retries fail
             ValueError: If all retries produce sensitive content
         """
-        if not AI_API_KEY:
-            raise RuntimeError("AI_API_KEY not configured. Set the environment variable.")
+        from app.config import get_ai_config_with_key
+        ai_cfg = get_ai_config_with_key(db)
+        if not ai_cfg or not ai_cfg.get("api_key"):
+            raise RuntimeError("AI API not configured. Set AI_API_KEY env var or save in Settings page.")
 
         user_prompt = self._build_prompt(template_body, context)
 
         for attempt in range(AI_MAX_RETRIES):
             try:
-                content = await self._call_api(user_prompt)
+                content = await self._call_api(ai_cfg, user_prompt)
             except httpx.HTTPError as e:
                 logger.warning("AI API call failed (attempt %d/%d): %s", attempt + 1, AI_MAX_RETRIES, e)
                 if attempt == AI_MAX_RETRIES - 1:
                     raise RuntimeError(f"AI API failed after {AI_MAX_RETRIES} attempts: {e}") from e
                 continue
 
-            if content_service.contains_sensitive(db, content):
+            if db and content_service.contains_sensitive(db, content):
                 logger.info("Generated content contains sensitive words, retrying (%d/%d)", attempt + 1, AI_MAX_RETRIES)
                 if attempt == AI_MAX_RETRIES - 1:
                     raise ValueError("All generated content contained sensitive words after max retries")
@@ -84,24 +86,27 @@ class AiGeneratorService:
 
             return content
 
-    async def _call_api(self, user_prompt: str) -> str:
-        """Call the AI API and return the generated text. Dispatches by AI_PROVIDER."""
-        if AI_PROVIDER == "openai":
-            return await self._call_openai(user_prompt)
-        return await self._call_anthropic(user_prompt)
+    async def _call_api(self, cfg: dict, user_prompt: str) -> str:
+        """Call the AI API and return the generated text. Dispatches by provider."""
+        api_url = cfg.get("api_url", "")
+        # Anthropic uses /v1/messages; OpenAI-compatible uses /v1/chat/completions
+        if "/v1/messages" in api_url:
+            return await self._call_anthropic(cfg, user_prompt)
+        return await self._call_openai(cfg, user_prompt)
 
-    async def _call_anthropic(self, user_prompt: str) -> str:
+    async def _call_anthropic(self, cfg: dict, user_prompt: str) -> str:
         """Call Anthropic Messages API."""
         client = self._get_client()
+        base_url = cfg["api_url"].rstrip("/").rsplit("/v1/messages", 1)[0]
         response = await client.post(
-            f"{AI_BASE_URL.rstrip('/')}/v1/messages",
+            f"{base_url}/v1/messages",
             headers={
-                "x-api-key": AI_API_KEY,
+                "x-api-key": cfg["api_key"],
                 "anthropic-version": "2023-06-01",
                 "content-type": "application/json",
             },
             json={
-                "model": AI_MODEL,
+                "model": cfg.get("model", "claude-3-haiku-20240307"),
                 "max_tokens": 200,
                 "system": SYSTEM_PROMPT,
                 "messages": [{"role": "user", "content": user_prompt}],
@@ -111,17 +116,17 @@ class AiGeneratorService:
         data = response.json()
         return data["content"][0]["text"].strip()
 
-    async def _call_openai(self, user_prompt: str) -> str:
+    async def _call_openai(self, cfg: dict, user_prompt: str) -> str:
         """Call OpenAI-compatible Chat Completions API."""
         client = self._get_client()
         response = await client.post(
-            f"{AI_BASE_URL.rstrip('/')}/v1/chat/completions",
+            cfg["api_url"],
             headers={
-                "Authorization": f"Bearer {AI_API_KEY}",
+                "Authorization": f"Bearer {cfg['api_key']}",
                 "content-type": "application/json",
             },
             json={
-                "model": AI_MODEL,
+                "model": cfg.get("model", "deepseek-chat"),
                 "max_tokens": 200,
                 "messages": [
                     {"role": "system", "content": SYSTEM_PROMPT},

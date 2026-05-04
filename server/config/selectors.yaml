@@ -1,8 +1,13 @@
 # UI 选择器配置 — 抖音 UI 变更时在此修改
 # 策略类型: text(控件文本), id(控件ID), desc(内容描述), className(类名), package(包名),
 #           coordinate(坐标百分比), image(以图找图, template=文件名, threshold=阈值)
-version: 1
+version: 2
 selectors:
+  - action_name: "back_btn"
+    strategies:
+      - { type: "desc", value: "返回", priority: 1 }
+      - { type: "id", value: "com.ss.android.ugc.aweme:id/back_btn", priority: 2 }
+
   - action_name: "open_app"
     strategies:
       - { type: "package", value: "com.ss.android.ugc.aweme", priority: 1 }
@@ -26,9 +31,18 @@ selectors:
     strategies:
       - { type: "id", value: "recycler_view", priority: 1 }
 
+  - action_name: "search_suggestion_list"
+    strategies:
+      - { type: "id", value: "recycler_view", priority: 1 }
+
   - action_name: "video_tab"
     strategies:
       - { type: "id", value: "text1", priority: 1 }
+
+  - action_name: "search_video_tab"
+    strategies:
+      - { type: "text", value: "视频", priority: 1 }
+      - { type: "id", value: "text1", priority: 2 }
 
   - action_name: "sort_button"
     strategies:
@@ -52,9 +66,9 @@ selectors:
 
   - action_name: "like_button"
     strategies:
-      - { type: "text", value: "赞", priority: 1 }
-      - { type: "desc", value: "点赞", priority: 2 }
-      - { type: "id", value: "com.ss.android.ugc.aweme:id/like_icon", priority: 3 }
+      - { type: "id", value: "com.ss.android.ugc.aweme:id/gle", priority: 1 }
+      - { type: "text", value: "赞", priority: 2 }
+      - { type: "desc", value: "点赞", priority: 3 }
 
   - action_name: "comment_input"
     strategies:
@@ -69,8 +83,9 @@ selectors:
 
   - action_name: "follow_button"
     strategies:
-      - { type: "text", value: "关注", priority: 1 }
-      - { type: "desc", value: "关注", priority: 2 }
+      - { type: "id", value: "com.ss.android.ugc.aweme:id/jym", priority: 1 }
+      - { type: "text", value: "关注", priority: 2 }
+      - { type: "desc", value: "关注", priority: 3 }
 
   - action_name: "profile_more"
     strategies:

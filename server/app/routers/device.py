@@ -5,9 +5,9 @@ from sqlalchemy.orm import Session
 import asyncio
 import io
 
-from app.models import TaskResultReport, PollResponse, DeviceRegisterRequest, DeviceRegisterResponse, RiskReport, DeviceGenerateRequest, DeviceGenerateResponse, PairRequestCreate, PairStatusResponse
+from app.models import TaskResultReport, PollResponse, DeviceRegisterRequest, DeviceRegisterResponse, RiskReport, DeviceGenerateRequest, DeviceGenerateResponse, DeviceAIProxyRequest, DeviceAIProxyResponse, PairRequestCreate, PairStatusResponse
 from app.database import get_db
-from app.deps import verify_device_secret
+from app.deps import verify_device_secret, verify_admin_token
 from app.services.task_service import task_service
 from app.config import ANTI_DETECT_CONFIG, ANTI_DETECT_CONFIG_VERSION, DEVICE_CONFIG
 from app.services.selector_service import selector_service
@@ -141,21 +141,18 @@ async def create_pair_request(
     return PairStatusResponse(pairing_token=token, status="pending")
 
 
-def _build_approved_payload(pair_req) -> dict:
+def _build_approved_payload(pair_req, db=None) -> dict:
     """Build the approved response payload (shared by HTTP and WS)."""
-    from app.config import DEVICE_CONFIG, ANTI_DETECT_CONFIG, ANTI_DETECT_CONFIG_VERSION, AI_API_KEY, AI_BASE_URL, AI_MODEL
+    from app.config import DEVICE_CONFIG, ANTI_DETECT_CONFIG, ANTI_DETECT_CONFIG_VERSION, get_ai_config
 
     config = {
         **DEVICE_CONFIG,
         "anti_detect_config": ANTI_DETECT_CONFIG,
         "anti_detect_config_version": ANTI_DETECT_CONFIG_VERSION,
     }
-    if AI_API_KEY:
-        config["ai_config"] = {
-            "api_key": AI_API_KEY,
-            "api_url": f"{AI_BASE_URL}/v1/chat/completions",
-            "model": AI_MODEL,
-        }
+    ai_cfg = get_ai_config(db)
+    if ai_cfg:
+        config["ai_config"] = ai_cfg
 
     return {
         "status": "approved",
@@ -337,8 +334,14 @@ async def ws_device_status(websocket: WebSocket, device_id: str = Query(""), sec
 def poll_tasks(
     device_id: str = Query(...),
     db: Session = Depends(get_db),
-    _: None = Depends(verify_device_secret),
+    authed_device_id: Optional[str] = Depends(verify_device_secret),
 ):
+    # Per-device secret: use the verified device_id, reject mismatch
+    if authed_device_id and authed_device_id != device_id:
+        raise HTTPException(status_code=403, detail="Device ID mismatch")
+    if authed_device_id:
+        device_id = authed_device_id
+
     task = task_service.get_pending_task(db, device_id)
     version = selector_service.get_version(db)
 
@@ -348,7 +351,7 @@ def poll_tasks(
 
     cancelled_task = task_service.check_cancelled_running(db, device_id)
 
-    from app.config import AI_API_KEY, AI_BASE_URL, AI_MODEL
+    from app.config import get_ai_config
 
     return PollResponse(
         task=task,
@@ -357,11 +360,7 @@ def poll_tasks(
         cancelled_task_id=cancelled_task.id if cancelled_task else None,
         anti_detect_config=ANTI_DETECT_CONFIG,
         anti_detect_config_version=ANTI_DETECT_CONFIG_VERSION,
-        ai_config={
-            "api_key": AI_API_KEY,
-            "api_url": f"{AI_BASE_URL}/v1/chat/completions",
-            "model": AI_MODEL,
-        } if AI_API_KEY else None,
+        ai_config=get_ai_config(db),
         device_config=DEVICE_CONFIG,
     )
 
@@ -370,8 +369,17 @@ def poll_tasks(
 def report_result(
     report: TaskResultReport,
     db: Session = Depends(get_db),
-    _: None = Depends(verify_device_secret),
+    authed_device_id: Optional[str] = Depends(verify_device_secret),
 ):
+    # Per-device secret: verify the task belongs to this device
+    if authed_device_id:
+        from app.db_models import Task as DBTask
+        db_task = db.query(DBTask).filter(DBTask.id == report.task_id).first()
+        if not db_task:
+            raise HTTPException(status_code=404, detail="Task not found")
+        if db_task.device_id and db_task.device_id != authed_device_id:
+            raise HTTPException(status_code=403, detail="Task does not belong to this device")
+
     try:
         task = task_service.report_result(
             db=db,
@@ -390,9 +398,15 @@ async def heartbeat(
     body: dict,
     raw_request: Request,
     db: Session = Depends(get_db),
-    _: None = Depends(verify_device_secret),
+    authed_device_id: Optional[str] = Depends(verify_device_secret),
 ):
     device_id = body.get("device_id", "")
+    # Per-device secret: use the verified device_id, reject mismatch
+    if authed_device_id and authed_device_id != device_id:
+        raise HTTPException(status_code=403, detail="Device ID mismatch")
+    if authed_device_id:
+        device_id = authed_device_id
+
     client_ip = raw_request.headers.get("x-forwarded-for", "").split(",")[0].strip()
     if not client_ip:
         client_ip = raw_request.client.host if raw_request.client else ""
@@ -412,10 +426,13 @@ def register_device(
     request: DeviceRegisterRequest,
     raw_request: Request,
     db: Session = Depends(get_db),
-    _: None = Depends(verify_device_secret),
+    authed_device_id: Optional[str] = Depends(verify_device_secret),
 ):
+    # Per-device secret: reject mismatch
+    if authed_device_id and authed_device_id != request.device_id:
+        raise HTTPException(status_code=403, detail="Device ID mismatch")
     from app.services.device_service import device_service
-    from app.config import AI_API_KEY, AI_BASE_URL, AI_MODEL
+    from app.config import get_ai_config
 
     # Capture client IP
     client_ip = raw_request.headers.get("x-forwarded-for", "").split(",")[0].strip()
@@ -442,12 +459,9 @@ def register_device(
         "anti_detect_config": ANTI_DETECT_CONFIG,
         "anti_detect_config_version": ANTI_DETECT_CONFIG_VERSION,
     }
-    if AI_API_KEY:
-        config["ai_config"] = {
-            "api_key": AI_API_KEY,
-            "api_url": f"{AI_BASE_URL}/v1/chat/completions",
-            "model": AI_MODEL,
-        }
+    ai_cfg = get_ai_config(db)
+    if ai_cfg:
+        config["ai_config"] = ai_cfg
 
     return DeviceRegisterResponse(
         device_id=result["device_id"],
@@ -502,7 +516,7 @@ def script_download(
 @router.post("/script-upload")
 async def script_upload(
     file: UploadFile = FastAPIFile(...),
-    _: None = Depends(verify_device_secret),
+    _: str = Depends(verify_admin_token),
 ):
     from app.services.script_service import script_service
     if not file.filename.endswith(".zip"):
@@ -554,3 +568,43 @@ async def generate_content(
         raise HTTPException(status_code=502, detail=f"AI service error: {e}")
 
     return DeviceGenerateResponse(content=content, template_id=request.template_id)
+
+
+@router.post("/ai-proxy", response_model=DeviceAIProxyResponse)
+async def ai_proxy(
+    request: DeviceAIProxyRequest,
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_device_secret),
+):
+    """设备端 AI 代理 — 设备不持有 API Key，通过服务端调用 AI。"""
+    import httpx
+    from app.config import get_ai_config_with_key
+
+    ai_cfg = get_ai_config_with_key(db)
+    if not ai_cfg or not ai_cfg.get("api_url"):
+        raise HTTPException(status_code=503, detail="AI service not configured")
+
+    try:
+        async with httpx.AsyncClient(timeout=60) as client:
+            resp = await client.post(
+                ai_cfg["api_url"],
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {ai_cfg.get('api_key', '')}",
+                },
+                json={
+                    "model": ai_cfg.get("model", "deepseek-chat"),
+                    "max_tokens": request.max_tokens,
+                    "temperature": request.temperature,
+                    "messages": [{"role": "user", "content": request.prompt}],
+                },
+            )
+        if resp.status_code != 200:
+            raise HTTPException(status_code=502, detail=f"AI API error: {resp.status_code}")
+        result = resp.json()
+        content = result["choices"][0]["message"]["content"].strip()
+        return DeviceAIProxyResponse(content=content)
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="AI API timeout")
+    except (KeyError, IndexError) as e:
+        raise HTTPException(status_code=502, detail=f"Invalid AI response: {e}")

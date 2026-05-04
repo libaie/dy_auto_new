@@ -300,7 +300,14 @@ var apiClient = {
     if (body) {
       var scriptDir = files.cwd() + "/update";
       files.ensureDir(scriptDir);
-      files.writeBytes(scriptDir + "/device-script.zip", body);
+      var zipPath = scriptDir + "/device-script.zip";
+      files.writeBytes(zipPath, body);
+      // 验证文件确实写入成功
+      if (!files.exists(zipPath)) {
+        logger.error(TAG, "下载完成但文件不存在: " + zipPath);
+        return false;
+      }
+      logger.info(TAG, "脚本已下载: " + zipPath + " (" + body.length + " bytes)");
       return true;
     }
     logger.error(TAG, "脚本下载所有重试均失败");

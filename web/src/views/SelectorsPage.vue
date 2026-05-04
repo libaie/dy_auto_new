@@ -20,6 +20,40 @@ import {
   deleteSelector,
   toggleSelector,
 } from '../api/selectors.js'
+import { useToastStore } from '../stores/toast.js'
+
+// 动作名称中文说明
+const actionDescriptions = {
+  back_btn: '返回按钮',
+  open_app: '打开抖音 App',
+  video_comment_btn: '视频评论入口按钮（点击打开评论面板）',
+  video_comment_input: '视频评论输入框（需先点击弹出键盘）',
+  search_tab: '搜索标签页入口',
+  search_input: '搜索输入框',
+  search_button: '搜索按钮',
+  search_suggestion: '搜索建议词',
+  video_tab: '视频标签页',
+  video_author_avatar: '视频作者头像（点击进入主页）',
+  sort_button: '排序按钮',
+  sort_latest: '最新排序选项',
+  sort_most_liked: '最多点赞排序选项',
+  sort_default: '默认排序选项',
+  like_button: '点赞按钮',
+  follow_button: '关注按钮',
+  comment_input: '评论输入框',
+  comment_submit: '评论提交按钮',
+  comment_reply_button: '评论回复按钮',
+  comment_list: '评论列表容器',
+  comment_text: '评论内容文本',
+  comment_author: '评论作者昵称',
+  comment_time: '评论发布时间',
+  comment_like_count: '评论点赞数',
+  comment_author_avatar: '评论作者头像',
+  message_button: '私信按钮',
+  dm_input: '私信输入框',
+  dm_send: '私信发送按钮',
+  profile_more: '个人主页更多菜单',
+}
 
 // Tooltip content for each field
 const tooltips = {
@@ -74,6 +108,7 @@ const deleting = ref(false)
 
 // --- Page-level error ---
 const pageError = ref(null)
+const toast = useToastStore()
 
 // --- Fetch selectors ---
 async function fetchSelectors() {
@@ -82,7 +117,7 @@ async function fetchSelectors() {
     const res = await listSelectors(includeDisabled.value)
     selectors.value = res.data.selectors || []
   } catch (e) {
-    console.error('Failed to fetch selectors:', e)
+    toast.error('加载选择器列表失败')
     selectors.value = []
   } finally {
     loading.value = false
@@ -210,27 +245,27 @@ onMounted(fetchSelectors)
 <template>
   <div>
     <!-- Page error banner -->
-    <div v-if="pageError" class="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded flex items-center justify-between">
+    <div v-if="pageError" class="mb-4 glass-card border-red-500/30 text-red-400 px-4 py-3 rounded-xl flex items-center justify-between">
       <span>{{ pageError }}</span>
-      <button class="text-red-500 hover:text-red-700 font-bold" @click="pageError = null">&times;</button>
+      <button class="text-red-400 hover:text-red-300 font-bold" @click="pageError = null">&times;</button>
     </div>
 
     <!-- Header -->
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-bold text-gray-800">选择器管理</h1>
+      <h1 class="text-2xl font-bold text-white">选择器管理</h1>
       <div class="flex items-center gap-4">
         <!-- Include disabled toggle -->
-        <label class="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+        <label class="flex items-center gap-2 text-sm text-slate-400 cursor-pointer select-none">
           <input
             v-model="includeDisabled"
             type="checkbox"
-            class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+            class="h-4 w-4 rounded border-white/20 bg-white/5 text-purple-500 focus:ring-purple-500"
           />
           显示已禁用
         </label>
         <!-- Add button -->
         <button
-          class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 transition-colors"
+          class="inline-flex items-center px-4 py-2 btn-aurora text-sm font-medium rounded-xl transition-colors"
           @click="openCreateDialog"
         >
           <svg
@@ -243,7 +278,7 @@ onMounted(fetchSelectors)
               d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
             />
           </svg>
-          添加选择器
+          <span class="relative z-10">添加选择器</span>
         </button>
       </div>
     </div>
@@ -260,7 +295,7 @@ onMounted(fetchSelectors)
         v-for="sel in selectors"
         :key="sel.action_name"
         :class="[
-          'rounded-lg border border-gray-200 bg-white p-5 shadow-sm transition-opacity',
+          'glass-card p-5 transition-opacity',
           !sel.enabled && 'opacity-50',
         ]"
       >
@@ -268,31 +303,34 @@ onMounted(fetchSelectors)
           <!-- Left: info -->
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-3 flex-wrap">
-              <span class="font-mono text-base font-semibold text-gray-900" :title="'动作名称：' + sel.action_name">
+              <span class="font-mono text-base font-semibold text-white" :title="'动作名称：' + sel.action_name">
                 {{ sel.action_name }}
               </span>
+              <span v-if="actionDescriptions[sel.action_name]" class="text-sm text-slate-400">
+                {{ actionDescriptions[sel.action_name] }}
+              </span>
               <span
-                class="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-700"
+                class="inline-flex items-center rounded-full bg-purple-500/15 text-purple-300 border border-purple-500/25 px-2.5 py-0.5 text-xs font-medium"
                 :title="'选择器版本号，每次修改自动递增'"
               >
                 v{{ sel.version }}
               </span>
               <span
                 v-if="sel.platform_version"
-                class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600"
+                class="inline-flex items-center rounded-full bg-slate-500/15 text-slate-300 border border-slate-500/25 px-2.5 py-0.5 text-xs font-medium"
                 :title="'适配的抖音版本：' + sel.platform_version"
               >
                 平台 {{ sel.platform_version }}
               </span>
               <span
                 v-if="!sel.enabled"
-                class="inline-flex items-center rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-medium text-red-700"
+                class="inline-flex items-center rounded-full bg-red-500/10 text-red-400 border border-red-500/20 px-2.5 py-0.5 text-xs font-medium"
                 title="此选择器已禁用，设备端不会使用"
               >
                 已禁用
               </span>
             </div>
-            <p class="mt-2 text-sm text-gray-500" :title="'策略详情：' + JSON.stringify(sel.strategies)">
+            <p class="mt-2 text-sm text-slate-400" :title="'策略详情：' + JSON.stringify(sel.strategies)">
               {{ formatStrategies(sel.strategies) }}
             </p>
           </div>
@@ -302,13 +340,13 @@ onMounted(fetchSelectors)
             <!-- Toggle switch -->
             <SwitchGroup>
               <div class="flex items-center gap-2">
-                <SwitchLabel class="text-sm text-gray-500 cursor-pointer">
+                <SwitchLabel class="text-sm text-slate-400 cursor-pointer">
                   {{ sel.enabled ? '启用' : '禁用' }}
                 </SwitchLabel>
                 <Switch
                   :model-value="sel.enabled"
-                  :class="sel.enabled ? 'bg-indigo-600' : 'bg-gray-200'"
-                  class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                  :class="sel.enabled ? 'bg-indigo-600' : 'bg-slate-600'"
+                  class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-0"
                   @update:model-value="(val) => handleToggle(sel, val)"
                 >
                   <span
@@ -321,7 +359,7 @@ onMounted(fetchSelectors)
 
             <!-- Edit button -->
             <button
-              class="inline-flex items-center px-3 py-1 text-sm font-medium text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded transition-colors"
+              class="inline-flex items-center px-3 py-1 text-sm font-medium text-cyan-400 hover:text-cyan-300 hover:bg-cyan-400/10 rounded transition-colors"
               @click="openEditDialog(sel)"
             >
               编辑
@@ -329,7 +367,7 @@ onMounted(fetchSelectors)
 
             <!-- Delete button -->
             <button
-              class="inline-flex items-center px-3 py-1 text-sm font-medium text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+              class="inline-flex items-center px-3 py-1 text-sm font-medium text-red-400 hover:text-red-300 hover:bg-red-400/10 rounded transition-colors"
               @click="openDeleteDialog(sel)"
             >
               删除
@@ -355,7 +393,7 @@ onMounted(fetchSelectors)
           leave-from="opacity-100"
           leave-to="opacity-0"
         >
-          <div class="fixed inset-0 bg-black/30" />
+          <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" />
         </TransitionChild>
 
         <div class="fixed inset-0 overflow-y-auto">
@@ -370,16 +408,16 @@ onMounted(fetchSelectors)
               leave-to="opacity-0 scale-95"
             >
               <DialogPanel
-                class="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl"
+                class="w-full max-w-lg glass-card p-6 gradient-border"
               >
-                <DialogTitle class="text-lg font-medium text-gray-900">
+                <DialogTitle class="text-lg font-medium text-white">
                   {{ isEditing ? '编辑选择器' : '添加选择器' }}
                 </DialogTitle>
 
                 <!-- Error message -->
                 <div
                   v-if="formError"
-                  class="mt-3 bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2 rounded"
+                  class="mt-3 bg-red-500/10 border border-red-500/20 text-red-400 text-sm px-3 py-2 rounded-lg"
                 >
                   {{ formError }}
                 </div>
@@ -389,16 +427,16 @@ onMounted(fetchSelectors)
                   <div>
                     <label
                       for="sel-action-name"
-                      class="flex items-center gap-1.5 text-sm font-medium text-gray-700"
+                      class="flex items-center gap-1.5 text-sm font-medium text-slate-300"
                     >
                       动作名称
-                      <span class="text-red-500">*</span>
+                      <span class="text-red-400">*</span>
                       <span class="tooltip-trigger group relative inline-flex items-center">
-                        <svg class="w-4 h-4 text-gray-400 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" d="M12 16v-4m0-4h.01" stroke-width="2"/></svg>
-                        <span class="tooltip-content invisible group-hover:visible absolute z-50 left-6 top-0 w-80 p-3 text-xs font-normal text-gray-600 bg-white border border-gray-200 rounded-lg shadow-lg leading-relaxed">
-                          <span class="font-semibold text-gray-800 block mb-1">{{ tooltips.action_name.title }}</span>
+                        <svg class="w-4 h-4 text-slate-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" d="M12 16v-4m0-4h.01" stroke-width="2"/></svg>
+                        <span class="tooltip-content invisible group-hover:visible absolute z-50 left-6 top-0 w-80 p-3 text-xs font-normal text-slate-300 bg-slate-800 border border-white/10 rounded-lg shadow-xl leading-relaxed">
+                          <span class="font-semibold text-white block mb-1">{{ tooltips.action_name.title }}</span>
                           {{ tooltips.action_name.desc }}<br><br>
-                          <span class="text-indigo-600">{{ tooltips.action_name.examples }}</span>
+                          <span class="text-cyan-400">{{ tooltips.action_name.examples }}</span>
                         </span>
                       </span>
                     </label>
@@ -408,25 +446,25 @@ onMounted(fetchSelectors)
                       type="text"
                       required
                       :disabled="isEditing"
-                      class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed font-mono"
+                      class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 disabled:bg-white/5 disabled:text-slate-500 disabled:cursor-not-allowed font-mono"
                       placeholder="例如 like_video"
                     />
-                    <p class="mt-1 text-xs text-gray-400">唯一标识符，对应设备端要执行的操作（如 like_video、comment_video）</p>
+                    <p class="mt-1 text-xs text-slate-500">唯一标识符，对应设备端要执行的操作（如 like_video、comment_video）</p>
                   </div>
 
                   <!-- platform_version -->
                   <div>
                     <label
                       for="sel-platform-version"
-                      class="flex items-center gap-1.5 text-sm font-medium text-gray-700"
+                      class="flex items-center gap-1.5 text-sm font-medium text-slate-300"
                     >
                       平台版本
                       <span class="tooltip-trigger group relative inline-flex items-center">
-                        <svg class="w-4 h-4 text-gray-400 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" d="M12 16v-4m0-4h.01" stroke-width="2"/></svg>
-                        <span class="tooltip-content invisible group-hover:visible absolute z-50 left-6 top-0 w-80 p-3 text-xs font-normal text-gray-600 bg-white border border-gray-200 rounded-lg shadow-lg leading-relaxed">
-                          <span class="font-semibold text-gray-800 block mb-1">{{ tooltips.platform_version.title }}</span>
+                        <svg class="w-4 h-4 text-slate-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" d="M12 16v-4m0-4h.01" stroke-width="2"/></svg>
+                        <span class="tooltip-content invisible group-hover:visible absolute z-50 left-6 top-0 w-80 p-3 text-xs font-normal text-slate-300 bg-slate-800 border border-white/10 rounded-lg shadow-xl leading-relaxed">
+                          <span class="font-semibold text-white block mb-1">{{ tooltips.platform_version.title }}</span>
                           {{ tooltips.platform_version.desc }}<br><br>
-                          <span class="text-indigo-600">{{ tooltips.platform_version.examples }}</span>
+                          <span class="text-cyan-400">{{ tooltips.platform_version.examples }}</span>
                         </span>
                       </span>
                     </label>
@@ -434,32 +472,32 @@ onMounted(fetchSelectors)
                       id="sel-platform-version"
                       v-model="form.platform_version"
                       type="text"
-                      class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 placeholder-slate-500"
                       placeholder="例如 29.0.0（留空表示所有版本）"
                     />
-                    <p class="mt-1 text-xs text-gray-400">抖音 App 版本号，用于多版本适配，留空表示通用</p>
+                    <p class="mt-1 text-xs text-slate-500">抖音 App 版本号，用于多版本适配，留空表示通用</p>
                   </div>
 
                   <!-- strategies -->
                   <div>
                     <label
                       for="sel-strategies"
-                      class="flex items-center gap-1.5 text-sm font-medium text-gray-700"
+                      class="flex items-center gap-1.5 text-sm font-medium text-slate-300"
                     >
                       选择策略 (JSON 数组)
-                      <span class="text-red-500">*</span>
+                      <span class="text-red-400">*</span>
                       <span class="tooltip-trigger group relative inline-flex items-center">
-                        <svg class="w-4 h-4 text-gray-400 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" d="M12 16v-4m0-4h.01" stroke-width="2"/></svg>
-                        <span class="tooltip-content invisible group-hover:visible absolute z-50 left-6 top-0 w-96 p-3 text-xs font-normal text-gray-600 bg-white border border-gray-200 rounded-lg shadow-lg leading-relaxed">
-                          <span class="font-semibold text-gray-800 block mb-1">{{ tooltips.strategies.title }}</span>
+                        <svg class="w-4 h-4 text-slate-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" d="M12 16v-4m0-4h.01" stroke-width="2"/></svg>
+                        <span class="tooltip-content invisible group-hover:visible absolute z-50 left-6 top-0 w-96 p-3 text-xs font-normal text-slate-300 bg-slate-800 border border-white/10 rounded-lg shadow-xl leading-relaxed">
+                          <span class="font-semibold text-white block mb-1">{{ tooltips.strategies.title }}</span>
                           {{ tooltips.strategies.desc }}<br><br>
-                          <span class="font-semibold text-gray-700">支持的策略类型：</span>
+                          <span class="font-semibold text-slate-300">支持的策略类型：</span>
                           <span v-for="t in tooltips.strategies.types" :key="t.type" class="block ml-2 mt-1">
-                            <code class="text-indigo-600 font-semibold">{{ t.type }}</code> — {{ t.value }}<br>
-                            <span class="text-gray-400 ml-4">字段：{{ t.fields }}</span>
+                            <code class="text-cyan-400 font-semibold">{{ t.type }}</code> — {{ t.value }}<br>
+                            <span class="text-slate-500 ml-4">字段：{{ t.fields }}</span>
                           </span>
                           <br>
-                          <span class="text-gray-500">{{ tooltips.strategies.commonFields }}</span>
+                          <span class="text-slate-400">{{ tooltips.strategies.commonFields }}</span>
                         </span>
                       </span>
                     </label>
@@ -468,18 +506,18 @@ onMounted(fetchSelectors)
                       v-model="form.strategies"
                       rows="8"
                       required
-                      class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-mono shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 font-mono"
                       placeholder='[{"type":"text","value":"赞","priority":1}]'
                     />
-                    <p class="mt-1 text-xs text-gray-400">
+                    <p class="mt-1 text-xs text-slate-500">
                       每个策略包含：type（类型）、value（查找值）、priority（优先级，越小越优先）、x_percent/y_percent（可选，坐标偏移）、template/threshold（可选，图片匹配）
                     </p>
                     <details class="mt-2">
-                      <summary class="text-xs text-indigo-500 cursor-pointer hover:text-indigo-700">展开查看策略类型速查表</summary>
-                      <div class="mt-2 p-3 bg-gray-50 rounded-md text-xs space-y-1.5">
+                      <summary class="text-xs text-cyan-400 cursor-pointer hover:text-cyan-300">展开查看策略类型速查表</summary>
+                      <div class="mt-2 p-3 bg-white/5 border border-white/5 rounded-lg text-xs space-y-1.5">
                         <div v-for="t in tooltips.strategies.types" :key="t.type" class="flex">
-                          <code class="w-20 flex-shrink-0 font-semibold text-indigo-600">{{ t.type }}</code>
-                          <span class="text-gray-600">{{ t.value }} <span class="text-gray-400">（{{ t.fields }}）</span></span>
+                          <code class="w-20 flex-shrink-0 font-semibold text-cyan-400">{{ t.type }}</code>
+                          <span class="text-slate-400">{{ t.value }} <span class="text-slate-500">（{{ t.fields }}）</span></span>
                         </div>
                       </div>
                     </details>
@@ -489,7 +527,7 @@ onMounted(fetchSelectors)
                   <div class="flex justify-end gap-3 pt-2">
                     <button
                       type="button"
-                      class="rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                      class="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-white/10 transition-colors"
                       @click="showFormDialog = false"
                     >
                       取消
@@ -497,9 +535,9 @@ onMounted(fetchSelectors)
                     <button
                       type="submit"
                       :disabled="saving"
-                      class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      class="btn-aurora rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {{ saving ? '保存中...' : '保存' }}
+                      <span class="relative z-10">{{ saving ? '保存中...' : '保存' }}</span>
                     </button>
                   </div>
                 </form>

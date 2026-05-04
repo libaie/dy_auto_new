@@ -30,45 +30,46 @@ async function handleLogin() {
 </script>
 
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-gray-100">
-    <div class="w-full max-w-sm bg-white rounded-lg shadow-md p-8">
-      <h1 class="text-2xl font-bold text-center text-gray-800 mb-6">管理后台登录</h1>
+  <div class="min-h-screen flex items-center justify-center login-aurora">
+    <div class="w-full max-w-sm glass-card p-8 gradient-border">
+      <h1 class="text-2xl font-bold text-center gradient-text mb-2">抖音助手</h1>
+      <p class="text-center text-slate-400 text-sm mb-8">管理后台登录</p>
 
-      <form @submit.prevent="handleLogin" class="space-y-4">
+      <form @submit.prevent="handleLogin" class="space-y-5">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1" for="username">用户名</label>
+          <label class="block text-sm font-medium text-slate-300 mb-1.5" for="username">用户名</label>
           <input
             id="username"
             v-model="username"
             type="text"
             required
-            class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            class="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg text-slate-200 placeholder-slate-500"
             placeholder="请输入用户名"
           />
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1" for="password">密码</label>
+          <label class="block text-sm font-medium text-slate-300 mb-1.5" for="password">密码</label>
           <input
             id="password"
             v-model="password"
             type="password"
             required
-            class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            class="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg text-slate-200 placeholder-slate-500"
             placeholder="请输入密码"
           />
         </div>
 
-        <div v-if="error" class="text-red-600 text-sm bg-red-50 p-2 rounded">
+        <div v-if="error" class="text-red-400 text-sm bg-red-500/10 border border-red-500/20 p-2.5 rounded-lg">
           {{ error }}
         </div>
 
         <button
           type="submit"
           :disabled="loading"
-          class="w-full py-2 px-4 bg-blue-600 text-white font-medium rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          class="btn-aurora w-full py-2.5 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {{ loading ? '登录中...' : '登录' }}
+          <span class="relative z-10">{{ loading ? '登录中...' : '登录' }}</span>
         </button>
       </form>
     </div>

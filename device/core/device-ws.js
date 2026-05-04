@@ -131,6 +131,10 @@ var deviceWs = {
           logger.warn(TAG, "设备已被服务端移除");
           if (this._callbacks.onDeviceRemoved) this._callbacks.onDeviceRemoved();
           break;
+        case "new_task_available":
+          logger.info(TAG, "有新任务可用，执行 catch-up poll");
+          if (this._callbacks.onNewTaskAvailable) this._callbacks.onNewTaskAvailable();
+          break;
         default:
           logger.debug(TAG, "未知事件: " + event);
       }

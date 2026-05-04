@@ -45,7 +45,7 @@ const emit = defineEmits(['confirm', 'cancel'])
         leave-from="opacity-100"
         leave-to="opacity-0"
       >
-        <div class="fixed inset-0 bg-black/30" />
+        <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" />
       </TransitionChild>
 
       <div class="fixed inset-0 overflow-y-auto">
@@ -60,32 +60,30 @@ const emit = defineEmits(['confirm', 'cancel'])
             leave-to="opacity-0 scale-95"
           >
             <DialogPanel
-              class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl"
+              class="glass-card w-full max-w-md p-6 gradient-border"
             >
-              <DialogTitle class="text-lg font-medium text-gray-900">
+              <DialogTitle class="text-lg font-medium text-white">
                 {{ title }}
               </DialogTitle>
 
-              <p class="mt-2 text-sm text-gray-500">
+              <p class="mt-2 text-sm text-slate-400">
                 {{ message }}
               </p>
 
               <div class="mt-6 flex justify-end gap-3">
                 <button
                   type="button"
-                  class="rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                  class="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-white/10 transition-colors"
                   @click="emit('cancel')"
                 >
                   取消
                 </button>
                 <button
                   type="button"
-                  :class="[
-                    danger
-                      ? 'bg-red-600 hover:bg-red-700 focus:ring-red-500'
-                      : 'bg-indigo-600 hover:bg-indigo-700 focus:ring-indigo-500',
-                  ]"
-                  class="rounded-md px-4 py-2 text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2"
+                  :class="danger
+                    ? 'bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 shadow-lg shadow-red-500/25'
+                    : 'btn-aurora'"
+                  class="rounded-lg px-4 py-2 text-sm font-medium text-white transition-all"
                   @click="emit('confirm')"
                 >
                   {{ confirmText }}

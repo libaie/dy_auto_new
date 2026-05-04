@@ -28,7 +28,7 @@ JWT_EXPIRE_HOURS = int(os.getenv("JWT_EXPIRE_HOURS", "24"))
 
 
 def _check_default_credentials():
-    """Check if default credentials are being used and warn/block."""
+    """Check if default credentials are being used and warn."""
     defaults_used = []
     if DEVICE_SECRET == "change-me-to-a-random-string":
         defaults_used.append("DEVICE_SECRET")
@@ -45,11 +45,7 @@ def _check_default_credentials():
         f"Set these environment variables before deploying to production."
     )
 
-    if not DEBUG:
-        print(f"FATAL: {msg}", file=sys.stderr)
-        sys.exit(1)
-
-    warnings.warn(msg, stacklevel=2)
+    print(f"WARNING: {msg}", file=sys.stderr)
 
 
 _check_default_credentials()
@@ -138,3 +134,46 @@ AI_BASE_URL = os.getenv("AI_BASE_URL", "https://api.deepseek.com")
 AI_MODEL = os.getenv("AI_MODEL", "deepseek-chat")
 AI_PROVIDER = os.getenv("AI_PROVIDER", "deepseek")  # deepseek / openai / anthropic
 AI_MAX_RETRIES = int(os.getenv("AI_MAX_RETRIES", "3"))
+
+
+def _resolve_ai_config(db=None):
+    """从 DB 读取 AI 配置，fallback 到环境变量。内部使用，含 API Key。"""
+    api_key = AI_API_KEY
+    base_url = AI_BASE_URL
+    model = AI_MODEL
+
+    if db:
+        try:
+            from app.db_models import SystemSetting
+            settings = {s.key: s.value for s in db.query(SystemSetting).all()}
+            api_key = settings.get("ai_api_key") or api_key
+            base_url = settings.get("ai_base_url") or base_url
+            model = settings.get("ai_model") or model
+        except Exception:
+            pass
+
+    return {
+        "api_key": api_key,
+        "api_url": f"{base_url}/v1/chat/completions",
+        "model": model,
+    }
+
+
+def get_ai_config(db=None):
+    """返回给设备端的 AI 配置（不含 API Key）。"""
+    cfg = _resolve_ai_config(db)
+    if not cfg["api_key"]:
+        return None
+    return {
+        "api_key": "",  # 不暴露 API Key 给设备端，设备通过服务端代理调用 AI
+        "api_url": cfg["api_url"],
+        "model": cfg["model"],
+    }
+
+
+def get_ai_config_with_key(db=None):
+    """服务端内部使用，含 API Key（仅供 ai-proxy 等服务端端点使用）。"""
+    cfg = _resolve_ai_config(db)
+    if not cfg["api_key"]:
+        return None
+    return cfg

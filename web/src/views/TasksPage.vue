@@ -10,11 +10,14 @@ import {
 import DataTable from '../components/DataTable.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
-import { listTasks, createTask, cancelTask } from '../api/tasks.js'
+import { listTasks, createTask, batchCreateTasks, cancelTask } from '../api/tasks.js'
 import { listAccounts } from '../api/accounts.js'
+import { listGroups } from '../api/accountGroups.js'
 import { listDevices } from '../api/devices.js'
 import { listTemplates, generateKeywords } from '../api/content.js'
 import { formatDate } from '../utils/format.js'
+import { useToastStore } from '../stores/toast.js'
+import TipIcon from '../components/TipIcon.vue'
 
 // --- Task type label map ---
 const typeLabelMap = {
@@ -52,6 +55,11 @@ const statusFilter = ref('')
 
 // --- Accounts for create form ---
 const accounts = ref([])
+
+// --- Groups for batch create ---
+const groups = ref([])
+const selectionMode = ref('single') // 'single' | 'group'
+const selectedGroupIds = ref([])
 
 // --- Devices for create form ---
 const devices = ref([])
@@ -109,8 +117,15 @@ const keywordList = ref([])
 const keywordGenerating = ref(false)
 const keywordError = ref(null)
 const keywordActionType = ref('search_comment')
-const keywordAccountId = ref('')
-const keywordCount = ref(10)
+const keywordSelectionMode = ref('single')
+const keywordSelectedGroupIds = ref([])
+const keywordSingleAccountId = ref('')
+const keywordDeviceId = ref('')
+const keywordSortBy = ref('')
+const keywordTemplateId = ref('')
+const keywordContent = ref('')
+const keywordGenerateCount = ref(10)
+const keywordProcessingCount = ref(5)
 
 // --- Cancel confirmation state ---
 const showCancelDialog = ref(false)
@@ -119,6 +134,8 @@ const cancelling = ref(false)
 
 // --- Page-level error ---
 const pageError = ref(null)
+
+const toast = useToastStore()
 
 // --- Table columns ---
 const columns = [
@@ -143,7 +160,7 @@ async function fetchTasks() {
     tasks.value = res.data.tasks || []
     total.value = res.data.total || 0
   } catch (e) {
-    console.error('Failed to fetch tasks:', e)
+    toast.error('加载任务列表失败')
     tasks.value = []
     total.value = 0
   } finally {
@@ -157,9 +174,17 @@ async function fetchAccounts() {
     const res = await listAccounts({ limit: 100 })
     accounts.value = res.data.accounts || []
   } catch (e) {
-    console.error('Failed to fetch accounts:', e)
+    toast.error('加载账号列表失败')
     accounts.value = []
   }
+}
+
+// --- Fetch groups for batch create ---
+async function fetchGroups() {
+  try {
+    const res = await listGroups({ limit: 100 })
+    groups.value = res.data.groups || res.data || []
+  } catch { /* ignore */ }
 }
 
 // --- Fetch devices for create form ---
@@ -168,7 +193,7 @@ async function fetchDevices() {
     const res = await listDevices({ limit: 100 })
     devices.value = res.data.devices || []
   } catch (e) {
-    console.error('Failed to fetch devices:', e)
+    toast.error('加载设备列表失败')
     devices.value = []
   }
 }
@@ -187,7 +212,7 @@ async function fetchTemplates() {
     const res = await listTemplates({ limit: 100 })
     templates.value = res.data.templates || []
   } catch (e) {
-    console.error('Failed to fetch templates:', e)
+    toast.error('加载模板列表失败')
     templates.value = []
   }
 }
@@ -221,6 +246,8 @@ function handlePageChange(p) {
 function openCreateDialog() {
   Object.assign(form, defaultForm)
   selectedTemplateId.value = ''
+  selectionMode.value = 'single'
+  selectedGroupIds.value = []
   createError.value = null
   showCreateDialog.value = true
 }
@@ -289,8 +316,12 @@ async function handleCreate() {
     createError.value = '请选择任务类型'
     return
   }
-  if (!form.account_id) {
+  if (selectionMode.value === 'single' && !form.account_id) {
     createError.value = '请选择账号'
+    return
+  }
+  if (selectionMode.value === 'group' && selectedGroupIds.value.length === 0) {
+    createError.value = '请至少选择一个分组'
     return
   }
   if (isSearchType.value && !form.keyword) {
@@ -302,15 +333,34 @@ async function handleCreate() {
   createError.value = null
 
   try {
-    const payload = {
-      type: form.type,
-      account_id: form.account_id,
-      params: buildParams(),
+    const params = buildParams()
+
+    if (selectionMode.value === 'group') {
+      // Batch create via groups
+      const payload = {
+        type: form.type,
+        group_ids: selectedGroupIds.value,
+        params,
+      }
+      if (form.device_id) {
+        payload.device_id = form.device_id
+      }
+      const res = await batchCreateTasks(payload)
+      const count = res.data?.created || 0
+      toast.success(`批量创建成功：${count} 个任务`)
+    } else {
+      // Single account create
+      const payload = {
+        type: form.type,
+        account_id: form.account_id,
+        params,
+      }
+      if (form.device_id) {
+        payload.device_id = form.device_id
+      }
+      await createTask(payload)
     }
-    if (form.device_id) {
-      payload.device_id = form.device_id
-    }
-    await createTask(payload)
+
     showCreateDialog.value = false
     page.value = 1
     fetchTasks()
@@ -351,8 +401,15 @@ function openKeywordDialog() {
   keywordList.value = []
   keywordError.value = null
   keywordActionType.value = 'search_comment'
-  keywordAccountId.value = ''
-  keywordCount.value = 10
+  keywordSelectionMode.value = 'single'
+  keywordSelectedGroupIds.value = []
+  keywordSingleAccountId.value = ''
+  keywordDeviceId.value = ''
+  keywordSortBy.value = ''
+  keywordTemplateId.value = ''
+  keywordContent.value = ''
+  keywordGenerateCount.value = 10
+  keywordProcessingCount.value = 5
   showKeywordDialog.value = true
 }
 
@@ -364,7 +421,7 @@ async function handleGenerateKeywords() {
   keywordGenerating.value = true
   keywordError.value = null
   try {
-    const res = await generateKeywords(keywordSeed.value.trim(), keywordCount.value)
+    const res = await generateKeywords(keywordSeed.value.trim(), keywordGenerateCount.value)
     keywordList.value = res.data.keywords || []
     if (keywordList.value.length === 0) {
       keywordError.value = '未生成关键词，请重试'
@@ -380,13 +437,28 @@ function removeKeyword(idx) {
   keywordList.value.splice(idx, 1)
 }
 
+function buildKeywordParams(kw) {
+  const params = { keyword: kw, count: keywordProcessingCount.value }
+  if (keywordSortBy.value) params.sort_by = keywordSortBy.value
+  if (keywordTemplateId.value) {
+    params.content_template_id = keywordTemplateId.value
+  } else if (keywordContent.value) {
+    params.content = keywordContent.value
+  }
+  return params
+}
+
 async function handleBatchCreateKeywordTasks() {
   if (keywordList.value.length === 0) {
     keywordError.value = '请先生成关键词'
     return
   }
-  if (!keywordAccountId.value) {
+  if (keywordSelectionMode.value === 'single' && !keywordSingleAccountId.value) {
     keywordError.value = '请选择账号'
+    return
+  }
+  if (keywordSelectionMode.value === 'group' && keywordSelectedGroupIds.value.length === 0) {
+    keywordError.value = '请至少选择一个分组'
     return
   }
 
@@ -398,15 +470,23 @@ async function handleBatchCreateKeywordTasks() {
 
   for (const kw of keywordList.value) {
     try {
-      const params = { keyword: kw, count: 5 }
-      if (['search_comment', 'search_dm', 'reply_comment'].includes(keywordActionType.value)) {
-        params.content = ''
+      const params = buildKeywordParams(kw)
+
+      if (keywordSelectionMode.value === 'group') {
+        await batchCreateTasks({
+          type: keywordActionType.value,
+          group_ids: keywordSelectedGroupIds.value,
+          params,
+          ...(keywordDeviceId.value ? { device_id: keywordDeviceId.value } : {}),
+        })
+      } else {
+        await createTask({
+          type: keywordActionType.value,
+          account_id: keywordSingleAccountId.value,
+          params,
+          ...(keywordDeviceId.value ? { device_id: keywordDeviceId.value } : {}),
+        })
       }
-      await createTask({
-        type: keywordActionType.value,
-        account_id: keywordAccountId.value,
-        params,
-      })
       successCount++
     } catch (e) {
       failCount++
@@ -419,7 +499,9 @@ async function handleBatchCreateKeywordTasks() {
   fetchTasks()
 
   if (failCount > 0) {
-    pageError.value = `批量创建完成：成功 ${successCount} 个，失败 ${failCount} 个`
+    toast.error(`批量创建完成：成功 ${successCount} 个，失败 ${failCount} 个`)
+  } else {
+    toast.success(`批量创建成功：${successCount} 个任务`)
   }
 }
 
@@ -427,6 +509,7 @@ async function handleBatchCreateKeywordTasks() {
 onMounted(() => {
   fetchTasks()
   fetchAccounts()
+  fetchGroups()
   fetchDevices()
   fetchTemplates()
 })
@@ -435,19 +518,19 @@ onMounted(() => {
 <template>
   <div>
     <!-- Page error banner -->
-    <div v-if="pageError" class="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded flex items-center justify-between">
+    <div v-if="pageError" class="mb-4 glass-card border-red-500/30 text-red-400 px-4 py-3 rounded-xl flex items-center justify-between">
       <span>{{ pageError }}</span>
-      <button class="text-red-500 hover:text-red-700 font-bold" @click="pageError = null">&times;</button>
+      <button class="text-red-400 hover:text-red-300 font-bold" @click="pageError = null">&times;</button>
     </div>
 
     <!-- Header -->
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-bold text-gray-800">任务中心</h1>
+      <h1 class="text-2xl font-bold text-white">任务中心</h1>
       <div class="flex items-center gap-3">
         <!-- Status filter -->
         <select
           v-model="statusFilter"
-          class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200"
         >
           <option
             v-for="opt in statusFilterOptions"
@@ -459,7 +542,7 @@ onMounted(() => {
         </select>
         <!-- Keyword search button -->
         <button
-          class="inline-flex items-center px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-md hover:bg-emerald-700 transition-colors"
+          class="inline-flex items-center px-4 py-2 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white text-sm font-medium rounded-xl hover:from-emerald-500 hover:to-emerald-400 transition-all shadow-lg shadow-emerald-500/25"
           @click="openKeywordDialog"
         >
           <svg class="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -469,11 +552,11 @@ onMounted(() => {
         </button>
         <!-- Create button -->
         <button
-          class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 transition-colors"
+          class="btn-aurora inline-flex items-center px-4 py-2 text-sm font-medium rounded-xl"
           @click="openCreateDialog"
         >
           <svg
-            class="-ml-1 mr-2 h-5 w-5"
+            class="-ml-1 mr-2 h-5 w-5 relative z-10"
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 20 20"
             fill="currentColor"
@@ -482,7 +565,7 @@ onMounted(() => {
               d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
             />
           </svg>
-          创建任务
+          <span class="relative z-10">创建任务</span>
         </button>
       </div>
     </div>
@@ -504,17 +587,17 @@ onMounted(() => {
 
       <!-- Account column -->
       <template #cell-account_id="{ value }">
-        <span class="text-gray-700">
+        <span class="text-slate-300">
           {{ accounts.find(a => a.id === value)?.nickname || value }}
         </span>
       </template>
 
       <!-- Device column -->
       <template #cell-device_id="{ value }">
-        <span v-if="value" class="text-gray-700">
+        <span v-if="value" class="text-slate-300">
           {{ devices.find(d => d.id === value)?.name || value }}
         </span>
-        <span v-else class="text-gray-400">自动分配</span>
+        <span v-else class="text-slate-500">自动分配</span>
       </template>
 
       <!-- Status column -->
@@ -532,7 +615,7 @@ onMounted(() => {
         <div class="flex justify-end gap-2">
           <button
             v-if="row.status === 'pending' || row.status === 'running'"
-            class="inline-flex items-center px-3 py-1 text-sm font-medium text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+            class="inline-flex items-center px-3 py-1 text-sm font-medium text-red-400 hover:text-red-300 hover:bg-red-400/10 rounded-lg transition-colors"
             @click="openCancelDialog(row)"
           >
             取消
@@ -557,7 +640,7 @@ onMounted(() => {
           leave-from="opacity-100"
           leave-to="opacity-0"
         >
-          <div class="fixed inset-0 bg-black/30" />
+          <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" />
         </TransitionChild>
 
         <div class="fixed inset-0 overflow-y-auto">
@@ -572,16 +655,16 @@ onMounted(() => {
               leave-to="opacity-0 scale-95"
             >
               <DialogPanel
-                class="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl"
+                class="glass-card w-full max-w-lg p-6 gradient-border"
               >
-                <DialogTitle class="text-lg font-medium text-gray-900">
+                <DialogTitle class="text-lg font-medium text-white">
                   创建任务
                 </DialogTitle>
 
                 <!-- Error message -->
                 <div
                   v-if="createError"
-                  class="mt-3 bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2 rounded"
+                  class="mt-3 bg-red-500/10 border border-red-500/20 text-red-400 text-sm px-3 py-2 rounded-lg"
                 >
                   {{ createError }}
                 </div>
@@ -589,12 +672,12 @@ onMounted(() => {
                 <form class="mt-4 space-y-4" @submit.prevent="handleCreate">
                   <!-- Task Type -->
                   <div>
-                    <label class="block text-sm font-medium text-gray-700">
-                      任务类型 <span class="text-red-500">*</span>
+                    <label class="block text-sm font-medium text-slate-300">
+                      任务类型 <TipIcon text="选择要执行的任务类型。养号=模拟真实用户行为提升权重；搜索评论/点赞/私信=按关键词搜索视频后自动操作；评论回复=回复已有评论引流" /> <span class="text-red-400">*</span>
                     </label>
                     <select
                       v-model="form.type"
-                      class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200"
                     >
                       <option v-for="opt in taskTypeOptions" :key="opt.value" :value="opt.value">
                         {{ opt.label }}
@@ -602,14 +685,31 @@ onMounted(() => {
                     </select>
                   </div>
 
-                  <!-- Account -->
+                  <!-- Account selection mode -->
                   <div>
-                    <label class="block text-sm font-medium text-gray-700">
-                      账号 <span class="text-red-500">*</span>
+                    <label class="block text-sm font-medium text-slate-300 mb-2">
+                      选择方式 <TipIcon text="单账号=为一个账号创建任务；按分组=为分组内所有活跃账号批量创建任务" />
+                    </label>
+                    <div class="flex gap-4">
+                      <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" v-model="selectionMode" value="single" class="text-purple-500 focus:ring-purple-500" />
+                        <span class="text-sm text-slate-300">单账号</span>
+                      </label>
+                      <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" v-model="selectionMode" value="group" class="text-purple-500 focus:ring-purple-500" />
+                        <span class="text-sm text-slate-300">按分组批量</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <!-- Account (single mode) -->
+                  <div v-if="selectionMode === 'single'">
+                    <label class="block text-sm font-medium text-slate-300">
+                      账号 <TipIcon text="选择执行此任务的抖音账号" /> <span class="text-red-400">*</span>
                     </label>
                     <select
                       v-model="form.account_id"
-                      class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200"
                     >
                       <option value="" disabled>请选择账号</option>
                       <option v-for="acct in accounts" :key="acct.id" :value="acct.id">
@@ -618,14 +718,40 @@ onMounted(() => {
                     </select>
                   </div>
 
+                  <!-- Groups (batch mode) -->
+                  <div v-if="selectionMode === 'group'">
+                    <label class="block text-sm font-medium text-slate-300 mb-1">
+                      选择分组 <TipIcon text="选中的分组内所有活跃账号都会创建相同任务" /> <span class="text-red-400">*</span>
+                    </label>
+                    <div class="max-h-40 overflow-y-auto rounded-lg border border-white/10 bg-white/5 p-2 space-y-1">
+                      <label
+                        v-for="grp in groups"
+                        :key="grp.id"
+                        class="flex items-center gap-2 px-2 py-1 rounded hover:bg-white/5 cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          :value="grp.id"
+                          v-model="selectedGroupIds"
+                          class="rounded border-white/20 bg-white/5 text-purple-500 focus:ring-purple-500"
+                        />
+                        <span class="text-sm text-slate-300">
+                          {{ grp.name }}
+                          <span class="text-slate-500">({{ grp.member_count || 0 }} 个账号)</span>
+                        </span>
+                      </label>
+                      <p v-if="groups.length === 0" class="text-sm text-slate-500 px-2 py-1">暂无分组，请先创建账号分组</p>
+                    </div>
+                  </div>
+
                   <!-- Device -->
                   <div>
-                    <label class="block text-sm font-medium text-gray-700">
-                      执行设备
+                    <label class="block text-sm font-medium text-slate-300">
+                      执行设备 <TipIcon text="选择运行任务的设备。留空则自动分配给该账号绑定的在线设备" />
                     </label>
                     <select
                       v-model="form.device_id"
-                      class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200"
                     >
                       <option value="">自动分配（绑定设备领取）</option>
                       <option v-for="dev in filteredDevices" :key="dev.id" :value="dev.id">
@@ -637,63 +763,64 @@ onMounted(() => {
                   <!-- 养号参数 -->
                   <template v-if="form.type === 'nurture'">
                     <div>
-                      <label class="block text-sm font-medium text-gray-700 mb-2">养号模式</label>
+                      <label class="block text-sm font-medium text-slate-300 mb-2">养号模式 <TipIcon text="简单模式=设定总时长，系统自动随机操作；高级模式=自定义多个子任务按顺序执行" width="w-80" /></label>
                       <div class="flex gap-4">
                         <label class="flex items-center gap-2 cursor-pointer">
-                          <input type="radio" v-model="nurtureMode" value="simple" class="text-indigo-600 focus:ring-indigo-500" />
-                          <span class="text-sm">简单模式</span>
+                          <input type="radio" v-model="nurtureMode" value="simple" class="text-purple-500 focus:ring-purple-500" />
+                          <span class="text-sm text-slate-300">简单模式</span>
                         </label>
                         <label class="flex items-center gap-2 cursor-pointer">
-                          <input type="radio" v-model="nurtureMode" value="advanced" class="text-indigo-600 focus:ring-indigo-500" />
-                          <span class="text-sm">高级模式（子任务）</span>
+                          <input type="radio" v-model="nurtureMode" value="advanced" class="text-purple-500 focus:ring-purple-500" />
+                          <span class="text-sm text-slate-300">高级模式（子任务）</span>
                         </label>
                       </div>
                     </div>
 
                     <!-- 简单模式 -->
                     <div v-if="nurtureMode === 'simple'">
-                      <label class="block text-sm font-medium text-gray-700">养号时长（分钟）</label>
+                      <label class="block text-sm font-medium text-slate-300">养号时长（分钟） <TipIcon text="简单模式下养号操作的总持续时间，建议 15-60 分钟" /></label>
                       <input
                         v-model.number="form.duration"
                         type="number"
                         min="1"
                         max="120"
-                        class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200"
                       />
                     </div>
 
                     <!-- 高级模式 -->
                     <div v-else class="space-y-3">
                       <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">子任务列表</label>
+                        <label class="block text-sm font-medium text-slate-300 mb-1">子任务列表 <TipIcon text="按顺序配置多个操作步骤。每个子任务指定类型和执行次数" /></label>
+                        <p class="mt-1 text-xs text-slate-500">浏览/观看=刷视频，点赞/评论/关注=互动操作</p>
                         <div class="space-y-2">
                           <div v-for="(st, idx) in subTasks" :key="idx" class="flex items-center gap-2">
-                            <select v-model="st.type" class="rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                            <select v-model="st.type" class="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-slate-200">
                               <option v-for="opt in subTaskTypeOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
                             </select>
-                            <input v-model.number="st.count" type="number" min="1" max="100" class="w-20 rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" placeholder="次数" />
-                            <select v-if="st.type === 'comment'" v-model="st.content_template_id" class="rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                            <input v-model.number="st.count" type="number" min="1" max="100" class="w-20 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-slate-200" placeholder="次数" />
+                            <select v-if="st.type === 'comment'" v-model="st.content_template_id" class="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-slate-200">
                               <option value="">选择模板</option>
                               <option v-for="tpl in templates" :key="tpl.id" :value="tpl.id">{{ tpl.name }}</option>
                             </select>
-                            <button type="button" @click="removeSubTask(idx)" class="text-red-500 hover:text-red-700">
+                            <button type="button" @click="removeSubTask(idx)" class="text-red-400 hover:text-red-300">
                               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                             </button>
                           </div>
                         </div>
-                        <button type="button" @click="addSubTask" class="mt-2 text-sm text-indigo-600 hover:text-indigo-800">+ 添加子任务</button>
+                        <button type="button" @click="addSubTask" class="mt-2 text-sm text-cyan-400 hover:text-cyan-300">+ 添加子任务</button>
                       </div>
                       <div class="grid grid-cols-2 gap-3">
                         <div>
-                          <label class="block text-sm font-medium text-gray-700">完成模式</label>
-                          <select v-model="completionMode" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                          <label class="block text-sm font-medium text-slate-300">完成模式 <TipIcon text="全部完成=所有子任务都必须完成才算成功；任一完成=任意一个子任务完成即可" /></label>
+                          <select v-model="completionMode" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200">
                             <option value="all">全部完成</option>
                             <option value="any">任一完成</option>
                           </select>
                         </div>
                         <div>
-                          <label class="block text-sm font-medium text-gray-700">最大时长（分钟）</label>
-                          <input v-model.number="maxDuration" type="number" min="1" max="240" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+                          <label class="block text-sm font-medium text-slate-300">最大时长（分钟） <TipIcon text="高级模式下整个养号任务的最大执行时间，超时自动停止" /></label>
+                          <input v-model.number="maxDuration" type="number" min="1" max="240" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200" />
                         </div>
                       </div>
                     </div>
@@ -702,23 +829,23 @@ onMounted(() => {
                   <!-- 搜索类参数 -->
                   <template v-if="isSearchType">
                     <div>
-                      <label class="block text-sm font-medium text-gray-700">
-                        搜索关键词 <span class="text-red-500">*</span>
+                      <label class="block text-sm font-medium text-slate-300">
+                        搜索关键词 <TipIcon text="输入搜索词，系统在抖音中搜索相关视频。支持逗号分隔多个关键词" /> <span class="text-red-400">*</span>
                       </label>
                       <input
                         v-model="form.keyword"
                         type="text"
                         maxlength="50"
-                        class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 placeholder-slate-500"
                         placeholder="例：美食、养生"
                       />
                     </div>
 
                     <div>
-                      <label class="block text-sm font-medium text-gray-700">排序方式</label>
+                      <label class="block text-sm font-medium text-slate-300">排序方式 <TipIcon text="控制搜索结果排序，影响目标视频选择优先级" /></label>
                       <select
                         v-model="form.sort_by"
-                        class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200"
                       >
                         <option value="">默认排序</option>
                         <option value="latest">最新发布</option>
@@ -727,15 +854,15 @@ onMounted(() => {
                     </div>
 
                     <div>
-                      <label class="block text-sm font-medium text-gray-700">
-                        {{ form.type === 'reply_comment' ? '每视频评论数' : '处理数量' }}
+                      <label class="block text-sm font-medium text-slate-300">
+                        {{ form.type === 'reply_comment' ? '每视频评论数' : '处理数量' }} <TipIcon text="每个搜索结果中要处理的数量" />
                       </label>
                       <input
                         v-model.number="form.count"
                         type="number"
                         min="1"
                         :max="form.type === 'search_like' ? 30 : 20"
-                        class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200"
                       />
                     </div>
                   </template>
@@ -743,23 +870,23 @@ onMounted(() => {
                   <!-- 评论回复特有参数 -->
                   <template v-if="form.type === 'reply_comment'">
                     <div>
-                      <label class="block text-sm font-medium text-gray-700">处理视频数</label>
+                      <label class="block text-sm font-medium text-slate-300">处理视频数 <TipIcon text="要处理的视频数量，每个视频下最多操作指定条数" /></label>
                       <input
                         v-model.number="form.video_count"
                         type="number"
                         min="1"
                         max="10"
-                        class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200"
                       />
                     </div>
                     <div>
-                      <label class="block text-sm font-medium text-gray-700">评论最大天数</label>
+                      <label class="block text-sm font-medium text-slate-300">评论最大天数 <TipIcon text="只回复在此天数内发布的评论，超过的将被忽略" /></label>
                       <input
                         v-model.number="form.max_age_days"
                         type="number"
                         min="1"
                         max="30"
-                        class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200"
                       />
                     </div>
                   </template>
@@ -768,10 +895,10 @@ onMounted(() => {
                   <template v-if="['search_comment', 'search_dm', 'reply_comment'].includes(form.type)">
                     <!-- Template -->
                     <div v-if="filteredTemplates.length > 0">
-                      <label class="block text-sm font-medium text-gray-700">内容模板</label>
+                      <label class="block text-sm font-medium text-slate-300">内容模板 <TipIcon text="选择预设的评论/私信模板，模板中的变量会自动替换为实际值" /></label>
                       <select
                         v-model="selectedTemplateId"
-                        class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200"
                       >
                         <option value="">不使用模板</option>
                         <option v-for="tpl in filteredTemplates" :key="tpl.id" :value="tpl.id">
@@ -781,14 +908,14 @@ onMounted(() => {
                     </div>
 
                     <div>
-                      <label class="block text-sm font-medium text-gray-700">
-                        {{ form.type === 'search_dm' ? '私信内容' : '评论/私信内容' }}
+                      <label class="block text-sm font-medium text-slate-300">
+                        {{ form.type === 'search_dm' ? '私信内容' : '评论/私信内容' }} <TipIcon text="发送的内容文本。支持 {keyword}、{username}、{video_title} 变量。留空则使用模板或 AI 生成" width="w-80" />
                       </label>
                       <textarea
                         v-model="form.content"
                         rows="3"
                         maxlength="500"
-                        class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 placeholder-slate-500"
                         :placeholder="form.type === 'reply_comment' ? '留空则使用 AI 生成招呼语' : '输入内容...'"
                       />
                     </div>
@@ -798,7 +925,7 @@ onMounted(() => {
                   <div class="flex justify-end gap-3 pt-2">
                     <button
                       type="button"
-                      class="rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                      class="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-white/10 transition-colors"
                       @click="showCreateDialog = false"
                     >
                       取消
@@ -806,9 +933,9 @@ onMounted(() => {
                     <button
                       type="submit"
                       :disabled="creating"
-                      class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      class="btn-aurora rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {{ creating ? '创建中...' : '创建' }}
+                      <span class="relative z-10">{{ creating ? '创建中...' : '创建' }}</span>
                     </button>
                   </div>
                 </form>
@@ -834,34 +961,40 @@ onMounted(() => {
     <TransitionRoot :show="showKeywordDialog" as="template">
       <Dialog as="div" class="relative z-50" @close="showKeywordDialog = false">
         <TransitionChild as="template" enter="ease-out duration-300" enter-from="opacity-0" enter-to="opacity-100" leave="ease-in duration-200" leave-from="opacity-100" leave-to="opacity-0">
-          <div class="fixed inset-0 bg-black/30" />
+          <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" />
         </TransitionChild>
         <div class="fixed inset-0 overflow-y-auto">
           <div class="flex min-h-full items-center justify-center p-4">
             <TransitionChild as="template" enter="ease-out duration-300" enter-from="opacity-0 scale-95" enter-to="opacity-100 scale-100" leave="ease-in duration-200" leave-from="opacity-100 scale-100" leave-to="opacity-0 scale-95">
-              <DialogPanel class="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
-                <DialogTitle class="text-lg font-medium text-gray-900">关键词搜索</DialogTitle>
+              <DialogPanel class="glass-card w-full max-w-xl p-6 gradient-border">
+                <DialogTitle class="text-lg font-medium text-white">关键词搜索</DialogTitle>
 
-                <div v-if="keywordError" class="mt-3 bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2 rounded">
+                <div v-if="keywordError" class="mt-3 bg-red-500/10 border border-red-500/20 text-red-400 text-sm px-3 py-2 rounded-lg">
                   {{ keywordError }}
                 </div>
 
-                <div class="mt-4 space-y-4">
+                <div class="mt-4 space-y-4 max-h-[70vh] overflow-y-auto pr-1">
                   <!-- Seed keyword input -->
-                  <div class="flex gap-2">
-                    <input
-                      v-model="keywordSeed"
-                      type="text"
-                      maxlength="50"
-                      class="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                      placeholder="输入种子关键词，如：美食"
-                      @keyup.enter="handleGenerateKeywords"
-                    />
-                    <input v-model.number="keywordCount" type="number" min="1" max="30" class="w-20 rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+                  <div class="flex gap-2 items-end">
+                    <div class="flex-1">
+                      <label class="block text-sm font-medium text-slate-300 mb-1">种子关键词 <TipIcon text="输入一个基础关键词，AI 会自动扩展出多个相关搜索词" /></label>
+                      <input
+                        v-model="keywordSeed"
+                        type="text"
+                        maxlength="50"
+                        class="block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 placeholder-slate-500"
+                        placeholder="输入种子关键词，如：美食"
+                        @keyup.enter="handleGenerateKeywords"
+                      />
+                    </div>
+                    <div>
+                      <label class="block text-sm font-medium text-slate-300 mb-1">生成数量</label>
+                      <input v-model.number="keywordGenerateCount" type="number" min="1" max="30" class="w-20 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200" />
+                    </div>
                     <button
                       type="button"
                       :disabled="keywordGenerating"
-                      class="px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-md hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      class="px-4 py-2 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white text-sm font-medium rounded-lg hover:from-emerald-500 hover:to-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-emerald-500/25"
                       @click="handleGenerateKeywords"
                     >
                       {{ keywordGenerating ? '生成中...' : 'AI 扩展' }}
@@ -870,53 +1003,132 @@ onMounted(() => {
 
                   <!-- Generated keywords -->
                   <div v-if="keywordList.length > 0">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">关键词矩阵（可编辑删除）</label>
-                    <div class="flex flex-wrap gap-2 p-3 border rounded-lg max-h-40 overflow-y-auto">
+                    <label class="block text-sm font-medium text-slate-300 mb-1">关键词矩阵 <TipIcon text="AI 生成的关键词列表，点击 X 可删除不需要的，最终保留的将各创建一个任务" /></label>
+                    <div class="flex flex-wrap gap-2 p-3 border border-white/10 rounded-lg max-h-32 overflow-y-auto">
                       <span
                         v-for="(kw, idx) in keywordList"
                         :key="idx"
-                        class="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-50 text-indigo-700 text-sm rounded-full"
+                        class="inline-flex items-center gap-1 px-2.5 py-1 bg-purple-500/15 text-purple-300 text-sm rounded-full border border-purple-500/25"
                       >
                         {{ kw }}
-                        <button type="button" @click="removeKeyword(idx)" class="text-indigo-400 hover:text-indigo-600">
+                        <button type="button" @click="removeKeyword(idx)" class="text-purple-400 hover:text-purple-300">
                           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                         </button>
                       </span>
                     </div>
                   </div>
 
-                  <!-- Action type -->
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700">操作类型</label>
-                    <select v-model="keywordActionType" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500">
-                      <option value="search_comment">搜索评论</option>
-                      <option value="search_like">搜索点赞</option>
-                      <option value="search_dm">搜索私信</option>
-                      <option value="reply_comment">评论回复</option>
-                    </select>
+                  <!-- Action type + Processing count -->
+                  <div class="grid grid-cols-2 gap-3">
+                    <div>
+                      <label class="block text-sm font-medium text-slate-300">操作类型 <TipIcon text="批量创建任务时使用的操作类型" /></label>
+                      <select v-model="keywordActionType" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200">
+                        <option value="search_comment">搜索评论</option>
+                        <option value="search_like">搜索点赞</option>
+                        <option value="search_dm">搜索私信</option>
+                        <option value="reply_comment">评论回复</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-sm font-medium text-slate-300">每关键词处理数 <TipIcon text="每个关键词搜索结果中要处理的视频数量" /></label>
+                      <input v-model.number="keywordProcessingCount" type="number" min="1" max="30" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200" />
+                    </div>
                   </div>
 
-                  <!-- Account selection -->
+                  <!-- Selection mode -->
                   <div>
-                    <label class="block text-sm font-medium text-gray-700">选择账号 <span class="text-red-500">*</span></label>
-                    <select v-model="keywordAccountId" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                    <label class="block text-sm font-medium text-slate-300 mb-2">选择方式</label>
+                    <div class="flex gap-4">
+                      <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" v-model="keywordSelectionMode" value="single" class="text-purple-500 focus:ring-purple-500" />
+                        <span class="text-sm text-slate-300">单账号</span>
+                      </label>
+                      <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" v-model="keywordSelectionMode" value="group" class="text-purple-500 focus:ring-purple-500" />
+                        <span class="text-sm text-slate-300">按分组批量</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <!-- Account (single mode) -->
+                  <div v-if="keywordSelectionMode === 'single'">
+                    <label class="block text-sm font-medium text-slate-300">选择账号 <span class="text-red-400">*</span></label>
+                    <select v-model="keywordSingleAccountId" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200">
                       <option value="" disabled>请选择账号</option>
                       <option v-for="acct in accounts" :key="acct.id" :value="acct.id">
                         {{ acct.nickname || acct.douyin_id || acct.id }}
                       </option>
                     </select>
                   </div>
+
+                  <!-- Groups (batch mode) -->
+                  <div v-if="keywordSelectionMode === 'group'">
+                    <label class="block text-sm font-medium text-slate-300 mb-1">选择分组 <span class="text-red-400">*</span></label>
+                    <div class="max-h-32 overflow-y-auto rounded-lg border border-white/10 bg-white/5 p-2 space-y-1">
+                      <label
+                        v-for="grp in groups"
+                        :key="grp.id"
+                        class="flex items-center gap-2 px-2 py-1 rounded hover:bg-white/5 cursor-pointer"
+                      >
+                        <input type="checkbox" :value="grp.id" v-model="keywordSelectedGroupIds" class="rounded border-white/20 bg-white/5 text-purple-500 focus:ring-purple-500" />
+                        <span class="text-sm text-slate-300">{{ grp.name }} <span class="text-slate-500">({{ grp.member_count || 0 }})</span></span>
+                      </label>
+                      <p v-if="groups.length === 0" class="text-sm text-slate-500 px-2 py-1">暂无分组</p>
+                    </div>
+                  </div>
+
+                  <!-- Sort by -->
+                  <div>
+                    <label class="block text-sm font-medium text-slate-300">排序方式</label>
+                    <select v-model="keywordSortBy" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200">
+                      <option value="">默认排序</option>
+                      <option value="latest">最新发布</option>
+                      <option value="most_liked">最多点赞</option>
+                    </select>
+                  </div>
+
+                  <!-- Content template / content (for content task types) -->
+                  <template v-if="['search_comment', 'search_dm', 'reply_comment'].includes(keywordActionType)">
+                    <div v-if="templates.length > 0">
+                      <label class="block text-sm font-medium text-slate-300">内容模板</label>
+                      <select v-model="keywordTemplateId" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200">
+                        <option value="">不使用模板</option>
+                        <option v-for="tpl in templates" :key="tpl.id" :value="tpl.id">{{ tpl.name }} ({{ tpl.category }})</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-sm font-medium text-slate-300">评论/私信内容 <TipIcon text="留空则使用模板或 AI 生成" /></label>
+                      <textarea
+                        v-model="keywordContent"
+                        rows="2"
+                        maxlength="500"
+                        class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 placeholder-slate-500"
+                        placeholder="输入内容...（留空用模板）"
+                      />
+                    </div>
+                  </template>
+
+                  <!-- Device -->
+                  <div>
+                    <label class="block text-sm font-medium text-slate-300">执行设备</label>
+                    <select v-model="keywordDeviceId" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200">
+                      <option value="">自动分配</option>
+                      <option v-for="dev in devices" :key="dev.id" :value="dev.id">
+                        {{ dev.name }} {{ dev.status === 'online' ? '(在线)' : '(离线)' }}
+                      </option>
+                    </select>
+                  </div>
                 </div>
 
                 <div class="flex justify-end gap-3 pt-4">
-                  <button type="button" class="rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 hover:bg-gray-50" @click="showKeywordDialog = false">取消</button>
+                  <button type="button" class="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-white/10 transition-colors" @click="showKeywordDialog = false">取消</button>
                   <button
                     type="button"
                     :disabled="creating || keywordList.length === 0"
-                    class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    class="btn-aurora rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                     @click="handleBatchCreateKeywordTasks"
                   >
-                    {{ creating ? '创建中...' : `批量创建 ${keywordList.length} 个任务` }}
+                    <span class="relative z-10">{{ creating ? '创建中...' : `批量创建 ${keywordList.length} 个任务` }}</span>
                   </button>
                 </div>
               </DialogPanel>

@@ -2,15 +2,19 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { getDashboard, getRealtimeStats } from '../api/stats.js'
 import LoadingSpinner from '../components/LoadingSpinner.vue'
+import TipIcon from '../components/TipIcon.vue'
+import { useToastStore } from '../stores/toast.js'
 
 const loading = ref(true)
 const error = ref(null)
 
 const accounts = ref({ total: 0, active: 0, risk_controlled: 0 })
 const devices = ref({ total: 0, online: 0 })
-const tasks = ref({ total: 0, pending: 0, running: 0, completed: 0, failed: 0 })
+const tasks = ref({ total: 0, pending: 0, running: 0, completed: 0, failed: 0, cancelled: 0 })
 
 const realtime = ref({ online_devices: 0, running_tasks: 0, pending_tasks: 0 })
+
+const toast = useToastStore()
 
 let refreshTimer = null
 
@@ -50,6 +54,7 @@ async function fetchDashboardData() {
     realtime.value = rtRes.data || realtime.value
     error.value = null
   } catch (e) {
+    toast.error('加载仪表盘数据失败')
     error.value = e.response?.data?.message || '加载仪表盘数据失败'
   } finally {
     loading.value = false
@@ -70,14 +75,14 @@ onUnmounted(() => {
 
 <template>
   <div>
-    <h1 class="text-2xl font-bold text-gray-800 mb-6">仪表盘</h1>
+    <h1 class="text-2xl font-bold text-white mb-6 inline-flex items-center gap-1.5">仪表盘 <TipIcon text="系统运行概览，展示账号、设备和任务的实时状态统计" /></h1>
 
     <LoadingSpinner v-if="loading" />
 
-    <div v-else-if="error" class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-6">
+    <div v-else-if="error" class="glass-card border-red-500/30 text-red-400 px-4 py-3 rounded-xl mb-6">
       {{ error }}
       <button
-        class="ml-2 underline text-red-800 hover:text-red-900"
+        class="ml-2 underline text-red-300 hover:text-red-200"
         @click="loading = true; fetchDashboardData()"
       >
         重试
@@ -88,83 +93,84 @@ onUnmounted(() => {
       <!-- Summary Cards -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <!-- Accounts Card -->
-        <div class="bg-white rounded-lg shadow p-6">
+        <div class="glass-card stat-shimmer p-6 cursor-pointer">
           <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-semibold text-gray-700">账号</h2>
+            <h2 class="text-lg font-semibold text-slate-300">账号</h2>
             <router-link
               to="/accounts"
-              class="text-sm text-indigo-600 hover:text-indigo-800"
+              class="text-sm text-cyan-400 hover:text-cyan-300 transition-colors"
             >
               查看全部
             </router-link>
           </div>
-          <div class="text-3xl font-bold text-indigo-600 mb-2">{{ accounts.total }}</div>
-          <div class="flex gap-4 text-sm text-gray-500">
-            <span>活跃: <strong class="text-green-600">{{ accounts.active }}</strong></span>
-            <span>风控中: <strong class="text-red-600">{{ accounts.risk_controlled }}</strong></span>
+          <div class="text-3xl font-bold gradient-text mb-2 animate-count">{{ accounts.total }}</div>
+          <div class="flex gap-4 text-sm text-slate-400">
+            <span>活跃: <strong class="text-emerald-400">{{ accounts.active }}</strong></span>
+            <span class="inline-flex items-center gap-1.5">风控中: <strong class="text-red-400">{{ accounts.risk_controlled }}</strong><TipIcon text="账号因异常操作被抖音风控限制，暂时无法执行任务" /></span>
           </div>
         </div>
 
         <!-- Devices Card -->
-        <div class="bg-white rounded-lg shadow p-6">
+        <div class="glass-card stat-shimmer p-6 cursor-pointer">
           <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-semibold text-gray-700">设备</h2>
+            <h2 class="text-lg font-semibold text-slate-300">设备</h2>
             <router-link
               to="/devices"
-              class="text-sm text-indigo-600 hover:text-indigo-800"
+              class="text-sm text-cyan-400 hover:text-cyan-300 transition-colors"
             >
               查看全部
             </router-link>
           </div>
-          <div class="text-3xl font-bold text-indigo-600 mb-2">{{ devices.total }}</div>
-          <div class="flex gap-4 text-sm text-gray-500">
-            <span>在线: <strong class="text-green-600">{{ realtime.online_devices }}</strong></span>
-            <span>总计在线: <strong class="text-gray-700">{{ devices.online }}</strong></span>
+          <div class="text-3xl font-bold gradient-text mb-2 animate-count">{{ devices.total }}</div>
+          <div class="flex gap-4 text-sm text-slate-400">
+            <span class="inline-flex items-center gap-1.5">在线: <strong class="text-emerald-400 relative inline-flex items-center">{{ realtime.online_devices }}<span class="ml-1 w-2 h-2 rounded-full bg-emerald-400 pulse-ring relative"></span></strong><TipIcon text="当前实时在线的设备数量（WebSocket 连接）" /></span>
+            <span class="inline-flex items-center gap-1.5">总计在线: <strong class="text-slate-300">{{ devices.online }}</strong><TipIcon text="今日内曾经上线过的设备总数" /></span>
           </div>
         </div>
 
         <!-- Tasks Card -->
-        <div class="bg-white rounded-lg shadow p-6">
+        <div class="glass-card stat-shimmer p-6 cursor-pointer">
           <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-semibold text-gray-700">任务</h2>
+            <h2 class="text-lg font-semibold text-slate-300">任务</h2>
             <router-link
               to="/tasks"
-              class="text-sm text-indigo-600 hover:text-indigo-800"
+              class="text-sm text-cyan-400 hover:text-cyan-300 transition-colors"
             >
               查看全部
             </router-link>
           </div>
-          <div class="text-3xl font-bold text-indigo-600 mb-2">{{ tasks.total }}</div>
-          <div class="flex flex-wrap gap-3 text-sm text-gray-500">
-            <span>待执行: <strong class="text-yellow-600">{{ realtime.pending_tasks }}</strong></span>
-            <span>运行中: <strong class="text-blue-600">{{ realtime.running_tasks }}</strong></span>
-            <span>已完成: <strong class="text-green-600">{{ tasks.completed }}</strong></span>
-            <span>失败: <strong class="text-red-600">{{ tasks.failed }}</strong></span>
+          <div class="text-3xl font-bold gradient-text mb-2 animate-count">{{ tasks.total }}</div>
+          <div class="flex flex-wrap gap-3 text-sm text-slate-400">
+            <span>待执行: <strong class="text-amber-400">{{ realtime.pending_tasks }}</strong></span>
+            <span>运行中: <strong class="text-blue-400">{{ realtime.running_tasks }}</strong></span>
+            <span>已完成: <strong class="text-emerald-400">{{ tasks.completed }}</strong></span>
+            <span>失败: <strong class="text-red-400">{{ tasks.failed }}</strong></span>
+            <span>已取消: <strong class="text-slate-400">{{ tasks.cancelled }}</strong></span>
           </div>
         </div>
       </div>
 
       <!-- Quick Actions -->
-      <div class="bg-white rounded-lg shadow p-6">
-        <h2 class="text-lg font-semibold text-gray-700 mb-4">快捷操作</h2>
+      <div class="glass-card p-6">
+        <h2 class="text-lg font-semibold text-slate-300 mb-4">快捷操作</h2>
         <div class="flex flex-wrap gap-4">
           <router-link
             to="/tasks"
-            class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 transition-colors"
+            class="btn-aurora inline-flex items-center px-5 py-2.5 text-sm font-medium rounded-xl"
           >
-            任务管理
+            <span class="relative z-10">任务管理</span>
           </router-link>
           <router-link
             to="/accounts"
-            class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 transition-colors"
+            class="btn-aurora inline-flex items-center px-5 py-2.5 text-sm font-medium rounded-xl"
           >
-            账号管理
+            <span class="relative z-10">账号管理</span>
           </router-link>
           <router-link
             to="/devices"
-            class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 transition-colors"
+            class="btn-aurora inline-flex items-center px-5 py-2.5 text-sm font-medium rounded-xl"
           >
-            设备管理
+            <span class="relative z-10">设备管理</span>
           </router-link>
         </div>
       </div>

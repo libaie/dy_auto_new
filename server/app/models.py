@@ -77,6 +77,21 @@ class TaskCreateRequest(BaseModel):
     scheduled_at: Optional[datetime] = None
 
 
+class BatchTaskCreateRequest(BaseModel):
+    type: TaskType
+    account_ids: Optional[list[str]] = None
+    group_ids: Optional[list[str]] = None
+    device_id: Optional[str] = None
+    params: dict[str, Any] = Field(default_factory=dict)
+    scheduled_at: Optional[datetime] = None
+
+    @model_validator(mode="after")
+    def check_at_least_one(self):
+        if not self.account_ids and not self.group_ids:
+            raise ValueError("account_ids 和 group_ids 至少提供一个")
+        return self
+
+
 # --- 任务参数校验模型 ---
 
 class ActionWeight(BaseModel):
@@ -263,6 +278,16 @@ class DeviceGenerateResponse(BaseModel):
     template_id: str
 
 
+class DeviceAIProxyRequest(BaseModel):
+    prompt: str
+    max_tokens: int = 512
+    temperature: float = 0.7
+
+
+class DeviceAIProxyResponse(BaseModel):
+    content: str
+
+
 class PairRequestCreate(BaseModel):
     device_id: str
     device_name: str
@@ -349,6 +374,7 @@ class ChainInstanceCreateRequest(BaseModel):
     template_id: str
     account_ids: Optional[list[str]] = None
     group_ids: Optional[list[str]] = None
+    device_id: Optional[str] = None
 
     @model_validator(mode="after")
     def check_at_least_one(self):
@@ -363,6 +389,7 @@ class ChainInstanceResponse(BaseModel):
     template_name: str = ""
     account_id: str
     account_nickname: str = ""
+    device_id: str = ""
     current_step: int
     total_steps: int
     status: str
@@ -390,3 +417,9 @@ class NurtureParamsV2(BaseModel):
 class KeywordMatrixRequest(BaseModel):
     keyword: str = Field(..., min_length=1, max_length=50)
     count: int = Field(default=10, ge=1, le=30)
+
+
+# --- 系统设置 ---
+
+class SettingUpdate(BaseModel):
+    settings: dict[str, str]

@@ -127,16 +127,18 @@ var uiOperator = {
     }
 
     var p = images.findImage(screen, tpl, { threshold: threshold });
-    tpl.recycle();
-    screen.recycle();
 
     if (p) {
       var cx = Math.round(p.x + tpl.getWidth() / 2);
       var cy = Math.round(p.y + tpl.getHeight() / 2);
+      tpl.recycle();
+      screen.recycle();
       logger.debug(TAG, "图片匹配: (" + p.x + "," + p.y + ") 中心: (" + cx + "," + cy + ")");
       return { isImage: true, x: cx, y: cy };
     }
 
+    tpl.recycle();
+    screen.recycle();
     return null;
   },
 
@@ -158,6 +160,12 @@ var uiOperator = {
     if (element.isImage) {
       logger.debug(TAG, "点击图片匹配: (" + element.x + ", " + element.y + ")");
       return click(element.x, element.y);
+    }
+
+    // package 类型 — 仅验证包名，无需点击
+    if (element.isPackage) {
+      logger.debug(TAG, "package 验证通过: " + element.packageName);
+      return true;
     }
 
     // 控件点击

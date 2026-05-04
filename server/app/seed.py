@@ -33,7 +33,11 @@ def seed_accounts(db: Session) -> int:
 
 
 def seed_selectors(db: Session) -> tuple[int, int]:
-    """Import selectors from selectors.yaml. Returns (added, updated) counts."""
+    """Import selectors from selectors.yaml. Returns (added, updated) counts.
+
+    Only updates strategies if YAML version is higher than the existing version.
+    This prevents seed from overwriting manual edits made via the API.
+    """
     version, selectors = load_selectors_config()
     added = 0
     updated = 0
@@ -43,9 +47,11 @@ def seed_selectors(db: Session) -> tuple[int, int]:
             UISelector.platform_version == sel.get("platform_version", "default"),
         ).first()
         if existing:
-            existing.strategies = sel["strategies"]
-            existing.version = version
-            updated += 1
+            # Only update if YAML version is higher (prevents overwriting manual edits)
+            if version > existing.version:
+                existing.strategies = sel["strategies"]
+                existing.version = version
+                updated += 1
             continue
         db.add(UISelector(
             action_name=sel["action_name"],

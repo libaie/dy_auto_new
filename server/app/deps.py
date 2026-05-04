@@ -13,23 +13,24 @@ from app.database import get_db
 def verify_device_secret(
     x_device_secret: Optional[str] = Header(None, alias="X-Device-Secret"),
     db: Session = Depends(get_db),
-):
-    """FastAPI dependency — verifies X-Device-Secret header. Raises 401 if invalid.
+) -> Optional[str]:
+    """FastAPI dependency — verifies X-Device-Secret header. Returns device_id or None.
 
     Accepts either the global DEVICE_SECRET (master key) or a per-device secret.
+    Returns the device_id for per-device secrets, None for master secret.
     """
     if not x_device_secret:
         raise HTTPException(status_code=401, detail="Missing device secret")
 
-    # Master secret — backward compatible
+    # Master secret — backward compatible, returns None (can access any device)
     if x_device_secret == DEVICE_SECRET:
-        return
+        return None
 
-    # Per-device secret
+    # Per-device secret — returns device_id for ownership verification
     from app.db_models import Device
     device = db.query(Device).filter(Device.device_secret == x_device_secret).first()
     if device:
-        return
+        return device.id
 
     raise HTTPException(status_code=401, detail="Invalid device secret")
 
@@ -56,3 +57,12 @@ def verify_admin_token(authorization: Optional[str] = Header(None)) -> str:
         raise HTTPException(status_code=401, detail="Token expired")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
+
+
+def verify_ws_admin_token(token: str) -> Optional[str]:
+    """Verify JWT token from WebSocket query parameter. Returns username or None."""
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+        return payload["sub"]
+    except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
+        return None

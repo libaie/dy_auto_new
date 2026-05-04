@@ -143,9 +143,28 @@ SearchBaseHandler._inputKeyword = function (keyword) {
 /**
  * 点击联想词
  * 在 recycler_view 中查找包含关键词的联想词并点击
+ * 优先使用选择器系统，回退到硬编码 ID
  */
 SearchBaseHandler._clickSuggestion = function (keyword) {
-  var rv = id("recycler_view").findOne(3000);
+  // 尝试使用选择器系统
+  var rv = null;
+  var selector = require("../core/selector-loader").get("search_suggestion_list");
+  if (selector) {
+    var strategies = selector.strategies.slice().sort(function (a, b) { return a.priority - b.priority; });
+    for (var s = 0; s < strategies.length; s++) {
+      try {
+        switch (strategies[s].type) {
+          case "id": rv = id(strategies[s].value).findOne(3000); break;
+          case "className": rv = className(strategies[s].value).findOne(3000); break;
+        }
+      } catch (e) {}
+      if (rv) break;
+    }
+  }
+  // 回退：硬编码 ID
+  if (!rv) {
+    rv = id("recycler_view").findOne(3000);
+  }
   if (!rv) {
     logger.warn(TAG, "联想词列表未找到");
     return false;
@@ -166,13 +185,21 @@ SearchBaseHandler._clickSuggestion = function (keyword) {
 
 /**
  * 点击"视频" tab
+ * 优先使用选择器系统，回退到硬编码
  */
 SearchBaseHandler._clickVideoTab = function () {
+  // 尝试使用选择器系统
+  var clicked = this.safeClick("search_video_tab", 2);
+  if (clicked) {
+    logger.info(TAG, "点击视频标签");
+    return true;
+  }
+  // 回退：硬编码
   try {
     var vt = id("text1").className("android.widget.Button").text("视频").findOne(5000);
     if (vt) {
       vt.parent().parent().click();
-      logger.info(TAG, "点击视频标签");
+      logger.info(TAG, "点击视频标签(硬编码)");
       return true;
     }
   } catch (e) {

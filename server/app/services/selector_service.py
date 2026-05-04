@@ -75,7 +75,10 @@ class SelectorService:
     def update_selector(self, db: Session, action_name: str,
                         strategies: list = None, platform_version: str = None) -> dict:
         """Update an existing selector. Auto-bumps version on any change."""
-        sel = db.query(UISelector).filter(UISelector.action_name == action_name).first()
+        q = db.query(UISelector).filter(UISelector.action_name == action_name)
+        if platform_version:
+            q = q.filter(UISelector.platform_version == platform_version)
+        sel = q.first()
         if not sel:
             raise ValueError(f"Selector '{action_name}' not found")
 
@@ -96,9 +99,12 @@ class SelectorService:
             "enabled": sel.enabled,
         }
 
-    def delete_selector(self, db: Session, action_name: str) -> bool:
-        """Delete a selector by action_name."""
-        sel = db.query(UISelector).filter(UISelector.action_name == action_name).first()
+    def delete_selector(self, db: Session, action_name: str, platform_version: str = None) -> bool:
+        """Delete a selector by action_name (and optionally platform_version)."""
+        q = db.query(UISelector).filter(UISelector.action_name == action_name)
+        if platform_version:
+            q = q.filter(UISelector.platform_version == platform_version)
+        sel = q.first()
         if not sel:
             return False
         db.delete(sel)

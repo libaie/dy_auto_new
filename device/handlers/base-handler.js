@@ -66,6 +66,42 @@ var BaseHandler = {
     }
     return false;
   },
+
+  /**
+   * 从当前屏幕提取视频相关文本（标题、描述、作者等）
+   * @returns {string} 拼接的文本内容
+   */
+  _extractVideoText: function () {
+    var parts = [];
+    try {
+      var desc = id("com.ss.android.ugc.aweme:id/desc").findOnce();
+      if (desc && desc.text()) parts.push(desc.text());
+
+      var author = id("com.ss.android.ugc.aweme:id/nickname").findOnce();
+      if (author && author.text()) parts.push(author.text());
+
+      var hashtags = className("android.widget.TextView").find();
+      for (var i = 0; i < Math.min(hashtags.length, 10); i++) {
+        var t = hashtags[i].text() || "";
+        if (t.indexOf("#") !== -1 || t.indexOf("话题") !== -1) {
+          parts.push(t);
+        }
+      }
+
+      if (parts.length === 0) {
+        var allTexts = className("android.widget.TextView").find();
+        for (var j = 0; j < Math.min(allTexts.length, 15); j++) {
+          var txt = allTexts[j].text() || "";
+          if (txt.length >= 3 && !/^\d+$/.test(txt) && !/^[^一-龥a-zA-Z]+$/.test(txt)) {
+            parts.push(txt);
+          }
+        }
+      }
+    } catch (e) {
+      logger.debug(TAG, "提取视频文本失败: " + e.message);
+    }
+    return parts.join(" | ");
+  },
 };
 
 module.exports = BaseHandler;

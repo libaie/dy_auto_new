@@ -8,7 +8,7 @@ defineProps({
 </script>
 
 <template>
-  <div class="flex flex-col items-center justify-center py-12 text-gray-400">
+  <div class="flex flex-col items-center justify-center py-12 text-slate-400">
     <svg
       class="h-12 w-12 mb-3"
       fill="none"

@@ -65,12 +65,8 @@ var antiDetect = {
       return sum + p.duration;
     }, 0);
 
-    // AutoJS6 gestures API: gestures(duration, [x, y], [x, y], ...)
-    var args = [totalDuration];
-    for (var i = 0; i < gesturePoints.length; i++) {
-      args.push(gesturePoints[i]);
-    }
-    gestures.apply(null, args);
+    // AutoJS6 gestures API: gestures([delay, duration, [x1,y1], [x2,y2], ...])
+    gestures([0, totalDuration].concat(gesturePoints));
   },
 
   /**
@@ -158,11 +154,7 @@ var antiDetect = {
       return sum + Math.round(p.duration / speedFactor);
     }, 0);
 
-    var args = [totalDuration];
-    for (var i = 0; i < gesturePoints.length; i++) {
-      args.push(gesturePoints[i]);
-    }
-    gestures.apply(null, args);
+    gestures([0, totalDuration].concat(gesturePoints));
   },
 
   /**

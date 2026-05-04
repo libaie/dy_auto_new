@@ -208,6 +208,7 @@ class ChainInstance(Base):
     id = Column(String(36), primary_key=True, default=_uuid)
     template_id = Column(String(36), ForeignKey("chain_templates.id", ondelete="RESTRICT"), nullable=False)
     account_id = Column(String(36), ForeignKey("accounts.id", ondelete="RESTRICT"), nullable=False)
+    device_id = Column(String(36), ForeignKey("devices.id"), nullable=True)
     current_step = Column(Integer, nullable=False, default=1)
     total_steps = Column(Integer, nullable=False)
     status = Column(String(20), nullable=False, default="pending")  # pending, running, completed, failed, cancelled
@@ -217,4 +218,13 @@ class ChainInstance(Base):
 
     template = relationship("ChainTemplate", back_populates="instances")
     account = relationship("Account")
+    device = relationship("Device")
     tasks = relationship("Task", back_populates="chain_instance")
+
+
+class SystemSetting(Base):
+    __tablename__ = "system_settings"
+
+    key = Column(String(100), primary_key=True)
+    value = Column(Text, nullable=False, default="")
+    updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))

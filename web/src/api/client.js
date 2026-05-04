@@ -17,24 +17,34 @@ client.interceptors.request.use(
   (error) => Promise.reject(error)
 )
 
-// Response interceptor: handle 401
-// Auth handler is set up lazily by setupAuthInterceptor() in main.js
+// Response interceptor: handle 401 + global toast
+// Handlers are set up lazily by setupAuthInterceptor() in main.js
 // to avoid circular dependency with router/store
 let _authHandler = null
+let _toastHandler = null
 
 client.interceptors.response.use(
   (response) => response,
   (error) => {
+    // 401 → redirect to login
     if (error.response && error.response.status === 401) {
       if (_authHandler) {
         _authHandler()
       } else {
-        // Fallback if interceptor fires before setup
         localStorage.removeItem('token')
         localStorage.removeItem('username')
         window.location.href = '/login'
       }
+      return Promise.reject(error)
     }
+
+    // All other errors → show toast
+    if (_toastHandler) {
+      const data = error.response?.data
+      const message = data?.detail || data?.message || (error.response ? `请求失败 (${error.response.status})` : '网络连接失败，请检查网络')
+      _toastHandler(message)
+    }
+
     return Promise.reject(error)
   }
 )
@@ -47,6 +57,16 @@ export function setupAuthInterceptor(authStore, router) {
   _authHandler = () => {
     authStore.logout()
     router.push('/login')
+  }
+}
+
+/**
+ * Call this after pinia is initialized.
+ * Sets up the global toast handler for all non-401 errors.
+ */
+export function setupToastInterceptor(toastStore) {
+  _toastHandler = (message) => {
+    toastStore.error(message)
   }
 }
 

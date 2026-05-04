@@ -294,6 +294,9 @@ function startMainLoop(serverUrl, secret) {
       if (serverConfig) applyServerConfig(serverConfig);
       if (proxy) apiClient.setProxy(proxy);
     },
+    onNewTaskAvailable: function () {
+      catchUpPoll();
+    },
     onDeviceRemoved: function () {
       logger.error(TAG, "设备已被服务端移除，返回配对界面");
       deviceWs.stop();
@@ -322,6 +325,9 @@ function startMainLoop(serverUrl, secret) {
   });
 
   // 启动 WS
+  // 初始化选择器（必须在 WS 连接前完成，否则 catch-up 任务找不到选择器）
+  selectorLoader.init();
+
   try {
     deviceWs.start();
   } catch (e) {
@@ -362,9 +368,6 @@ function startMainLoop(serverUrl, secret) {
   } catch (e) {
     logger.warn(TAG, "注册出错: " + e.message);
   }
-
-  // 初始化选择器
-  selectorLoader.init();
 
   // 一次性 poll 捕获离线期间的任务
   catchUpPoll();

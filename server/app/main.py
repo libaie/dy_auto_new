@@ -9,11 +9,12 @@ if _server_dir not in sys.path:
 
 import asyncio
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from app.database import get_db, init_db, SessionLocal
 from app.seed import seed_all
-from app.routers import device, tasks, accounts, devices, auth, selectors, stats, content, account_groups, chains
+from app.routers import device, tasks, accounts, devices, auth, selectors, stats, content, account_groups, chains, settings
 from app.services.ai_generator import ai_generator
 
 
@@ -25,8 +26,8 @@ async def _offline_checker():
 
     while True:
         await asyncio.sleep(30)
+        db = SessionLocal()
         try:
-            db = SessionLocal()
             now = datetime.now(timezone.utc).replace(tzinfo=None)
 
             # 1. Devices online in DB but with no active WS connection → offline immediately
@@ -56,9 +57,10 @@ async def _offline_checker():
                         "device_id": device_id,
                         "status": "offline",
                     })
-            db.close()
         except Exception:
             pass
+        finally:
+            db.close()
 
 
 @asynccontextmanager
@@ -79,6 +81,14 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.include_router(device.router)
 app.include_router(tasks.router)
 app.include_router(accounts.router)
@@ -89,6 +99,7 @@ app.include_router(stats.router)
 app.include_router(content.router)
 app.include_router(account_groups.router)
 app.include_router(chains.router)
+app.include_router(settings.router)
 
 
 @app.get("/health")

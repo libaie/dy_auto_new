@@ -9,8 +9,10 @@ import {
 } from '@headlessui/vue'
 import DataTable from '../components/DataTable.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
+import TipIcon from '../components/TipIcon.vue'
 import { listTemplates, createTemplate, updateTemplate, deleteTemplate } from '../api/chains.js'
 import { formatDate } from '../utils/format.js'
+import { useToastStore } from '../stores/toast.js'
 
 const typeOptions = [
   { value: 'nurture', label: '养号' },
@@ -57,6 +59,8 @@ const deleting = ref(false)
 // --- Page-level error ---
 const pageError = ref(null)
 
+const toast = useToastStore()
+
 // --- Table columns ---
 const columns = [
   { key: 'name', label: '模板名称' },
@@ -78,7 +82,7 @@ async function fetchTemplates() {
     }))
     total.value = res.data.total || 0
   } catch (e) {
-    console.error('Failed to fetch templates:', e)
+    toast.error('加载模板列表失败')
     templates.value = []
     total.value = 0
   } finally {
@@ -219,22 +223,24 @@ onMounted(fetchTemplates)
 <template>
   <div>
     <!-- Page error banner -->
-    <div v-if="pageError" class="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded flex items-center justify-between">
+    <div v-if="pageError" class="mb-4 glass-card border-red-500/30 text-red-400 rounded-xl px-4 py-3 flex items-center justify-between">
       <span>{{ pageError }}</span>
-      <button class="text-red-500 hover:text-red-700 font-bold" @click="pageError = null">&times;</button>
+      <button class="text-red-400 hover:text-red-300 font-bold" @click="pageError = null">&times;</button>
     </div>
 
     <!-- Header -->
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-bold text-gray-800">任务链模板</h1>
+      <h1 class="text-2xl font-bold text-white flex items-center gap-1.5">任务链模板<TipIcon text="创建多步骤任务模板，定义任务链的执行顺序和参数。模板可在链实例中批量分配给多个账号" width="w-80" /></h1>
       <button
-        class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 transition-colors"
+        class="btn-aurora inline-flex items-center px-4 py-2 text-sm font-medium rounded-xl"
         @click="openCreateDialog"
       >
-        <svg class="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-          <path d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" />
-        </svg>
-        创建模板
+        <span class="relative z-10 inline-flex items-center">
+          <svg class="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" />
+          </svg>
+          创建模板
+        </span>
       </button>
     </div>
 
@@ -255,13 +261,13 @@ onMounted(fetchTemplates)
       <template #cell-actions="{ row }">
         <div class="flex justify-end gap-2">
           <button
-            class="inline-flex items-center px-3 py-1 text-sm font-medium text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded transition-colors"
+            class="inline-flex items-center px-3 py-1 text-sm font-medium text-cyan-400 hover:text-cyan-300 hover:bg-cyan-400/10 rounded transition-colors"
             @click="openEditDialog(row)"
           >
             编辑
           </button>
           <button
-            class="inline-flex items-center px-3 py-1 text-sm font-medium text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+            class="inline-flex items-center px-3 py-1 text-sm font-medium text-red-400 hover:text-red-300 hover:bg-red-400/10 rounded transition-colors"
             @click="openDeleteDialog(row)"
           >
             删除
@@ -274,89 +280,89 @@ onMounted(fetchTemplates)
     <TransitionRoot :show="showFormDialog" as="template">
       <Dialog as="div" class="relative z-50" @close="showFormDialog = false">
         <TransitionChild as="template" enter="ease-out duration-300" enter-from="opacity-0" enter-to="opacity-100" leave="ease-in duration-200" leave-from="opacity-100" leave-to="opacity-0">
-          <div class="fixed inset-0 bg-black/30" />
+          <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" />
         </TransitionChild>
         <div class="fixed inset-0 overflow-y-auto">
           <div class="flex min-h-full items-center justify-center p-4">
             <TransitionChild as="template" enter="ease-out duration-300" enter-from="opacity-0 scale-95" enter-to="opacity-100 scale-100" leave="ease-in duration-200" leave-from="opacity-100 scale-100" leave-to="opacity-0 scale-95">
-              <DialogPanel class="w-full max-w-2xl rounded-xl bg-white p-6 shadow-xl">
-                <DialogTitle class="text-lg font-medium text-gray-900">
+              <DialogPanel class="w-full max-w-2xl glass-card p-6 gradient-border">
+                <DialogTitle class="text-lg font-medium text-white">
                   {{ isEditing ? '编辑模板' : '创建模板' }}
                 </DialogTitle>
-                <div v-if="formError" class="mt-3 bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2 rounded">
+                <div v-if="formError" class="mt-3 bg-red-500/10 border border-red-500/20 text-red-400 text-sm px-3 py-2 rounded-lg">
                   {{ formError }}
                 </div>
                 <form class="mt-4 space-y-4" @submit.prevent="handleSave">
                   <div>
-                    <label class="block text-sm font-medium text-gray-700">模板名称 <span class="text-red-500">*</span></label>
-                    <input v-model="form.name" type="text" required class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" placeholder="请输入模板名称" />
+                    <label class="block text-sm font-medium text-slate-300">模板名称 <span class="text-red-400">*</span></label>
+                    <input v-model="form.name" type="text" required class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 placeholder-slate-500" placeholder="请输入模板名称" />
                   </div>
                   <div>
-                    <label class="block text-sm font-medium text-gray-700">描述</label>
-                    <textarea v-model="form.description" rows="2" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" placeholder="请输入模板描述"></textarea>
+                    <label class="block text-sm font-medium text-slate-300">描述</label>
+                    <textarea v-model="form.description" rows="2" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 placeholder-slate-500" placeholder="请输入模板描述"></textarea>
                   </div>
 
                   <!-- Steps editor -->
                   <div>
                     <div class="flex items-center justify-between mb-2">
-                      <label class="block text-sm font-medium text-gray-700">步骤配置</label>
-                      <button type="button" class="text-sm text-indigo-600 hover:text-indigo-800" @click="addStep">+ 添加步骤</button>
+                      <label class="text-sm font-medium text-slate-300 flex items-center gap-1.5">步骤配置<TipIcon text="定义任务链中的每个执行步骤，按顺序依次执行。每个步骤可配置不同类型的任务" width="w-80" /></label>
+                      <button type="button" class="text-sm text-cyan-400 hover:text-cyan-300" @click="addStep">+ 添加步骤</button>
                     </div>
-                    <div v-if="form.steps.length === 0" class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center text-sm text-gray-400">
+                    <div v-if="form.steps.length === 0" class="border-2 border-dashed border-white/10 rounded-lg p-6 text-center text-sm text-slate-500">
                       点击「添加步骤」开始配置任务链
                     </div>
                     <div v-else class="space-y-3">
-                      <div v-for="(step, index) in form.steps" :key="index" class="border rounded-lg p-3 bg-gray-50">
+                      <div v-for="(step, index) in form.steps" :key="index" class="border border-white/10 rounded-lg p-3 bg-white/5">
                         <div class="flex items-center justify-between mb-2">
-                          <span class="text-sm font-medium text-gray-600">步骤 {{ step.step_order }}</span>
+                          <span class="text-sm font-medium text-slate-400">步骤 {{ step.step_order }}</span>
                           <div class="flex gap-1">
-                            <button type="button" class="text-gray-400 hover:text-gray-600 px-1" :disabled="index === 0" @click="moveStepUp(index)">
+                            <button type="button" class="text-slate-500 hover:text-slate-300 px-1" :disabled="index === 0" @click="moveStepUp(index)">
                               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/></svg>
                             </button>
-                            <button type="button" class="text-gray-400 hover:text-gray-600 px-1" :disabled="index === form.steps.length - 1" @click="moveStepDown(index)">
+                            <button type="button" class="text-slate-500 hover:text-slate-300 px-1" :disabled="index === form.steps.length - 1" @click="moveStepDown(index)">
                               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                             </button>
-                            <button type="button" class="text-red-400 hover:text-red-600 px-1" @click="removeStep(index)">
+                            <button type="button" class="text-red-400 hover:text-red-300 px-1" @click="removeStep(index)">
                               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                             </button>
                           </div>
                         </div>
                         <div class="grid grid-cols-2 gap-2">
                           <div>
-                            <label class="block text-xs text-gray-500">任务类型</label>
-                            <select v-model="step.type" @change="onStepTypeChange(step)" class="mt-1 block w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                            <label class="text-xs text-slate-400 flex items-center gap-1.5">任务类型<TipIcon text="养号=模拟真实用户提升权重；搜索评论/点赞/私信=按关键词搜索后自动操作；评论回复=回复已有评论" width="w-80" /></label>
+                            <select v-model="step.type" @change="onStepTypeChange(step)" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-slate-200 placeholder-slate-500">
                               <option v-for="opt in typeOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
                             </select>
                           </div>
                           <div>
-                            <label class="block text-xs text-gray-500">步骤标签</label>
-                            <input v-model="step.label" type="text" class="mt-1 block w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+                            <label class="text-xs text-slate-400 flex items-center gap-1.5">步骤标签<TipIcon text="给步骤命名以便识别，如'先养号'、'再评论'，执行时会显示此标签" /></label>
+                            <input v-model="step.label" type="text" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-slate-200 placeholder-slate-500" />
                           </div>
                         </div>
                         <!-- Params for the step -->
                         <div class="mt-2 grid grid-cols-2 gap-2">
                           <template v-if="step.type === 'nurture'">
                             <div>
-                              <label class="block text-xs text-gray-500">时长(分钟)</label>
-                              <input v-model.number="step.params.duration" type="number" min="1" max="120" class="mt-1 block w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm shadow-sm" />
+                              <label class="text-xs text-slate-400 flex items-center gap-1.5">时长(分钟)<TipIcon text="养号步骤的执行时长" /></label>
+                              <input v-model.number="step.params.duration" type="number" min="1" max="120" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-slate-200" />
                             </div>
                           </template>
                           <template v-else>
                             <div>
-                              <label class="block text-xs text-gray-500">关键词</label>
-                              <input v-model="step.params.keyword" type="text" class="mt-1 block w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm shadow-sm" />
+                              <label class="block text-xs text-slate-400">关键词</label>
+                              <input v-model="step.params.keyword" type="text" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-slate-200" />
                             </div>
                             <div>
-                              <label class="block text-xs text-gray-500">数量</label>
-                              <input v-model.number="step.params.count" type="number" min="1" max="20" class="mt-1 block w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm shadow-sm" />
+                              <label class="text-xs text-slate-400 flex items-center gap-1.5">数量<TipIcon text="搜索类任务要处理的视频/评论数量" /></label>
+                              <input v-model.number="step.params.count" type="number" min="1" max="20" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-slate-200" />
                             </div>
                             <div v-if="step.type === 'reply_comment'">
-                              <label class="block text-xs text-gray-500">视频数</label>
-                              <input v-model.number="step.params.video_count" type="number" min="1" max="10" class="mt-1 block w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm shadow-sm" />
+                              <label class="text-xs text-slate-400 flex items-center gap-1.5">视频数<TipIcon text="要回复评论的视频数量" /></label>
+                              <input v-model.number="step.params.video_count" type="number" min="1" max="10" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-slate-200" />
                             </div>
                             <div v-if="['search_comment', 'search_dm', 'reply_comment'].includes(step.type)">
-                              <label class="block text-xs text-gray-500">内容</label>
-                              <input v-model="step.params.content" type="text" class="mt-1 block w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm shadow-sm" />
+                              <label class="text-xs text-slate-400 flex items-center gap-1.5">内容<TipIcon text="评论/私信的文本内容，支持 {keyword} 等变量" /></label>
+                              <input v-model="step.params.content" type="text" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-slate-200" />
                             </div>
                           </template>
                         </div>
@@ -365,9 +371,9 @@ onMounted(fetchTemplates)
                   </div>
 
                   <div class="flex justify-end gap-3 pt-2">
-                    <button type="button" class="rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 hover:bg-gray-50" @click="showFormDialog = false">取消</button>
-                    <button type="submit" :disabled="saving" class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed">
-                      {{ saving ? '保存中...' : '保存' }}
+                    <button type="button" class="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-white/10 transition-colors" @click="showFormDialog = false">取消</button>
+                    <button type="submit" :disabled="saving" class="btn-aurora rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                      <span class="relative z-10">{{ saving ? '保存中...' : '保存' }}</span>
                     </button>
                   </div>
                 </form>

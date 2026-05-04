@@ -5,7 +5,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from pydantic import BaseModel
-from app.models import TaskCreateRequest, TaskStatus, TASK_PARAMS_VALIDATORS
+from app.models import TaskCreateRequest, BatchTaskCreateRequest, TaskStatus, TASK_PARAMS_VALIDATORS
 from app.database import get_db
 from app.db_models import Device
 from app.deps import verify_admin_token
@@ -92,15 +92,112 @@ async def create_task(
         device_id=device_id,
     )
 
-    # Push task to assigned device via WS
+    # Notify device(s) that a new task is available — device must poll/claim via /poll
+    # (sending full task via WS would bypass the claim state machine, quota checks, and scheduled_at)
+    from app.ws_manager import pair_ws_manager
     if task.device_id:
-        from app.ws_manager import pair_ws_manager
         await pair_ws_manager.send_to_device(task.device_id, {
-            "event": "task",
-            "task": task.model_dump(mode="json"),
+            "event": "new_task_available",
+        })
+    elif task.account_id:
+        bound_device = db.query(Device).filter(Device.bound_account_id == task.account_id).first()
+        if bound_device:
+            await pair_ws_manager.send_to_device(bound_device.id, {
+                "event": "new_task_available",
+            })
+        else:
+            await pair_ws_manager.broadcast_to_devices({
+                "event": "new_task_available",
+            })
+    else:
+        await pair_ws_manager.broadcast_to_devices({
+            "event": "new_task_available",
         })
 
     return task
+
+
+@router.post("/batch")
+async def batch_create_tasks(
+    request: BatchTaskCreateRequest,
+    db: Session = Depends(get_db),
+    _: str = Depends(verify_admin_token),
+):
+    # Resolve group_ids to account_ids
+    account_ids = list(request.account_ids or [])
+    if request.group_ids:
+        from app.services.chain_service import chain_service
+        group_accounts = chain_service.resolve_accounts_from_groups(db, request.group_ids)
+        account_ids = list(set(account_ids + group_accounts))
+
+    if not account_ids:
+        raise HTTPException(status_code=422, detail="没有可用的账号")
+
+    # Validate device_id if specified
+    device_id = request.device_id
+    if device_id:
+        device = db.query(Device).filter(Device.id == device_id).first()
+        if not device:
+            raise HTTPException(status_code=404, detail="设备不存在")
+        # If device is bound to an account, that account must be in the batch
+        if device.bound_account_id and device.bound_account_id not in account_ids:
+            raise HTTPException(status_code=400, detail="该设备绑定的账号不在批量任务的账号列表中")
+
+    # Validate params once
+    validator = TASK_PARAMS_VALIDATORS.get(request.type.value)
+    if validator:
+        try:
+            if isinstance(validator, type) and issubclass(validator, BaseModel):
+                validated = validator(**request.params)
+                params = validated.model_dump(exclude_none=True)
+            else:
+                params = validator(request.params)
+        except Exception as e:
+            raise HTTPException(status_code=422, detail=f"参数校验失败: {e}")
+    else:
+        params = dict(request.params)
+
+    # Create a task per account (每账号独立解析模板，避免内容雷同)
+    from app.ws_manager import pair_ws_manager
+    created_tasks = []
+    for account_id in account_ids:
+        account_params = await _maybe_resolve_template(db, dict(params), request.type.value)
+        task = task_service.create_task(
+            db=db,
+            task_type=request.type,
+            account_id=account_id,
+            params=dict(account_params),
+            scheduled_at=request.scheduled_at,
+            device_id=device_id,
+        )
+        created_tasks.append(task)
+
+    # Notify device(s) — only send new_task_available, let devices poll/claim
+    if device_id:
+        await pair_ws_manager.send_to_device(device_id, {
+            "event": "new_task_available",
+        })
+    else:
+        # Notify bound devices for each account
+        notified_devices = set()
+        for task in created_tasks:
+            bound_device = db.query(Device).filter(Device.bound_account_id == task.account_id).first()
+            if bound_device and bound_device.id not in notified_devices:
+                notified_devices.add(bound_device.id)
+                await pair_ws_manager.send_to_device(bound_device.id, {
+                    "event": "new_task_available",
+                })
+        # Broadcast for any unbound accounts
+        unbound_accounts = [
+            t.account_id for t in created_tasks
+            if not db.query(Device).filter(Device.bound_account_id == t.account_id).first()
+        ]
+        if unbound_accounts:
+            await pair_ws_manager.broadcast_to_devices({
+                "event": "new_task_available",
+            })
+
+    return {"created": len(created_tasks), "tasks": created_tasks}
 
 
 @router.get("")

@@ -2,6 +2,7 @@
 var BaseHandler = require("./base-handler");
 var uiOperator = require("../core/ui-operator");
 var antiDetect = require("../core/anti-detect");
+var aiAnalyzer = require("../core/ai-analyzer");
 var logger = require("../utils/logger");
 
 var TAG = "养号";
@@ -59,6 +60,10 @@ NurtureHandler._executeV2 = function (params) {
 
     // Randomly pick one incomplete sub-task
     var task = pending[Math.floor(Math.random() * pending.length)];
+
+    // 执行前确保在推荐页（防止误触跳转后所有操作都在错误页面）
+    this._ensureOnFeed();
+
     try {
       this._executeSubTask(task);
       task.done++;
@@ -117,18 +122,199 @@ NurtureHandler._executeSubTask = function (task) {
 };
 
 NurtureHandler._browseFeed = function () {
-  var watchTime = Math.floor(Math.random() * 10000 + 5000);
+  this._ensureOnFeed();
+  // 浏览推荐页：快速扫一眼，大部分 2-5 秒，偶尔多停一会
+  var watchTime = this._humanDuration(2000, 8000, 4000);
   logger.debug(TAG, "浏览推荐页 " + Math.round(watchTime / 1000) + "s");
   sleep(watchTime);
 };
 
 NurtureHandler._watchVideo = function () {
-  var watchTime = Math.floor(Math.random() * 20000 + 10000);
-  logger.debug(TAG, "观看视频 " + Math.round(watchTime / 1000) + "s");
+  // 先检测是否是广告 — 广告快速划走
+  if (this._isAdContent()) {
+    var adTime = Math.floor(Math.random() * 1500 + 500);
+    logger.debug(TAG, "检测到广告，快速划走 " + adTime + "ms");
+    sleep(adTime);
+    return;
+  }
+
+  // 检测内容互动数据来判断质量
+  var quality = this._assessContentQuality();
+  var watchTime;
+
+  if (quality === "high") {
+    // 精彩内容：看得久，30-60 秒，偶尔模拟看评论
+    watchTime = this._humanDuration(25000, 60000, 40000);
+    logger.debug(TAG, "精彩内容，深度观看 " + Math.round(watchTime / 1000) + "s");
+  } else if (quality === "medium") {
+    // 普通内容：15-30 秒
+    watchTime = this._humanDuration(12000, 30000, 20000);
+    logger.debug(TAG, "普通内容，正常观看 " + Math.round(watchTime / 1000) + "s");
+  } else {
+    // 无亮点内容：3-10 秒快速划走
+    watchTime = this._humanDuration(3000, 10000, 5000);
+    logger.debug(TAG, "无亮点内容，快速划走 " + Math.round(watchTime / 1000) + "s");
+  }
+
   sleep(watchTime);
+
+  // 精彩内容有概率模拟看评论区（停留更久）
+  if (quality === "high" && Math.random() < 0.3) {
+    var commentPause = Math.floor(Math.random() * 5000 + 3000);
+    logger.debug(TAG, "模拟浏览评论区 " + Math.round(commentPause / 1000) + "s");
+    sleep(commentPause);
+  }
+};
+
+/**
+ * 生成拟人化的观看时长 — 基于对数正态分布
+ * 大部分时间偏短，偶尔有长停留，符合真实用户行为
+ * @param {number} min - 最小时长(ms)
+ * @param {number} max - 最大时长(ms)
+ * @param {number} median - 中位数(ms)，控制主体集中位置
+ * @returns {number} 拟人化的时长(ms)
+ */
+NurtureHandler._humanDuration = function (min, max, median) {
+  // 对数正态分布：ln(N(mu, sigma)) 产生右偏分布
+  var mu = Math.log(median);
+  var sigma = 0.5; // 控制离散程度，0.3-0.6 较自然
+  // Box-Muller 变换生成正态随机数
+  var u1 = Math.random();
+  var u2 = Math.random();
+  var z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+  var value = Math.exp(mu + sigma * z);
+  // 限制在 [min, max] 范围内
+  return Math.max(min, Math.min(max, Math.round(value)));
+};
+
+/**
+ * 检测当前屏幕是否为广告内容
+ * @returns {boolean}
+ */
+NurtureHandler._isAdContent = function () {
+  try {
+    // 常见广告标识文本
+    var adTexts = ["广告", "推广", "赞助", "购物", "立即购买", "查看详情"];
+    for (var i = 0; i < adTexts.length; i++) {
+      var el = textContains(adTexts[i]).findOnce();
+      if (el) {
+        logger.debug(TAG, "发现广告标识: " + adTexts[i]);
+        return true;
+      }
+    }
+    // 检查是否在购物/商品页面（右下角有购物车图标）
+    var shopBtn = desc("购物车").findOnce();
+    if (shopBtn) {
+      logger.debug(TAG, "发现购物车标识，判定为广告");
+      return true;
+    }
+  } catch (e) {
+    // 检测失败不影响正常流程
+  }
+  return false;
+};
+
+/**
+ * 评估当前视频内容质量 — 基于可见的互动数据
+ * @returns {"high" | "medium" | "low"}
+ */
+NurtureHandler._assessContentQuality = function () {
+  try {
+    // 尝试读取点赞数（控件 id 可能随版本变化）
+    var likeCountEl = id("com.ss.android.ugc.aweme:id/like_count").findOnce();
+    if (likeCountEl) {
+      var likeText = likeCountEl.text() || "";
+      var likeNum = this._parseCount(likeText);
+      // 高赞内容判定：万级以上
+      if (likeNum >= 10000) return "high";
+      if (likeNum >= 1000) return "medium";
+    }
+
+    // 尝试读取评论数
+    var commentCountEl = id("com.ss.android.ugc.aweme:id/comment_count").findOnce();
+    if (commentCountEl) {
+      var commentText = commentCountEl.text() || "";
+      var commentNum = this._parseCount(commentText);
+      if (commentNum >= 1000) return "high";
+      if (commentNum >= 100) return "medium";
+    }
+  } catch (e) {
+    // 读取失败时降级为随机判定
+  }
+
+  // 无法读取数据时，用概率模拟：20% 高、50% 中、30% 低
+  var r = Math.random();
+  if (r < 0.2) return "high";
+  if (r < 0.7) return "medium";
+  return "low";
+};
+
+/**
+ * 解析抖音互动数字文本（支持 "1.2万"、"3.5亿" 等格式）
+ * @param {string} text - 数字文本
+ * @returns {number}
+ */
+NurtureHandler._parseCount = function (text) {
+  if (!text) return 0;
+  text = text.replace(/,/g, "").trim();
+  if (text.indexOf("w") !== -1 || text.indexOf("万") !== -1) {
+    return Math.round(parseFloat(text) * 10000);
+  }
+  if (text.indexOf("亿") !== -1) {
+    return Math.round(parseFloat(text) * 100000000);
+  }
+  var num = parseInt(text, 10);
+  return isNaN(num) ? 0 : num;
+};
+
+/**
+ * 确保在推荐页 — 如果误触跳转到其他页面，返回推荐页
+ * 使用选择器系统检测点赞按钮（推荐页特征），避免硬编码 ID 失效
+ * 支持最多重试 5 次，每次优先 safeClick("back_btn")，失败则回退系统 back()
+ */
+NurtureHandler._ensureOnFeed = function () {
+  var maxRetries = 5;
+  for (var attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      // 检测是否在推荐页 — 使用选择器系统的 like_button（自动匹配最新 ID）
+      var likeBtn = uiOperator.findElement("like_button", 1000);
+      if (likeBtn) return; // 已在推荐页
+
+      // 检测是否在有底部 tab 的主页面（首页/朋友/消息/我的）
+      var homeTab = text("首页").findOnce();
+      if (homeTab) {
+        // 在主页但不在推荐视频流，点击"首页" tab
+        logger.info(TAG, "在主页面，点击首页 tab（第" + (attempt + 1) + "次）");
+        homeTab.parent().click();
+        sleep(2000);
+        continue;
+      }
+
+      logger.info(TAG, "不在推荐页（第" + (attempt + 1) + "次），尝试返回");
+
+      // 优先使用选择器系统的 back_btn
+      var backed = this.safeClick("back_btn", 1);
+      if (!backed) {
+        // 选择器找不到，回退到系统 back() — 万能兜底
+        logger.info(TAG, "back_btn 未找到，使用系统 back()");
+        back();
+      }
+      sleep(1500);
+    } catch (e) {
+      logger.warn(TAG, "页面检测异常: " + e.message);
+      back(); // 异常时也尝试系统 back
+      sleep(1000);
+    }
+  }
+  logger.warn(TAG, maxRetries + " 次尝试后仍未回到推荐页");
 };
 
 NurtureHandler._likeCurrentVideo = function () {
+  var videoText = this._extractVideoText();
+  if (!aiAnalyzer.checkHealthRelevance(videoText)) {
+    logger.info(TAG, "内容与大健康不相关，跳过点赞");
+    return;
+  }
   var clicked = this.safeClick("like_button", 2);
   if (clicked) {
     logger.info(TAG, "点赞成功");
@@ -136,17 +322,59 @@ NurtureHandler._likeCurrentVideo = function () {
 };
 
 NurtureHandler._commentOnVideo = function (templateId) {
-  var opened = this.safeClick("comment_input", 3);
-  if (!opened) return;
+  // 1. 提取视频内容，AI 生成评论
+  var videoText = this._extractVideoText();
+  var content = aiAnalyzer.generateVideoComment(videoText);
+  if (!content) {
+    logger.warn(TAG, "AI 生成评论失败，跳过评论");
+    return;
+  }
+  logger.info(TAG, "AI 生成评论: '" + content.substring(0, 20) + "'");
+
+  // 2. 点击评论入口按钮，打开评论面板
+  var opened = this.safeClick("video_comment_btn", 3);
+  if (!opened) {
+    logger.warn(TAG, "评论入口按钮未找到");
+    return;
+  }
+  sleep(1500);
+
+  // 3. 点击评论输入框，弹出键盘
+  var inputClicked = this.safeClick("video_comment_input", 3);
+  if (!inputClicked) {
+    logger.warn(TAG, "评论输入框未找到");
+    back();
+    sleep(500);
+    return;
+  }
+  sleep(1000);
+
+  // 4. 输入评论内容
+  var inputResult = this.safeInput("video_comment_input", content);
+  if (!inputResult) {
+    logger.warn(TAG, "输入评论内容失败");
+    back();
+    sleep(500);
+    return;
+  }
   sleep(500);
-  var content = "好视频！";
-  uiOperator.typeText(content);
-  sleep(300);
+
+  // 5. 提交评论
   this.safeClick("comment_submit", 2);
+  sleep(1000);
   logger.info(TAG, "评论成功");
+
+  // 6. 关闭评论面板
+  this.safeClick("back_btn", 2);
+  sleep(800);
 };
 
 NurtureHandler._followCurrentUser = function () {
+  var videoText = this._extractVideoText();
+  if (!aiAnalyzer.checkHealthRelevance(videoText)) {
+    logger.info(TAG, "内容与大健康不相关，跳过关注");
+    return;
+  }
   var clicked = this.safeClick("follow_button", 2);
   if (clicked) {
     logger.info(TAG, "关注成功");
@@ -173,6 +401,7 @@ NurtureHandler._legacyExecute = function (params) {
   var stats = { videos_watched: 0, likes: 0, follows: 0, errors: 0 };
 
   while (Date.now() < endTime) {
+    this._ensureOnFeed();
     var action = this._weightedRandom(actions);
     try {
       switch (action.type) {

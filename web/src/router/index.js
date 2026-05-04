@@ -62,7 +62,16 @@ const routes = [
         name: 'Content',
         component: () => import('../views/ContentPage.vue'),
       },
+      {
+        path: 'settings',
+        name: 'Settings',
+        component: () => import('../views/SettingsPage.vue'),
+      },
     ],
+  },
+  {
+    path: '/:pathMatch(.*)*',
+    redirect: '/',
   },
 ]
 

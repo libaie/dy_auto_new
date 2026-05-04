@@ -3,6 +3,8 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { Chart, registerables } from 'chart.js'
 import { getDailyStats } from '../api/stats.js'
 import LoadingSpinner from '../components/LoadingSpinner.vue'
+import TipIcon from '../components/TipIcon.vue'
+import { useToastStore } from '../stores/toast.js'
 
 Chart.register(...registerables)
 
@@ -19,6 +21,7 @@ const loading = ref(false)
 const statsData = ref(null)
 const chartCanvas = ref(null)
 let chartInstance = null
+const toast = useToastStore()
 
 const summaryCards = [
   { key: 'likes', label: '点赞', color: 'bg-blue-500' },
@@ -104,7 +107,7 @@ async function fetchStats() {
       buildChart(statsData.value.accounts)
     }
   } catch (err) {
-    console.error('Failed to fetch daily stats:', err)
+    toast.error('加载统计数据失败')
     statsData.value = null
   } finally {
     loading.value = false
@@ -131,12 +134,15 @@ onUnmounted(() => {
   <div>
     <!-- Header -->
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-bold text-gray-800">数据统计</h1>
-      <input
-        v-model="selectedDate"
-        type="date"
-        class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-      />
+      <h1 class="text-2xl font-bold text-white flex items-center gap-1.5">数据统计<TipIcon text="查看各账号的操作统计数据，支持按日期筛选" /></h1>
+      <div class="flex items-center gap-1.5">
+        <input
+          v-model="selectedDate"
+          type="date"
+          class="border border-white/10 bg-white/5 rounded-lg px-3 py-2 text-sm text-slate-200"
+        />
+        <TipIcon text="选择查看统计数据的日期，默认为今天" />
+      </div>
     </div>
 
     <!-- Loading -->
@@ -147,7 +153,7 @@ onUnmounted(() => {
       v-else-if="!statsData || !statsData.accounts || statsData.accounts.length === 0"
       class="flex items-center justify-center py-20"
     >
-      <p class="text-gray-400 text-lg">暂无数据</p>
+      <p class="text-slate-400 text-lg">暂无数据</p>
     </div>
 
     <!-- Data content -->
@@ -157,7 +163,7 @@ onUnmounted(() => {
         <div
           v-for="card in summaryCards"
           :key="card.key"
-          class="bg-white rounded-lg shadow p-4 text-center"
+          class="glass-card stat-shimmer p-4 text-center cursor-pointer"
         >
           <div
             class="w-10 h-10 rounded-full mx-auto mb-2 flex items-center justify-center text-white text-sm"
@@ -165,16 +171,16 @@ onUnmounted(() => {
           >
             {{ card.label.charAt(0) }}
           </div>
-          <p class="text-2xl font-bold text-gray-800">
+          <p class="text-2xl font-bold gradient-text animate-count">
             {{ totals[card.key] }}
           </p>
-          <p class="text-sm text-gray-500">{{ card.label }}</p>
+          <p class="text-sm text-slate-400">{{ card.label }}</p>
         </div>
       </div>
 
       <!-- Chart -->
-      <div class="bg-white rounded-lg shadow p-6">
-        <h2 class="text-lg font-semibold text-gray-700 mb-4">各账号操作统计</h2>
+      <div class="glass-card p-6">
+        <h2 class="text-lg font-semibold text-slate-300 mb-4 flex items-center gap-1.5">各账号操作统计<TipIcon text="选定日期内所有账号的操作统计总计" /></h2>
         <div class="relative" style="height: 400px">
           <canvas ref="chartCanvas"></canvas>
         </div>

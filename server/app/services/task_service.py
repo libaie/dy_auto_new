@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy.orm import Session
-from sqlalchemy import update, or_, and_
+from sqlalchemy import update, or_, and_, null
 
 from app.db_models import Task as DBTask, Device as DBDevice
 from app.models import TaskType, TaskStatus, Task as PydanticTask
@@ -92,10 +92,12 @@ class TaskService:
                 and_(DBTask.device_id.is_(None), ~DBTask.account_id.in_(bound_account_ids)),
             )
 
-        # 3. Find candidate tasks with routing applied
+        # 3. Find candidate tasks with routing and scheduled_at applied
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         candidates = db.query(DBTask).filter(
             DBTask.status == TaskStatus.PENDING.value,
             route_filter,
+            or_(DBTask.scheduled_at.is_(None), DBTask.scheduled_at <= now),
         ).order_by(DBTask.created_at.asc()).limit(10).all()
 
         if not candidates:

@@ -214,8 +214,14 @@ ReplyCommentHandler._searchAndSort = function (keyword, sortBy) {
  * 打开评论区
  */
 ReplyCommentHandler._openComments = function () {
-  // 点击评论区入口（通常是底部的评论图标）
-  var clicked = this.safeClick("comment_input", 3);
+  // 点击评论区入口（视频评论按钮）
+  var clicked = this.safeClick("video_comment_btn", 3);
+  if (clicked) {
+    sleep(2000);
+    return true;
+  }
+  // 备用：旧版 comment_input
+  clicked = this.safeClick("comment_input", 3);
   if (clicked) {
     sleep(2000);
     return true;
@@ -440,7 +446,7 @@ ReplyCommentHandler._parseTime = function (timeStr) {
  * @returns {boolean}
  */
 ReplyCommentHandler._replyToComment = function (replyText) {
-  // 点击回复按钮
+  // 1. 点击回复按钮，打开回复输入框
   var replyClicked = this.safeClick("comment_reply_button", 2);
   if (!replyClicked) {
     logger.warn(TAG, "回复按钮未找到");
@@ -448,7 +454,15 @@ ReplyCommentHandler._replyToComment = function (replyText) {
   }
   sleep(1000);
 
-  // 输入回复内容
+  // 2. 点击回复输入框，弹出键盘
+  var inputClicked = this.safeClick("comment_input", 3);
+  if (!inputClicked) {
+    logger.warn(TAG, "回复输入框未找到");
+    return false;
+  }
+  sleep(800);
+
+  // 3. 输入回复内容
   var inputResult = this.safeInput("comment_input", replyText);
   if (!inputResult) {
     logger.warn(TAG, "输入回复内容失败");
@@ -456,7 +470,7 @@ ReplyCommentHandler._replyToComment = function (replyText) {
   }
   sleep(500);
 
-  // 发送
+  // 4. 发送
   var submitClicked = this.safeClick("comment_submit", 3);
   if (!submitClicked) {
     logger.warn(TAG, "提交回复失败");

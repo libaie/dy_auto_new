@@ -8,6 +8,10 @@ export function createTask(data) {
   return client.post('/tasks', data)
 }
 
+export function batchCreateTasks(data) {
+  return client.post('/tasks/batch', data)
+}
+
 export function cancelTask(id) {
   return client.post(`/tasks/${id}/cancel`)
 }

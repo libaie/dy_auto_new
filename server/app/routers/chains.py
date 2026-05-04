@@ -23,13 +23,15 @@ def _template_to_dict(t: ChainTemplate) -> dict:
     }
 
 
-def _instance_to_dict(inst: ChainInstance, template_name: str = "", account_nickname: str = "") -> dict:
+def _instance_to_dict(inst: ChainInstance, template_name: str = "", account_nickname: str = "", device_name: str = "") -> dict:
     return {
         "id": inst.id,
         "template_id": inst.template_id,
         "template_name": template_name,
         "account_id": inst.account_id,
         "account_nickname": account_nickname,
+        "device_id": inst.device_id or "",
+        "device_name": device_name,
         "current_step": inst.current_step,
         "total_steps": inst.total_steps,
         "status": inst.status,
@@ -157,7 +159,7 @@ async def create_instances(
         raise HTTPException(status_code=422, detail="未指定任何账号")
 
     try:
-        results = chain_service.create_chain_instances(db, request.template_id, account_ids)
+        results = chain_service.create_chain_instances(db, request.template_id, account_ids, device_id=request.device_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -194,12 +196,14 @@ def list_instances(
 
     template_ids = list(set(i.template_id for i in instances))
     account_ids = list(set(i.account_id for i in instances))
+    device_ids = list(set(i.device_id for i in instances if i.device_id))
     templates = {t.id: t.name for t in db.query(ChainTemplate).filter(ChainTemplate.id.in_(template_ids)).all()}
     accounts = {a.id: a.nickname for a in db.query(Account).filter(Account.id.in_(account_ids)).all()}
+    devices_map = {d.id: d.name for d in db.query(Device).filter(Device.id.in_(device_ids)).all()} if device_ids else {}
 
     return {
         "instances": [
-            _instance_to_dict(i, templates.get(i.template_id, ""), accounts.get(i.account_id, ""))
+            _instance_to_dict(i, templates.get(i.template_id, ""), accounts.get(i.account_id, ""), devices_map.get(i.device_id, ""))
             for i in instances
         ],
         "total": total,
@@ -217,6 +221,7 @@ def get_instance(
         raise HTTPException(status_code=404, detail="链实例不存在")
     template = db.query(ChainTemplate).filter(ChainTemplate.id == inst.template_id).first()
     account = db.query(Account).filter(Account.id == inst.account_id).first()
+    device = db.query(Device).filter(Device.id == inst.device_id).first() if inst.device_id else None
 
     tasks = (
         db.query(DBTask)
@@ -225,7 +230,7 @@ def get_instance(
         .all()
     )
 
-    result = _instance_to_dict(inst, template.name if template else "", account.nickname if account else "")
+    result = _instance_to_dict(inst, template.name if template else "", account.nickname if account else "", device.name if device else "")
     result["tasks"] = [
         {
             "id": t.id,

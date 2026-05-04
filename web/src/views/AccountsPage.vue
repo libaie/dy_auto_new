@@ -17,6 +17,8 @@ import {
   deleteAccount,
 } from '../api/accounts.js'
 import { formatDate } from '../utils/format.js'
+import { useToastStore } from '../stores/toast.js'
+import TipIcon from '../components/TipIcon.vue'
 
 // --- Data state ---
 const accounts = ref([])
@@ -38,6 +40,7 @@ const defaultForm = {
   status: 'active',
   daily_limits: '',
 }
+const dailyLimitsError = ref(null)
 const form = reactive({ ...defaultForm })
 const editingId = ref(null)
 
@@ -49,11 +52,13 @@ const deleting = ref(false)
 // --- Page-level error ---
 const pageError = ref(null)
 
+const toast = useToastStore()
+
 // --- Status options for the dropdown ---
 const statusOptions = [
   { value: 'active', label: '正常' },
   { value: 'risk_controlled', label: '风控中' },
-  { value: 'disabled', label: '已禁用' },
+  { value: 'banned', label: '已禁用' },
 ]
 
 // --- Table columns ---
@@ -75,7 +80,7 @@ async function fetchAccounts() {
     accounts.value = res.data.accounts || []
     total.value = res.data.total || 0
   } catch (e) {
-    console.error('Failed to fetch accounts:', e)
+    toast.error('加载账号列表失败')
     accounts.value = []
     total.value = 0
   } finally {
@@ -94,6 +99,7 @@ function openCreateDialog() {
   editingId.value = null
   Object.assign(form, defaultForm)
   formError.value = null
+  dailyLimitsError.value = null
   showFormDialog.value = true
 }
 
@@ -106,8 +112,9 @@ function openEditDialog(account) {
   form.group = account.group || ''
   form.status = account.status || 'active'
   form.daily_limits =
-    account.daily_limits != null ? String(account.daily_limits) : ''
+    account.daily_limits != null ? JSON.stringify(account.daily_limits) : ''
   formError.value = null
+  dailyLimitsError.value = null
   showFormDialog.value = true
 }
 
@@ -131,8 +138,21 @@ async function handleSave() {
   if (form.daily_limits === '' || form.daily_limits == null) {
     payload.daily_limits = null
   } else {
-    const n = Number(form.daily_limits)
-    if (!isNaN(n)) payload.daily_limits = n
+    try {
+      const parsed = JSON.parse(form.daily_limits)
+      if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+        payload.daily_limits = parsed
+        dailyLimitsError.value = null
+      } else {
+        dailyLimitsError.value = '每日限额需为 JSON 对象格式，如 {"like": 50, "comment": 20}'
+        saving.value = false
+        return
+      }
+    } catch {
+      dailyLimitsError.value = 'JSON 格式不正确，请检查'
+      saving.value = false
+      return
+    }
   }
 
   try {
@@ -185,20 +205,20 @@ onMounted(fetchAccounts)
 <template>
   <div>
     <!-- Page error banner -->
-    <div v-if="pageError" class="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded flex items-center justify-between">
+    <div v-if="pageError" class="mb-4 glass-card border-red-500/30 text-red-400 px-4 py-3 rounded-xl flex items-center justify-between">
       <span>{{ pageError }}</span>
-      <button class="text-red-500 hover:text-red-700 font-bold" @click="pageError = null">&times;</button>
+      <button class="text-red-400 hover:text-red-300 font-bold" @click="pageError = null">&times;</button>
     </div>
 
     <!-- Header -->
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-bold text-gray-800">账号管理</h1>
+      <h1 class="text-2xl font-bold text-white inline-flex items-center gap-1.5">账号管理 <TipIcon text="管理抖音账号，配置状态、分组和每日操作限额" /></h1>
       <button
-        class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 transition-colors"
+        class="btn-aurora inline-flex items-center px-4 py-2 text-sm font-medium rounded-xl"
         @click="openCreateDialog"
       >
         <svg
-          class="-ml-1 mr-2 h-5 w-5"
+          class="-ml-1 mr-2 h-5 w-5 relative z-10"
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 20 20"
           fill="currentColor"
@@ -207,7 +227,7 @@ onMounted(fetchAccounts)
             d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
           />
         </svg>
-        添加账号
+        <span class="relative z-10">添加账号</span>
       </button>
     </div>
 
@@ -235,13 +255,13 @@ onMounted(fetchAccounts)
       <template #cell-actions="{ row }">
         <div class="flex justify-end gap-2">
           <button
-            class="inline-flex items-center px-3 py-1 text-sm font-medium text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded transition-colors"
+            class="inline-flex items-center px-3 py-1 text-sm font-medium text-cyan-400 hover:text-cyan-300 hover:bg-cyan-400/10 rounded-lg transition-colors"
             @click="openEditDialog(row)"
           >
             编辑
           </button>
           <button
-            class="inline-flex items-center px-3 py-1 text-sm font-medium text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+            class="inline-flex items-center px-3 py-1 text-sm font-medium text-red-400 hover:text-red-300 hover:bg-red-400/10 rounded-lg transition-colors"
             @click="openDeleteDialog(row)"
           >
             删除
@@ -266,7 +286,7 @@ onMounted(fetchAccounts)
           leave-from="opacity-100"
           leave-to="opacity-0"
         >
-          <div class="fixed inset-0 bg-black/30" />
+          <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" />
         </TransitionChild>
 
         <div class="fixed inset-0 overflow-y-auto">
@@ -281,18 +301,24 @@ onMounted(fetchAccounts)
               leave-to="opacity-0 scale-95"
             >
               <DialogPanel
-                class="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl"
+                class="glass-card w-full max-w-lg p-6 gradient-border"
               >
-                <DialogTitle class="text-lg font-medium text-gray-900">
+                <DialogTitle class="text-lg font-medium text-white">
                   {{ isEditing ? '编辑账号' : '添加账号' }}
                 </DialogTitle>
 
                 <!-- Error message -->
                 <div
                   v-if="formError"
-                  class="mt-3 bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2 rounded"
+                  class="mt-3 bg-red-500/10 border border-red-500/20 text-red-400 text-sm px-3 py-2 rounded-lg"
                 >
                   {{ formError }}
+                </div>
+                <div
+                  v-if="dailyLimitsError"
+                  class="mt-3 bg-amber-500/10 border border-amber-500/20 text-amber-400 text-sm px-3 py-2 rounded-lg"
+                >
+                  {{ dailyLimitsError }}
                 </div>
 
                 <form class="mt-4 space-y-4" @submit.prevent="handleSave">
@@ -300,16 +326,16 @@ onMounted(fetchAccounts)
                   <div>
                     <label
                       for="nickname"
-                      class="block text-sm font-medium text-gray-700"
+                      class="block text-sm font-medium text-slate-300"
                     >
-                      昵称 <span class="text-red-500">*</span>
+                      昵称 <span class="text-red-400">*</span>
                     </label>
                     <input
                       id="nickname"
                       v-model="form.nickname"
                       type="text"
                       required
-                      class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 placeholder-slate-500"
                       placeholder="请输入昵称"
                     />
                   </div>
@@ -318,7 +344,7 @@ onMounted(fetchAccounts)
                   <div>
                     <label
                       for="douyin_id"
-                      class="block text-sm font-medium text-gray-700"
+                      class="block text-sm font-medium text-slate-300"
                     >
                       抖音号
                     </label>
@@ -326,7 +352,7 @@ onMounted(fetchAccounts)
                       id="douyin_id"
                       v-model="form.douyin_id"
                       type="text"
-                      class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 placeholder-slate-500"
                       placeholder="请输入抖音号"
                     />
                   </div>
@@ -335,15 +361,16 @@ onMounted(fetchAccounts)
                   <div>
                     <label
                       for="group"
-                      class="block text-sm font-medium text-gray-700"
+                      class="flex items-center gap-1.5 text-sm font-medium text-slate-300"
                     >
                       分组
+                      <TipIcon text="为账号分配分组标签，方便批量管理和创建链实例" />
                     </label>
                     <input
                       id="group"
                       v-model="form.group"
                       type="text"
-                      class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 placeholder-slate-500"
                       placeholder="请输入分组"
                     />
                   </div>
@@ -352,14 +379,15 @@ onMounted(fetchAccounts)
                   <div>
                     <label
                       for="status"
-                      class="block text-sm font-medium text-gray-700"
+                      class="flex items-center gap-1.5 text-sm font-medium text-slate-300"
                     >
                       状态
+                      <TipIcon text="正常=可执行任务；风控中=触发抖音风控，暂停任务；已禁用=手动禁用，不分配任务" width="w-80" />
                     </label>
                     <select
                       id="status"
                       v-model="form.status"
-                      class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200"
                     >
                       <option
                         v-for="opt in statusOptions"
@@ -375,25 +403,25 @@ onMounted(fetchAccounts)
                   <div>
                     <label
                       for="daily_limits"
-                      class="block text-sm font-medium text-gray-700"
+                      class="flex items-center gap-1.5 text-sm font-medium text-slate-300"
                     >
                       每日限额
+                      <TipIcon text="按操作类型设置每日上限，JSON 格式。如 {&quot;like&quot;: 50, &quot;comment&quot;: 20}，留空不限制" width="w-96" />
                     </label>
-                    <input
+                    <textarea
                       id="daily_limits"
                       v-model="form.daily_limits"
-                      type="number"
-                      min="0"
-                      class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                      placeholder="请输入每日限额"
-                    />
+                      rows="3"
+                      class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 font-mono"
+                      placeholder='{"like": 50, "comment": 20}'
+                    ></textarea>
                   </div>
 
                   <!-- Buttons -->
                   <div class="flex justify-end gap-3 pt-2">
                     <button
                       type="button"
-                      class="rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                      class="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-white/10 transition-colors"
                       @click="showFormDialog = false"
                     >
                       取消
@@ -401,9 +429,9 @@ onMounted(fetchAccounts)
                     <button
                       type="submit"
                       :disabled="saving"
-                      class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      class="btn-aurora rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {{ saving ? '保存中...' : '保存' }}
+                      <span class="relative z-10">{{ saving ? '保存中...' : '保存' }}</span>
                     </button>
                   </div>
                 </form>

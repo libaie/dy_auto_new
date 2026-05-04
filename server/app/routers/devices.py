@@ -7,15 +7,19 @@ import asyncio
 
 from app.database import get_db
 from app.db_models import Device, DevicePairRequest
-from app.deps import verify_admin_token
+from app.deps import verify_admin_token, verify_ws_admin_token
 from app.ws_manager import pair_ws_manager
 
 router = APIRouter(prefix="/api/devices", tags=["devices"])
 
 
 @router.websocket("/ws/pair-events")
-async def ws_pair_events(websocket: WebSocket):
+async def ws_pair_events(websocket: WebSocket, token: str = Query(...)):
     """Admin subscribes to real-time pairing events (new requests, approvals, rejections)."""
+    username = verify_ws_admin_token(token)
+    if not username:
+        await websocket.close(code=4001, reason="Unauthorized")
+        return
     await pair_ws_manager.register_admin(websocket)
     try:
         while True:
@@ -71,6 +75,12 @@ def create_device(
     db: Session = Depends(get_db),
     _: str = Depends(verify_admin_token),
 ):
+    # Validate bound_account_id references an existing account
+    if request.bound_account_id:
+        from app.db_models import Account
+        if not db.query(Account).filter(Account.id == request.bound_account_id).first():
+            raise HTTPException(status_code=404, detail="Account not found")
+
     dev = Device(
         name=request.name,
         ip=request.ip,
@@ -148,7 +158,7 @@ async def approve_pair_request(
 ):
     """Approve a pairing request — generates per-device secret and creates Device record."""
     import uuid
-    from app.config import DEVICE_CONFIG, ANTI_DETECT_CONFIG, ANTI_DETECT_CONFIG_VERSION, AI_API_KEY, AI_BASE_URL, AI_MODEL
+    from app.config import DEVICE_CONFIG, ANTI_DETECT_CONFIG, ANTI_DETECT_CONFIG_VERSION, get_ai_config
 
     pair_req = db.query(DevicePairRequest).filter(DevicePairRequest.id == request_id).first()
     if not pair_req:
@@ -205,12 +215,9 @@ async def approve_pair_request(
         "anti_detect_config": ANTI_DETECT_CONFIG,
         "anti_detect_config_version": ANTI_DETECT_CONFIG_VERSION,
     }
-    if AI_API_KEY:
-        config["ai_config"] = {
-            "api_key": AI_API_KEY,
-            "api_url": f"{AI_BASE_URL}/v1/chat/completions",
-            "model": AI_MODEL,
-        }
+    ai_cfg = get_ai_config(db)
+    if ai_cfg:
+        config["ai_config"] = ai_cfg
     await pair_ws_manager.notify(pair_req.pairing_token, {
         "status": "approved",
         "secret": device_secret,
@@ -291,6 +298,10 @@ async def update_device(
     if request.status is not None:
         dev.status = request.status
     if request.bound_account_id is not None:
+        if request.bound_account_id:
+            from app.db_models import Account
+            if not db.query(Account).filter(Account.id == request.bound_account_id).first():
+                raise HTTPException(status_code=404, detail="Account not found")
         dev.bound_account_id = request.bound_account_id
     if request.proxy_config is not None:
         dev.proxy_config = request.proxy_config

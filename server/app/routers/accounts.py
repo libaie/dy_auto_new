@@ -123,6 +123,18 @@ def delete_account(
     acc = db.query(Account).filter(Account.id == account_id).first()
     if not acc:
         raise HTTPException(status_code=404, detail="Account not found")
+
+    from app.db_models import Device, Task as DBTask
+    # 1. 解绑关联设备
+    db.query(Device).filter(Device.bound_account_id == account_id).update(
+        {"bound_account_id": None}, synchronize_session=False
+    )
+    # 2. 取消该账号的 pending/running 任务
+    db.query(DBTask).filter(
+        DBTask.account_id == account_id,
+        DBTask.status.in_(["pending", "running"]),
+    ).update({"status": "failed", "result": '{"error": "account deleted"}'}, synchronize_session=False)
+
     db.delete(acc)
     db.commit()
     return {"deleted": True, "id": account_id}

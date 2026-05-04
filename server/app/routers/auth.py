@@ -1,4 +1,5 @@
 """Admin authentication — login endpoint with brute-force protection."""
+import hmac
 import time
 from collections import defaultdict
 from threading import Lock
@@ -16,14 +17,28 @@ _LOGIN_MAX_ATTEMPTS = 5
 _LOGIN_WINDOW_SECONDS = 300
 _failed_attempts: dict[str, list[float]] = defaultdict(list)
 _rate_limit_lock = Lock()
+_MAX_TRACKED_IPS = 10000
+
+
+def _get_client_ip(http_request: Request) -> str:
+    """获取真实客户端 IP（支持反向代理）。"""
+    forwarded = http_request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    real_ip = http_request.headers.get("x-real-ip")
+    if real_ip:
+        return real_ip.strip()
+    return http_request.client.host if http_request.client else "unknown"
 
 
 def _check_rate_limit(client_ip: str) -> None:
     """Raise 429 if too many failed attempts from this IP."""
     now = time.monotonic()
     with _rate_limit_lock:
+        # 防止内存无限增长
+        if len(_failed_attempts) > _MAX_TRACKED_IPS:
+            _failed_attempts.clear()
         attempts = _failed_attempts[client_ip]
-        # Remove expired entries
         _failed_attempts[client_ip] = [
             t for t in attempts if now - t < _LOGIN_WINDOW_SECONDS
         ]
@@ -49,10 +64,13 @@ def _clear_failures(client_ip: str) -> None:
 @router.post("/login", response_model=LoginResponse)
 def login(request: LoginRequest, http_request: Request):
     """Admin login — returns JWT token."""
-    client_ip = http_request.client.host if http_request.client else "unknown"
+    client_ip = _get_client_ip(http_request)
     _check_rate_limit(client_ip)
 
-    if request.username != ADMIN_USERNAME or request.password != ADMIN_PASSWORD:
+    # 常量时间比较，防止时序攻击
+    username_ok = hmac.compare_digest(request.username, ADMIN_USERNAME)
+    password_ok = hmac.compare_digest(request.password, ADMIN_PASSWORD)
+    if not username_ok or not password_ok:
         _record_failure(client_ip)
         raise HTTPException(status_code=401, detail="Invalid credentials")
 

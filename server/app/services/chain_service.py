@@ -35,6 +35,7 @@ class ChainService:
         db: Session,
         template_id: str,
         account_ids: list[str],
+        device_id: Optional[str] = None,
     ) -> dict:
         """Create chain instances for each account, skipping busy ones.
 
@@ -66,6 +67,7 @@ class ChainService:
                 instance = ChainInstance(
                     template_id=template_id,
                     account_id=account_id,
+                    device_id=device_id,
                     current_step=1,
                     total_steps=total_steps,
                     status="pending",
@@ -147,6 +149,7 @@ class ChainService:
         task = DBTask(
             type=step_type,
             account_id=chain.account_id,
+            device_id=chain.device_id,
             params=step.get("params", {}),
             status="pending",
             chain_instance_id=chain.id,
@@ -155,49 +158,64 @@ class ChainService:
         db.add(task)
 
     def _safe_push_pending_tasks(self, db: Session, account_ids: list[str]):
-        """Push pending tasks for chain instances to bound devices.
+        """Push pending tasks for chain instances to devices.
 
+        Uses chain's device_id if set, otherwise falls back to account-bound device.
         Safe for both sync and async contexts.
         """
         from app.ws_manager import pair_ws_manager
 
         for account_id in account_ids:
-            device = db.query(Device).filter(Device.bound_account_id == account_id).first()
-            if not device:
-                continue
             task = (
                 db.query(DBTask)
                 .filter(DBTask.account_id == account_id, DBTask.status == "pending", DBTask.chain_instance_id.isnot(None))
                 .order_by(DBTask.created_at.desc())
                 .first()
             )
-            if task:
-                self._schedule_push(device.id, {
-                    "event": "task",
-                    "task": _task_to_push_dict(task),
-                })
+            if not task:
+                continue
+
+            # Use task's device_id (set from chain instance) or find bound device
+            target_device_id = task.device_id
+            if not target_device_id:
+                device = db.query(Device).filter(Device.bound_account_id == account_id).first()
+                if not device:
+                    continue
+                target_device_id = device.id
+
+            self._schedule_push(target_device_id, {
+                "event": "task",
+                "task": _task_to_push_dict(task),
+            })
 
     def _safe_push_step_task(self, db: Session, chain: ChainInstance):
-        """Push the current step task to the bound device.
+        """Push the current step task to the device.
 
+        Uses chain's device_id if set, otherwise falls back to account-bound device.
         Safe for both sync and async contexts.
         """
         from app.ws_manager import pair_ws_manager
 
-        device = db.query(Device).filter(Device.bound_account_id == chain.account_id).first()
-        if not device:
-            return
         task = (
             db.query(DBTask)
             .filter(DBTask.chain_instance_id == chain.id, DBTask.status == "pending")
             .order_by(DBTask.step_order.desc())
             .first()
         )
-        if task:
-            self._schedule_push(device.id, {
-                "event": "task",
-                "task": _task_to_push_dict(task),
-            })
+        if not task:
+            return
+
+        target_device_id = chain.device_id
+        if not target_device_id:
+            device = db.query(Device).filter(Device.bound_account_id == chain.account_id).first()
+            if not device:
+                return
+            target_device_id = device.id
+
+        self._schedule_push(target_device_id, {
+            "event": "task",
+            "task": _task_to_push_dict(task),
+        })
 
     @staticmethod
     def _schedule_push(device_id: str, data: dict):

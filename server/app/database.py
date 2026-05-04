@@ -40,10 +40,15 @@ def _migrate_add_columns():
                     default = ""
                     if col.default is not None:
                         default_sql = col.default.arg
-                        if isinstance(default_sql, str):
+                        if isinstance(default_sql, bool):
+                            default = f" DEFAULT {1 if default_sql else 0}"
+                        elif isinstance(default_sql, str):
                             default = f" DEFAULT '{default_sql}'"
                         elif isinstance(default_sql, (int, float)):
                             default = f" DEFAULT {default_sql}"
+                        elif isinstance(default_sql, (list, dict)):
+                            import json as _json
+                            default = f" DEFAULT '{_json.dumps(default_sql)}'"
                     sql = f"ALTER TABLE {table_name} ADD COLUMN {col.name} {col_type} {nullable}{default}"
                     logger.info(f"Migration: {sql}")
                     conn.execute(text(sql))

@@ -6,17 +6,17 @@ defineProps({
   },
 })
 
-const colorMap = {
-  active: 'bg-green-100 text-green-800',
-  online: 'bg-green-100 text-green-800',
-  offline: 'bg-gray-100 text-gray-800',
-  pending: 'bg-yellow-100 text-yellow-800',
-  running: 'bg-blue-100 text-blue-800',
-  completed: 'bg-green-100 text-green-800',
-  failed: 'bg-red-100 text-red-800',
-  cancelled: 'bg-gray-100 text-gray-800',
-  risk_controlled: 'bg-red-100 text-red-800',
-  disabled: 'bg-gray-100 text-gray-800',
+const badgeClassMap = {
+  active: 'badge-success',
+  online: 'badge-success',
+  offline: 'badge-info',
+  pending: 'badge-warning',
+  running: 'badge-info',
+  completed: 'badge-success',
+  failed: 'badge-danger',
+  cancelled: 'badge-info',
+  risk_controlled: 'badge-danger',
+  disabled: 'badge-info',
 }
 
 const labelMap = {
@@ -31,12 +31,26 @@ const labelMap = {
   risk_controlled: '风控中',
   disabled: '已禁用',
 }
+
+const titleMap = {
+  active: '账号状态正常，可执行任务',
+  online: '设备当前在线，可执行任务',
+  offline: '设备当前离线，无法执行任务',
+  pending: '排队中等待设备执行的任务',
+  running: '正在设备上执行的任务',
+  completed: '已成功完成的任务',
+  failed: '执行出错的任务，可查看详情或重试',
+  cancelled: '被手动取消的任务',
+  risk_controlled: '账号触发抖音平台风控，暂停任务执行',
+  disabled: '手动禁用的账号，不会分配任何任务',
+}
 </script>
 
 <template>
   <span
-    :class="[colorMap[status] || 'bg-gray-100 text-gray-800']"
-    class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+    :class="badgeClassMap[status] || 'badge-info'"
+    :title="titleMap[status] || ''"
+    class="inline-flex items-center"
   >
     {{ labelMap[status] || status }}
   </span>

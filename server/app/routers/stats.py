@@ -33,6 +33,7 @@ def dashboard_summary(
     running_tasks = db.query(Task).filter(Task.status == "running").count()
     completed_tasks = db.query(Task).filter(Task.status == "completed").count()
     failed_tasks = db.query(Task).filter(Task.status == "failed").count()
+    cancelled_tasks = db.query(Task).filter(Task.status == "cancelled").count()
 
     return {
         "accounts": {
@@ -50,6 +51,7 @@ def dashboard_summary(
             "running": running_tasks,
             "completed": completed_tasks,
             "failed": failed_tasks,
+            "cancelled": cancelled_tasks,
         },
     }
 

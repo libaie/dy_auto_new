@@ -9,6 +9,7 @@ import {
 } from '@headlessui/vue'
 import DataTable from '../components/DataTable.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
+import TipIcon from '../components/TipIcon.vue'
 import {
   listGroups,
   createGroup,
@@ -20,6 +21,7 @@ import {
 } from '../api/accountGroups.js'
 import { listAccounts } from '../api/accounts.js'
 import { formatDate } from '../utils/format.js'
+import { useToastStore } from '../stores/toast.js'
 
 // --- Data state ---
 const groups = ref([])
@@ -57,6 +59,7 @@ const selectedAccountIds = ref([])
 
 // --- Page-level error ---
 const pageError = ref(null)
+const toast = useToastStore()
 
 // --- Table columns ---
 const columns = [
@@ -76,7 +79,7 @@ async function fetchGroups() {
     groups.value = res.data.groups || []
     total.value = res.data.total || 0
   } catch (e) {
-    console.error('Failed to fetch groups:', e)
+    toast.error('加载分组列表失败')
     groups.value = []
     total.value = 0
   } finally {
@@ -180,7 +183,7 @@ async function fetchMembers(groupId) {
     const res = await listMembers(groupId)
     members.value = res.data.members || []
   } catch (e) {
-    console.error('Failed to fetch members:', e)
+    toast.error('加载成员列表失败')
     members.value = []
   } finally {
     membersLoading.value = false
@@ -192,7 +195,7 @@ async function fetchAllAccounts() {
     const res = await listAccounts({ limit: 200 })
     allAccounts.value = res.data.accounts || []
   } catch (e) {
-    console.error('Failed to fetch accounts:', e)
+    toast.error('加载账号列表失败')
     allAccounts.value = []
   }
 }
@@ -240,22 +243,24 @@ onMounted(fetchGroups)
 <template>
   <div>
     <!-- Page error banner -->
-    <div v-if="pageError" class="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded flex items-center justify-between">
+    <div v-if="pageError" class="mb-4 glass-card border-red-500/30 text-red-400 rounded-xl px-4 py-3 flex items-center justify-between">
       <span>{{ pageError }}</span>
-      <button class="text-red-500 hover:text-red-700 font-bold" @click="pageError = null">&times;</button>
+      <button class="text-red-400 hover:text-red-300 font-bold" @click="pageError = null">&times;</button>
     </div>
 
     <!-- Header -->
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-bold text-gray-800">账号分组</h1>
+      <h1 class="text-2xl font-bold text-white flex items-center gap-1.5">账号分组<TipIcon text="将账号分组管理，方便批量创建链实例和统计" /></h1>
       <button
-        class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 transition-colors"
+        class="btn-aurora inline-flex items-center px-4 py-2 text-sm font-medium rounded-xl"
         @click="openCreateDialog"
       >
-        <svg class="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-          <path d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" />
-        </svg>
-        创建分组
+        <span class="relative z-10 inline-flex items-center">
+          <svg class="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" />
+          </svg>
+          创建分组
+        </span>
       </button>
     </div>
 
@@ -270,7 +275,7 @@ onMounted(fetchGroups)
       @page-change="handlePageChange"
     >
       <template #cell-member_count="{ value }">
-        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium badge-info">
           {{ value }} 人
         </span>
       </template>
@@ -282,19 +287,19 @@ onMounted(fetchGroups)
       <template #cell-actions="{ row }">
         <div class="flex justify-end gap-2">
           <button
-            class="inline-flex items-center px-3 py-1 text-sm font-medium text-green-600 hover:text-green-800 hover:bg-green-50 rounded transition-colors"
+            class="inline-flex items-center px-3 py-1 text-sm font-medium text-emerald-400 hover:text-emerald-300 hover:bg-emerald-400/10 rounded transition-colors"
             @click="openMembersDialog(row)"
           >
             成员管理
           </button>
           <button
-            class="inline-flex items-center px-3 py-1 text-sm font-medium text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded transition-colors"
+            class="inline-flex items-center px-3 py-1 text-sm font-medium text-cyan-400 hover:text-cyan-300 hover:bg-cyan-400/10 rounded transition-colors"
             @click="openEditDialog(row)"
           >
             编辑
           </button>
           <button
-            class="inline-flex items-center px-3 py-1 text-sm font-medium text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+            class="inline-flex items-center px-3 py-1 text-sm font-medium text-red-400 hover:text-red-300 hover:bg-red-400/10 rounded transition-colors"
             @click="openDeleteDialog(row)"
           >
             删除
@@ -307,31 +312,31 @@ onMounted(fetchGroups)
     <TransitionRoot :show="showFormDialog" as="template">
       <Dialog as="div" class="relative z-50" @close="showFormDialog = false">
         <TransitionChild as="template" enter="ease-out duration-300" enter-from="opacity-0" enter-to="opacity-100" leave="ease-in duration-200" leave-from="opacity-100" leave-to="opacity-0">
-          <div class="fixed inset-0 bg-black/30" />
+          <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" />
         </TransitionChild>
         <div class="fixed inset-0 overflow-y-auto">
           <div class="flex min-h-full items-center justify-center p-4">
             <TransitionChild as="template" enter="ease-out duration-300" enter-from="opacity-0 scale-95" enter-to="opacity-100 scale-100" leave="ease-in duration-200" leave-from="opacity-100 scale-100" leave-to="opacity-0 scale-95">
-              <DialogPanel class="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
-                <DialogTitle class="text-lg font-medium text-gray-900">
+              <DialogPanel class="w-full max-w-lg glass-card p-6 gradient-border">
+                <DialogTitle class="text-lg font-medium text-white">
                   {{ isEditing ? '编辑分组' : '创建分组' }}
                 </DialogTitle>
-                <div v-if="formError" class="mt-3 bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2 rounded">
+                <div v-if="formError" class="mt-3 bg-red-500/10 border border-red-500/20 text-red-400 text-sm px-3 py-2 rounded-lg">
                   {{ formError }}
                 </div>
                 <form class="mt-4 space-y-4" @submit.prevent="handleSave">
                   <div>
-                    <label class="block text-sm font-medium text-gray-700">分组名称 <span class="text-red-500">*</span></label>
-                    <input v-model="form.name" type="text" required class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" placeholder="请输入分组名称" />
+                    <label class="block text-sm font-medium text-slate-300">分组名称 <span class="text-red-400">*</span></label>
+                    <input v-model="form.name" type="text" required class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 placeholder-slate-500" placeholder="请输入分组名称" />
                   </div>
                   <div>
-                    <label class="block text-sm font-medium text-gray-700">描述</label>
-                    <textarea v-model="form.description" rows="3" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" placeholder="请输入分组描述"></textarea>
+                    <label class="block text-sm font-medium text-slate-300">描述</label>
+                    <textarea v-model="form.description" rows="3" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 placeholder-slate-500" placeholder="请输入分组描述"></textarea>
                   </div>
                   <div class="flex justify-end gap-3 pt-2">
-                    <button type="button" class="rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 hover:bg-gray-50" @click="showFormDialog = false">取消</button>
-                    <button type="submit" :disabled="saving" class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed">
-                      {{ saving ? '保存中...' : '保存' }}
+                    <button type="button" class="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-white/10 transition-colors" @click="showFormDialog = false">取消</button>
+                    <button type="submit" :disabled="saving" class="btn-aurora rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                      <span class="relative z-10">{{ saving ? '保存中...' : '保存' }}</span>
                     </button>
                   </div>
                 </form>
@@ -346,64 +351,64 @@ onMounted(fetchGroups)
     <TransitionRoot :show="showMembersDialog" as="template">
       <Dialog as="div" class="relative z-50" @close="showMembersDialog = false">
         <TransitionChild as="template" enter="ease-out duration-300" enter-from="opacity-0" enter-to="opacity-100" leave="ease-in duration-200" leave-from="opacity-100" leave-to="opacity-0">
-          <div class="fixed inset-0 bg-black/30" />
+          <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" />
         </TransitionChild>
         <div class="fixed inset-0 overflow-y-auto">
           <div class="flex min-h-full items-center justify-center p-4">
             <TransitionChild as="template" enter="ease-out duration-300" enter-from="opacity-0 scale-95" enter-to="opacity-100 scale-100" leave="ease-in duration-200" leave-from="opacity-100 scale-100" leave-to="opacity-0 scale-95">
-              <DialogPanel class="w-full max-w-2xl rounded-xl bg-white p-6 shadow-xl">
-                <DialogTitle class="text-lg font-medium text-gray-900">
+              <DialogPanel class="w-full max-w-2xl glass-card p-6 gradient-border">
+                <DialogTitle class="text-lg font-medium text-white">
                   成员管理 — {{ managingGroupName }}
                 </DialogTitle>
 
                 <div class="mt-4 grid grid-cols-2 gap-4">
                   <!-- Left: Available accounts -->
                   <div>
-                    <h3 class="text-sm font-medium text-gray-700 mb-2">可选账号</h3>
-                    <div class="border rounded-lg p-3 h-64 overflow-y-auto">
-                      <div v-if="availableAccounts.length === 0" class="text-sm text-gray-400 text-center py-4">
+                    <h3 class="text-sm font-medium text-slate-300 mb-2 flex items-center gap-1.5">可选账号<TipIcon text="状态为'正常'且尚未加入此分组的账号，勾选后点击添加选中加入分组" /></h3>
+                    <div class="border border-white/10 rounded-lg p-3 h-64 overflow-y-auto">
+                      <div v-if="availableAccounts.length === 0" class="text-sm text-slate-500 text-center py-4">
                         暂无可选账号
                       </div>
                       <label
                         v-for="account in availableAccounts"
                         :key="account.id"
-                        class="flex items-center gap-2 py-1 px-2 hover:bg-gray-50 rounded cursor-pointer"
+                        class="flex items-center gap-2 py-1 px-2 hover:bg-white/5 rounded cursor-pointer"
                       >
                         <input
                           type="checkbox"
                           :value="account.id"
                           v-model="selectedAccountIds"
-                          class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                          class="rounded border-white/10 text-cyan-400 focus:ring-cyan-500"
                         />
-                        <span class="text-sm">{{ account.nickname || account.douyin_id || account.id }}</span>
+                        <span class="text-sm text-slate-300">{{ account.nickname || account.douyin_id || account.id }}</span>
                       </label>
                     </div>
                     <button
                       v-if="selectedAccountIds.length > 0"
-                      class="mt-2 w-full inline-flex items-center justify-center px-3 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700"
+                      class="btn-aurora mt-2 w-full inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-lg"
                       @click="handleAddMembers"
                     >
-                      添加选中 ({{ selectedAccountIds.length }})
+                      <span class="relative z-10">添加选中 ({{ selectedAccountIds.length }})</span>
                     </button>
                   </div>
 
                   <!-- Right: Current members -->
                   <div>
-                    <h3 class="text-sm font-medium text-gray-700 mb-2">当前成员 ({{ members.length }})</h3>
-                    <div class="border rounded-lg p-3 h-64 overflow-y-auto">
-                      <div v-if="membersLoading" class="text-sm text-gray-400 text-center py-4">加载中...</div>
-                      <div v-else-if="members.length === 0" class="text-sm text-gray-400 text-center py-4">暂无成员</div>
+                    <h3 class="text-sm font-medium text-slate-300 mb-2 flex items-center gap-1.5">当前成员 ({{ members.length }})<TipIcon text="已加入此分组的账号。非活跃状态的账号在创建链实例时会被自动跳过" /></h3>
+                    <div class="border border-white/10 rounded-lg p-3 h-64 overflow-y-auto">
+                      <div v-if="membersLoading" class="text-sm text-slate-500 text-center py-4">加载中...</div>
+                      <div v-else-if="members.length === 0" class="text-sm text-slate-500 text-center py-4">暂无成员</div>
                       <div
                         v-for="member in members"
                         :key="member.id"
-                        class="flex items-center justify-between py-1 px-2 hover:bg-gray-50 rounded"
+                        class="flex items-center justify-between py-1 px-2 hover:bg-white/5 rounded"
                       >
                         <div>
-                          <span class="text-sm">{{ member.nickname || member.douyin_id || member.id }}</span>
-                          <span v-if="member.status !== 'active'" class="ml-1 text-xs text-red-500">({{ member.status }})</span>
+                          <span class="text-sm text-slate-300">{{ member.nickname || member.douyin_id || member.id }}</span>
+                          <span v-if="member.status !== 'active'" class="ml-1 text-xs text-red-400">({{ member.status }})</span>
                         </div>
                         <button
-                          class="text-xs text-red-500 hover:text-red-700 px-2 py-1 hover:bg-red-50 rounded"
+                          class="text-xs text-red-400 hover:text-red-300 px-2 py-1 hover:bg-red-400/10 rounded"
                           @click="handleRemoveMember(member.id)"
                         >
                           移除
@@ -415,7 +420,7 @@ onMounted(fetchGroups)
 
                 <div class="flex justify-end mt-4">
                   <button
-                    class="rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 hover:bg-gray-50"
+                    class="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-white/10 transition-colors"
                     @click="showMembersDialog = false"
                   >
                     关闭

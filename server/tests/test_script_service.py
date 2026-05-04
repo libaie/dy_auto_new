@@ -13,6 +13,7 @@ def test_get_version_returns_string():
 
 def test_get_version_increments(tmp_path, monkeypatch):
     """Version increments when script zip is uploaded."""
+    monkeypatch.setattr(script_service, "_script_dir", tmp_path / "scripts")
     monkeypatch.setattr(script_service, "_version_file", tmp_path / "version.txt")
     v1 = script_service.get_version()
     script_service.upload_script(io.BytesIO(b"fake zip"))

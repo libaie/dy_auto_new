@@ -1,5 +1,6 @@
 """Channel service tests."""
 import pytest
+from datetime import datetime, timezone
 from tests.conftest import setup_group
 from app.db_models import Account, AccountGroup, AccountGroupMember, Channel, ChannelItem
 from app.services.channel_service import channel_service
@@ -142,3 +143,204 @@ def test_get_channel_stats(db):
     stats = channel_service.get_channel_stats(db, ch.id)
     assert stats["total"] == 2
     assert stats["pending"] == 2
+
+
+def test_claim_pending_item(db):
+    """Device should be able to claim a pending channel item."""
+    setup_group(db, group_id="grp-cl-001", account_ids=["acc-cl-001"])
+    ch = channel_service.create_channel(
+        db, group_id="grp-cl-001", task_type="search_comment",
+        account_mode="single_account", account_id="acc-cl-001",
+        keywords=["美食"], params_template={"content": "hi", "count": 5},
+    )
+    from app.db_models import Device
+    db.add(Device(id="dev-cl-001", name="test-device", status="online"))
+    db.flush()
+
+    result = channel_service.claim_channel_item(db, "dev-cl-001")
+    assert result is not None
+    task, channel_item_id = result
+    assert task.type == "search_comment"
+    assert task.account_id == "acc-cl-001"
+
+    item = db.query(ChannelItem).filter(ChannelItem.id == channel_item_id).first()
+    assert item.status == "assigned"
+    assert item.assigned_device_id == "dev-cl-001"
+    assert item.task_id == task.id
+
+
+def test_claim_respects_account_status_filter(db):
+    """Should not claim items for risk_controlled accounts."""
+    group = AccountGroup(id="grp-cl-002", name="risk-group")
+    db.add(group)
+    db.add(Account(id="acc-cl-risk", nickname="risk", status="risk_controlled"))
+    db.add(AccountGroupMember(group_id="grp-cl-002", account_id="acc-cl-risk"))
+    db.flush()
+
+    ch = Channel(id="ch-cl-risk", group_id="grp-cl-002", task_type="search_comment",
+                 status="active", account_mode="single_account", account_id="acc-cl-risk",
+                 params_template={})
+    db.add(ch)
+    db.add(ChannelItem(id="ci-cl-risk", channel_id="ch-cl-risk", keyword="test",
+                       account_id="acc-cl-risk", status="pending", queue_position=0))
+    db.flush()
+
+    from app.db_models import Device
+    db.add(Device(id="dev-cl-risk", name="dev", status="online"))
+    db.flush()
+
+    result = channel_service.claim_channel_item(db, "dev-cl-risk")
+    assert result is None
+
+
+def test_claim_respects_per_account_concurrency(db):
+    """Should not assign second item to account that already has running channel task."""
+    setup_group(db, group_id="grp-cl-003", account_ids=["acc-cl-003"])
+    ch = channel_service.create_channel(
+        db, group_id="grp-cl-003", task_type="search_comment",
+        account_mode="single_account", account_id="acc-cl-003",
+        keywords=["a", "b"], params_template={"content": "x", "count": 1},
+    )
+    from app.db_models import Device
+    db.add(Device(id="dev-cl-c1", name="c1", status="online"))
+    db.add(Device(id="dev-cl-c2", name="c2", status="online"))
+    db.flush()
+
+    result1 = channel_service.claim_channel_item(db, "dev-cl-c1")
+    assert result1 is not None
+
+    result2 = channel_service.claim_channel_item(db, "dev-cl-c2")
+    assert result2 is None
+
+
+def test_claim_returns_none_when_empty(db):
+    """Should return None when no pending items."""
+    from app.db_models import Device
+    db.add(Device(id="dev-cl-empty", name="empty", status="online"))
+    db.flush()
+    result = channel_service.claim_channel_item(db, "dev-cl-empty")
+    assert result is None
+
+
+def test_claim_stale_recovery(db):
+    """Items assigned > 10 min ago should auto-revert to pending."""
+    from datetime import timedelta
+    setup_group(db, group_id="grp-cl-004", account_ids=["acc-cl-004"])
+    ch = channel_service.create_channel(
+        db, group_id="grp-cl-004", task_type="search_comment",
+        account_mode="single_account", account_id="acc-cl-004",
+        keywords=["stale-kw"], params_template={},
+    )
+    items = db.query(ChannelItem).filter(ChannelItem.channel_id == ch.id).all()
+    item = items[0]
+    from app.db_models import Device
+    db.add(Device(id="dev-cl-stale", name="stale", status="online"))
+    db.flush()
+    item.status = "assigned"
+    item.assigned_device_id = "dev-cl-stale"
+    item.assigned_at = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=11)
+    db.flush()
+
+    db.add(Device(id="dev-cl-new", name="new", status="online"))
+    db.flush()
+    result = channel_service.claim_channel_item(db, "dev-cl-new")
+    assert result is not None
+
+    db.refresh(item)
+    assert item.status == "assigned"
+    assert item.assigned_device_id == "dev-cl-new"
+
+
+def test_claim_cooldown_filtering(db):
+    """Should not claim item if account is within cooldown period."""
+    setup_group(db, group_id="grp-cl-005", account_ids=["acc-cl-005"])
+    ch = channel_service.create_channel(
+        db, group_id="grp-cl-005", task_type="search_comment",
+        account_mode="single_account", account_id="acc-cl-005",
+        keywords=["cd-a", "cd-b"], params_template={},
+        cooldown_seconds=600,
+    )
+    from app.db_models import Device
+    db.add(Device(id="dev-cl-cd1", name="cd1", status="online"))
+    db.add(Device(id="dev-cl-cd2", name="cd2", status="online"))
+    db.flush()
+
+    result1 = channel_service.claim_channel_item(db, "dev-cl-cd1")
+    assert result1 is not None
+
+    items = db.query(ChannelItem).filter(ChannelItem.channel_id == ch.id).order_by(ChannelItem.queue_position).all()
+    items[0].status = "completed"
+    items[0].completed_at = datetime.now(timezone.utc)
+    db.flush()
+
+    result2 = channel_service.claim_channel_item(db, "dev-cl-cd2")
+    assert result2 is None
+
+
+def test_claim_respects_bound_account_routing(db):
+    """Bound device should only claim items for its bound account."""
+    group = AccountGroup(id="grp-cl-006", name="bound-group")
+    db.add(group)
+    db.add(Account(id="acc-cl-b1", nickname="b1", status="active"))
+    db.add(Account(id="acc-cl-b2", nickname="b2", status="active"))
+    db.add(AccountGroupMember(group_id="grp-cl-006", account_id="acc-cl-b1"))
+    db.add(AccountGroupMember(group_id="grp-cl-006", account_id="acc-cl-b2"))
+    db.flush()
+
+    ch = Channel(id="ch-cl-bound", group_id="grp-cl-006", task_type="search_comment",
+                 status="active", account_mode="round_robin", params_template={})
+    db.add(ch)
+    db.add(ChannelItem(id="ci-cl-b1", channel_id="ch-cl-bound", keyword="kw1",
+                       account_id="acc-cl-b1", status="pending", queue_position=0))
+    db.add(ChannelItem(id="ci-cl-b2", channel_id="ch-cl-bound", keyword="kw2",
+                       account_id="acc-cl-b2", status="pending", queue_position=1))
+    db.flush()
+
+    from app.db_models import Device
+    db.add(Device(id="dev-cl-bound", name="bound", status="online", bound_account_id="acc-cl-b1"))
+    db.flush()
+
+    result = channel_service.claim_channel_item(db, "dev-cl-bound")
+    assert result is not None
+    task, item_id = result
+    assert task.account_id == "acc-cl-b1"
+
+
+def test_claim_concurrent_optimistic_lock(db):
+    """Two devices trying to claim the same item — only one succeeds."""
+    setup_group(db, group_id="grp-cl-007", account_ids=["acc-cl-007"])
+    ch = channel_service.create_channel(
+        db, group_id="grp-cl-007", task_type="search_comment",
+        account_mode="single_account", account_id="acc-cl-007",
+        keywords=["concurrent"], params_template={},
+    )
+    from app.db_models import Device
+    db.add(Device(id="dev-cl-oc1", name="c1", status="online"))
+    db.add(Device(id="dev-cl-oc2", name="c2", status="online"))
+    db.flush()
+
+    result1 = channel_service.claim_channel_item(db, "dev-cl-oc1")
+    result2 = channel_service.claim_channel_item(db, "dev-cl-oc2")
+    assert result1 is not None
+    assert result2 is None
+
+
+def test_claim_respects_quota_limit(db):
+    """Should not claim item if account has exceeded daily quota."""
+    from app.services.stats_service import stats_service
+    setup_group(db, group_id="grp-cl-008", account_ids=["acc-cl-008"])
+    ch = channel_service.create_channel(
+        db, group_id="grp-cl-008", task_type="search_comment",
+        account_mode="single_account", account_id="acc-cl-008",
+        keywords=["quota-kw"], params_template={},
+    )
+    from app.db_models import Device
+    db.add(Device(id="dev-cl-quota", name="quota", status="online"))
+    db.flush()
+
+    for _ in range(20):
+        stats_service.increment(db, "acc-cl-008", "search_comment")
+    db.flush()
+
+    result = channel_service.claim_channel_item(db, "dev-cl-quota")
+    assert result is None

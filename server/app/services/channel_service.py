@@ -2,10 +2,12 @@
 from datetime import datetime, timezone
 from typing import Optional
 
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from app.db_models import (
     Channel, ChannelItem, Account, AccountGroup, AccountGroupMember,
+    Task as DBTask, Device as DBDevice,
 )
 
 
@@ -119,6 +121,120 @@ class ChannelService:
             acc = sorted_accounts[i % len(sorted_accounts)]
             result.append(acc.id)
         return result
+
+    def claim_channel_item(self, db: Session, device_id: str):
+        """Claim a pending channel item. Returns (PydanticTask, channel_item_id) or None."""
+        from app.services.task_service import _db_task_to_pydantic
+        from app.services.stats_service import stats_service
+        from app.models import TaskType, TaskStatus
+
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+
+        # Stale recovery: reset items assigned > 10 min ago
+        from datetime import timedelta
+        stale_threshold = now - timedelta(seconds=600)
+        db.execute(
+            update(ChannelItem)
+            .where(
+                ChannelItem.status == "assigned",
+                ChannelItem.assigned_at.isnot(None),
+                ChannelItem.assigned_at < stale_threshold,
+            )
+            .values(status="pending", assigned_device_id=None, assigned_at=None, task_id=None)
+        )
+        db.flush()
+        db.expire_all()
+
+        # Find active channels with pending items
+        active_channels = db.query(Channel).filter(
+            Channel.status == "active",
+            Channel.deleted_at.is_(None),
+        ).all()
+
+        if not active_channels:
+            return None
+
+        channel_ids = [ch.id for ch in active_channels]
+        channel_map = {ch.id: ch for ch in active_channels}
+
+        # Build routing filter based on device's bound_account_id
+        device = db.query(DBDevice).filter(DBDevice.id == device_id).first()
+        bound_account_id = device.bound_account_id if device else None
+
+        # Get pending items from active channels
+        candidates = db.query(ChannelItem).filter(
+            ChannelItem.channel_id.in_(channel_ids),
+            ChannelItem.status == "pending",
+        ).order_by(ChannelItem.queue_position.asc()).limit(10).all()
+
+        for item in candidates:
+            ch = channel_map[item.channel_id]
+
+            # Filter: account must be active
+            account = db.query(Account).filter(Account.id == item.account_id).first()
+            if not account or account.status != "active":
+                continue
+
+            # Filter: routing (bound device can only claim its account's items)
+            if bound_account_id and item.account_id != bound_account_id:
+                continue
+
+            # Filter: per-account concurrency
+            running = db.query(ChannelItem).filter(
+                ChannelItem.account_id == item.account_id,
+                ChannelItem.status == "assigned",
+                ChannelItem.channel_id.in_(channel_ids),
+            ).first()
+            if running:
+                continue
+
+            # Filter: cooldown
+            last_completed = db.query(ChannelItem).filter(
+                ChannelItem.account_id == item.account_id,
+                ChannelItem.status == "completed",
+                ChannelItem.completed_at.isnot(None),
+            ).order_by(ChannelItem.completed_at.desc()).first()
+            if last_completed and ch.cooldown_seconds > 0:
+                elapsed = (now - last_completed.completed_at.replace(tzinfo=None)).total_seconds()
+                if elapsed < ch.cooldown_seconds:
+                    continue
+
+            # Filter: daily quota
+            if not stats_service.check_quota(db, item.account_id, ch.task_type):
+                continue
+
+            # Optimistic lock: claim the item
+            result = db.execute(
+                update(ChannelItem)
+                .where(ChannelItem.id == item.id, ChannelItem.status == "pending")
+                .values(
+                    status="assigned",
+                    assigned_device_id=device_id,
+                    assigned_at=now,
+                )
+            )
+            if result.rowcount == 0:
+                continue
+
+            # Flush-only Task creation (no commit)
+            params = dict(ch.params_template or {})
+            params["keyword"] = item.keyword
+            task = DBTask(
+                type=ch.task_type,
+                account_id=item.account_id,
+                device_id=device_id,
+                params=params,
+                status=TaskStatus.PENDING.value,
+            )
+            db.add(task)
+            db.flush()
+
+            item.task_id = task.id
+            db.flush()
+
+            return (_db_task_to_pydantic(task), item.id)
+
+        return None
 
     def get_channel(self, db: Session, channel_id: str) -> Optional[Channel]:
         return db.query(Channel).filter(

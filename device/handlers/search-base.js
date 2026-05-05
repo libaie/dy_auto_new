@@ -316,14 +316,22 @@ SearchBaseHandler._clickSearchResult = function (index) {
       if (isVisible(items[i])) {
         if (seenCount === index) {
           var target = items[i];
+          var clicked = false;
           if (target.clickable()) {
             logger.info(TAG, "点击第 " + (index + 1) + " 个可见视频列表项(总数 " + items.length + ")");
-            return target.click();
+            clicked = target.click();
+          } else {
+            var bounds = target.bounds();
+            if (bounds) {
+              logger.info(TAG, "点击第 " + (index + 1) + " 个可见视频列表项(坐标, 总数 " + items.length + ")");
+              clicked = click(bounds.centerX(), bounds.centerY());
+            }
           }
-          var bounds = target.bounds();
-          if (bounds) {
-            logger.info(TAG, "点击第 " + (index + 1) + " 个可见视频列表项(坐标, 总数 " + items.length + ")");
-            return click(bounds.centerX(), bounds.centerY());
+          if (clicked) {
+            sleep(2000);
+            // 关闭视频自动播放
+            this.safeClick("off_video", 2);
+            return true;
           }
           return false;
         }

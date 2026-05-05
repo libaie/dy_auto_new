@@ -70,6 +70,14 @@ class TaskService:
         - Bound device (device.bound_account_id set) -> only tasks for that account
         - Unbound device -> only tasks with no device_id AND whose account is not bound to any device
         """
+        # --- Channel claim (priority path) ---
+        from app.services.channel_service import channel_service
+        channel_result = channel_service.claim_channel_item(db, device_id)
+        if channel_result:
+            task_pydantic, _channel_item_id = channel_result
+            db.commit()
+            return task_pydantic
+
         # 1. Look up the polling device's bound account
         device = db.query(DBDevice).filter(DBDevice.id == device_id).first()
         bound_account_id = device.bound_account_id if device else None
@@ -159,6 +167,19 @@ class TaskService:
         if db_task.chain_instance_id and db_task.status in ("completed", "failed"):
             from app.services.chain_service import chain_service
             chain_service.advance_chain(db, task_id, db_task.status, result)
+
+        # Update channel item if this task belongs to one
+        from app.db_models import ChannelItem
+        from app.services.channel_service import channel_service
+        channel_item = db.query(ChannelItem).filter(ChannelItem.task_id == task_id).first()
+        if channel_item:
+            if db_task.status == TaskStatus.COMPLETED.value:
+                channel_service.complete_item(db, channel_item.id, "completed")
+            elif db_task.status == TaskStatus.FAILED.value:
+                if db_task.retry_count < MAX_RETRIES:
+                    channel_service.complete_item(db, channel_item.id, "failed", retrying=True)
+                else:
+                    channel_service.complete_item(db, channel_item.id, "failed")
 
         db.commit()
         db.refresh(db_task)

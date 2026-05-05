@@ -13,6 +13,7 @@ import {
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import LoadingSpinner from '../components/LoadingSpinner.vue'
 import EmptyState from '../components/EmptyState.vue'
+import StrategyCard from '../components/StrategyCard.vue'
 import {
   listSelectors,
   createSelector,
@@ -101,6 +102,50 @@ const defaultForm = {
 }
 const form = reactive({ ...defaultForm })
 
+// --- Strategy card builder state ---
+const editMode = ref('form') // 'form' | 'json'
+const strategyList = ref([])
+
+function syncStrategiesToList() {
+  try {
+    strategyList.value = JSON.parse(form.strategies || '[]')
+  } catch {
+    strategyList.value = []
+  }
+}
+
+function syncListToStrategies() {
+  form.strategies = JSON.stringify(strategyList.value, null, 2)
+}
+
+function addStrategy() {
+  strategyList.value.push({ type: 'text', value: '', priority: strategyList.value.length + 1 })
+  syncListToStrategies()
+}
+
+function updateStrategy(index, newStrategy) {
+  strategyList.value[index] = newStrategy
+  syncListToStrategies()
+}
+
+function deleteStrategy(index) {
+  strategyList.value.splice(index, 1)
+  // Re-index priorities
+  strategyList.value.forEach((s, i) => { s.priority = i + 1 })
+  syncListToStrategies()
+}
+
+function moveStrategy(index, direction) {
+  const target = index + direction
+  if (target < 0 || target >= strategyList.value.length) return
+  const tmp = strategyList.value[index]
+  strategyList.value[index] = strategyList.value[target]
+  strategyList.value[target] = tmp
+  // Re-index priorities
+  strategyList.value.forEach((s, i) => { s.priority = i + 1 })
+  syncListToStrategies()
+}
+
 // --- Delete confirmation state ---
 const showDeleteDialog = ref(false)
 const deletingSelector = ref(null)
@@ -145,6 +190,8 @@ function openCreateDialog() {
   form.action_name = ''
   form.platform_version = ''
   form.strategies = '[]'
+  editMode.value = 'form'
+  strategyList.value = []
   formError.value = null
   showFormDialog.value = true
 }
@@ -155,6 +202,8 @@ function openEditDialog(sel) {
   form.action_name = sel.action_name
   form.platform_version = sel.platform_version || ''
   form.strategies = JSON.stringify(sel.strategies || [], null, 2)
+  editMode.value = 'form'
+  syncStrategiesToList()
   formError.value = null
   showFormDialog.value = true
 }
@@ -480,47 +529,71 @@ onMounted(fetchSelectors)
 
                   <!-- strategies -->
                   <div>
-                    <label
-                      for="sel-strategies"
-                      class="flex items-center gap-1.5 text-sm font-medium text-slate-300"
-                    >
-                      选择策略 (JSON 数组)
-                      <span class="text-red-400">*</span>
-                      <span class="tooltip-trigger group relative inline-flex items-center">
-                        <svg class="w-4 h-4 text-slate-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" d="M12 16v-4m0-4h.01" stroke-width="2"/></svg>
-                        <span class="tooltip-content invisible group-hover:visible absolute z-50 left-6 top-0 w-96 p-3 text-xs font-normal text-slate-300 bg-slate-800 border border-white/10 rounded-lg shadow-xl leading-relaxed">
-                          <span class="font-semibold text-white block mb-1">{{ tooltips.strategies.title }}</span>
-                          {{ tooltips.strategies.desc }}<br><br>
-                          <span class="font-semibold text-slate-300">支持的策略类型：</span>
-                          <span v-for="t in tooltips.strategies.types" :key="t.type" class="block ml-2 mt-1">
-                            <code class="text-cyan-400 font-semibold">{{ t.type }}</code> — {{ t.value }}<br>
-                            <span class="text-slate-500 ml-4">字段：{{ t.fields }}</span>
-                          </span>
-                          <br>
-                          <span class="text-slate-400">{{ tooltips.strategies.commonFields }}</span>
-                        </span>
-                      </span>
-                    </label>
-                    <textarea
-                      id="sel-strategies"
-                      v-model="form.strategies"
-                      rows="8"
-                      required
-                      class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 font-mono"
-                      placeholder='[{"type":"text","value":"赞","priority":1}]'
-                    />
-                    <p class="mt-1 text-xs text-slate-500">
-                      每个策略包含：type（类型）、value（查找值）、priority（优先级，越小越优先）、x_percent/y_percent（可选，坐标偏移）、template/threshold（可选，图片匹配）
-                    </p>
-                    <details class="mt-2">
-                      <summary class="text-xs text-cyan-400 cursor-pointer hover:text-cyan-300">展开查看策略类型速查表</summary>
-                      <div class="mt-2 p-3 bg-white/5 border border-white/5 rounded-lg text-xs space-y-1.5">
-                        <div v-for="t in tooltips.strategies.types" :key="t.type" class="flex">
-                          <code class="w-20 flex-shrink-0 font-semibold text-cyan-400">{{ t.type }}</code>
-                          <span class="text-slate-400">{{ t.value }} <span class="text-slate-500">（{{ t.fields }}）</span></span>
-                        </div>
+                    <div class="flex items-center justify-between mb-2">
+                      <label class="flex items-center gap-1.5 text-sm font-medium text-slate-300">
+                        选择策略
+                        <span class="text-red-400">*</span>
+                      </label>
+                      <!-- Mode toggle -->
+                      <div class="flex items-center rounded-lg border border-white/10 overflow-hidden">
+                        <button
+                          type="button"
+                          :class="editMode === 'form' ? 'bg-purple-500/20 text-purple-300' : 'text-slate-500 hover:text-slate-300'"
+                          class="px-3 py-1 text-xs font-medium transition-colors"
+                          @click="editMode = 'form'"
+                        >
+                          可视化
+                        </button>
+                        <button
+                          type="button"
+                          :class="editMode === 'json' ? 'bg-purple-500/20 text-purple-300' : 'text-slate-500 hover:text-slate-300'"
+                          class="px-3 py-1 text-xs font-medium transition-colors"
+                          @click="editMode = 'json'; syncListToStrategies()"
+                        >
+                          JSON
+                        </button>
                       </div>
-                    </details>
+                    </div>
+
+                    <!-- Form mode: card builder -->
+                    <div v-if="editMode === 'form'" class="space-y-3">
+                      <div v-if="strategyList.length === 0" class="text-center py-6 text-slate-500 text-sm border border-dashed border-white/10 rounded-lg">
+                        暂无策略，点击下方按钮添加
+                      </div>
+                      <StrategyCard
+                        v-for="(s, i) in strategyList"
+                        :key="i"
+                        :strategy="s"
+                        :index="i"
+                        :total-count="strategyList.length"
+                        :action-name="form.action_name"
+                        @update="updateStrategy(i, $event)"
+                        @delete="deleteStrategy(i)"
+                        @move-up="moveStrategy(i, -1)"
+                        @move-down="moveStrategy(i, 1)"
+                      />
+                      <button
+                        type="button"
+                        class="w-full py-2 border border-dashed border-white/20 rounded-lg text-sm text-slate-400 hover:text-purple-300 hover:border-purple-500/30 transition-colors"
+                        @click="addStrategy"
+                      >
+                        + 添加策略
+                      </button>
+                    </div>
+
+                    <!-- JSON mode: raw textarea -->
+                    <div v-else>
+                      <textarea
+                        v-model="form.strategies"
+                        rows="8"
+                        class="block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 font-mono"
+                        placeholder='[{"type":"text","value":"赞","priority":1}]'
+                        @blur="syncStrategiesToList()"
+                      />
+                      <p class="mt-1 text-xs text-slate-500">
+                        JSON 数组，每个策略含 type、value、priority 等字段
+                      </p>
+                    </div>
                   </div>
 
                   <!-- Buttons -->

@@ -4,7 +4,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.db_models import Base, Task, ChainInstance, DailyStats, AccountGroup, AccountGroupMember
+from app.db_models import Base, Task, ChainInstance, DailyStats, Account, AccountGroup, AccountGroupMember
 from app.database import get_db
 from app.main import app
 from app.seed import seed_accounts, seed_selectors
@@ -87,3 +87,17 @@ def db():
     session = next(gen)
     yield session
     gen.close()
+
+
+def setup_group(db, group_id="grp-001", account_ids=None):
+    """Helper: create a group with active accounts."""
+    if account_ids is None:
+        account_ids = ["acc-001", "acc-002"]
+    group = AccountGroup(id=group_id, name=f"test-{group_id}")
+    db.add(group)
+    for aid in account_ids:
+        acc = Account(id=aid, nickname=f"nick-{aid}", status="active")
+        db.add(acc)
+        db.add(AccountGroupMember(group_id=group_id, account_id=aid))
+    db.flush()
+    return group

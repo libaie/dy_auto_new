@@ -381,6 +381,33 @@ function startMainLoop(serverUrl, secret) {
     }
   }, config.heartbeatInterval);
 
+  /**
+   * catch-up poll — 捕获离线期间积累的任务
+   */
+  function catchUpPoll() {
+    try {
+      var response = apiClient.poll();
+      if (!response) return;
+
+      if (response.proxy) apiClient.setProxy(response.proxy);
+      if (response.device_config) applyServerConfig(response.device_config);
+      if (response.anti_detect_config) antiDetect.updateFromServer(response.anti_detect_config);
+      if (response.selectors_version) selectorLoader.checkAndUpdate(response.selectors_version);
+
+      if (response.cancelled_task_id) {
+        logger.info(TAG, "catch-up: 服务端取消任务: " + response.cancelled_task_id);
+        taskExecutor.cancel(response.cancelled_task_id);
+      }
+
+      if (response.task) {
+        logger.info(TAG, "catch-up: 发现待执行任务: " + response.task.id);
+        handleTask(response.task);
+      }
+    } catch (e) {
+      logger.warn(TAG, "catch-up poll 失败: " + e.message);
+    }
+  }
+
   // 空闲时定时 poll — 即使 WS 通知丢失也能发现待执行任务
   var IDLE_POLL_INTERVAL = 30000;
   setInterval(function () {
@@ -390,36 +417,6 @@ function startMainLoop(serverUrl, secret) {
   }, IDLE_POLL_INTERVAL);
 
   logger.info(TAG, "等待任务推送...");
-}
-
-/**
- * catch-up poll — 捕获离线期间积累的任务
- */
-function catchUpPoll() {
-  try {
-    // catch-up poll 仅查询待执行任务，不需要抖音在前台
-    var response = apiClient.poll();
-    if (!response) return;
-
-    if (response.proxy) apiClient.setProxy(response.proxy);
-    if (response.device_config) applyServerConfig(response.device_config);
-    if (response.anti_detect_config) antiDetect.updateFromServer(response.anti_detect_config);
-    if (response.selectors_version) selectorLoader.checkAndUpdate(response.selectors_version);
-
-    // 服务端标记的任务取消 — 中断当前执行
-    if (response.cancelled_task_id) {
-      logger.info(TAG, "catch-up: 服务端取消任务: " + response.cancelled_task_id);
-      taskExecutor.cancel(response.cancelled_task_id);
-    }
-
-    if (response.task) {
-      logger.info(TAG, "catch-up: 发现离线期间任务: " + response.task.id);
-      // 放入队列，由 processTaskQueue 串行执行，避免单设备并发
-      handleTask(response.task);
-    }
-  } catch (e) {
-    logger.warn(TAG, "catch-up poll 失败: " + e.message);
-  }
 }
 
 /**

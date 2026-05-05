@@ -267,6 +267,23 @@ var uiOperator = {
    */
   inputText: function (element, text) {
     if (!element) return false;
+
+    // 图片匹配返回的是坐标对象，需要先点击激活输入框，再找真实 EditText
+    if (element.isImage || element.isCoordinate) {
+      var x = element.x || Math.round(element.x_percent * device.width);
+      var y = element.y || Math.round(element.y_percent * device.height);
+      click(x, y);
+      sleep(500);
+      // 找到实际的输入框控件
+      var editText = className("EditText").findOne(3000);
+      if (editText) {
+        editText.setText(text);
+        return true;
+      }
+      logger.warn(TAG, "图片匹配后未找到 EditText 控件");
+      return false;
+    }
+
     element.setText(text);
     return true;
   },

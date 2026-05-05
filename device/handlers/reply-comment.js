@@ -78,108 +78,110 @@ ReplyCommentHandler.execute = function (params) {
       continue;
     }
 
-    // 2c. 读取评论
-    var comments = this._readComments(count * 2);
-    logger.info(TAG, "读取 " + comments.length + " 条评论");
-
-    // 2d. 按时效筛选
-    var filtered = this._filterByTime(comments, maxAgeDays);
-    logger.info(TAG, "时效筛选后: " + filtered.length + " 条评论");
-
-    // 2e. 逐条处理评论
+    // 2c. 逐批读取+处理评论（避免批量读取后元素失效）
     var processed = 0;
-    for (var i = 0; i < filtered.length && processed < count; i++) {
-      var comment = filtered[i];
-      logger.info(TAG, "分析评论 " + (i + 1) + "/" + filtered.length +
-        ": [" + comment.nickname + "] " + comment.text.substring(0, 30));
+    var totalRead = 0;
+    var maxBatches = 10;
 
-      // AI 五维度分析
-      var analysis = aiAnalyzer.analyzeComment({
-        searchKeyword: keyword,
-        nickname: comment.nickname,
-        commentText: comment.text,
-      });
-
-      if (!analysis) {
-        logger.warn(TAG, "AI 分析失败，跳过");
-        stats.skipped++;
-        continue;
+    for (var batch = 0; batch < maxBatches && processed < count; batch++) {
+      // 读取当前可见的评论
+      var items = uiOperator.findElements("comment_list", 3000);
+      if (!items || items.length === 0) {
+        logger.warn(TAG, "未找到评论列表");
+        break;
       }
 
-      logger.info(TAG, "分数=" + analysis.score + ", 层级=" + analysis.tier +
-        ", 意图=" + (analysis.dimensions ? analysis.dimensions.intent : "未知"));
+      // 只处理本批新出现的评论（跳过之前已读的）
+      for (var i = totalRead; i < items.length && processed < count; i++) {
+        var comment = this._parseCommentItem(items[i]);
+        if (!comment) continue;
 
-      // 检查分数阈值
-      if (analysis.score < aiAnalyzer.SCORE_THRESHOLD) {
-        logger.info(TAG, "分数 " + analysis.score + " 低于阈值，跳过");
-        stats.skipped++;
-        continue;
-      }
-
-      // 检查水军/同行
-      if (analysis.dimensions && analysis.dimensions.lead_quality) {
-        var lq = analysis.dimensions.lead_quality;
-        if (lq.is_bot || lq.is_competitor) {
-          logger.info(TAG, "检测到水军/同行，跳过");
-          stats.skipped++;
+        // 时效筛选
+        if (!this._filterByTime([comment], maxAgeDays).length) {
+          totalRead++;
           continue;
         }
-      }
 
-      // 回复评论
-      logger.info(TAG, "回复: '" + analysis.reply.substring(0, 30) + "...'");
-      var replySuccess = this._replyToComment(analysis.reply);
-      if (!replySuccess) {
-        stats.fail_count++;
-        continue;
-      }
+        logger.info(TAG, "分析评论 " + (processed + 1) + "/" + count +
+          ": [" + comment.nickname + "] " + comment.text.substring(0, 30));
 
-      stats.success_count++;
-      stats.details.push({
-        video: v + 1,
-        nickname: comment.nickname,
-        score: analysis.score,
-        tier: analysis.tier,
-        intent: analysis.dimensions ? analysis.dimensions.intent : "unknown",
-        reply: analysis.reply,
-      });
+        // AI 五维度分析
+        var analysis = aiAnalyzer.analyzeComment({
+          searchKeyword: keyword,
+          nickname: comment.nickname,
+          commentText: comment.text,
+        });
 
-      // 点击头像进入主页
-      sleep(1000);
-      var profileEntered = this._enterCommenterProfile(comment.nickname);
-      if (!profileEntered) {
-        logger.warn(TAG, "进入主页失败，跳过关注+私信");
-        processed++;
-        antiDetect.maybePause();
-        continue;
-      }
+        if (!analysis) { logger.warn(TAG, "AI 分析失败，跳过"); stats.skipped++; totalRead++; continue; }
 
-      // 关注
-      this._followUser();
-      sleep(1000);
+        logger.info(TAG, "分数=" + analysis.score + ", 层级=" + analysis.tier +
+          ", 意图=" + (analysis.dimensions ? analysis.dimensions.intent : "未知"));
 
-      // 私信
-      if (content) {
-        var dmContent = content;
-        if (analysis.tier === "high") {
-          var aiDM = aiAnalyzer.generateDM({
-            searchKeyword: keyword,
-            nickname: comment.nickname,
-            commentText: comment.text,
-            tier: analysis.tier || "high",
-          });
-          if (aiDM) dmContent = aiDM;
+        if (analysis.score < aiAnalyzer.SCORE_THRESHOLD) {
+          logger.info(TAG, "分数 " + analysis.score + " 低于阈值，跳过");
+          stats.skipped++; totalRead++; continue;
         }
-        this._sendDM(dmContent);
+
+        if (analysis.dimensions && analysis.dimensions.lead_quality) {
+          var lq = analysis.dimensions.lead_quality;
+          if (lq.is_bot || lq.is_competitor) {
+            logger.info(TAG, "检测到水军/同行，跳过");
+            stats.skipped++; totalRead++; continue;
+          }
+        }
+
+        // 回复评论
+        logger.info(TAG, "回复: '" + analysis.reply.substring(0, 30) + "...'");
+        var replySuccess = this._replyToComment(analysis.reply);
+        if (!replySuccess) { stats.fail_count++; totalRead++; continue; }
+
+        stats.success_count++;
+        stats.details.push({
+          video: v + 1, nickname: comment.nickname,
+          score: analysis.score, tier: analysis.tier,
+          intent: analysis.dimensions ? analysis.dimensions.intent : "unknown",
+          reply: analysis.reply,
+        });
+
+        // 点击头像进入主页
         sleep(1000);
+        var profileEntered = this._enterCommenterProfile(comment.nickname);
+        if (!profileEntered) {
+          logger.warn(TAG, "进入主页失败，跳过关注+私信");
+          processed++; totalRead++; antiDetect.maybePause(); continue;
+        }
+
+        this._followUser();
+        sleep(1000);
+
+        if (content) {
+          var dmContent = content;
+          if (analysis.tier === "high") {
+            var aiDM = aiAnalyzer.generateDM({
+              searchKeyword: keyword, nickname: comment.nickname,
+              commentText: comment.text, tier: analysis.tier || "high",
+            });
+            if (aiDM) dmContent = aiDM;
+          }
+          this._sendDM(dmContent);
+          sleep(1000);
+        }
+
+        // 返回评论区
+        this._returnToComments();
+        sleep(1500);
+
+        processed++;
+        totalRead++;
+        antiDetect.maybePause();
       }
 
-      // 返回评论区
-      this._returnToComments();
-      sleep(1500);
-
-      processed++;
-      antiDetect.maybePause();
+      // 还需要更多评论，滑动加载
+      if (processed < count) {
+        logger.info(TAG, "已处理 " + processed + "/" + count + "，滑动加载更多评论...");
+        uiOperator.swipeUp();
+        sleep(1500);
+      }
     }
 
     // 容错返回：连续 back 直到回到搜索视频列表页

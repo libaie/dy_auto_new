@@ -243,10 +243,17 @@ var uiOperator = {
     if (element.clickable()) {
       return element.click();
     } else {
-      // 控件不可点击，尝试点击其父元素或坐标
+      // 控件不可点击，尝试坐标点击
       var bounds = element.bounds();
       if (bounds) {
-        return click(bounds.centerX(), bounds.centerY());
+        var cx = bounds.centerX();
+        var cy = bounds.centerY();
+        // 坐标必须在屏幕内
+        if (cx < 0 || cy < 0 || cx >= device.width || cy >= device.height) {
+          logger.warn(TAG, "坐标 (" + cx + "," + cy + ") 在屏幕外，跳过点击");
+          return false;
+        }
+        return click(cx, cy);
       }
     }
     return false;

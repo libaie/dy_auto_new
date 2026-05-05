@@ -339,11 +339,13 @@ SearchBaseHandler._clickSearchResult = function (index) {
       }
     }
 
-    // 目标不可见，滑动
+    // 目标不可见，连续滑动两次加快加载
     if (scroll < maxScroll - 1) {
       logger.info(TAG, "第 " + (index + 1) + " 个目标不可见(已见 " + seenCount + ")，滑动...");
       uiOperator.swipeUp();
-      sleep(2000);
+      sleep(1500);
+      uiOperator.swipeUp();
+      sleep(1500);
     }
   }
 

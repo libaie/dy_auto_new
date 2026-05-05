@@ -64,7 +64,7 @@ ReplyCommentHandler.execute = function (params) {
   for (var v = 0; v < videoCount; v++) {
     logger.info(TAG, "=== 视频 " + (v + 1) + "/" + videoCount + " ===");
 
-    // 2a. 点击第 v 个视频
+    // 2a. 点击第 v 个视频（_clickSearchResult 内部自动滑动定位）
     if (!this._clickSearchResult(v)) {
       logger.warn(TAG, "点击视频 " + (v + 1) + " 失败，停止处理");
       break;

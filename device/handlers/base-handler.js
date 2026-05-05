@@ -68,6 +68,13 @@ var BaseHandler = {
   },
 
   /**
+   * 通过键盘回车提交（比点击提交按钮更可靠）
+   */
+  submitViaKeyboard: function () {
+    return uiOperator.submitViaKeyboard();
+  },
+
+  /**
    * 从当前屏幕提取视频相关文本（标题、描述、作者等）
    * @returns {string} 拼接的文本内容
    */

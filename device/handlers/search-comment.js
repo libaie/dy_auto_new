@@ -72,12 +72,9 @@ SearchCommentHandler._interactWithVideo = function (content, stats) {
   }
   sleep(500);
 
-  // 4. 点击发送
-  var submitClicked = this.safeClick("comment_submit", 3);
-  if (!submitClicked) {
-    logger.warn(TAG, "发送评论失败");
-    return false;
-  }
+  // 4. 通过键盘回车发送
+  sleep(500);
+  this.submitViaKeyboard();
   sleep(1000);
 
   // 5. 关闭评论面板

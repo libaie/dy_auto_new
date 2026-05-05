@@ -434,8 +434,9 @@ NurtureHandler._commentOnVideo = function (templateId) {
   }
   sleep(500);
 
-  // 5. 提交评论
-  this.safeClick("comment_submit", 2);
+  // 5. 通过键盘回车提交评论
+  sleep(500);
+  this.submitViaKeyboard();
   sleep(1000);
   logger.info(TAG, "评论成功");
 

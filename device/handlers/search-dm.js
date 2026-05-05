@@ -54,12 +54,9 @@ SearchDMHandler._interactWithVideo = function (content, stats) {
   }
   sleep(500);
 
-  // 4. 点击发送
-  var sendClicked = this.safeClick("dm_send", 3);
-  if (!sendClicked) {
-    logger.warn(TAG, "发送私信失败");
-    return false;
-  }
+  // 4. 通过键盘回车发送
+  sleep(500);
+  this.submitViaKeyboard();
   sleep(1000);
 
   logger.info(TAG, "私信已发送: '" + content.substring(0, 20) + "'");

@@ -266,26 +266,58 @@ var uiOperator = {
    * @returns {boolean}
    */
   inputText: function (element, text) {
-    if (!element) return false;
+    if (!element || !text) return false;
 
-    // 图片匹配返回的是坐标对象，需要先点击激活输入框，再找真实 EditText
+    // 点击输入框获取焦点
     if (element.isImage || element.isCoordinate) {
       var x = element.x || Math.round(element.x_percent * device.width);
       var y = element.y || Math.round(element.y_percent * device.height);
       click(x, y);
-      sleep(500);
-      // 找到实际的输入框控件
-      var editText = className("EditText").findOne(3000);
-      if (editText) {
-        editText.setText(text);
-        return true;
+    } else {
+      try { element.click(); } catch (e) { /* ignore */ }
+    }
+    sleep(500);
+
+    // 通过剪贴板复制粘贴（比 setText 更可靠）
+    try {
+      setClip(text);
+      sleep(200);
+      // 粘贴: KEYCODE_PASTE = 279
+      keyCode(279);
+      sleep(300);
+      logger.debug(TAG, "已粘贴文本: '" + text.substring(0, 20) + "'");
+      return true;
+    } catch (e) {
+      logger.warn(TAG, "剪贴板粘贴失败: " + e.message);
+      // 回退: 尝试 setText
+      try {
+        if (!element.isImage && !element.isCoordinate) {
+          element.setText(text);
+          return true;
+        }
+        var editText = className("EditText").findOne(2000);
+        if (editText) { editText.setText(text); return true; }
+      } catch (e2) {
+        logger.warn(TAG, "setText 回退也失败: " + e2.message);
       }
-      logger.warn(TAG, "图片匹配后未找到 EditText 控件");
+    }
+    return false;
+  },
+
+  /**
+   * 通过键盘回车提交（比点击提交按钮更可靠）
+   * @returns {boolean}
+   */
+  submitViaKeyboard: function () {
+    try {
+      // KEYCODE_ENTER = 66
+      keyCode(66);
+      logger.debug(TAG, "已按回车提交");
+      return true;
+    } catch (e) {
+      logger.warn(TAG, "回车提交失败: " + e.message);
       return false;
     }
-
-    element.setText(text);
-    return true;
   },
 
   /**

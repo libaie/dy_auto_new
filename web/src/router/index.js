@@ -53,6 +53,11 @@ const routes = [
         component: () => import('../views/SelectorsPage.vue'),
       },
       {
+        path: 'channels',
+        name: 'Channels',
+        component: () => import('../views/ChannelsPage.vue'),
+      },
+      {
         path: 'stats',
         name: 'Stats',
         component: () => import('../views/StatsPage.vue'),

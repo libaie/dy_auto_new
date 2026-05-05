@@ -289,16 +289,65 @@ SearchBaseHandler._submitSearch = function () {
 
 /**
  * 点击第 index 个搜索结果
+ * 优先通过选择器/RecyclerView 查找视频列表项，回退到坐标点击
  */
 SearchBaseHandler._clickSearchResult = function (index) {
+  // 先尝试用选择器查找视频列表
+  var selector = require("../core/selector-loader").get("search_video_list");
+  var rv = null;
+  if (selector) {
+    var strategies = selector.strategies.slice().sort(function (a, b) { return a.priority - b.priority; });
+    for (var s = 0; s < strategies.length; s++) {
+      try {
+        switch (strategies[s].type) {
+          case "id": rv = id(strategies[s].value).findOne(3000); break;
+          case "className": rv = className(strategies[s].value).findOne(3000); break;
+        }
+      } catch (e) {}
+      if (rv) break;
+    }
+  }
+  // 回退：通用 RecyclerView
+  if (!rv) {
+    try { rv = className("androidx.recyclerview.widget.RecyclerView").findOne(3000); } catch (e) {}
+  }
+  if (!rv) {
+    try { rv = className("android.widget.ListView").findOne(3000); } catch (e) {}
+  }
+
+  if (rv) {
+    var children = rv.children();
+    // 需要滑动到目标位置
+    if (index >= children.length) {
+      for (var i = 0; i < index - children.length + 1; i++) {
+        uiOperator.swipeUp();
+        sleep(1000);
+      }
+      children = rv.children();
+    }
+    var target = children[Math.min(index, children.length - 1)];
+    if (target && target.clickable()) {
+      logger.info(TAG, "点击第 " + (index + 1) + " 个视频列表项");
+      return target.click();
+    } else if (target) {
+      var bounds = target.bounds();
+      if (bounds) {
+        logger.info(TAG, "点击第 " + (index + 1) + " 个视频列表项(坐标)");
+        return click(bounds.centerX(), bounds.centerY());
+      }
+    }
+  }
+
+  // 最终回退：坐标点击
   if (index > 0) {
-    for (var i = 0; i < index; i++) {
+    for (var j = 0; j < index; j++) {
       uiOperator.swipeUp();
       sleep(1000);
     }
   }
   var x = Math.round(device.width * 0.5);
   var y = Math.round(device.height * 0.4);
+  logger.info(TAG, "坐标点击第 " + (index + 1) + " 个视频 (" + x + "," + y + ")");
   return click(x, y);
 };
 

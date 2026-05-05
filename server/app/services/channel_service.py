@@ -207,9 +207,14 @@ class ChannelService:
                 if elapsed < ch.cooldown_seconds:
                     continue
 
-            # Filter: daily quota
+            # Filter: daily quota (reply_comment 还需额外检查关注和私信配额)
             if not stats_service.check_quota(db, item.account_id, ch.task_type):
                 continue
+            if ch.task_type == "reply_comment":
+                if not stats_service.check_quota(db, item.account_id, "follow"):
+                    continue
+                if not stats_service.check_quota(db, item.account_id, "search_dm"):
+                    continue
 
             # Optimistic lock: claim the item
             result = db.execute(

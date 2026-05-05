@@ -133,24 +133,31 @@ class TaskService:
         ).distinct().scalar_subquery()
 
         for db_task in candidates:
-            if stats_service.check_quota(db, db_task.account_id, db_task.type):
-                # Atomic claim: only succeeds if no other task for this account is RUNNING
-                result = db.execute(
-                    update(DBTask)
-                    .where(
-                        DBTask.id == db_task.id,
-                        DBTask.status == TaskStatus.PENDING.value,
-                        ~DBTask.account_id.in_(busy_account_ids),
-                    )
-                    .values(status=TaskStatus.RUNNING.value, device_id=device_id, started_at=datetime.now(timezone.utc))
-                )
-                db.commit()
-
-                if result.rowcount == 0:
+            # Check main task quota AND follow/DM quotas for reply_comment
+            if not stats_service.check_quota(db, db_task.account_id, db_task.type):
+                continue
+            if db_task.type == "reply_comment":
+                if not stats_service.check_quota(db, db_task.account_id, "follow"):
                     continue
+                if not stats_service.check_quota(db, db_task.account_id, "search_dm"):
+                    continue
+            # Atomic claim: only succeeds if no other task for this account is RUNNING
+            result = db.execute(
+                update(DBTask)
+                .where(
+                    DBTask.id == db_task.id,
+                    DBTask.status == TaskStatus.PENDING.value,
+                    ~DBTask.account_id.in_(busy_account_ids),
+                )
+                .values(status=TaskStatus.RUNNING.value, device_id=device_id, started_at=datetime.now(timezone.utc))
+            )
+            db.commit()
 
-                db.refresh(db_task)
-                return _db_task_to_pydantic(db_task)
+            if result.rowcount == 0:
+                continue
+
+            db.refresh(db_task)
+            return _db_task_to_pydantic(db_task)
 
         return None
 

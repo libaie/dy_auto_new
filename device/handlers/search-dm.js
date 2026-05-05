@@ -67,16 +67,4 @@ SearchDMHandler._interactWithVideo = function (content, stats) {
   return true;
 };
 
-/**
- * 返回搜索结果页 — DM 流程经过: 视频 → 作者主页 → 私信页面，需要多次 back
- */
-SearchDMHandler._goBack = function () {
-  back();
-  sleep(800);
-  back();
-  sleep(800);
-  back();
-  sleep(1000);
-};
-
 module.exports = SearchDMHandler;

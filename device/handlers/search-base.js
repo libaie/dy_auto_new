@@ -88,8 +88,11 @@ SearchBaseHandler.execute = function (params) {
       stats.fail_count++;
     }
 
-    this._goBack();
-    sleep(1500);
+    // 容错返回：连续 back 直到回到搜索视频列表页
+    if (!this._backToSearchResults()) {
+      logger.warn(TAG, "无法回到搜索列表页，停止后续视频处理");
+      break;
+    }
 
     antiDetect.maybePause();
   }
@@ -233,9 +236,8 @@ SearchBaseHandler._sortResults = function (sortBy) {
   var clicked = this.safeClick(actionName, 3);
   if (clicked) {
     logger.info(TAG, "排序方式: " + sortBy);
-    sleep(500);
-    // 关闭排序弹出框
-    this._closeSortPopup();
+    sleep(1000);
+    // 弹窗选中后通常自动关闭，不额外点击（避免二次打开）
     return true;
   }
 
@@ -292,37 +294,53 @@ SearchBaseHandler._submitSearch = function () {
  * 通过选择器系统查找视频列表容器，再点击子项
  */
 SearchBaseHandler._clickSearchResult = function (index) {
-  var rv = uiOperator.findElement("search_video_list", 5000);
-  if (!rv) {
-    logger.error(TAG, "视频列表未找到，请在选择器管理中配置 search_video_list");
-    return false;
+  var screenW = device.width;
+  var screenH = device.height;
+
+  function isVisible(el) {
+    try {
+      var b = el.bounds();
+      if (!b) return false;
+      var cx = b.centerX();
+      var cy = b.centerY();
+      return cx >= 0 && cy >= 0 && cx < screenW && cy < screenH;
+    } catch (e) { return false; }
   }
 
-  var children = rv.children();
-  if (index >= children.length) {
-    // 滑动加载更多
-    for (var i = 0; i < index - children.length + 1; i++) {
-      uiOperator.swipeUp();
-      sleep(1000);
+  // 循环滑动直到目标元素出现在可见区域
+  var maxScroll = 10;
+  for (var scroll = 0; scroll < maxScroll; scroll++) {
+    var items = uiOperator.findElements("search_video_list", 3000);
+    var seenCount = 0;
+
+    for (var i = 0; i < items.length; i++) {
+      if (isVisible(items[i])) {
+        if (seenCount === index) {
+          var target = items[i];
+          if (target.clickable()) {
+            logger.info(TAG, "点击第 " + (index + 1) + " 个可见视频列表项(总数 " + items.length + ")");
+            return target.click();
+          }
+          var bounds = target.bounds();
+          if (bounds) {
+            logger.info(TAG, "点击第 " + (index + 1) + " 个可见视频列表项(坐标, 总数 " + items.length + ")");
+            return click(bounds.centerX(), bounds.centerY());
+          }
+          return false;
+        }
+        seenCount++;
+      }
     }
-    children = rv.children();
+
+    // 目标不可见，滑动
+    if (scroll < maxScroll - 1) {
+      logger.info(TAG, "第 " + (index + 1) + " 个目标不可见(已见 " + seenCount + ")，滑动...");
+      uiOperator.swipeUp();
+      sleep(2000);
+    }
   }
 
-  if (index >= children.length) {
-    logger.warn(TAG, "视频列表项不足，需要 " + (index + 1) + " 个，实际 " + children.length + " 个");
-    return false;
-  }
-
-  var target = children[index];
-  if (target.clickable()) {
-    logger.info(TAG, "点击第 " + (index + 1) + " 个视频列表项");
-    return target.click();
-  }
-  var bounds = target.bounds();
-  if (bounds) {
-    logger.info(TAG, "点击第 " + (index + 1) + " 个视频列表项(坐标)");
-    return click(bounds.centerX(), bounds.centerY());
-  }
+  logger.warn(TAG, "目标视频 " + (index + 1) + " 未找到（最多滑动 10 次）");
   return false;
 };
 
@@ -332,6 +350,37 @@ SearchBaseHandler._clickSearchResult = function (index) {
 SearchBaseHandler._goBack = function () {
   back();
   sleep(1000);
+};
+
+/**
+ * 容错返回：连续按返回键直到回到搜索视频列表页
+ * 不管当前在评论列表页/个人主页/私信页/视频详情页，最终都能回到搜索结果列表
+ * @returns {boolean} 是否成功回到搜索列表页
+ */
+SearchBaseHandler._backToSearchResults = function () {
+  var maxBacks = 5;
+  for (var i = 0; i < maxBacks; i++) {
+    // 检测是否已在搜索视频列表页
+    var items = uiOperator.findElements("search_video_list", 2000);
+    if (items.length > 0) {
+      logger.info(TAG, "已在搜索视频列表页 (back " + i + " 次)");
+      return true;
+    }
+    // 也检测视频 tab 是否存在
+    var videoTab = uiOperator.findElement("search_video_tab", 1000);
+    if (videoTab) {
+      logger.info(TAG, "检测到视频 tab，已在搜索页 (back " + i + " 次)");
+      return true;
+    }
+    // 不在搜索页，按一次返回
+    logger.info(TAG, "第 " + (i + 1) + " 次 back，当前位置非搜索列表页");
+    back();
+    sleep(1000);
+  }
+
+  // 最后兜底：确保在搜索结果页（重新执行搜索步骤）
+  logger.warn(TAG, "back " + maxBacks + " 次后仍未回到搜索列表页，尝试重新导航");
+  return false;
 };
 
 /**

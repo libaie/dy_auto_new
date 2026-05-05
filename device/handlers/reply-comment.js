@@ -176,9 +176,11 @@ ReplyCommentHandler.execute = function (params) {
       antiDetect.maybePause();
     }
 
-    // 返回搜索结果页
-    back();
-    sleep(1500);
+    // 容错返回：连续 back 直到回到搜索视频列表页
+    if (!this._backToSearchResults()) {
+      logger.warn(TAG, "无法回到搜索列表页，停止后续视频处理");
+      break;
+    }
 
     stats.videos_processed++;
     antiDetect.maybePause();
@@ -211,9 +213,17 @@ ReplyCommentHandler._searchAndSort = function (keyword, sortBy) {
 };
 
 /**
- * 打开评论区
+ * 打开评论区（幂等：已在评论面板则直接返回）
  */
 ReplyCommentHandler._openComments = function () {
+  // 已在评论面板？
+  var commentInput = uiOperator.findElement("video_comment_input", 500);
+  var commentList = uiOperator.findElement("comment_list", 500);
+  if (commentInput || commentList) {
+    logger.info(TAG, "评论区已打开");
+    return true;
+  }
+
   // 点击评论区入口（视频评论按钮）
   var clicked = this.safeClick("video_comment_btn", 3);
   if (clicked) {
@@ -231,7 +241,8 @@ ReplyCommentHandler._openComments = function () {
 
 /**
  * 读取评论列表
- * 使用服务端下发的选择器查找评论列表
+ * 使用 findElements 直接获取所有评论控件（不走 children）
+ * 支持滑动加载更多评论
  * @param {number} maxCount - 最多读取数量
  * @returns {Array} [{ nickname, text, time, element }]
  */
@@ -239,23 +250,32 @@ ReplyCommentHandler._readComments = function (maxCount) {
   var comments = [];
 
   try {
-    // 使用选择器系统查找评论列表
-    var commentList = uiOperator.findElement("comment_list", 5000);
+    // 等待评论面板打开
+    sleep(1000);
 
-    if (!commentList) {
-      logger.warn(TAG, "评论列表未找到");
+    // 使用 findElements 直接获取评论控件数组
+    var items = uiOperator.findElements("comment_list", 5000);
+    if (!items || items.length === 0) {
+      logger.warn(TAG, "评论列表未找到或为空");
       return comments;
     }
+    logger.info(TAG, "评论列表: " + items.length + " 条");
 
-    // findElement 返回的是 UiObject，需要获取子元素
-    var children = commentList.children();
-    logger.info(TAG, "评论列表共 " + children.length + " 条");
+    // 滑动加载更多直到满足数量要求
+    var maxScroll = 10;
+    for (var scroll = 0; scroll < maxScroll && comments.length < maxCount; scroll++) {
+      for (var i = 0; i < items.length && comments.length < maxCount; i++) {
+        var comment = this._parseCommentItem(items[i]);
+        if (comment) {
+          comments.push(comment);
+        }
+      }
 
-    for (var i = 0; i < Math.min(children.length, maxCount); i++) {
-      var item = children[i];
-      var comment = this._parseCommentItem(item);
-      if (comment) {
-        comments.push(comment);
+      if (comments.length < maxCount) {
+        logger.info(TAG, "已读取 " + comments.length + "/" + maxCount + " 条，滑动加载更多...");
+        uiOperator.swipeUp();
+        sleep(1500);
+        items = uiOperator.findElements("comment_list", 3000);
       }
     }
   } catch (e) {
@@ -554,15 +574,37 @@ ReplyCommentHandler._sendDM = function (content) {
 };
 
 /**
- * 返回评论区（从用户主页返回）
+ * 容错返回评论区（从私信页/个人主页/任意页面回到评论区）
+ * 使用检测驱动，不再依赖固定次数 back
  */
 ReplyCommentHandler._returnToComments = function () {
-  // 返回两次：第一次退出私信/主页，第二次回到评论区
-  back();
-  sleep(1000);
-  back();
-  sleep(1000);
-  // 重新打开评论区（如果返回后评论区关闭了）
+  var maxBacks = 5;
+
+  for (var i = 0; i < maxBacks; i++) {
+    // 已在评论面板？
+    var commentList = uiOperator.findElement("comment_list", 1000);
+    var commentInput = uiOperator.findElement("video_comment_input", 500);
+    if (commentList || commentInput) {
+      logger.info(TAG, "已在评论面板 (back " + i + " 次)");
+      return;
+    }
+
+    // 已在视频详情页？（检测评论入口按钮）
+    var commentBtn = uiOperator.findElement("video_comment_btn", 500);
+    if (commentBtn) {
+      logger.info(TAG, "回到视频详情页 (back " + i + " 次)，重新打开评论区");
+      this._openComments();
+      return;
+    }
+
+    // 不在目标页面，继续 back
+    logger.info(TAG, "第 " + (i + 1) + " 次 back，离开当前位置...");
+    back();
+    sleep(1000);
+  }
+
+  // 兜底：强制 back 后重新打开评论区
+  logger.warn(TAG, "back " + maxBacks + " 次后尚未确认位置，尝试打开评论区");
   this._openComments();
 };
 

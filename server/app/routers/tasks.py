@@ -73,9 +73,9 @@ async def _maybe_expand_keywords(params: dict, task_type: str, db=None) -> dict:
                 continue
             expanded = await content_service.generate_keyword_matrix(seed, 8, db=db)
             all_expanded.extend(expanded)
-        # Deduplicate while preserving order
-        seen = set()
-        unique = []
+        # Deduplicate while preserving order, seed keywords first
+        seen = set(keywords)
+        unique = list(keywords)
         for kw in all_expanded:
             if kw not in seen:
                 seen.add(kw)
@@ -84,7 +84,6 @@ async def _maybe_expand_keywords(params: dict, task_type: str, db=None) -> dict:
         logger.info("Expanded %d seed keywords into %d matrix keywords", len(keywords), len(unique))
     except Exception as e:
         logger.warning("Failed to expand keywords for nurture task: %s", e)
-        # Fallback: use seed keywords as-is
         params["keyword_matrix"] = [str(k).strip() for k in keywords if str(k).strip()]
 
     return params
@@ -202,10 +201,42 @@ async def batch_create_tasks(
     else:
         params = dict(request.params)
 
-    # Create a task per account (每账号独立解析模板，避免内容雷同)
-    from app.ws_manager import pair_ws_manager
-    # Expand keywords once (shared across all accounts)
+    # AI expand keywords for all task types
     params = await _maybe_expand_keywords(params, request.type.value, db=db)
+
+    # Extract keywords: use keyword_matrix (AI expanded) first, then keywords (seed), then keyword (single)
+    keyword_list = (params.get("keyword_matrix")
+                    or params.get("keywords")
+                    or ([params.get("keyword")] if params.get("keyword") else []))
+
+    # Auto-create channel when group_ids provided (handles multi-device concurrency)
+    if request.group_ids and keyword_list:
+        from app.services.channel_service import channel_service
+        created_channels = []
+        for group_id in request.group_ids:
+            channel = channel_service.create_channel(
+                db=db,
+                group_id=group_id,
+                task_type=request.type.value,
+                account_mode="round_robin",
+                keywords=keyword_list,
+                params_template=params,
+                account_id=request.account_ids[0] if request.account_ids else None,
+            )
+            created_channels.append({
+                "channel_id": channel.id,
+                "group_id": group_id,
+                "total_items": channel.total_keywords,
+            })
+
+        # Notify devices
+        from app.ws_manager import pair_ws_manager
+        await pair_ws_manager.broadcast_to_devices({"event": "new_task_available"})
+
+        return {"created": len(keyword_list) * len(request.group_ids), "mode": "channel", "channels": created_channels}
+
+    # Fallback: create individual tasks per account (no group_ids or no keywords)
+    from app.ws_manager import pair_ws_manager
     created_tasks = []
     for account_id in account_ids:
         account_params = await _maybe_resolve_template(db, dict(params), request.type.value)
@@ -219,30 +250,22 @@ async def batch_create_tasks(
         )
         created_tasks.append(task)
 
-    # Notify device(s) — only send new_task_available, let devices poll/claim
+    # Notify device(s)
     if device_id:
-        await pair_ws_manager.send_to_device(device_id, {
-            "event": "new_task_available",
-        })
+        await pair_ws_manager.send_to_device(device_id, {"event": "new_task_available"})
     else:
-        # Notify bound devices for each account
         notified_devices = set()
         for task in created_tasks:
             bound_device = db.query(Device).filter(Device.bound_account_id == task.account_id).first()
             if bound_device and bound_device.id not in notified_devices:
                 notified_devices.add(bound_device.id)
-                await pair_ws_manager.send_to_device(bound_device.id, {
-                    "event": "new_task_available",
-                })
-        # Broadcast for any unbound accounts
+                await pair_ws_manager.send_to_device(bound_device.id, {"event": "new_task_available"})
         unbound_accounts = [
             t.account_id for t in created_tasks
             if not db.query(Device).filter(Device.bound_account_id == t.account_id).first()
         ]
         if unbound_accounts:
-            await pair_ws_manager.broadcast_to_devices({
-                "event": "new_task_available",
-            })
+            await pair_ws_manager.broadcast_to_devices({"event": "new_task_available"})
 
     return {"created": len(created_tasks), "tasks": created_tasks}
 

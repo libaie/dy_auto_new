@@ -110,6 +110,7 @@ class NurtureParams(BaseModel):
 
 class SearchCommentParams(BaseModel):
     keyword: str = Field(..., min_length=1, max_length=50, description="搜索关键词")
+    keywords: Optional[list[str]] = Field(None, description="批量关键词（通道模式）")
     content: Optional[str] = Field(None, max_length=200, description="评论内容")
     content_template_id: Optional[str] = Field(None, description="内容模板ID")
     count: int = Field(default=5, ge=1, le=20, description="处理数量")
@@ -118,12 +119,14 @@ class SearchCommentParams(BaseModel):
 
 class SearchLikeParams(BaseModel):
     keyword: str = Field(..., min_length=1, max_length=50, description="搜索关键词")
+    keywords: Optional[list[str]] = Field(None, description="批量关键词（通道模式）")
     count: int = Field(default=5, ge=1, le=30, description="点赞数量")
     sort_by: Optional[str] = Field(None, pattern="^(latest|most_liked)$")
 
 
 class SearchDMParams(BaseModel):
     keyword: str = Field(..., min_length=1, max_length=50, description="搜索关键词")
+    keywords: Optional[list[str]] = Field(None, description="批量关键词（通道模式）")
     content: Optional[str] = Field(None, max_length=500, description="私信内容")
     content_template_id: Optional[str] = Field(None, description="内容模板ID")
     count: int = Field(default=5, ge=1, le=10, description="私信数量")
@@ -132,6 +135,7 @@ class SearchDMParams(BaseModel):
 
 class ReplyCommentParams(BaseModel):
     keyword: str = Field(..., min_length=1, max_length=50, description="搜索关键词")
+    keywords: Optional[list[str]] = Field(None, description="批量关键词（通道模式）")
     content: Optional[str] = Field(None, max_length=500, description="私信内容")
     content_template_id: Optional[str] = Field(None, description="内容模板ID")
     count: int = Field(default=5, ge=1, le=10, description="每个视频处理评论数")

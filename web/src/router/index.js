@@ -54,8 +54,7 @@ const routes = [
       },
       {
         path: 'channels',
-        name: 'Channels',
-        component: () => import('../views/ChannelsPage.vue'),
+        redirect: '/tasks',
       },
       {
         path: 'stats',

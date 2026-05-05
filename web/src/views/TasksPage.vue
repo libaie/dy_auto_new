@@ -11,6 +11,7 @@ import DataTable from '../components/DataTable.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import { listTasks, createTask, batchCreateTasks, cancelTask } from '../api/tasks.js'
+import { listChannels, updateChannel, deleteChannel as deleteChannelApi } from '../api/channels.js'
 import { listAccounts } from '../api/accounts.js'
 import { listGroups } from '../api/accountGroups.js'
 import { listDevices } from '../api/devices.js'
@@ -18,6 +19,7 @@ import { listTemplates, generateKeywords } from '../api/content.js'
 import { formatDate } from '../utils/format.js'
 import { useToastStore } from '../stores/toast.js'
 import TipIcon from '../components/TipIcon.vue'
+import ChannelDetail from '../components/ChannelDetail.vue'
 
 // --- Task type label map ---
 const typeLabelMap = {
@@ -127,8 +129,10 @@ const keywordDeviceId = ref('')
 const keywordSortBy = ref('')
 const keywordTemplateId = ref('')
 const keywordContent = ref('')
+const keywordMaxAgeDays = ref(5)
 const keywordGenerateCount = ref(10)
 const keywordProcessingCount = ref(5)
+const keywordExpandCount = ref(8)
 
 // --- Cancel confirmation state ---
 const showCancelDialog = ref(false)
@@ -137,6 +141,36 @@ const cancelling = ref(false)
 
 // --- Page-level error ---
 const pageError = ref(null)
+
+// --- Tab switching ---
+const activeTab = ref('tasks') // 'tasks' | 'channels'
+
+// --- Channel state ---
+const channels = ref([])
+const channelsLoading = ref(false)
+const detailChannel = ref(null)
+
+const channelTaskTypeLabel = (type) => ({
+  search_comment: '评论搜索',
+  search_like: '点赞搜索',
+  search_dm: '私信搜索',
+  reply_comment: '回复评论',
+  nurture: '养号',
+}[type] || type)
+
+const channelStatusLabel = (s) => ({
+  active: '运行中',
+  paused: '已暂停',
+  completed: '已完成',
+  cancelled: '已取消',
+}[s] || s)
+
+const channelStatusClass = (s) => ({
+  active: 'bg-green-500/20 text-green-400',
+  paused: 'bg-yellow-500/20 text-yellow-400',
+  completed: 'bg-blue-500/20 text-blue-400',
+  cancelled: 'bg-slate-600/50 text-slate-400',
+}[s] || 'bg-slate-600/50 text-slate-400')
 
 const toast = useToastStore()
 
@@ -169,6 +203,45 @@ async function fetchTasks() {
   } finally {
     loading.value = false
   }
+}
+
+// --- Fetch channels ---
+async function fetchChannels() {
+  channelsLoading.value = true
+  try {
+    const resp = await listChannels()
+    channels.value = resp.data.channels || []
+  } catch (e) {
+    console.error('Failed to fetch channels:', e)
+  } finally {
+    channelsLoading.value = false
+  }
+}
+
+async function pauseChannel(ch) {
+  await updateChannel(ch.id, { status: 'paused' })
+  await fetchChannels()
+}
+
+async function resumeChannel(ch) {
+  await updateChannel(ch.id, { status: 'active' })
+  await fetchChannels()
+}
+
+async function cancelChannel(ch) {
+  if (!confirm('确定取消此通道？')) return
+  await updateChannel(ch.id, { status: 'cancelled' })
+  await fetchChannels()
+}
+
+async function deleteChannel(ch) {
+  if (!confirm('确定删除此通道？')) return
+  await deleteChannelApi(ch.id)
+  await fetchChannels()
+}
+
+function openChannelDetail(ch) {
+  detailChannel.value = ch
 }
 
 // --- Fetch accounts for create form ---
@@ -440,6 +513,7 @@ function openKeywordDialog() {
   keywordSortBy.value = ''
   keywordTemplateId.value = ''
   keywordContent.value = ''
+  keywordMaxAgeDays.value = 5
   keywordGenerateCount.value = 10
   keywordProcessingCount.value = 5
   showKeywordDialog.value = true
@@ -454,10 +528,17 @@ async function handleGenerateKeywords() {
   keywordError.value = null
   try {
     const res = await generateKeywords(keywordSeed.value.trim(), keywordGenerateCount.value)
-    keywordList.value = res.data.keywords || []
-    if (keywordList.value.length === 0) {
-      keywordError.value = '未生成关键词，请重试'
+    const expanded = res.data.keywords || []
+    // 种子词排在第一位，AI 扩展词追加，去重
+    const seen = new Set([keywordSeed.value.trim()])
+    const merged = [keywordSeed.value.trim()]
+    for (const kw of expanded) {
+      if (!seen.has(kw)) {
+        seen.add(kw)
+        merged.push(kw)
+      }
     }
+    keywordList.value = merged
   } catch (e) {
     keywordError.value = e.response?.data?.detail || '生成失败，请重试'
   } finally {
@@ -469,9 +550,39 @@ function removeKeyword(idx) {
   keywordList.value.splice(idx, 1)
 }
 
+async function expandCreateKeyword() {
+  var seed = form.keyword.trim()
+  if (!seed) return
+  keywordGenerating.value = true
+  try {
+    // 处理逗号分隔的多个种子词
+    var seeds = seed.split(/[,，]/).map(function (s) { return s.trim() }).filter(Boolean)
+    var allExpanded = []
+    for (var i = 0; i < seeds.length; i++) {
+      var res = await generateKeywords(seeds[i], keywordExpandCount.value)
+      allExpanded.push.apply(allExpanded, res.data.keywords || [])
+    }
+    // 种子词排前面，AI 扩展词去重追加
+    var seen = {}
+    var merged = []
+    for (var s = 0; s < seeds.length; s++) {
+      if (!seen[seeds[s]]) { seen[seeds[s]] = true; merged.push(seeds[s]) }
+    }
+    for (var j = 0; j < allExpanded.length; j++) {
+      if (!seen[allExpanded[j]]) { seen[allExpanded[j]] = true; merged.push(allExpanded[j]) }
+    }
+    form.keyword = merged.join('，')
+  } catch (e) {
+    toast.error('关键词扩展失败')
+  } finally {
+    keywordGenerating.value = false
+  }
+}
+
 function buildKeywordParams(kw) {
   const params = { keyword: kw, count: keywordProcessingCount.value }
   if (keywordSortBy.value) params.sort_by = keywordSortBy.value
+  if (keywordMaxAgeDays.value) params.max_age_days = keywordMaxAgeDays.value
   if (keywordTemplateId.value) {
     params.content_template_id = keywordTemplateId.value
   } else if (keywordContent.value) {
@@ -497,49 +608,68 @@ async function handleBatchCreateKeywordTasks() {
   creating.value = true
   keywordError.value = null
 
-  let successCount = 0
-  let failCount = 0
-
-  for (const kw of keywordList.value) {
-    try {
-      const params = buildKeywordParams(kw)
-
-      if (keywordSelectionMode.value === 'group') {
-        await batchCreateTasks({
-          type: keywordActionType.value,
-          group_ids: keywordSelectedGroupIds.value,
-          params,
-          ...(keywordDeviceId.value ? { device_id: keywordDeviceId.value } : {}),
-        })
-      } else {
+  try {
+    if (keywordSelectionMode.value === 'group') {
+      var kwList = keywordList.value.map(function (k) { return typeof k === 'string' ? k.trim() : k }).filter(Boolean)
+      const params = {
+        keyword: kwList[0] || '',
+        keywords: kwList,
+        count: keywordProcessingCount.value,
+      }
+      if (keywordSortBy.value) params.sort_by = keywordSortBy.value
+      if (keywordMaxAgeDays.value) params.max_age_days = keywordMaxAgeDays.value
+      if (keywordTemplateId.value) {
+        params.content_template_id = keywordTemplateId.value
+      } else if (keywordContent.value) {
+        params.content = keywordContent.value
+      }
+      const resp = await batchCreateTasks({
+        type: keywordActionType.value,
+        group_ids: keywordSelectedGroupIds.value,
+        params: params,
+        ...(keywordDeviceId.value ? { device_id: keywordDeviceId.value } : {}),
+      })
+      const created = resp.data?.created || 0
+      const mode = resp.data?.mode || ''
+      toast.success(mode === 'channel'
+        ? ('通道已创建，' + created + ' 个关键词任务将自动分发')
+        : ('成功创建 ' + created + ' 个任务'))
+    } else {
+      var successCount = 0
+      for (var i = 0; i < keywordList.value.length; i++) {
+        var kw = typeof keywordList.value[i] === 'string' ? keywordList.value[i].trim() : keywordList.value[i]
+        if (!kw) continue
+        var params = { keyword: kw, count: keywordProcessingCount.value }
+        if (keywordSortBy.value) params.sort_by = keywordSortBy.value
+        if (keywordMaxAgeDays.value) params.max_age_days = keywordMaxAgeDays.value
+        if (keywordTemplateId.value) {
+          params.content_template_id = keywordTemplateId.value
+        } else if (keywordContent.value) {
+          params.content = keywordContent.value
+        }
         await createTask({
           type: keywordActionType.value,
           account_id: keywordSingleAccountId.value,
-          params,
+          params: params,
           ...(keywordDeviceId.value ? { device_id: keywordDeviceId.value } : {}),
         })
+        successCount++
       }
-      successCount++
-    } catch (e) {
-      failCount++
+      toast.success('成功创建 ' + successCount + ' 个任务')
     }
+  } catch (e) {
+    keywordError.value = e.response?.data?.detail || '创建失败'
   }
 
   creating.value = false
   showKeywordDialog.value = false
   page.value = 1
   fetchTasks()
-
-  if (failCount > 0) {
-    toast.error(`批量创建完成：成功 ${successCount} 个，失败 ${failCount} 个`)
-  } else {
-    toast.success(`批量创建成功：${successCount} 个任务`)
-  }
 }
-
 // --- Init ---
 onMounted(() => {
   fetchTasks()
+  fetchChannels()
   fetchAccounts()
   fetchGroups()
   fetchDevices()
@@ -555,9 +685,25 @@ onMounted(() => {
       <button class="text-red-400 hover:text-red-300 font-bold" @click="pageError = null">&times;</button>
     </div>
 
+    <!-- Tab bar -->
+    <div class="flex items-center gap-1 mb-6 bg-slate-800/50 rounded-xl p-1 w-fit">
+      <button
+        @click="activeTab = 'tasks'"
+        class="px-4 py-2 text-sm font-medium rounded-lg transition-all"
+        :class="activeTab === 'tasks' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'"
+      >任务管理</button>
+      <button
+        @click="activeTab = 'channels'; fetchChannels()"
+        class="px-4 py-2 text-sm font-medium rounded-lg transition-all"
+        :class="activeTab === 'channels' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'"
+      >任务通道</button>
+    </div>
+
+    <!-- ==================== 任务管理 Tab ==================== -->
+    <div v-if="activeTab === 'tasks'">
     <!-- Header -->
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-bold text-white">任务中心</h1>
+      <h1 class="text-2xl font-bold text-white">任务管理</h1>
       <div class="flex items-center gap-3">
         <!-- Status filter -->
         <select
@@ -582,20 +728,13 @@ onMounted(() => {
           </svg>
           关键词搜索
         </button>
-        <!-- Create button -->
+        <!-- Create single task -->
         <button
           class="btn-aurora inline-flex items-center px-4 py-2 text-sm font-medium rounded-xl"
           @click="openCreateDialog"
         >
-          <svg
-            class="-ml-1 mr-2 h-5 w-5 relative z-10"
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-          >
-            <path
-              d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
-            />
+          <svg class="-ml-1 mr-2 h-5 w-5 relative z-10" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"/>
           </svg>
           <span class="relative z-10">创建任务</span>
         </button>
@@ -892,15 +1031,33 @@ onMounted(() => {
                   <template v-if="isSearchType">
                     <div>
                       <label class="block text-sm font-medium text-slate-300">
-                        搜索关键词 <TipIcon text="输入搜索词，系统在抖音中搜索相关视频。支持逗号分隔多个关键词" /> <span class="text-red-400">*</span>
+                        搜索关键词 <TipIcon text="输入种子词，点击 AI 扩展自动生成相关关键词" /> <span class="text-red-400">*</span>
                       </label>
-                      <input
-                        v-model="form.keyword"
-                        type="text"
-                        maxlength="50"
-                        class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 placeholder-slate-500"
-                        placeholder="例：美食、养生"
-                      />
+                      <div class="flex gap-2 mt-1">
+                        <input
+                          v-model="form.keyword"
+                          type="text"
+                          maxlength="200"
+                          class="flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 placeholder-slate-500"
+                          placeholder="例：美食、养生"
+                        />
+                        <input
+                          v-model.number="keywordExpandCount"
+                          type="number"
+                          min="3"
+                          max="30"
+                          class="w-16 rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-sm text-slate-200 text-center"
+                          title="扩展数量"
+                        />
+                        <button
+                          type="button"
+                          @click="expandCreateKeyword"
+                          :disabled="keywordGenerating"
+                          class="px-3 py-2 bg-emerald-600 text-white text-sm rounded-lg hover:bg-emerald-500 disabled:opacity-50 transition-colors whitespace-nowrap"
+                        >
+                          {{ keywordGenerating ? '...' : 'AI 扩展' }}
+                        </button>
+                      </div>
                     </div>
 
                     <div>
@@ -1149,6 +1306,18 @@ onMounted(() => {
                     </select>
                   </div>
 
+                  <!-- max_age_days (for comment task types) -->
+                  <div v-if="['search_comment', 'reply_comment'].includes(keywordActionType)">
+                    <label class="block text-sm font-medium text-slate-300">评论最大天数 <TipIcon text="只回复在此天数内发布的评论，超过的将被忽略" /></label>
+                    <input
+                      v-model.number="keywordMaxAgeDays"
+                      type="number"
+                      min="1"
+                      max="30"
+                      class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200"
+                    />
+                  </div>
+
                   <!-- Content template / content (for content task types) -->
                   <template v-if="['search_comment', 'search_dm', 'reply_comment'].includes(keywordActionType)">
                     <div v-if="templates.length > 0">
@@ -1199,5 +1368,84 @@ onMounted(() => {
         </div>
       </Dialog>
     </TransitionRoot>
+    </div>
+    <!-- ==================== End 任务管理 Tab ==================== -->
+
+    <!-- ==================== 任务通道 Tab ==================== -->
+    <div v-if="activeTab === 'channels'">
+      <div class="flex items-center justify-between mb-6">
+        <h2 class="text-xl font-bold text-white">任务通道</h2>
+        <span class="text-sm text-slate-400">通过关键词搜索批量创建任务时自动生成</span>
+      </div>
+
+      <!-- Channel cards -->
+      <div v-if="channelsLoading" class="text-center py-12 text-slate-400">加载中...</div>
+      <div v-else-if="channels.length === 0" class="text-center py-12 text-slate-400">
+        暂无通道，点击上方按钮创建
+      </div>
+      <div v-else class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div
+          v-for="ch in channels"
+          :key="ch.id"
+          class="bg-slate-800/50 backdrop-blur rounded-lg shadow p-4 border border-slate-700 hover:border-slate-500 transition-all cursor-pointer"
+          @click="openChannelDetail(ch)"
+        >
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-sm font-medium text-white">
+              {{ ch.group_name }} · {{ channelTaskTypeLabel(ch.task_type) }}
+            </span>
+            <span :class="channelStatusClass(ch.status)" class="px-2 py-0.5 text-xs rounded-full">
+              {{ channelStatusLabel(ch.status) }}
+            </span>
+          </div>
+          <div class="mb-2">
+            <div class="flex justify-between text-xs text-slate-400 mb-1">
+              <span>{{ ch.completed }}/{{ ch.total }} 完成</span>
+              <span>{{ ch.pending }} 待处理</span>
+            </div>
+            <div class="w-full bg-slate-700 rounded-full h-2">
+              <div
+                class="bg-green-500 h-2 rounded-full transition-all"
+                :style="{ width: ch.total ? (ch.completed / ch.total * 100) + '%' : '0%' }"
+              />
+            </div>
+          </div>
+          <div class="flex items-center justify-between text-xs text-slate-500">
+            <span>{{ ch.account_mode === 'single_account' ? '单账号' : '轮转' }}</span>
+            <span>{{ ch.assigned }} 执行中</span>
+          </div>
+          <div class="flex gap-2 mt-3">
+            <button
+              v-if="ch.status === 'active'"
+              @click.stop="pauseChannel(ch)"
+              class="px-3 py-1 text-xs bg-yellow-500/20 text-yellow-400 rounded hover:bg-yellow-500/30 transition-colors"
+            >暂停</button>
+            <button
+              v-if="ch.status === 'paused'"
+              @click.stop="resumeChannel(ch)"
+              class="px-3 py-1 text-xs bg-green-500/20 text-green-400 rounded hover:bg-green-500/30 transition-colors"
+            >恢复</button>
+            <button
+              v-if="ch.status !== 'cancelled' && ch.status !== 'completed'"
+              @click.stop="cancelChannel(ch)"
+              class="px-3 py-1 text-xs bg-red-500/20 text-red-400 rounded hover:bg-red-500/30 transition-colors"
+            >取消</button>
+            <button
+              @click.stop="deleteChannel(ch)"
+              class="px-3 py-1 text-xs bg-slate-600/50 text-slate-300 rounded hover:bg-slate-600 transition-colors"
+            >删除</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Channel detail dialog -->
+      <ChannelDetail
+        v-if="detailChannel"
+        :channel="detailChannel"
+        @close="detailChannel = null"
+        @refresh="fetchChannels"
+      />
+    </div>
+    <!-- ==================== End 任务通道 Tab ==================== -->
   </div>
 </template>

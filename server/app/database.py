@@ -62,6 +62,61 @@ def _migrate_add_columns():
                     conn.execute(text(sql))
 
 
+def _seed_selector_descriptions():
+    """Populate empty description fields for known action names (idempotent)."""
+    from app.db_models import UISelector
+
+    descriptions = {
+        "back_btn": "返回按钮",
+        "open_app": "打开抖音 App",
+        "video_comment_btn": "视频评论入口按钮（点击打开评论面板）",
+        "video_comment_input": "视频评论输入框（需先点击弹出键盘）",
+        "search_tab": "搜索标签页入口",
+        "search_input": "搜索输入框",
+        "search_button": "搜索按钮",
+        "search_suggestion": "搜索建议词",
+        "search_suggestion_list": "搜索联想词列表容器",
+        "search_video_tab": "搜索结果-视频标签页",
+        "search_video_list": "搜索结果-视频列表容器",
+        "video_tab": "视频标签页",
+        "video_author_avatar": "视频作者头像（点击进入主页）",
+        "sort_button": "排序按钮",
+        "sort_latest": "最新排序选项",
+        "sort_most_liked": "最多点赞排序选项",
+        "sort_default": "默认排序选项",
+        "like_button": "点赞按钮",
+        "follow_button": "关注按钮",
+        "comment_input": "评论输入框",
+        "comment_submit": "评论提交按钮",
+        "comment_reply_button": "评论回复按钮",
+        "comment_reply_input": "评论回复输入框",
+        "comment_reply_submit": "评论回复提交按钮",
+        "comment_list": "评论列表容器",
+        "comment_text": "评论内容文本",
+        "comment_author": "评论作者昵称",
+        "comment_time": "评论发布时间",
+        "comment_like_count": "评论点赞数",
+        "comment_author_avatar": "评论作者头像",
+        "message_button": "私信按钮",
+        "dm_input": "私信输入框",
+        "dm_send": "私信发送按钮",
+        "profile_more": "个人主页更多菜单",
+    }
+
+    with SessionLocal() as db:
+        updated = 0
+        for sel in db.query(UISelector).filter(
+            (UISelector.description == "") | (UISelector.description.is_(None))
+        ).all():
+            desc = descriptions.get(sel.action_name, "")
+            if desc:
+                sel.description = desc
+                updated += 1
+        if updated:
+            db.commit()
+            logger.info(f"Seeded {updated} selector descriptions")
+
+
 def init_db():
     """Create all tables. Called once at startup."""
     # Ensure data directory exists for SQLite
@@ -69,6 +124,7 @@ def init_db():
         Path(DATABASE_URL.replace("sqlite:///", "")).parent.mkdir(parents=True, exist_ok=True)
     Base.metadata.create_all(bind=engine)
     _migrate_add_columns()
+    _seed_selector_descriptions()
 
 
 def get_db():

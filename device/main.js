@@ -459,6 +459,39 @@ function applyServerConfig(serverConfig) {
       logger.warn(TAG, "悬浮窗初始化失败: " + e.message);
     }
 
+    // 前置申请截图权限（图找图需要）
+    try {
+      // 并行线程自动点击权限弹窗的"立即开始"按钮
+      var permThread = threads.start(function () {
+        for (var i = 0; i < 10; i++) {
+          sleep(500);
+          try {
+            var btn = text("立即开始").findOnce();
+            if (btn) { btn.click(); break; }
+          } catch (e) {}
+          try {
+            var btn2 = text("允许").findOnce();
+            if (btn2) { btn2.click(); break; }
+          } catch (e) {}
+          try {
+            var btn3 = text("START NOW").findOnce();
+            if (btn3) { btn3.click(); break; }
+          } catch (e) {}
+        }
+      });
+
+      var granted = images.requestScreenCapture();
+      permThread.interrupt();
+
+      if (!granted) {
+        logger.warn(TAG, "截图权限被拒绝，图找图功能将不可用");
+      } else {
+        logger.info(TAG, "截图权限已获取");
+      }
+    } catch (e) {
+      logger.warn(TAG, "截图权限申请异常: " + e.message);
+    }
+
     // 检查是否已配对
     if (pairing.isConfigured()) {
       logger.info(TAG, "设备已配对，直接启动");

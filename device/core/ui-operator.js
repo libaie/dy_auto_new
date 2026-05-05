@@ -94,7 +94,7 @@ var uiOperator = {
   },
 
   /**
-   * 按策略类型查找控件
+   * 按策略类型查找单个控件
    * @param {Object} strategy - { type, value, x_percent, y_percent, template, threshold }
    * @returns {UiObject|null}
    */
@@ -124,6 +124,57 @@ var uiOperator = {
       default:
         return null;
     }
+  },
+
+  /**
+   * 按策略类型查找多个控件（返回数组）
+   * @param {Object} strategy - { type, value }
+   * @returns {Array} UiObject 数组
+   */
+  _findManyByStrategy: function (strategy) {
+    switch (strategy.type) {
+      case "text": return text(strategy.value).find();
+      case "id": return id(strategy.value).find();
+      case "desc": return desc(strategy.value).find();
+      case "className": return className(strategy.value).find();
+      default: return [];
+    }
+  },
+
+  /**
+   * 使用选择器查找多个控件（返回数组）
+   * 按策略优先级依次尝试，返回第一个非空结果
+   * @param {string} actionName - 操作名称
+   * @param {number} timeout - 超时时间（毫秒），默认 5000
+   * @returns {Array} UiObject 数组，找不到返回空数组
+   */
+  findElements: function (actionName, timeout) {
+    timeout = timeout || 5000;
+    var selector = selectorLoader.get(actionName);
+    if (!selector) {
+      logger.error(TAG, "未找到选择器配置: " + actionName);
+      return [];
+    }
+
+    var strategies = selector.strategies.slice().sort(function (a, b) {
+      return a.priority - b.priority;
+    });
+
+    var startTime = Date.now();
+    while (Date.now() - startTime < timeout) {
+      for (var i = 0; i < strategies.length; i++) {
+        var s = strategies[i];
+        var results = this._findManyByStrategy(s);
+        if (results && results.length > 0) {
+          logger.debug(TAG, "通过 " + s.type + " 找到 " + results.length + " 个元素: '" + actionName + "'");
+          return results;
+        }
+      }
+      sleep(500);
+    }
+
+    logger.warn(TAG, "未找到元素列表: " + actionName);
+    return [];
   },
 
   /**

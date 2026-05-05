@@ -43,25 +43,103 @@
 
         <!-- Keywords -->
         <div class="mb-4">
-          <label class="block text-sm font-medium text-slate-300 mb-1">关键词（每行一个）</label>
+          <label class="block text-sm font-medium text-slate-300 mb-1">种子关键词（每行一个）</label>
+          <div class="flex gap-2 mb-2">
+            <input
+              v-model="seedKeyword"
+              class="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-blue-500"
+              placeholder="输入主题词，如：美食探店"
+              @keydown.enter.prevent="expandKeywords"
+            />
+            <button
+              type="button"
+              @click="expandKeywords"
+              :disabled="keywordGenerating"
+              class="px-3 py-2 bg-emerald-600 text-white text-sm rounded-lg hover:bg-emerald-500 disabled:opacity-50 transition-colors whitespace-nowrap"
+            >
+              {{ keywordGenerating ? '生成中...' : 'AI 扩展' }}
+            </button>
+          </div>
           <textarea
             v-model="keywordsText"
             rows="4"
             class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
-            placeholder="美食&#10;旅游&#10;健身"
+            placeholder="种子关键词 + AI 扩展词&#10;每行一个关键词&#10;也可手动编辑"
           />
         </div>
 
-        <!-- Params template (JSON) -->
-        <div class="mb-4">
-          <label class="block text-sm font-medium text-slate-300 mb-1">参数模板 (JSON)</label>
+        <!-- Common params -->
+        <div class="grid grid-cols-2 gap-3 mb-4">
+          <div>
+            <label class="block text-sm font-medium text-slate-300 mb-1">处理数量</label>
+            <input
+              v-model.number="formParams.count"
+              type="number"
+              min="1"
+              max="20"
+              class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+            />
+          </div>
+          <div v-if="form.task_type === 'reply_comment'">
+            <label class="block text-sm font-medium text-slate-300 mb-1">处理视频数</label>
+            <input
+              v-model.number="formParams.video_count"
+              type="number"
+              min="1"
+              max="10"
+              class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+            />
+          </div>
+        </div>
+
+        <!-- Reply comment specific -->
+        <template v-if="form.task_type === 'reply_comment'">
+          <div class="grid grid-cols-2 gap-3 mb-4">
+            <div>
+              <label class="block text-sm font-medium text-slate-300 mb-1">评论最大天数</label>
+              <input
+                v-model.number="formParams.max_age_days"
+                type="number"
+                min="1"
+                max="30"
+                class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-slate-300 mb-1">排序方式</label>
+              <select v-model="formParams.sort_by" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500">
+                <option value="">默认</option>
+                <option value="latest">最新发布</option>
+                <option value="most_liked">最多点赞</option>
+              </select>
+            </div>
+          </div>
+        </template>
+
+        <!-- DM / comment content -->
+        <div v-if="['search_comment', 'search_dm', 'reply_comment'].includes(form.task_type)" class="mb-4">
+          <label class="block text-sm font-medium text-slate-300 mb-1">
+            {{ form.task_type === 'search_dm' ? '私信' : '评论/私信' }}内容（可选）
+          </label>
+          <textarea
+            v-model="formParams.content"
+            rows="2"
+            maxlength="500"
+            class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-blue-500"
+            :placeholder="form.task_type === 'reply_comment' ? '留空则 AI 生成回复和私信' : '留空则 AI 自动生成'"
+          />
+        </div>
+
+        <!-- Params template (JSON) for advanced -->
+        <details class="mb-4">
+          <summary class="text-sm text-slate-400 cursor-pointer hover:text-slate-300">高级参数 (JSON)</summary>
           <textarea
             v-model="paramsText"
             rows="2"
-            class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white placeholder-slate-500 font-mono text-sm focus:outline-none focus:border-blue-500"
-            placeholder='{"content": "好棒！", "count": 5}'
+            class="mt-2 w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white placeholder-slate-500 font-mono text-sm focus:outline-none focus:border-blue-500"
+            placeholder='{"count": 5}'
           />
-        </div>
+        </details>
 
         <!-- Error -->
         <p v-if="error" class="text-red-400 text-sm mb-4">{{ error }}</p>
@@ -82,6 +160,7 @@
 import { ref, watch, onMounted } from 'vue'
 import { createChannel } from '../api/channels.js'
 import { listGroups, listMembers } from '../api/accountGroups.js'
+import { generateKeywords } from '../api/content.js'
 
 const emit = defineEmits(['close', 'created'])
 
@@ -94,14 +173,23 @@ const form = ref({
   account_id: '',
 })
 const keywordsText = ref('')
+const seedKeyword = ref('')
+const keywordGenerating = ref(false)
 const paramsText = ref('{}')
+const formParams = ref({
+  count: 5,
+  video_count: 3,
+  max_age_days: 5,
+  sort_by: '',
+  content: '',
+})
 const error = ref('')
 const submitting = ref(false)
 
 onMounted(async () => {
   try {
     const resp = await listGroups()
-    groups.value = resp.data || []
+    groups.value = resp.data.groups || resp.data || []
   } catch (e) {
     console.error('Failed to load groups:', e)
   }
@@ -112,11 +200,39 @@ watch(() => form.value.group_id, async (gid) => {
   if (!gid) return
   try {
     const resp = await listMembers(gid, { status: 'active' })
-    accounts.value = resp.data || []
+    accounts.value = resp.data.members || resp.data || []
   } catch (e) {
     console.error('Failed to load group members:', e)
   }
 })
+
+async function expandKeywords() {
+  var seed = seedKeyword.value.trim()
+  if (!seed) return
+  keywordGenerating.value = true
+  try {
+    var resp = await generateKeywords(seed, 10)
+    var newKeywords = resp.data.keywords || []
+    // 合并种子关键词和 AI 扩展词，去重
+    var existing = keywordsText.value.split('\n').map(function (k) { return k.trim() }).filter(Boolean)
+    var seedWords = seed.split(/[,，\s]+/).filter(Boolean)
+    var all = seedWords.slice()
+    for (var i = 0; i < newKeywords.length; i++) {
+      var kw = newKeywords[i].trim()
+      if (all.indexOf(kw) === -1) all.push(kw)
+    }
+    // 追加已有手动输入的关键词（不在种子词和扩展词中的）
+    for (var j = 0; j < existing.length; j++) {
+      if (all.indexOf(existing[j]) === -1) all.push(existing[j])
+    }
+    keywordsText.value = all.join('\n')
+    seedKeyword.value = ''
+  } catch (e) {
+    console.error('AI keyword expansion failed:', e)
+  } finally {
+    keywordGenerating.value = false
+  }
+}
 
 async function submit() {
   error.value = ''
@@ -134,12 +250,28 @@ async function submit() {
     return
   }
 
+  // 合并表单参数（JSON 优先级更高）
+  var fp = formParams.value
+  var merged = {
+    count: params.count !== undefined ? params.count : fp.count,
+    content: params.content !== undefined ? params.content : (fp.content || undefined),
+  }
+  if (form.value.task_type === 'reply_comment') {
+    merged.video_count = params.video_count !== undefined ? params.video_count : fp.video_count
+    merged.max_age_days = params.max_age_days !== undefined ? params.max_age_days : fp.max_age_days
+    if (fp.sort_by) merged.sort_by = params.sort_by || fp.sort_by
+  }
+  // 其他 JSON 参数
+  Object.keys(params).forEach(function (k) {
+    if (merged[k] === undefined) merged[k] = params[k]
+  })
+
   submitting.value = true
   try {
     await createChannel({
       ...form.value,
       keywords,
-      params_template: params,
+      params_template: merged,
     })
     emit('created')
   } catch (e) {

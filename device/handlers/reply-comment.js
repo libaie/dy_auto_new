@@ -255,13 +255,15 @@ ReplyCommentHandler._readComments = function (maxCount) {
 
     // 滑动加载更多直到满足数量要求
     var maxScroll = 10;
+    var lastProcessed = 0; // 已处理到的下标，避免重复解析
     for (var scroll = 0; scroll < maxScroll && comments.length < maxCount; scroll++) {
-      for (var i = 0; i < items.length && comments.length < maxCount; i++) {
+      for (var i = lastProcessed; i < items.length && comments.length < maxCount; i++) {
         var comment = this._parseCommentItem(items[i]);
         if (comment) {
           comments.push(comment);
         }
       }
+      lastProcessed = items.length;
 
       if (comments.length < maxCount) {
         logger.info(TAG, "已读取 " + comments.length + "/" + maxCount + " 条，滑动加载更多...");

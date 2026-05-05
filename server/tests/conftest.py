@@ -4,7 +4,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.db_models import Base, Task, ChainInstance, DailyStats, Account, AccountGroup, AccountGroupMember
+from app.db_models import Base, Task, ChainInstance, DailyStats, Account, AccountGroup, AccountGroupMember, Channel, ChannelItem
 from app.database import get_db
 from app.main import app
 from app.seed import seed_accounts, seed_selectors
@@ -12,6 +12,7 @@ from app.seed import seed_accounts, seed_selectors
 # Tables to clean between tests (order matters for FK constraints)
 _CLEANUP_TABLES = [
     Task, DailyStats, AccountGroupMember, AccountGroup, ChainInstance,
+    ChannelItem, Channel,
 ]
 
 

@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import (
     Column, String, Integer, DateTime, Text, Boolean,
-    JSON, ForeignKey, UniqueConstraint,
+    JSON, ForeignKey, UniqueConstraint, Index,
 )
 from sqlalchemy.orm import DeclarativeBase, relationship
 
@@ -228,3 +228,50 @@ class SystemSetting(Base):
     key = Column(String(100), primary_key=True)
     value = Column(Text, nullable=False, default="")
     updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+
+class Channel(Base):
+    __tablename__ = "channels"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    group_id = Column(String(36), ForeignKey("account_groups.id", ondelete="RESTRICT"), nullable=False)
+    task_type = Column(String(30), nullable=False)  # search_comment, search_like, search_dm, reply_comment
+    status = Column(String(20), nullable=False, default="active")  # active, paused, completed, cancelled
+    account_mode = Column(String(20), nullable=False, default="round_robin")  # single_account, round_robin
+    account_id = Column(String(36), ForeignKey("accounts.id"), nullable=True)  # single_account mode
+    params_template = Column(JSON, nullable=False, default=dict)
+    cooldown_seconds = Column(Integer, nullable=False, default=300)
+    delay_range = Column(JSON, nullable=False, default=lambda: [3000, 8000])
+    max_keywords = Column(Integer, nullable=False, default=500)
+    current_account_index = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    completed_at = Column(DateTime, nullable=True)
+    deleted_at = Column(DateTime, nullable=True)
+
+    group = relationship("AccountGroup")
+    account = relationship("Account")
+    items = relationship("ChannelItem", back_populates="channel", cascade="all, delete-orphan")
+
+
+class ChannelItem(Base):
+    __tablename__ = "channel_items"
+    __table_args__ = (
+        Index("ix_channel_items_channel_status", "channel_id", "status"),
+    )
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    channel_id = Column(String(36), ForeignKey("channels.id", ondelete="CASCADE"), nullable=False)
+    keyword = Column(String(200), nullable=False)
+    account_id = Column(String(36), ForeignKey("accounts.id"), nullable=False)
+    status = Column(String(20), nullable=False, default="pending")  # pending, assigned, completed, failed, skipped
+    assigned_device_id = Column(String(36), ForeignKey("devices.id"), nullable=True)
+    assigned_at = Column(DateTime, nullable=True)  # for stale recovery
+    task_id = Column(String(36), ForeignKey("tasks.id"), nullable=True)
+    queue_position = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    completed_at = Column(DateTime, nullable=True)
+
+    channel = relationship("Channel", back_populates="items")
+    account = relationship("Account")
+    device = relationship("Device")
+    task = relationship("Task")

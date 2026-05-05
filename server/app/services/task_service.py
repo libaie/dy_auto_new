@@ -179,9 +179,17 @@ class TaskService:
             db_task.status = TaskStatus.COMPLETED.value
             db_task.result = result
             db_task.completed_at = datetime.now(timezone.utc)
-            # Record operation count
-            success_count = (result or {}).get("success_count", 1)
+            # Record operation counts (分别统计回复/关注/私信，风控关键)
+            r = result or {}
+            success_count = r.get("success_count", 1)
             stats_service.increment(db, db_task.account_id, db_task.type, count=success_count)
+            # 额外统计关注和私信（reply_comment 任务包含多种操作）
+            follow_count = r.get("follow_count", 0)
+            if follow_count > 0:
+                stats_service.increment(db, db_task.account_id, "follow", count=follow_count)
+            dm_count = r.get("dm_count", 0)
+            if dm_count > 0:
+                stats_service.increment(db, db_task.account_id, "search_dm", count=dm_count)
         elif status == TaskStatus.FAILED:
             db_task.retry_count += 1
             # Channel tasks: skip retry, fail immediately (channel redistributes naturally)

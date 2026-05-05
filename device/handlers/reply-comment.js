@@ -57,7 +57,8 @@ ReplyCommentHandler.execute = function (params) {
     return { success: false, error: "搜索排序失败" };
   }
 
-  var stats = { videos_processed: 0, success_count: 0, fail_count: 0, skipped: 0, details: [] };
+  var stats = { videos_processed: 0, success_count: 0, fail_count: 0, skipped: 0,
+    follow_count: 0, dm_count: 0, details: [] };
 
   // 2. 逐个视频处理
   for (var v = 0; v < videoCount; v++) {
@@ -151,7 +152,8 @@ ReplyCommentHandler.execute = function (params) {
           processed++; totalRead++; antiDetect.maybePause(); continue;
         }
 
-        this._followUser();
+        var followed = this._followUser();
+        if (followed) stats.follow_count++;
         sleep(1000);
 
         if (content) {
@@ -163,7 +165,8 @@ ReplyCommentHandler.execute = function (params) {
             });
             if (aiDM) dmContent = aiDM;
           }
-          this._sendDM(dmContent);
+          var dmSent = this._sendDM(dmContent);
+          if (dmSent) stats.dm_count++;
           sleep(1000);
         }
 
@@ -536,6 +539,7 @@ ReplyCommentHandler._followUser = function () {
   } else {
     logger.warn(TAG, "关注按钮未找到（可能已关注）");
   }
+  return !!followed;
 };
 
 /**

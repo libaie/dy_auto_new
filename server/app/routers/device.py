@@ -588,6 +588,30 @@ async def generate_content(
     return DeviceGenerateResponse(content=content, template_id=request.template_id)
 
 
+@router.get("/templates")
+def device_list_templates(
+    _: Optional[str] = Depends(verify_device_secret),
+):
+    """Return template list with MD5 hashes for incremental sync."""
+    from app.services.template_service import template_service
+    templates = template_service.list_templates()
+    return {"templates": templates}
+
+
+@router.get("/templates/{filename}")
+def device_download_template(
+    filename: str,
+    _: Optional[str] = Depends(verify_device_secret),
+):
+    """Download a single template image (binary)."""
+    from app.services.template_service import template_service
+    from fastapi.responses import FileResponse
+    filepath = template_service.get_template_path(filename)
+    if not filepath:
+        raise HTTPException(status_code=404, detail="模板文件不存在")
+    return FileResponse(str(filepath), media_type="image/png", filename=filename)
+
+
 @router.post("/ai-proxy", response_model=DeviceAIProxyResponse)
 async def ai_proxy(
     request: DeviceAIProxyRequest,

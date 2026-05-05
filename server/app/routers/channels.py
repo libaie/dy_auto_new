@@ -91,9 +91,12 @@ def list_channels(
         for g in db.query(AccountGroup).filter(AccountGroup.id.in_(group_ids)).all()
     } if group_ids else {}
 
+    channel_ids = [ch.id for ch in channels]
+    stats_map = channel_service.get_channels_stats_batch(db, channel_ids)
+
     result = []
     for ch in channels:
-        stats = channel_service.get_channel_stats(db, ch.id)
+        stats = stats_map.get(ch.id, {"total": 0, "pending": 0, "assigned": 0, "completed": 0, "failed": 0, "skipped": 0})
         result.append(_channel_to_response(ch, stats, groups.get(ch.group_id, "")))
     return {"channels": result, "total": len(result)}
 

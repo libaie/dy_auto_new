@@ -404,5 +404,25 @@ class ChannelService:
                 stats[item.status] += 1
         return stats
 
+    def get_channels_stats_batch(self, db: Session, channel_ids: list[str]) -> dict[str, dict]:
+        """Batch query stats for multiple channels. Returns {channel_id: stats_dict}."""
+        from sqlalchemy import func
+        if not channel_ids:
+            return {}
+        rows = db.query(
+            ChannelItem.channel_id,
+            ChannelItem.status,
+            func.count(ChannelItem.id).label("cnt"),
+        ).filter(
+            ChannelItem.channel_id.in_(channel_ids),
+        ).group_by(ChannelItem.channel_id, ChannelItem.status).all()
+
+        result = {cid: {"total": 0, "pending": 0, "assigned": 0, "completed": 0, "failed": 0, "skipped": 0} for cid in channel_ids}
+        for channel_id, status, cnt in rows:
+            result[channel_id]["total"] += cnt
+            if status in result[channel_id]:
+                result[channel_id][status] = cnt
+        return result
+
 
 channel_service = ChannelService()

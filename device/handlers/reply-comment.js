@@ -622,11 +622,11 @@ ReplyCommentHandler._generateDMGreeting = function (searchKeyword, nickname, com
     case "buy_intent":
       greeting = "你好，看到你在评论区问" + searchKeyword + "的事，可以聊聊~";
       break;
-    case "health_consult":
-      greeting = "你好，关于" + searchKeyword + "的问题，有些调理经验可以分享~";
+    case "compare_intent":
+      greeting = "你好，看到你在对比" + searchKeyword + "，有些经验可以分享";
       break;
-    case "patient_self":
-      greeting = "你好，看到你也关注" + searchKeyword + "，有些心得体会可以交流";
+    case "consult_intent":
+      greeting = "你好，关于" + searchKeyword + "的问题，可以交流下~";
       break;
     default:
       greeting = "你好，看到你也关注" + searchKeyword + "，认识一下~";

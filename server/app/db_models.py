@@ -113,6 +113,7 @@ class UISelector(Base):
 
     id = Column(String(36), primary_key=True, default=_uuid)
     action_name = Column(String(100), nullable=False, index=True)
+    description = Column(String(200), nullable=False, default="")
     platform_version = Column(String(50), nullable=False, default="default")
     strategies = Column(JSON, nullable=False)  # list of {type, value, x_percent, y_percent, priority}
     version = Column(Integer, nullable=False, default=1)

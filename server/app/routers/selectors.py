@@ -17,11 +17,13 @@ class SelectorCreateRequest(BaseModel):
     action_name: str
     strategies: list[dict]
     platform_version: str = "default"
+    description: str = ""
 
 
 class SelectorUpdateRequest(BaseModel):
     strategies: Optional[list[dict]] = None
     platform_version: Optional[str] = None
+    description: Optional[str] = None
     # Note: version is auto-bumped on any change, not user-settable
 
 
@@ -63,6 +65,7 @@ async def create_selector(
             db, action_name=request.action_name,
             strategies=request.strategies,
             platform_version=request.platform_version,
+            description=request.description,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -88,6 +91,7 @@ async def update_selector(
             db, action_name=action_name,
             strategies=request.strategies,
             platform_version=request.platform_version,
+            description=request.description,
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))

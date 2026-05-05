@@ -6,6 +6,26 @@ from sqlalchemy.orm import Session
 from app.db_models import UISelector
 
 
+def _to_dict(sel: UISelector) -> dict:
+    return {
+        "action_name": sel.action_name,
+        "description": sel.description or "",
+        "platform_version": sel.platform_version,
+        "strategies": sel.strategies,
+        "version": sel.version,
+        "enabled": sel.enabled,
+    }
+
+
+def _to_device_dict(sel: UISelector) -> dict:
+    """Device-facing dict (no description/version/enabled)."""
+    return {
+        "action_name": sel.action_name,
+        "platform_version": sel.platform_version,
+        "strategies": sel.strategies,
+    }
+
+
 class SelectorService:
     """UI selector management — DB-backed."""
 
@@ -15,14 +35,7 @@ class SelectorService:
         if not selectors:
             return 0, []
         version = max(s.version for s in selectors)
-        result = []
-        for s in selectors:
-            result.append({
-                "action_name": s.action_name,
-                "platform_version": s.platform_version,
-                "strategies": s.strategies,
-            })
-        return version, result
+        return version, [_to_device_dict(s) for s in selectors]
 
     def get_selector(self, db: Session, action_name: str) -> Optional[dict]:
         """Get a single selector by action_name."""
@@ -32,11 +45,7 @@ class SelectorService:
         ).first()
         if not s:
             return None
-        return {
-            "action_name": s.action_name,
-            "platform_version": s.platform_version,
-            "strategies": s.strategies,
-        }
+        return _to_dict(s)
 
     def get_version(self, db: Session) -> int:
         """Get current selectors version."""
@@ -46,7 +55,8 @@ class SelectorService:
         return max(s.version for s in selectors)
 
     def create_selector(self, db: Session, action_name: str, strategies: list,
-                        platform_version: str = "default", version: int = 1) -> dict:
+                        platform_version: str = "default", version: int = 1,
+                        description: str = "") -> dict:
         """Create a new UI selector."""
         existing = db.query(UISelector).filter(
             UISelector.action_name == action_name,
@@ -57,6 +67,7 @@ class SelectorService:
 
         sel = UISelector(
             action_name=action_name,
+            description=description,
             platform_version=platform_version,
             strategies=strategies,
             version=version,
@@ -64,16 +75,11 @@ class SelectorService:
         db.add(sel)
         db.commit()
         db.refresh(sel)
-        return {
-            "action_name": sel.action_name,
-            "platform_version": sel.platform_version,
-            "strategies": sel.strategies,
-            "version": sel.version,
-            "enabled": sel.enabled,
-        }
+        return _to_dict(sel)
 
     def update_selector(self, db: Session, action_name: str,
-                        strategies: list = None, platform_version: str = None) -> dict:
+                        strategies: list = None, platform_version: str = None,
+                        description: str = None) -> dict:
         """Update an existing selector. Auto-bumps version on any change."""
         q = db.query(UISelector).filter(UISelector.action_name == action_name)
         if platform_version:
@@ -86,18 +92,14 @@ class SelectorService:
             sel.strategies = strategies
         if platform_version is not None:
             sel.platform_version = platform_version
+        if description is not None:
+            sel.description = description
         # Auto-bump version on any change
         sel.version = (sel.version or 1) + 1
 
         db.commit()
         db.refresh(sel)
-        return {
-            "action_name": sel.action_name,
-            "platform_version": sel.platform_version,
-            "strategies": sel.strategies,
-            "version": sel.version,
-            "enabled": sel.enabled,
-        }
+        return _to_dict(sel)
 
     def delete_selector(self, db: Session, action_name: str, platform_version: str = None) -> bool:
         """Delete a selector by action_name (and optionally platform_version)."""
@@ -120,13 +122,7 @@ class SelectorService:
         sel.enabled = enabled
         db.commit()
         db.refresh(sel)
-        return {
-            "action_name": sel.action_name,
-            "platform_version": sel.platform_version,
-            "strategies": sel.strategies,
-            "version": sel.version,
-            "enabled": sel.enabled,
-        }
+        return _to_dict(sel)
 
     def list_all_selectors(self, db: Session, include_disabled: bool = False) -> list[dict]:
         """List all selectors (optionally including disabled ones)."""
@@ -134,13 +130,7 @@ class SelectorService:
         if not include_disabled:
             query = query.filter(UISelector.enabled == True)
         selectors = query.order_by(UISelector.action_name).all()
-        return [{
-            "action_name": s.action_name,
-            "platform_version": s.platform_version,
-            "strategies": s.strategies,
-            "version": s.version,
-            "enabled": s.enabled,
-        } for s in selectors]
+        return [_to_dict(s) for s in selectors]
 
 
 # Module-level singleton — stateless, DB sessions injected per call

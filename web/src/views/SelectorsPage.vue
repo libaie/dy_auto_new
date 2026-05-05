@@ -97,6 +97,7 @@ const formError = ref(null)
 
 const defaultForm = {
   action_name: '',
+  description: '',
   platform_version: '',
   strategies: '[]',
 }
@@ -200,6 +201,7 @@ function openCreateDialog() {
 function openEditDialog(sel) {
   isEditing.value = true
   form.action_name = sel.action_name
+  form.description = sel.description || ''
   form.platform_version = sel.platform_version || ''
   form.strategies = JSON.stringify(sel.strategies || [], null, 2)
   editMode.value = 'form'
@@ -233,6 +235,7 @@ async function handleSave() {
   const payload = {
     strategies: parsedStrategies,
     platform_version: form.platform_version.trim() || undefined,
+    description: form.description.trim() || '',
   }
 
   try {
@@ -355,8 +358,8 @@ onMounted(fetchSelectors)
               <span class="font-mono text-base font-semibold text-white" :title="'动作名称：' + sel.action_name">
                 {{ sel.action_name }}
               </span>
-              <span v-if="actionDescriptions[sel.action_name]" class="text-sm text-slate-400">
-                {{ actionDescriptions[sel.action_name] }}
+              <span v-if="sel.description || actionDescriptions[sel.action_name]" class="text-sm text-slate-400">
+                {{ sel.description || actionDescriptions[sel.action_name] }}
               </span>
               <span
                 class="inline-flex items-center rounded-full bg-purple-500/15 text-purple-300 border border-purple-500/25 px-2.5 py-0.5 text-xs font-medium"
@@ -499,6 +502,21 @@ onMounted(fetchSelectors)
                       placeholder="例如 like_video"
                     />
                     <p class="mt-1 text-xs text-slate-500">唯一标识符，对应设备端要执行的操作（如 like_video、comment_video）</p>
+                  </div>
+
+                  <!-- description -->
+                  <div>
+                    <label for="sel-description" class="flex items-center gap-1.5 text-sm font-medium text-slate-300">
+                      说明
+                    </label>
+                    <input
+                      id="sel-description"
+                      v-model="form.description"
+                      type="text"
+                      class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 placeholder-slate-500"
+                      placeholder="例如：视频评论入口按钮（点击打开评论面板）"
+                    />
+                    <p class="mt-1 text-xs text-slate-500">可选，描述此选择器的用途，方便后续管理</p>
                   </div>
 
                   <!-- platform_version -->

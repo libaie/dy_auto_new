@@ -354,31 +354,40 @@ SearchBaseHandler._goBack = function () {
 /**
  * 容错返回：连续按返回键直到回到搜索视频列表页
  * 不管当前在评论列表页/个人主页/私信页/视频详情页，最终都能回到搜索结果列表
+ *
+ * 页面检测选择器（需在管理后台配置）：
+ *   search_video_list  — 搜索视频列表存在 → 已在搜索页
+ *   search_video_tab   — 视频 tab 存在 → 已在搜索页
+ *   is_comment_view    — 在评论面板？
+ *   is_user_view       — 在个人主页？
+ *
  * @returns {boolean} 是否成功回到搜索列表页
  */
 SearchBaseHandler._backToSearchResults = function () {
   var maxBacks = 5;
   for (var i = 0; i < maxBacks; i++) {
-    // 检测是否已在搜索视频列表页
+    // 已在搜索视频列表页？
     var items = uiOperator.findElements("search_video_list", 2000);
     if (items.length > 0) {
       logger.info(TAG, "已在搜索视频列表页 (back " + i + " 次)");
       return true;
     }
-    // 也检测视频 tab 是否存在
     var videoTab = uiOperator.findElement("search_video_tab", 1000);
     if (videoTab) {
       logger.info(TAG, "检测到视频 tab，已在搜索页 (back " + i + " 次)");
       return true;
     }
-    // 不在搜索页，按一次返回
-    logger.info(TAG, "第 " + (i + 1) + " 次 back，当前位置非搜索列表页");
+
+    // 诊断当前页面
+    var where = "未知";
+    if (uiOperator.findElement("is_comment_view", 300)) where = "评论面板";
+    else if (uiOperator.findElement("is_user_view", 300)) where = "个人主页";
+    logger.info(TAG, "第 " + (i + 1) + " 次 back，当前位置: " + where);
     back();
     sleep(1000);
   }
 
-  // 最后兜底：确保在搜索结果页（重新执行搜索步骤）
-  logger.warn(TAG, "back " + maxBacks + " 次后仍未回到搜索列表页，尝试重新导航");
+  logger.warn(TAG, "back " + maxBacks + " 次后仍未回到搜索列表页");
   return false;
 };
 

@@ -567,35 +567,38 @@ ReplyCommentHandler._sendDM = function (content) {
 
 /**
  * 容错返回评论区（从私信页/个人主页/任意页面回到评论区）
- * 使用检测驱动，不再依赖固定次数 back
+ * 使用选择器动作名检测当前页面，不依赖固定次数 back
+ *
+ * 页面检测选择器（需在管理后台配置）：
+ *   is_comment_view  — 当前在评论面板？
+ *   is_user_view     — 当前在个人主页？
  */
 ReplyCommentHandler._returnToComments = function () {
   var maxBacks = 5;
 
   for (var i = 0; i < maxBacks; i++) {
     // 已在评论面板？
-    var commentList = uiOperator.findElement("comment_list", 1000);
-    var commentInput = uiOperator.findElement("video_comment_input", 500);
-    if (commentList || commentInput) {
+    if (uiOperator.findElement("is_comment_view", 500)) {
       logger.info(TAG, "已在评论面板 (back " + i + " 次)");
       return;
     }
 
-    // 已在视频详情页？（检测评论入口按钮）
+    // 已在视频详情页？（检测评论入口按钮，重新打开评论区）
     var commentBtn = uiOperator.findElement("video_comment_btn", 500);
     if (commentBtn) {
-      logger.info(TAG, "回到视频详情页 (back " + i + " 次)，重新打开评论区");
+      logger.info(TAG, "回到视频详情页 (back " + i + " 次)，打开评论区");
       this._openComments();
       return;
     }
 
     // 不在目标页面，继续 back
-    logger.info(TAG, "第 " + (i + 1) + " 次 back，离开当前位置...");
+    logger.info(TAG, "第 " + (i + 1) + " 次 back，当前位置: " +
+      (uiOperator.findElement("is_user_view", 300) ? "个人主页" : "私信/其他"));
     back();
     sleep(1000);
   }
 
-  // 兜底：强制 back 后重新打开评论区
+  // 兜底
   logger.warn(TAG, "back " + maxBacks + " 次后尚未确认位置，尝试打开评论区");
   this._openComments();
 };

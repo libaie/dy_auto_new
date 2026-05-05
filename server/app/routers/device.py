@@ -19,6 +19,9 @@ router = APIRouter(prefix="/api/device", tags=["device"])
 
 async def _notify_pending_tasks(db: Session, device_id: str):
     """Check if there are pending tasks for this device and notify it via WS."""
+    import logging
+    logger = logging.getLogger(__name__)
+
     from app.db_models import Device, Task as DBTask
     from app.models import TaskStatus
     from datetime import datetime, timezone
@@ -26,6 +29,7 @@ async def _notify_pending_tasks(db: Session, device_id: str):
 
     device = db.query(Device).filter(Device.id == device_id).first()
     if not device:
+        logger.info(f"[notify] 设备 {device_id} 不存在，跳过")
         return
 
     now = datetime.now(timezone.utc).replace(tzinfo=None)
@@ -36,6 +40,7 @@ async def _notify_pending_tasks(db: Session, device_id: str):
             DBTask.device_id == device_id,
             and_(DBTask.device_id.is_(None), DBTask.account_id == device.bound_account_id),
         )
+        logger.info(f"[notify] 设备 {device_id} 绑定账号 {device.bound_account_id}，查询匹配任务...")
     else:
         bound_account_ids = db.query(Device.bound_account_id).filter(
             Device.bound_account_id.isnot(None)
@@ -44,15 +49,19 @@ async def _notify_pending_tasks(db: Session, device_id: str):
             DBTask.device_id == device_id,
             and_(DBTask.device_id.is_(None), ~DBTask.account_id.in_(bound_account_ids)),
         )
+        logger.info(f"[notify] 设备 {device_id} 未绑定账号，查询孤儿任务...")
 
-    has_pending = db.query(DBTask).filter(
+    pending_tasks = db.query(DBTask).filter(
         DBTask.status == TaskStatus.PENDING.value,
         route_filter,
         or_(DBTask.scheduled_at.is_(None), DBTask.scheduled_at <= now),
-    ).first()
+    ).all()
 
-    if has_pending:
-        await pair_ws_manager.send_to_device(device_id, {"event": "new_task_available"})
+    logger.info(f"[notify] 设备 {device_id} 找到 {len(pending_tasks)} 个待执行任务")
+
+    if pending_tasks:
+        sent = await pair_ws_manager.send_to_device(device_id, {"event": "new_task_available"})
+        logger.info(f"[notify] 向设备 {device_id} 推送 new_task_available: {'成功' if sent else '失败'}")
 
 
 @router.post("/pair-request", response_model=PairStatusResponse)

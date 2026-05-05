@@ -134,21 +134,26 @@ async def create_task(
 
     # Notify device(s) that a new task is available — device must poll/claim via /poll
     # (sending full task via WS would bypass the claim state machine, quota checks, and scheduled_at)
+    import logging
+    logger = logging.getLogger(__name__)
     from app.ws_manager import pair_ws_manager
     if task.device_id:
-        await pair_ws_manager.send_to_device(task.device_id, {
+        sent = await pair_ws_manager.send_to_device(task.device_id, {
             "event": "new_task_available",
         })
+        logger.info(f"[task-create] 任务 {task.id} 指派设备 {task.device_id}，通知: {'成功' if sent else '设备离线'}")
     elif task.account_id:
         bound_device = db.query(Device).filter(Device.bound_account_id == task.account_id).first()
         if bound_device:
-            await pair_ws_manager.send_to_device(bound_device.id, {
+            sent = await pair_ws_manager.send_to_device(bound_device.id, {
                 "event": "new_task_available",
             })
+            logger.info(f"[task-create] 任务 {task.id} 账号 {task.account_id} 绑定设备 {bound_device.id}，通知: {'成功' if sent else '设备离线'}")
         else:
             await pair_ws_manager.broadcast_to_devices({
                 "event": "new_task_available",
             })
+            logger.info(f"[task-create] 任务 {task.id} 账号 {task.account_id} 无绑定设备，广播通知")
     else:
         await pair_ws_manager.broadcast_to_devices({
             "event": "new_task_available",

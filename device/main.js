@@ -381,6 +381,14 @@ function startMainLoop(serverUrl, secret) {
     }
   }, config.heartbeatInterval);
 
+  // 空闲时定时 poll — 即使 WS 通知丢失也能发现待执行任务
+  var IDLE_POLL_INTERVAL = 30000;
+  setInterval(function () {
+    if (!_taskBusy && _taskQueue.length === 0) {
+      catchUpPoll();
+    }
+  }, IDLE_POLL_INTERVAL);
+
   logger.info(TAG, "等待任务推送...");
 }
 

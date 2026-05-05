@@ -262,6 +262,15 @@ var apiClient = {
     return this.get("/api/device/poll", { device_id: config.deviceId });
   },
 
+  fetchTemplateList: function () {
+    return this.get("/api/device/templates");
+  },
+
+  downloadTemplate: function (filename) {
+    var url = config.serverUrl + "/api/device/templates/" + encodeURIComponent(filename);
+    return this._downloadWithRetry(url);
+  },
+
   report: function (taskId, status, result, uiSnapshot) {
     var body = {
       task_id: taskId,

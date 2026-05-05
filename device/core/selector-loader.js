@@ -33,6 +33,7 @@ var selectorLoader = global.__selectorLoader || {
           this._version = response.version;
           this._initialized = true;
           logger.info(TAG, "已加载 " + Object.keys(this._cache).length + " 个选择器, 版本=" + this._version);
+          this.syncTemplates();
           return;
         }
         logger.warn(TAG, "服务端返回空选择器 (尝试 " + attempt + ")");
@@ -57,6 +58,7 @@ var selectorLoader = global.__selectorLoader || {
         this._applySelectors(response.selectors);
         this._version = response.version;
         logger.info(TAG, "选择器已更新至版本 " + this._version);
+        this.syncTemplates();
       }
     }
   },
@@ -104,6 +106,69 @@ var selectorLoader = global.__selectorLoader || {
       this._cache[s.action_name] = s;
     }
     logger.debug(TAG, "已应用选择器配置，当前缓存 " + Object.keys(this._cache).length + " 个选择器");
+  },
+
+  /**
+   * 同步模板图片 — 从服务端下载缺失的模板，清理多余的
+   */
+  syncTemplates: function () {
+    try {
+      var response = apiClient.fetchTemplateList();
+      if (!response || !response.templates) {
+        logger.warn(TAG, "获取模板列表失败");
+        return;
+      }
+
+      var remoteList = response.templates;
+      var localDir = "/sdcard/dy_auto/templates/";
+      files.ensureDir(localDir);
+
+      // 构建远程文件名集合
+      var remoteNames = {};
+      for (var i = 0; i < remoteList.length; i++) {
+        remoteNames[remoteList[i].filename] = remoteList[i];
+      }
+
+      // 下载缺失的模板
+      var downloaded = 0;
+      for (var j = 0; j < remoteList.length; j++) {
+        var t = remoteList[j];
+        var localPath = localDir + t.filename;
+        if (!files.exists(localPath)) {
+          var data = apiClient.downloadTemplate(t.filename);
+          if (data) {
+            files.writeBytes(localPath, data);
+            downloaded++;
+            logger.info(TAG, "模板已下载: " + t.filename + " (" + data.length + " bytes)");
+          } else {
+            logger.warn(TAG, "模板下载失败: " + t.filename);
+          }
+        }
+      }
+
+      // 清理本地多余模板
+      var cleaned = 0;
+      if (files.isDir(localDir)) {
+        var localFiles = files.listDir(localDir);
+        for (var k = 0; k < localFiles.length; k++) {
+          if (!remoteNames[localFiles[k]]) {
+            try {
+              files.remove(localDir + localFiles[k]);
+              cleaned++;
+              logger.info(TAG, "清理过期模板: " + localFiles[k]);
+            } catch (e) {
+              logger.warn(TAG, "清理模板失败: " + localFiles[k] + " - " + e.message);
+            }
+          }
+        }
+      }
+
+      if (downloaded > 0 || cleaned > 0) {
+        logger.info(TAG, "模板同步完成: 下载 " + downloaded + ", 清理 " + cleaned);
+      }
+    } catch (e) {
+      logger.warn(TAG, "模板同步失败: " + e.message);
+    }
   },
 
   /**

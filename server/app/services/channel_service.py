@@ -9,6 +9,7 @@ from app.db_models import (
     Channel, ChannelItem, Account, AccountGroup, AccountGroupMember,
     Task as DBTask, Device as DBDevice,
 )
+from app.models import TaskStatus
 
 
 MAX_KEYWORDS = 500
@@ -179,13 +180,20 @@ class ChannelService:
             if bound_account_id and item.account_id != bound_account_id:
                 continue
 
-            # Filter: per-account concurrency
-            running = db.query(ChannelItem).filter(
+            # Filter: per-account concurrency (check both ChannelItem and Task tables)
+            running_item = db.query(ChannelItem).filter(
                 ChannelItem.account_id == item.account_id,
                 ChannelItem.status == "assigned",
                 ChannelItem.channel_id.in_(channel_ids),
             ).first()
-            if running:
+            if running_item:
+                continue
+
+            running_task = db.query(DBTask).filter(
+                DBTask.account_id == item.account_id,
+                DBTask.status == TaskStatus.RUNNING.value,
+            ).first()
+            if running_task:
                 continue
 
             # Filter: cooldown
@@ -217,6 +225,7 @@ class ChannelService:
                 continue
 
             # Flush-only Task creation (no commit)
+            # Task is created as RUNNING to prevent get_pending_task from stealing it
             params = dict(ch.params_template or {})
             params["keyword"] = item.keyword
             task = DBTask(
@@ -224,7 +233,8 @@ class ChannelService:
                 account_id=item.account_id,
                 device_id=device_id,
                 params=params,
-                status=TaskStatus.PENDING.value,
+                status=TaskStatus.RUNNING.value,
+                started_at=now,
             )
             db.add(task)
             db.flush()

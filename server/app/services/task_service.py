@@ -100,7 +100,22 @@ class TaskService:
                 and_(DBTask.device_id.is_(None), ~DBTask.account_id.in_(bound_account_ids)),
             )
 
-        # 3. Find candidate tasks with routing and scheduled_at applied
+        # 3. Recover stuck RUNNING tasks (device crashed while executing)
+        from datetime import timedelta
+        stale_threshold = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=10)
+        stale_running = db.query(DBTask).filter(
+            DBTask.status == TaskStatus.RUNNING.value,
+            DBTask.started_at.isnot(None),
+            DBTask.started_at < stale_threshold,
+        ).all()
+        for stale in stale_running:
+            stale.status = TaskStatus.PENDING.value
+            stale.device_id = None
+            stale.started_at = None
+        if stale_running:
+            db.flush()
+
+        # 4. Find candidate tasks with routing and scheduled_at applied
         now = datetime.now(timezone.utc).replace(tzinfo=None)
         candidates = db.query(DBTask).filter(
             DBTask.status == TaskStatus.PENDING.value,
@@ -111,12 +126,22 @@ class TaskService:
         if not candidates:
             return None
 
-        # 4. Filter by daily quota and claim via optimistic locking
+        # 5. Filter by daily quota and claim via atomic optimistic locking
+        # Subquery: accounts that already have a RUNNING task
+        busy_account_ids = db.query(DBTask.account_id).filter(
+            DBTask.status == TaskStatus.RUNNING.value,
+        ).distinct().scalar_subquery()
+
         for db_task in candidates:
             if stats_service.check_quota(db, db_task.account_id, db_task.type):
+                # Atomic claim: only succeeds if no other task for this account is RUNNING
                 result = db.execute(
                     update(DBTask)
-                    .where(DBTask.id == db_task.id, DBTask.status == TaskStatus.PENDING.value)
+                    .where(
+                        DBTask.id == db_task.id,
+                        DBTask.status == TaskStatus.PENDING.value,
+                        ~DBTask.account_id.in_(busy_account_ids),
+                    )
                     .values(status=TaskStatus.RUNNING.value, device_id=device_id, started_at=datetime.now(timezone.utc))
                 )
                 db.commit()

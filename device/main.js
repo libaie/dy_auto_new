@@ -406,30 +406,8 @@ function catchUpPoll() {
 
     if (response.task) {
       logger.info(TAG, "catch-up: 发现离线期间任务: " + response.task.id);
-      floatingWindow.setStatus("running");
-
-      // 在新线程中执行，不阻塞
-      threads.start(function () {
-        try {
-          var result = taskExecutor.execute(response.task);
-
-          var uiSnapshot = null;
-          if (result.status === "failed") {
-            try {
-              var uiOperator = require("./core/ui-operator");
-              uiSnapshot = uiOperator.captureUISnapshot();
-            } catch (e) {
-              logger.warn(TAG, "截取界面快照失败: " + e.message);
-            }
-          }
-
-          apiClient.report(response.task.id, result.status, result.result, uiSnapshot);
-          logger.info(TAG, "任务结果已上报: " + result.status);
-          floatingWindow.setStatus(result.status === "completed" ? "success" : "error");
-        } catch (e) {
-          logger.error(TAG, "catch-up 任务执行异常: " + e.message);
-        }
-      });
+      // 放入队列，由 processTaskQueue 串行执行，避免单设备并发
+      handleTask(response.task);
     }
   } catch (e) {
     logger.warn(TAG, "catch-up poll 失败: " + e.message);

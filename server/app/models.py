@@ -425,3 +425,75 @@ class KeywordMatrixRequest(BaseModel):
 
 class SettingUpdate(BaseModel):
     settings: dict[str, str]
+
+
+# --- 通道 (Channel) ---
+
+class ChannelCreate(BaseModel):
+    group_id: str
+    task_type: TaskType
+    account_mode: str = Field(default="round_robin", pattern="^(single_account|round_robin)$")
+    account_id: Optional[str] = None
+    keywords: list[str] = Field(..., min_length=1, max_length=500)
+    params_template: dict[str, Any] = Field(default_factory=dict)
+    cooldown_seconds: int = Field(default=300, ge=30, le=3600)
+    delay_range: list[int] = Field(default=[3000, 8000])
+
+    @model_validator(mode="after")
+    def validate_single_account(self):
+        if self.account_mode == "single_account" and not self.account_id:
+            raise ValueError("single_account 模式下 account_id 必填")
+        if len(self.delay_range) != 2 or self.delay_range[0] >= self.delay_range[1]:
+            raise ValueError("delay_range 必须为 [min, max] 且 min < max")
+        return self
+
+
+class ChannelUpdate(BaseModel):
+    status: Optional[str] = Field(None, pattern="^(paused|active|cancelled)$")
+
+
+class ChannelItemUpdate(BaseModel):
+    status: Optional[str] = Field(None, pattern="^(skipped|pending)$")
+
+
+class ChannelAppendItems(BaseModel):
+    keywords: list[str] = Field(..., min_length=1, max_length=500)
+
+
+class ChannelItemResponse(BaseModel):
+    id: str
+    keyword: str
+    account_id: str
+    account_nickname: str = ""
+    status: str
+    assigned_device_id: str = ""
+    device_name: str = ""
+    task_id: str = ""
+    queue_position: int
+    created_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+
+
+class ChannelResponse(BaseModel):
+    id: str
+    group_id: str
+    group_name: str = ""
+    task_type: str
+    status: str
+    account_mode: str
+    account_id: str = ""
+    params_template: dict[str, Any] = Field(default_factory=dict)
+    cooldown_seconds: int = 300
+    delay_range: list[int] = Field(default=[3000, 8000])
+    total: int = 0
+    pending: int = 0
+    assigned: int = 0
+    completed: int = 0
+    failed: int = 0
+    skipped: int = 0
+    created_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+
+
+class ChannelDetailResponse(ChannelResponse):
+    items: list[ChannelItemResponse] = []

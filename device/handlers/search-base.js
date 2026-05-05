@@ -236,12 +236,16 @@ SearchBaseHandler._sortResults = function (sortBy) {
   var clicked = this.safeClick(actionName, 3);
   if (clicked) {
     logger.info(TAG, "排序方式: " + sortBy);
-    sleep(1000);
-    // 弹窗选中后通常自动关闭，不额外点击（避免二次打开）
+    sleep(500);
+    // 用 back() 关闭弹窗（比点排序按钮安全，不会二次打开）
+    back();
+    sleep(500);
     return true;
   }
 
-  logger.warn(TAG, "点击排序选项失败: " + sortBy);
+  logger.warn(TAG, "点击排序选项失败: " + sortBy + "，关闭弹窗");
+  back();
+  sleep(500);
   return false;
 };
 

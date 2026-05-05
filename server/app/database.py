@@ -3,7 +3,7 @@ import os
 import logging
 from pathlib import Path
 
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.orm import sessionmaker, Session
 
 from app.db_models import Base
@@ -21,6 +21,14 @@ if DATABASE_URL.startswith("sqlite"):
 
 engine = create_engine(DATABASE_URL, echo=False, connect_args=connect_args)
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
+
+
+@event.listens_for(engine, "connect")
+def _set_sqlite_pragma(dbapi_conn, connection_record):
+    cursor = dbapi_conn.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.execute("PRAGMA busy_timeout=5000")
+    cursor.close()
 
 
 def _migrate_add_columns():

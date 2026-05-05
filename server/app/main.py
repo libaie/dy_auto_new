@@ -46,9 +46,22 @@ async def _offline_checker():
 
             all_offline_ids = no_ws_ids + stale_ids
             if all_offline_ids:
+                # Mark devices offline
                 db.query(Device).filter(Device.id.in_(all_offline_ids)).update(
                     {"status": "offline"}, synchronize_session=False
                 )
+
+                # Mark RUNNING tasks on offline devices as FAILED (设备意外退出)
+                from app.db_models import Task as DBTask
+                orphaned = db.query(DBTask).filter(
+                    DBTask.device_id.in_(all_offline_ids),
+                    DBTask.status == "running",
+                ).all()
+                for t in orphaned:
+                    t.status = "failed"
+                    t.result = {"error": "设备离线，任务中断"}
+                    t.completed_at = now
+
                 db.commit()
 
                 for device_id in all_offline_ids:

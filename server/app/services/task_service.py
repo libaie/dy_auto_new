@@ -102,7 +102,7 @@ class TaskService:
 
         # 3. Recover stuck RUNNING tasks (device crashed while executing)
         from datetime import timedelta
-        stale_threshold = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=10)
+        stale_threshold = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=3)
         stale_running = db.query(DBTask).filter(
             DBTask.status == TaskStatus.RUNNING.value,
             DBTask.started_at.isnot(None),
@@ -223,7 +223,7 @@ class TaskService:
         return query.count()
 
     def cancel_task(self, db: Session, task_id: str):
-        """Cancel a pending or running task."""
+        """Cancel a pending or running task. Resets associated channel item if any."""
         task = db.query(DBTask).filter(DBTask.id == task_id).first()
         if not task:
             raise ValueError(f"Task {task_id} not found")
@@ -231,6 +231,16 @@ class TaskService:
             raise ValueError(f"Cannot cancel task in status: {task.status}")
         task.status = TaskStatus.CANCELLED.value
         task.completed_at = datetime.now(timezone.utc)
+
+        # Reset associated channel item so it can be re-dispatched
+        from app.db_models import ChannelItem
+        channel_item = db.query(ChannelItem).filter(ChannelItem.task_id == task_id).first()
+        if channel_item:
+            channel_item.status = "pending"
+            channel_item.assigned_device_id = None
+            channel_item.assigned_at = None
+            channel_item.task_id = None
+
         db.commit()
         db.refresh(task)
         return _db_task_to_pydantic(task)

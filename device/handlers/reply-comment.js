@@ -84,6 +84,7 @@ ReplyCommentHandler.execute = function (params) {
     var totalRead = 0;
     var maxBatches = 10;
 
+    var prevItemCount = 0;
     for (var batch = 0; batch < maxBatches && processed < count; batch++) {
       // 读取当前可见的评论
       var items = uiOperator.findElements("comment_list", 3000);
@@ -91,6 +92,13 @@ ReplyCommentHandler.execute = function (params) {
         logger.warn(TAG, "未找到评论列表");
         break;
       }
+
+      // 如果没有新元素加载，说明到底了
+      if (items.length <= prevItemCount && batch > 0) {
+        logger.info(TAG, "评论已到底（" + items.length + " 条）");
+        break;
+      }
+      prevItemCount = items.length;
 
       // 只处理本批新出现的评论（跳过之前已读的）
       for (var i = totalRead; i < items.length && processed < count; i++) {

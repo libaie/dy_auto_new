@@ -162,7 +162,13 @@ ReplyCommentHandler.execute = function (params) {
       if (content) {
         var dmContent = content;
         if (analysis.tier === "high") {
-          dmContent = this._generateDMGreeting(keyword, comment.nickname, comment.text, analysis);
+          var aiDM = aiAnalyzer.generateDM({
+            searchKeyword: keyword,
+            nickname: comment.nickname,
+            commentText: comment.text,
+            tier: analysis.tier || "high",
+          });
+          if (aiDM) dmContent = aiDM;
         }
         this._sendDM(dmContent);
         sleep(1000);

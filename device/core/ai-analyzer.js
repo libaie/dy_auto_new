@@ -217,31 +217,124 @@ var aiAnalyzer = {
   },
 
   /**
-   * 根据视频内容生成私信
-   * @param {string} videoText - 从屏幕提取的视频文本
-   * @returns {string|null} 生成的私信内容，失败返回 null
+   * 生成私信 — opener 阶段（破冰）
+   * @param {Object} params
+   *   - searchKeyword: string (搜索词)
+   *   - nickname: string (对方昵称)
+   *   - commentText: string (可选，对方的评论)
+   *   - tier: string (可选，命中分层)
+   *   - videoText: string (可选，视频内容，无评论时用)
+   * @returns {string|null}
    */
-  generateVideoDM: function (videoText) {
-    if (!videoText || videoText.length < 2) {
-      logger.warn(TAG, "视频文本太短，无法生成私信");
-      return null;
-    }
+  generateDM: function (params) {
+    var searchKeyword = params.searchKeyword || "";
+    var nickname = params.nickname || "";
+    var commentText = params.commentText || "";
+    var tier = params.tier || "other";
+    var videoText = params.videoText || "";
 
-    var prompt = "你是一个抖音用户，看到一条健康/养生相关视频后想和博主私信交流。请根据视频内容写一条友好的私信。\n\n" +
-      "## 要求\n" +
-      "- 像普通人私信，自然亲切\n" +
-      "- 20-40字\n" +
-      "- 结合视频具体内容，表明你是看了他的视频才来聊的\n" +
-      "- 可以表达共鸣、请教、分享经验\n" +
-      "- 严禁禁用词：治愈/根治/治好/疗效保证/替代药物/停药/医生/专家/保证有效/百分百/神药\n" +
-      "- 严禁营销感：不要带链接、不要推销\n\n" +
-      "## 视频内容\n" + videoText.substring(0, 500) + "\n\n" +
-      "只输出私信文本，不要引号、不要其他解释。";
+    var prompt = '你是一个关心家人健康的普通人，在抖音私信一位对【' + searchKeyword + '】话题感兴趣的陌生网友。\n\n' +
+      '## 绝对禁用词（任何情况下不得出现）\n' +
+      '治愈 / 根治 / 治好 / 疗效保证 / 包好 / 替代药物 / 停药 / 不用吃药 /\n' +
+      '医生 / 我是医生 / 专家 / 我是专家 / 保证有效 / 百分百 / 100% / 神药\n\n' +
+      '## 身份设定\n' +
+      '- 你是「健康生活指南」视角，像一个靠谱的健康科普账号。\n' +
+      '- 不是医生，不是产品顾问，不做诊断，不保证疗效。\n' +
+      '- 讨论的是日常饮食、生活习惯，不是治疗方案。\n' +
+      '- **严禁自我代入**：不要用"我都是…"、"我自己…"、"我家…"等第一人称经验分享。\n' +
+      '- 使用建议/指南风格：用"可以尝试"、"建议"、"若想…"等客观建议句式。\n\n' +
+      '## 这一条是破冰，唯一目标\n' +
+      '- 自然地接住对方的评论，给出一条实用的生活小建议，不卖货、不留联系方式。\n' +
+      '- 以「针对对方评论的实用建议」为切口，不要像客服。\n\n' +
+      '## 风格\n' +
+      '- 像健康科普博主给建议一样自然，避免"亲/亲亲/宝"营销口吻。\n' +
+      '- 中老年用户居多，不用年轻化网络梗。\n' +
+      '- 单条不超过 50 字，一次只说一件事。\n\n' +
+      '根据 tier 选择语气：\n' +
+      '- strong_buy: 不报价不发链接，先柔和确认需求背景。\n' +
+      '- health_consult: 以"我家里也有这种情况，正好一起交流"切入。\n' +
+      '- patient_self: 先共情，绝不第一条就推销。\n' +
+      '- other: 以"看到你评论，我这边也关心"切入。\n\n' +
+      '## 输入\n' +
+      '- 搜索词：' + searchKeyword + '\n' +
+      '- 对方昵称：' + nickname + '\n' +
+      (commentText ? '- 对方的评论：' + commentText + '\n' : '') +
+      (videoText ? '- 视频内容：' + videoText.substring(0, 300) + '\n' : '') +
+      '- 命中分层：' + tier + '\n\n' +
+      '请输出一条开场白，**只输出消息文本本身，不要引号、不要解释**。';
 
     var text = this._callAI(prompt, 200, 0.8);
     if (text) {
       text = text.replace(/^["'「]|["'」]$/g, "");
-      logger.info(TAG, "AI 生成私信: '" + text.substring(0, 30) + "'");
+      logger.info(TAG, "AI 生成私信(opener): '" + text.substring(0, 30) + "'");
+    }
+    return text;
+  },
+
+  /**
+   * 根据视频内容生成私信（兼容旧接口，内部调用 generateDM）
+   */
+  generateVideoDM: function (videoText) {
+    return this.generateDM({ videoText: videoText });
+  },
+
+  /**
+   * 多阶段私信生成 — 非 opener 阶段
+   * @param {string} stage - "qualifying" | "nurturing" | "converting" | "follow_up"
+   * @param {Object} params
+   *   - searchKeyword, nickname, history (最近对话), silentDays (follow_up)
+   * @returns {string|null}
+   */
+  generateDMStage: function (stage, params) {
+    var stageConfig = {
+      qualifying: {
+        name: '了解需求',
+        goal: '只问不卖。确认对方真实场景：本人还是家人、什么情况、日常习惯。每次只问一个问题，不盘问。',
+        style: '像健康顾问了解情况，朴素具体。共情对方处境。单条 ≤ 50 字。',
+        maxTokens: 150,
+      },
+      nurturing: {
+        name: '信任培育',
+        goal: '给出日常饮食/生活习惯的实用建议。用"可以试试""建议""若想…"等客观句式。绝不用"医生说""专家建议"。仍不卖货不提产品。',
+        style: '细节感优先：具体做法 > 笼统道理。单条 ≤ 50 字。',
+        maxTokens: 200,
+      },
+      converting: {
+        name: '转化引导',
+        goal: '对方释放成交信号。不报价不发链接。确认诉求，表明"稍后有朋友详细对接"，让对方愿意等。留一个温和的 gatekeeper 问题。',
+        style: '语气诚恳不催促。禁止承诺价格/折扣。单条 ≤ 60 字。',
+        maxTokens: 150,
+      },
+      follow_up: {
+        name: '唤回',
+        goal: '极其轻量地问一句，不追问不卖货。可以以具体生活场景切入，不是"在吗/怎么没回"。单次只发一条。',
+        style: '语气平和没压迫感。单条 ≤ 40 字。自然，不像群发。',
+        maxTokens: 120,
+      },
+    };
+
+    var cfg = stageConfig[stage];
+    if (!cfg) { logger.warn(TAG, "未知私信阶段: " + stage); return null; }
+
+    var prompt = '你是一个关心家人健康的普通人，与对方私信已有互动。当前阶段：' + cfg.name + '。\n\n' +
+      '## 禁用词（强制）\n' +
+      '治愈 / 根治 / 治好 / 疗效保证 / 包好 / 替代药物 / 停药 / 不用吃药 /\n' +
+      '医生 / 我是医生 / 专家 / 我是专家 / 保证有效 / 百分百 / 100% / 神药\n\n' +
+      '## 阶段目标\n' + cfg.goal + '\n\n' +
+      '## 风格\n' + cfg.style + '\n\n' +
+      '- **严禁自我代入**：不要用"我家…""我也是…""我自己…"等第一人称经验分享。\n' +
+      '- 不给医嘱，不指导用药。\n\n' +
+      '## 输入\n' +
+      '- 搜索词：' + (params.searchKeyword || '') + '\n' +
+      '- 对方昵称：' + (params.nickname || '') + '\n' +
+      (params.silentDays ? '- 沉默天数：' + params.silentDays + '\n' : '') +
+      '- 最近对话：\n' + (params.history || '(首轮对话)') + '\n\n' +
+      '请**只输出消息文本本身**，不要引号、不要解释。';
+
+    var text = this._callAI(prompt, cfg.maxTokens, 0.7);
+    if (text) {
+      text = text.replace(/^["'「]|["'」]$/g, "");
+      logger.info(TAG, "AI 私信(" + stage + "): '" + text.substring(0, 30) + "'");
     }
     return text;
   },

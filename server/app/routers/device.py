@@ -541,6 +541,9 @@ def report_risk(
         return {"status": "ignored", "account_status": "unknown"}
     if account.status == "active":
         account.status = "risk_controlled"
+        # Skip pending channel items for this account
+        from app.services.channel_service import channel_service
+        channel_service.on_risk_control(db, report.account_id)
         db.commit()
     return {"status": "acknowledged", "account_status": account.status}
 

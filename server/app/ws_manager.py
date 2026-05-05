@@ -53,6 +53,21 @@ class PairWSManager:
         for ws in dead:
             self._admin_connections.discard(ws)
 
+    async def broadcast_channel_progress(self, channel_id: str, stats: dict):
+        """Push channel progress event to admin WS connections."""
+        await self.broadcast_to_admins({
+            "event": "channel_progress",
+            "channel_id": channel_id,
+            **stats,
+        })
+
+    async def broadcast_channel_completed(self, channel_id: str):
+        """Push channel completed event to admin WS connections."""
+        await self.broadcast_to_admins({
+            "event": "channel_completed",
+            "channel_id": channel_id,
+        })
+
     # --- Device status connections (persistent WS for online/offline) ---
 
     async def register_device_status(self, device_id: str, ws: WebSocket):

@@ -236,24 +236,23 @@ class ChannelService:
 
         return None
 
-    def complete_item(self, db: Session, item_id: str, status: str, retrying: bool = False):
-        """Complete a channel item and check if channel is fully done."""
+    def complete_item(self, db: Session, item_id: str, status: str) -> dict:
+        """Complete a channel item and check if channel is fully done.
+
+        Returns {"channel_id": str, "stats": dict, "channel_completed": bool}
+        for the caller to handle WS broadcast.
+        """
         item = db.query(ChannelItem).filter(ChannelItem.id == item_id).first()
         if not item:
-            return
+            return {}
 
         channel_id = item.channel_id
-
-        if retrying:
-            item.status = "pending"
-            item.assigned_device_id = None
-            item.task_id = None
-            db.flush()
-            return
 
         item.status = status
         item.completed_at = datetime.now(timezone.utc)
         db.flush()
+
+        channel_completed = False
 
         # Atomic completion check
         if status in ("completed", "failed"):
@@ -273,18 +272,11 @@ class ChannelService:
             )
             db.flush()
             db.expire_all()
+            ch = db.query(Channel).filter(Channel.id == channel_id).first()
+            channel_completed = ch.status == "completed" if ch else False
 
-        # Broadcast channel progress to admin WS
-        try:
-            import asyncio
-            from app.ws_manager import pair_ws_manager
-            stats = self.get_channel_stats(db, channel_id)
-            asyncio.create_task(pair_ws_manager.broadcast_channel_progress(channel_id, stats))
-            ch_status = db.query(Channel).filter(Channel.id == channel_id).first()
-            if ch_status and ch_status.status == "completed":
-                asyncio.create_task(pair_ws_manager.broadcast_channel_completed(channel_id))
-        except Exception:
-            pass  # WS broadcast is non-critical
+        stats = self.get_channel_stats(db, channel_id)
+        return {"channel_id": channel_id, "stats": stats, "channel_completed": channel_completed}
 
     def on_risk_control(self, db: Session, account_id: str):
         """Skip all pending channel items for a risk-controlled account."""

@@ -43,7 +43,7 @@ def test_no_duplicate_assignment(db):
 def test_report_result(db):
     task = task_service.create_task(db, TaskType.NURTURE, "acc-001", {"duration": 5})
     task_service.get_pending_task(db, "dev-001")
-    result_task = task_service.report_result(db, task.id, TaskStatus.COMPLETED, {"success_count": 3})
+    result_task, _ = task_service.report_result(db, task.id, TaskStatus.COMPLETED, {"success_count": 3})
     assert result_task.status == TaskStatus.COMPLETED
     assert result_task.result["success_count"] == 3
 
@@ -51,7 +51,7 @@ def test_report_result(db):
 def test_report_failure_increments_retry(db):
     task = task_service.create_task(db, TaskType.NURTURE, "acc-001", {"duration": 5})
     task_service.get_pending_task(db, "dev-001")
-    failed = task_service.report_result(db, task.id, TaskStatus.FAILED, {"details": "error"})
+    failed, _ = task_service.report_result(db, task.id, TaskStatus.FAILED, {"details": "error"})
     assert failed.status == TaskStatus.PENDING  # re-queued
     assert failed.retry_count == 1
 
@@ -60,7 +60,7 @@ def test_max_retries(db):
     task = task_service.create_task(db, TaskType.NURTURE, "acc-001", {"duration": 5})
     for i in range(3):
         task_service.get_pending_task(db, "dev-001")
-        task = task_service.report_result(db, task.id, TaskStatus.FAILED, {"details": f"fail {i}"})
+        task, _ = task_service.report_result(db, task.id, TaskStatus.FAILED, {"details": f"fail {i}"})
     assert task.status == TaskStatus.FAILED
 
 

@@ -136,14 +136,19 @@ class TaskService:
         status: TaskStatus,
         result: Optional[dict] = None,
         ui_snapshot: Optional[dict] = None,
-    ) -> PydanticTask:
+    ) -> tuple[PydanticTask, Optional[dict]]:
         db_task = db.query(DBTask).filter(DBTask.id == task_id).first()
         if not db_task:
             raise ValueError(f"Task {task_id} not found")
 
         # Task already in terminal state — ignore late reports
         if db_task.status in (TaskStatus.CANCELLED.value, TaskStatus.COMPLETED.value, TaskStatus.FAILED.value):
-            return _db_task_to_pydantic(db_task)
+            return _db_task_to_pydantic(db_task), None
+
+        # Check channel association early (affects retry logic)
+        from app.db_models import ChannelItem
+        from app.services.channel_service import channel_service
+        channel_item = db.query(ChannelItem).filter(ChannelItem.task_id == task_id).first()
 
         if status == TaskStatus.COMPLETED:
             db_task.status = TaskStatus.COMPLETED.value
@@ -154,7 +159,8 @@ class TaskService:
             stats_service.increment(db, db_task.account_id, db_task.type, count=success_count)
         elif status == TaskStatus.FAILED:
             db_task.retry_count += 1
-            if db_task.retry_count >= MAX_RETRIES:
+            # Channel tasks: skip retry, fail immediately (channel redistributes naturally)
+            if channel_item or db_task.retry_count >= MAX_RETRIES:
                 db_task.status = TaskStatus.FAILED.value
                 db_task.result = result
                 db_task.completed_at = datetime.now(timezone.utc)
@@ -168,22 +174,15 @@ class TaskService:
             from app.services.chain_service import chain_service
             chain_service.advance_chain(db, task_id, db_task.status, result)
 
-        # Update channel item if this task belongs to one
-        from app.db_models import ChannelItem
-        from app.services.channel_service import channel_service
-        channel_item = db.query(ChannelItem).filter(ChannelItem.task_id == task_id).first()
-        if channel_item:
-            if db_task.status == TaskStatus.COMPLETED.value:
-                channel_service.complete_item(db, channel_item.id, "completed")
-            elif db_task.status == TaskStatus.FAILED.value:
-                if db_task.retry_count < MAX_RETRIES:
-                    channel_service.complete_item(db, channel_item.id, "failed", retrying=True)
-                else:
-                    channel_service.complete_item(db, channel_item.id, "failed")
+        # Update channel item status
+        channel_broadcast_info = None
+        if channel_item and db_task.status in (TaskStatus.COMPLETED.value, TaskStatus.FAILED.value):
+            channel_broadcast_info = channel_service.complete_item(db, channel_item.id,
+                "completed" if db_task.status == TaskStatus.COMPLETED.value else "failed")
 
         db.commit()
         db.refresh(db_task)
-        return _db_task_to_pydantic(db_task)
+        return _db_task_to_pydantic(db_task), channel_broadcast_info
 
     def list_tasks(self, db: Session, status: Optional[TaskStatus] = None, skip: int = 0, limit: int = 50) -> list[PydanticTask]:
         query = db.query(DBTask)

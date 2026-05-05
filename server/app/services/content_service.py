@@ -180,7 +180,7 @@ class ContentService:
 
     # --- Keyword Matrix Generation ---
 
-    async def generate_keyword_matrix(self, keyword: str, count: int = 10) -> list[str]:
+    async def generate_keyword_matrix(self, keyword: str, count: int = 10, db=None) -> list[str]:
         """Generate expanded keyword matrix from a seed keyword using AI."""
         prompt = f"""基于关键词「{keyword}」，生成 {count} 个相关的抖音搜索关键词。
 要求：
@@ -191,7 +191,7 @@ class ContentService:
 示例：["关键词1", "关键词2", "关键词3"]"""
 
         from app.services.ai_generator import ai_generator
-        response = await ai_generator.generate(None, prompt, {})
+        response = await ai_generator.generate(db, prompt, {})
         try:
             keywords = json.loads(response)
             if isinstance(keywords, list):

@@ -1,5 +1,6 @@
 """Device-facing API — poll, report, heartbeat, selectors."""
 from fastapi import APIRouter, HTTPException, Query, Depends, UploadFile, File as FastAPIFile, WebSocket, Request
+from fastapi.responses import JSONResponse
 from typing import Optional
 from sqlalchemy.orm import Session
 import asyncio
@@ -381,7 +382,7 @@ def report_result(
             raise HTTPException(status_code=403, detail="Task does not belong to this device")
 
     try:
-        task = task_service.report_result(
+        task, channel_broadcast_info = task_service.report_result(
             db=db,
             task_id=report.task_id,
             status=report.status,
@@ -390,6 +391,20 @@ def report_result(
         )
     except ValueError:
         raise HTTPException(status_code=404, detail="Task not found")
+
+    # Broadcast channel progress via WS (BackgroundTasks runs after response)
+    if channel_broadcast_info:
+        from fastapi import BackgroundTasks
+        bg = BackgroundTasks()
+        from app.ws_manager import pair_ws_manager
+        bg.add_task(pair_ws_manager.broadcast_channel_progress,
+                    channel_broadcast_info["channel_id"], channel_broadcast_info["stats"])
+        if channel_broadcast_info.get("channel_completed"):
+            bg.add_task(pair_ws_manager.broadcast_channel_completed,
+                        channel_broadcast_info["channel_id"])
+        from fastapi.encoders import jsonable_encoder
+        return JSONResponse(content=jsonable_encoder(task), background=bg)
+
     return task
 
 

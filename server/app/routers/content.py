@@ -150,7 +150,7 @@ async def generate_keywords(
     _: str = Depends(verify_admin_token),
 ):
     try:
-        keywords = await content_service.generate_keyword_matrix(request.keyword, request.count)
+        keywords = await content_service.generate_keyword_matrix(request.keyword, request.count, db=db)
     except RuntimeError as e:
         if "not configured" in str(e):
             raise HTTPException(status_code=503, detail="AI service not configured.")

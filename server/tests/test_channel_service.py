@@ -380,13 +380,13 @@ def test_complete_item_not_completed_when_items_remain(db):
     assert ch.status == "active"
 
 
-def test_complete_item_with_retry_rollback(db):
-    """When task retries, channel item should roll back to pending."""
+def test_complete_item_failed_marks_failed(db):
+    """Channel task failure marks item as failed (no retry rollback)."""
     setup_group(db, group_id="grp-cm-003", account_ids=["acc-cm-003"])
     ch = channel_service.create_channel(
         db, group_id="grp-cm-003", task_type="search_comment",
         account_mode="single_account", account_id="acc-cm-003",
-        keywords=["retry-kw"], params_template={},
+        keywords=["fail-kw"], params_template={},
     )
     items = db.query(ChannelItem).filter(ChannelItem.channel_id == ch.id).all()
     item = items[0]
@@ -394,11 +394,13 @@ def test_complete_item_with_retry_rollback(db):
     item.assigned_device_id = "dev-cm-001"
     db.flush()
 
-    channel_service.complete_item(db, item.id, "failed", retrying=True)
+    result = channel_service.complete_item(db, item.id, "failed")
 
     db.refresh(item)
-    assert item.status == "pending"
-    assert item.assigned_device_id is None
+    assert item.status == "failed"
+    assert item.completed_at is not None
+    assert result["channel_id"] == ch.id
+    assert result["channel_completed"] is True  # only 1 item, all done
 
 
 def test_risk_control_skips_pending_items(db):

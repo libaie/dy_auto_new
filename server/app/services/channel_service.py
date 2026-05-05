@@ -2,7 +2,7 @@
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import update
+from sqlalchemy import update, and_, exists
 from sqlalchemy.orm import Session
 
 from app.db_models import (
@@ -235,6 +235,146 @@ class ChannelService:
             return (_db_task_to_pydantic(task), item.id)
 
         return None
+
+    def complete_item(self, db: Session, item_id: str, status: str, retrying: bool = False):
+        """Complete a channel item and check if channel is fully done."""
+        item = db.query(ChannelItem).filter(ChannelItem.id == item_id).first()
+        if not item:
+            return
+
+        channel_id = item.channel_id
+
+        if retrying:
+            item.status = "pending"
+            item.assigned_device_id = None
+            item.task_id = None
+            db.flush()
+            return
+
+        item.status = status
+        item.completed_at = datetime.now(timezone.utc)
+        db.flush()
+
+        # Atomic completion check
+        if status in ("completed", "failed"):
+            db.execute(
+                update(Channel)
+                .where(
+                    Channel.id == channel_id,
+                    Channel.status == "active",
+                    ~exists().where(
+                        and_(
+                            ChannelItem.channel_id == channel_id,
+                            ChannelItem.status.notin_(["completed", "failed", "skipped"]),
+                        )
+                    ),
+                )
+                .values(status="completed", completed_at=datetime.now(timezone.utc))
+            )
+            db.flush()
+            db.expire_all()
+
+    def on_risk_control(self, db: Session, account_id: str):
+        """Skip all pending channel items for a risk-controlled account."""
+        db.execute(
+            update(ChannelItem)
+            .where(
+                ChannelItem.account_id == account_id,
+                ChannelItem.status == "pending",
+            )
+            .values(status="skipped", completed_at=datetime.now(timezone.utc))
+        )
+        db.flush()
+        db.expire_all()
+
+    def update_channel_status(self, db: Session, channel_id: str, new_status: str):
+        """Update channel status with validation."""
+        ch = self.get_channel(db, channel_id)
+        if not ch:
+            raise ValueError(f"通道 {channel_id} 不存在")
+
+        valid_transitions = {
+            "active": ["paused", "cancelled"],
+            "paused": ["active", "cancelled"],
+        }
+        allowed = valid_transitions.get(ch.status, [])
+        if new_status not in allowed:
+            raise ValueError(f"不允许从 {ch.status} 转换到 {new_status}")
+
+        ch.status = new_status
+        if new_status == "cancelled":
+            db.execute(
+                update(ChannelItem)
+                .where(
+                    ChannelItem.channel_id == channel_id,
+                    ChannelItem.status == "pending",
+                )
+                .values(status="skipped", completed_at=datetime.now(timezone.utc))
+            )
+        db.commit()
+
+    def soft_delete_channel(self, db: Session, channel_id: str):
+        """Soft delete a channel."""
+        ch = self.get_channel(db, channel_id)
+        if not ch:
+            raise ValueError(f"通道 {channel_id} 不存在")
+        ch.deleted_at = datetime.now(timezone.utc)
+        db.execute(
+            update(ChannelItem)
+            .where(
+                ChannelItem.channel_id == channel_id,
+                ChannelItem.status == "pending",
+            )
+            .values(status="skipped", completed_at=datetime.now(timezone.utc))
+        )
+        db.commit()
+
+    def append_items(self, db: Session, channel_id: str, keywords: list[str]):
+        """Append new keywords to an active channel."""
+        ch = self.get_channel(db, channel_id)
+        if not ch:
+            raise ValueError(f"通道 {channel_id} 不存在")
+        if ch.status != "active":
+            raise ValueError("只能向活跃通道追加关键词")
+
+        existing_count = db.query(ChannelItem).filter(ChannelItem.channel_id == channel_id).count()
+        if existing_count + len(keywords) > ch.max_keywords:
+            raise ValueError(f"超出最大关键词数 {ch.max_keywords}")
+
+        if ch.account_mode == "single_account":
+            account_ids = [ch.account_id] * len(keywords)
+        else:
+            active_accounts = _get_active_accounts(db, ch.group_id)
+            account_ids = self._round_robin_assign(db, keywords, active_accounts)
+
+        for i, keyword in enumerate(keywords):
+            item = ChannelItem(
+                channel_id=channel_id,
+                keyword=keyword,
+                account_id=account_ids[i],
+                status="pending",
+                queue_position=existing_count + i,
+            )
+            db.add(item)
+        db.commit()
+
+    def update_item_status(self, db: Session, item_id: str, new_status: str):
+        """Update a single channel item status (skip/requeue)."""
+        item = db.query(ChannelItem).filter(ChannelItem.id == item_id).first()
+        if not item:
+            raise ValueError(f"Item {item_id} 不存在")
+
+        valid = {"pending": ["skipped"], "failed": ["pending"]}
+        allowed = valid.get(item.status, [])
+        if new_status not in allowed:
+            raise ValueError(f"不允许从 {item.status} 转换到 {new_status}")
+
+        item.status = new_status
+        if new_status == "pending":
+            item.assigned_device_id = None
+            item.task_id = None
+            item.completed_at = None
+        db.commit()
 
     def get_channel(self, db: Session, channel_id: str) -> Optional[Channel]:
         return db.query(Channel).filter(

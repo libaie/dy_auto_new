@@ -344,3 +344,219 @@ def test_claim_respects_quota_limit(db):
 
     result = channel_service.claim_channel_item(db, "dev-cl-quota")
     assert result is None
+
+
+def test_complete_item_marks_channel_completed_when_all_done(db):
+    """Channel should be marked completed when all items are terminal."""
+    setup_group(db, group_id="grp-cm-001", account_ids=["acc-cm-001"])
+    ch = channel_service.create_channel(
+        db, group_id="grp-cm-001", task_type="search_comment",
+        account_mode="single_account", account_id="acc-cm-001",
+        keywords=["only-one"], params_template={},
+    )
+    items = db.query(ChannelItem).filter(ChannelItem.channel_id == ch.id).all()
+    assert len(items) == 1
+
+    channel_service.complete_item(db, items[0].id, "completed")
+
+    db.refresh(ch)
+    assert ch.status == "completed"
+    assert ch.completed_at is not None
+
+
+def test_complete_item_not_completed_when_items_remain(db):
+    """Channel should stay active when items remain."""
+    setup_group(db, group_id="grp-cm-002", account_ids=["acc-cm-002"])
+    ch = channel_service.create_channel(
+        db, group_id="grp-cm-002", task_type="search_comment",
+        account_mode="single_account", account_id="acc-cm-002",
+        keywords=["a", "b"], params_template={},
+    )
+    items = db.query(ChannelItem).filter(ChannelItem.channel_id == ch.id).order_by(ChannelItem.queue_position).all()
+
+    channel_service.complete_item(db, items[0].id, "completed")
+
+    db.refresh(ch)
+    assert ch.status == "active"
+
+
+def test_complete_item_with_retry_rollback(db):
+    """When task retries, channel item should roll back to pending."""
+    setup_group(db, group_id="grp-cm-003", account_ids=["acc-cm-003"])
+    ch = channel_service.create_channel(
+        db, group_id="grp-cm-003", task_type="search_comment",
+        account_mode="single_account", account_id="acc-cm-003",
+        keywords=["retry-kw"], params_template={},
+    )
+    items = db.query(ChannelItem).filter(ChannelItem.channel_id == ch.id).all()
+    item = items[0]
+    item.status = "assigned"
+    item.assigned_device_id = "dev-cm-001"
+    db.flush()
+
+    channel_service.complete_item(db, item.id, "failed", retrying=True)
+
+    db.refresh(item)
+    assert item.status == "pending"
+    assert item.assigned_device_id is None
+
+
+def test_risk_control_skips_pending_items(db):
+    """Risk control event should skip all pending items for the account."""
+    setup_group(db, group_id="grp-cm-004", account_ids=["acc-cm-004"])
+    ch = channel_service.create_channel(
+        db, group_id="grp-cm-004", task_type="search_comment",
+        account_mode="single_account", account_id="acc-cm-004",
+        keywords=["a", "b", "c"], params_template={},
+    )
+
+    channel_service.on_risk_control(db, "acc-cm-004")
+
+    items = db.query(ChannelItem).filter(ChannelItem.channel_id == ch.id).all()
+    assert all(i.status == "skipped" for i in items)
+
+
+def test_cancel_channel_skips_pending_items(db):
+    """Cancelling a channel should skip all pending items."""
+    setup_group(db, group_id="grp-cm-005", account_ids=["acc-cm-005"])
+    ch = channel_service.create_channel(
+        db, group_id="grp-cm-005", task_type="search_comment",
+        account_mode="single_account", account_id="acc-cm-005",
+        keywords=["x", "y"], params_template={},
+    )
+
+    channel_service.update_channel_status(db, ch.id, "cancelled")
+
+    db.refresh(ch)
+    assert ch.status == "cancelled"
+    items = db.query(ChannelItem).filter(ChannelItem.channel_id == ch.id).all()
+    assert all(i.status == "skipped" for i in items)
+
+
+def test_pause_and_resume_channel(db):
+    """Pause and resume a channel."""
+    setup_group(db, group_id="grp-cm-006", account_ids=["acc-cm-006"])
+    ch = channel_service.create_channel(
+        db, group_id="grp-cm-006", task_type="search_comment",
+        account_mode="single_account", account_id="acc-cm-006",
+        keywords=["pause-kw"], params_template={},
+    )
+
+    channel_service.update_channel_status(db, ch.id, "paused")
+    db.refresh(ch)
+    assert ch.status == "paused"
+
+    channel_service.update_channel_status(db, ch.id, "active")
+    db.refresh(ch)
+    assert ch.status == "active"
+
+
+def test_invalid_status_transition(db):
+    """Should raise ValueError for invalid status transitions."""
+    setup_group(db, group_id="grp-cm-007", account_ids=["acc-cm-007"])
+    ch = channel_service.create_channel(
+        db, group_id="grp-cm-007", task_type="search_comment",
+        account_mode="single_account", account_id="acc-cm-007",
+        keywords=["inv-kw"], params_template={},
+    )
+
+    with pytest.raises(ValueError, match="不允许"):
+        channel_service.update_channel_status(db, ch.id, "completed")
+
+
+def test_soft_delete_channel(db):
+    """Soft delete should set deleted_at and skip pending items."""
+    setup_group(db, group_id="grp-cm-008", account_ids=["acc-cm-008"])
+    ch = channel_service.create_channel(
+        db, group_id="grp-cm-008", task_type="search_comment",
+        account_mode="single_account", account_id="acc-cm-008",
+        keywords=["del-a", "del-b"], params_template={},
+    )
+
+    channel_service.soft_delete_channel(db, ch.id)
+
+    db.refresh(ch)
+    assert ch.deleted_at is not None
+    items = db.query(ChannelItem).filter(ChannelItem.channel_id == ch.id).all()
+    assert all(i.status == "skipped" for i in items)
+
+
+def test_append_items_to_active_channel(db):
+    """Should append new keywords to an active channel."""
+    setup_group(db, group_id="grp-cm-009", account_ids=["acc-cm-009"])
+    ch = channel_service.create_channel(
+        db, group_id="grp-cm-009", task_type="search_comment",
+        account_mode="single_account", account_id="acc-cm-009",
+        keywords=["orig"], params_template={},
+    )
+
+    channel_service.append_items(db, ch.id, ["new-a", "new-b"])
+
+    items = db.query(ChannelItem).filter(ChannelItem.channel_id == ch.id).order_by(ChannelItem.queue_position).all()
+    assert len(items) == 3
+    assert items[1].keyword == "new-a"
+    assert items[2].keyword == "new-b"
+
+
+def test_append_items_rejects_paused_channel(db):
+    """Should raise ValueError when appending to a paused channel."""
+    setup_group(db, group_id="grp-cm-010", account_ids=["acc-cm-010"])
+    ch = channel_service.create_channel(
+        db, group_id="grp-cm-010", task_type="search_comment",
+        account_mode="single_account", account_id="acc-cm-010",
+        keywords=["orig"], params_template={},
+    )
+    channel_service.update_channel_status(db, ch.id, "paused")
+
+    with pytest.raises(ValueError, match="活跃"):
+        channel_service.append_items(db, ch.id, ["new"])
+
+
+def test_update_item_status_skip(db):
+    """Should allow skipping a pending item."""
+    setup_group(db, group_id="grp-cm-011", account_ids=["acc-cm-011"])
+    ch = channel_service.create_channel(
+        db, group_id="grp-cm-011", task_type="search_comment",
+        account_mode="single_account", account_id="acc-cm-011",
+        keywords=["skip-kw"], params_template={},
+    )
+    items = db.query(ChannelItem).filter(ChannelItem.channel_id == ch.id).all()
+
+    channel_service.update_item_status(db, items[0].id, "skipped")
+    db.refresh(items[0])
+    assert items[0].status == "skipped"
+
+
+def test_update_item_status_requeue_failed(db):
+    """Should allow re-queuing a failed item."""
+    setup_group(db, group_id="grp-cm-012", account_ids=["acc-cm-012"])
+    ch = channel_service.create_channel(
+        db, group_id="grp-cm-012", task_type="search_comment",
+        account_mode="single_account", account_id="acc-cm-012",
+        keywords=["requeue-kw"], params_template={},
+    )
+    items = db.query(ChannelItem).filter(ChannelItem.channel_id == ch.id).all()
+    items[0].status = "failed"
+    items[0].completed_at = datetime.now(timezone.utc)
+    db.flush()
+
+    channel_service.update_item_status(db, items[0].id, "pending")
+    db.refresh(items[0])
+    assert items[0].status == "pending"
+    assert items[0].completed_at is None
+
+
+def test_complete_item_failed_finalizes_channel(db):
+    """Failed items (no retry) should contribute to channel completion."""
+    setup_group(db, group_id="grp-cm-013", account_ids=["acc-cm-013"])
+    ch = channel_service.create_channel(
+        db, group_id="grp-cm-013", task_type="search_comment",
+        account_mode="single_account", account_id="acc-cm-013",
+        keywords=["fail-final"], params_template={},
+    )
+    items = db.query(ChannelItem).filter(ChannelItem.channel_id == ch.id).all()
+
+    channel_service.complete_item(db, items[0].id, "failed")
+
+    db.refresh(ch)
+    assert ch.status == "completed"

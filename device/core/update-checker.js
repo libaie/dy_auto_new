@@ -56,6 +56,12 @@ var updateChecker = {
       var updateDir = files.cwd() + "/update";
       var zipPath = updateDir + "/device-script.zip";
       var tempDir = updateDir + "/temp";
+
+      if (!files.exists(zipPath)) {
+        logger.error(TAG, "Download reported success but zip not found: " + zipPath);
+        return false;
+      }
+
       files.ensureDir(tempDir);
 
       $zip.extract(zipPath, tempDir);

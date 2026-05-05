@@ -9,14 +9,30 @@ var uiOperator = {
    * @returns {boolean}
    */
   openApp: function () {
+    var TARGET_PKG = "com.ss.android.ugc.aweme";
     logger.info(TAG, "正在打开抖音...");
-    app.launchApp("抖音");
-    sleep(3000); // 等待 App 启动
-    if (currentPackage() === "com.ss.android.ugc.aweme") {
-      logger.info(TAG, "抖音打开成功");
+
+    // 如果已在前台，直接返回
+    if (currentPackage() === TARGET_PKG) {
+      logger.info(TAG, "抖音已在前台");
       return true;
     }
-    logger.error(TAG, "打开抖音失败");
+
+    app.launchApp("抖音");
+
+    // 最多重试 3 次，每次等待 3 秒
+    for (var i = 0; i < 3; i++) {
+      sleep(3000);
+      var pkg = currentPackage();
+      if (pkg === TARGET_PKG) {
+        logger.info(TAG, "抖音打开成功");
+        return true;
+      }
+      logger.warn(TAG, "等待抖音启动 (" + (i + 1) + "/3), 当前包名: " + pkg);
+    }
+
+    var finalPkg = currentPackage();
+    logger.error(TAG, "打开抖音失败, 当前包名: " + finalPkg + " (期望: " + TARGET_PKG + ")");
     return false;
   },
 
@@ -34,7 +50,11 @@ var uiOperator = {
    * @returns {boolean}
    */
   isAppActive: function () {
-    return currentPackage() === "com.ss.android.ugc.aweme";
+    var pkg = currentPackage();
+    if (pkg === "com.ss.android.ugc.aweme") return true;
+    // 部分场景下 currentPackage 返回系统 UI 或空，也视为抖音未在前台
+    logger.debug(TAG, "抖音未在前台, 当前包名: " + pkg);
+    return false;
   },
 
   /**

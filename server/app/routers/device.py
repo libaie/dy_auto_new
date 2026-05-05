@@ -311,6 +311,10 @@ async def ws_device_status(websocket: WebSocket, device_id: str = Query(""), sec
             await websocket.close(code=4001, reason="Missing device_id")
             return
 
+        # Register WS connection FIRST — before DB update — so _offline_checker
+        # never sees "DB online but no WS" during the race window
+        await pair_ws_manager.register_device_status(device_id, websocket)
+
         # Mark device online and capture IP
         from app.services.device_service import device_service
         ws_client_ip = websocket.headers.get("x-forwarded-for", "").split(",")[0].strip()
@@ -322,9 +326,6 @@ async def ws_device_status(websocket: WebSocket, device_id: str = Query(""), sec
             "device_id": device_id,
             "status": "online",
         })
-
-        # Register connection
-        await pair_ws_manager.register_device_status(device_id, websocket)
 
         # Check for pending tasks and notify device
         await _notify_pending_tasks(db, device_id)

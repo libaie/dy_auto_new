@@ -17,6 +17,44 @@ from app.ws_manager import pair_ws_manager
 router = APIRouter(prefix="/api/device", tags=["device"])
 
 
+async def _notify_pending_tasks(db: Session, device_id: str):
+    """Check if there are pending tasks for this device and notify it via WS."""
+    from app.db_models import Device, Task as DBTask
+    from app.models import TaskStatus
+    from datetime import datetime, timezone
+    from sqlalchemy import or_, and_
+
+    device = db.query(Device).filter(Device.id == device_id).first()
+    if not device:
+        return
+
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    # Build routing filter (same logic as task_service.get_pending_task)
+    if device.bound_account_id:
+        route_filter = or_(
+            DBTask.device_id == device_id,
+            and_(DBTask.device_id.is_(None), DBTask.account_id == device.bound_account_id),
+        )
+    else:
+        bound_account_ids = db.query(Device.bound_account_id).filter(
+            Device.bound_account_id.isnot(None)
+        ).scalar_subquery()
+        route_filter = or_(
+            DBTask.device_id == device_id,
+            and_(DBTask.device_id.is_(None), ~DBTask.account_id.in_(bound_account_ids)),
+        )
+
+    has_pending = db.query(DBTask).filter(
+        DBTask.status == TaskStatus.PENDING.value,
+        route_filter,
+        or_(DBTask.scheduled_at.is_(None), DBTask.scheduled_at <= now),
+    ).first()
+
+    if has_pending:
+        await pair_ws_manager.send_to_device(device_id, {"event": "new_task_available"})
+
+
 @router.post("/pair-request", response_model=PairStatusResponse)
 async def create_pair_request(
     request: PairRequestCreate,
@@ -288,6 +326,9 @@ async def ws_device_status(websocket: WebSocket, device_id: str = Query(""), sec
         # Register connection
         await pair_ws_manager.register_device_status(device_id, websocket)
 
+        # Check for pending tasks and notify device
+        await _notify_pending_tasks(db, device_id)
+
         try:
             while True:
                 # Keep alive — wait for client messages (text ping/close)
@@ -433,6 +474,7 @@ async def heartbeat(
             "device_id": device_id,
             "status": "online",
         })
+        await _notify_pending_tasks(db, device_id)
     return {"status": "ok", "device_id": device_id}
 
 

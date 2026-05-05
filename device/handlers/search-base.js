@@ -236,29 +236,24 @@ SearchBaseHandler._sortResults = function (sortBy) {
   var clicked = this.safeClick(actionName, 3);
   if (clicked) {
     logger.info(TAG, "排序方式: " + sortBy);
-    sleep(500);
-    // 用 back() 关闭弹窗（比点排序按钮安全，不会二次打开）
-    back();
-    sleep(500);
+    sleep(800);
+    // 检测弹窗是否还在（看排序选项是否仍可见），在的话点排序按钮关闭
+    var stillOpen = uiOperator.findElement("sort_latest", 500)
+                 || uiOperator.findElement("sort_most_liked", 500)
+                 || uiOperator.findElement("sort_default", 500);
+    if (stillOpen) {
+      logger.info(TAG, "排序弹窗未自动关闭，点击排序按钮关闭");
+      this.safeClick("sort_button", 2);
+      sleep(500);
+    } else {
+      logger.info(TAG, "排序弹窗已关闭");
+    }
     return true;
   }
 
-  logger.warn(TAG, "点击排序选项失败: " + sortBy + "，关闭弹窗");
-  back();
+  logger.warn(TAG, "点击排序选项失败: " + sortBy + "，尝试关闭弹窗");
+  this.safeClick("sort_button", 2);
   sleep(500);
-  return false;
-};
-
-/**
- * 关闭排序弹出框（再次点击排序按钮）
- */
-SearchBaseHandler._closeSortPopup = function () {
-  var clicked = this.safeClick("sort_button", 2);
-  if (clicked) {
-    sleep(500);
-    logger.info(TAG, "排序弹窗已关闭");
-    return true;
-  }
   return false;
 };
 

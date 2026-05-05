@@ -1,12 +1,14 @@
 """Selector management CRUD API — admin only."""
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, UploadFile, File as FastAPIFile
 from typing import Optional
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+import time
 
 from app.database import get_db
 from app.deps import verify_admin_token
 from app.services.selector_service import selector_service
+from app.services.template_service import template_service
 
 router = APIRouter(prefix="/api/selectors", tags=["selectors"])
 
@@ -137,3 +139,45 @@ async def toggle_selector(
         "version": version,
     })
     return sel
+
+
+# --- Template image endpoints ---
+
+@router.get("/templates")
+def list_templates(
+    _: str = Depends(verify_admin_token),
+):
+    templates = template_service.list_templates()
+    return {"templates": templates, "total": len(templates)}
+
+
+@router.post("/templates/upload")
+async def upload_template(
+    file: UploadFile = FastAPIFile(...),
+    action_name: str = "",
+    _: str = Depends(verify_admin_token),
+):
+    import os
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if ext not in (".png", ".jpg", ".jpeg"):
+        raise HTTPException(status_code=400, detail="仅支持 .png/.jpg/.jpeg 格式")
+
+    content = await file.read()
+    if len(content) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="文件大小不能超过 5MB")
+
+    safe_name = (action_name or "template").replace("/", "_").replace("\\", "_")
+    filename = f"{safe_name}_{int(time.time() * 1000)}{ext}"
+    template_service.save_template(filename, content)
+    return {"filename": filename, "size": len(content)}
+
+
+@router.delete("/templates/{filename}")
+def delete_template(
+    filename: str,
+    _: str = Depends(verify_admin_token),
+):
+    deleted = template_service.delete_template(filename)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="模板文件不存在")
+    return {"deleted": True, "filename": filename}

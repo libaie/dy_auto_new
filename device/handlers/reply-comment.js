@@ -213,17 +213,9 @@ ReplyCommentHandler._searchAndSort = function (keyword, sortBy) {
 };
 
 /**
- * 打开评论区（幂等：已在评论面板则直接返回）
+ * 打开评论区 — 点击视频评论入口按钮
  */
 ReplyCommentHandler._openComments = function () {
-  // 已在评论面板？
-  var commentInput = uiOperator.findElement("video_comment_input", 500);
-  var commentList = uiOperator.findElement("comment_list", 500);
-  if (commentInput || commentList) {
-    logger.info(TAG, "评论区已打开");
-    return true;
-  }
-
   // 点击评论区入口（视频评论按钮）
   var clicked = this.safeClick("video_comment_btn", 3);
   if (clicked) {

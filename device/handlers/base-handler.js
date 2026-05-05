@@ -68,10 +68,11 @@ var BaseHandler = {
   },
 
   /**
-   * 通过键盘回车提交（比点击提交按钮更可靠）
+   * 通过键盘回车提交（优先键盘，回退点击提交按钮）
+   * @param {string} submitActionName - 提交按钮的动作名（回退方案）
    */
-  submitViaKeyboard: function () {
-    return uiOperator.submitViaKeyboard();
+  submitViaKeyboard: function (submitActionName) {
+    return uiOperator.submitViaKeyboard(submitActionName);
   },
 
   /**

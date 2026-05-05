@@ -436,7 +436,7 @@ NurtureHandler._commentOnVideo = function (templateId) {
 
   // 5. 通过键盘回车提交评论
   sleep(500);
-  this.submitViaKeyboard();
+  this.submitViaKeyboard("comment_submit");
   sleep(1000);
   logger.info(TAG, "评论成功");
 

@@ -278,46 +278,58 @@ var uiOperator = {
     }
     sleep(500);
 
-    // 通过剪贴板复制粘贴（比 setText 更可靠）
+    // 通过剪贴板粘贴
     try {
       setClip(text);
       sleep(200);
-      // 粘贴: KEYCODE_PASTE = 279
-      keyCode(279);
+      // 尝试多种粘贴方式
+      try { shell("input keyevent 279", true); } catch (e1) { /* ignore */ }
+      try { keyCode(279); } catch (e2) { /* ignore */ }
       sleep(300);
       logger.debug(TAG, "已粘贴文本: '" + text.substring(0, 20) + "'");
       return true;
     } catch (e) {
       logger.warn(TAG, "剪贴板粘贴失败: " + e.message);
-      // 回退: 尝试 setText
-      try {
-        if (!element.isImage && !element.isCoordinate) {
-          element.setText(text);
-          return true;
-        }
-        var editText = className("EditText").findOne(2000);
-        if (editText) { editText.setText(text); return true; }
-      } catch (e2) {
-        logger.warn(TAG, "setText 回退也失败: " + e2.message);
+    }
+
+    // 回退: setText
+    try {
+      if (!element.isImage && !element.isCoordinate) {
+        element.setText(text);
+        return true;
       }
+      var editText = className("EditText").findOne(2000);
+      if (editText) { editText.setText(text); return true; }
+    } catch (e2) {
+      logger.warn(TAG, "setText 回退也失败: " + e2.message);
     }
     return false;
   },
 
   /**
-   * 通过键盘回车提交（比点击提交按钮更可靠）
+   * 通过键盘回车提交（多种方式尝试，回退点击提交按钮）
+   * @param {string} submitActionName - 提交按钮的动作名（回退方案）
    * @returns {boolean}
    */
-  submitViaKeyboard: function () {
-    try {
-      // KEYCODE_ENTER = 66
-      keyCode(66);
-      logger.debug(TAG, "已按回车提交");
-      return true;
-    } catch (e) {
-      logger.warn(TAG, "回车提交失败: " + e.message);
-      return false;
+  submitViaKeyboard: function (submitActionName) {
+    // 尝试键盘回车
+    try { shell("input keyevent 66", true); sleep(300); return true; } catch (e1) { /* ignore */ }
+    try { keyCode(66); sleep(300); return true; } catch (e2) { /* ignore */ }
+
+    // 回退: 点击提交按钮
+    if (submitActionName) {
+      try {
+        var selectorLoader = require("./selector-loader");
+        var selector = selectorLoader.get(submitActionName);
+        if (selector) {
+          var btn = this.findElement(submitActionName, 2000);
+          if (btn) { this.clickElement(btn); sleep(500); return true; }
+        }
+      } catch (e3) { /* ignore */ }
     }
+
+    logger.warn(TAG, "回车提交和按钮提交均失败");
+    return false;
   },
 
   /**

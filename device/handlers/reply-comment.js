@@ -494,7 +494,7 @@ ReplyCommentHandler._replyToComment = function (replyText) {
 
   // 4. 通过键盘回车发送
   sleep(500);
-  this.submitViaKeyboard();
+  this.submitViaKeyboard("comment_submit");
   sleep(1500);
   logger.info(TAG, "回复已发送: '" + replyText.substring(0, 20) + "'");
   return true;
@@ -544,7 +544,7 @@ ReplyCommentHandler._followUser = function () {
  */
 ReplyCommentHandler._sendDM = function (content) {
   // 点击私信按钮
-  var messageClicked = this.safeClick("message_button", 3);
+  var messageClicked = this.safeClick("dm_entry_btn", 3);
   if (!messageClicked) {
     logger.warn(TAG, "私信按钮未找到");
     return false;
@@ -561,7 +561,7 @@ ReplyCommentHandler._sendDM = function (content) {
 
   // 通过键盘回车发送
   sleep(500);
-  this.submitViaKeyboard();
+  this.submitViaKeyboard("dm_send");
   sleep(1000);
   logger.info(TAG, "私信已发送: '" + content.substring(0, 20) + "'");
   return true;

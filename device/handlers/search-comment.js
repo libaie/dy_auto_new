@@ -74,7 +74,7 @@ SearchCommentHandler._interactWithVideo = function (content, stats) {
 
   // 4. 通过键盘回车发送
   sleep(500);
-  this.submitViaKeyboard();
+  this.submitViaKeyboard("comment_submit");
   sleep(1000);
 
   // 5. 关闭评论面板

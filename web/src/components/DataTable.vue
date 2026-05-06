@@ -61,7 +61,9 @@ const goToPage = (p) => {
                 class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider"
                 :class="col.headerClass"
               >
-                {{ col.label }}
+                <slot :name="`header-${col.key}`" :col="col">
+                  {{ col.label }}
+                </slot>
               </th>
             </tr>
           </thead>

@@ -838,6 +838,12 @@ onUnmounted(() => {
       :page-size="pageSize"
       @page-change="handlePageChange"
     >
+      <!-- Select column header -->
+      <template #header-select>
+        <input type="checkbox" :checked="tasks.length > 0 && selectedTaskIds.length === tasks.length"
+          @change="toggleSelectAll" class="rounded" />
+      </template>
+
       <!-- Select column -->
       <template #cell-select="{ row }">
         <input type="checkbox" :value="row.id" v-model="selectedTaskIds" class="rounded" />

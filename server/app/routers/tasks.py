@@ -171,13 +171,17 @@ def list_tasks(
     return {"tasks": tasks, "total": total}
 
 
+class BatchDeleteRequest(BaseModel):
+    task_ids: list[str]
+
+
 @router.post("/batch-delete")
 def batch_delete_tasks(
-    task_ids: list[str],
+    body: BatchDeleteRequest,
     db: Session = Depends(get_db),
     _: str = Depends(verify_admin_token),
 ):
-    count = task_service.delete_tasks_batch(db, task_ids)
+    count = task_service.delete_tasks_batch(db, body.task_ids)
     return {"deleted": count}
 
 

@@ -309,17 +309,23 @@ class TaskService:
         if not task_ids:
             return 0
         from app.db_models import ChannelItem
-        # Reset associated channel items
-        channel_items = db.query(ChannelItem).filter(ChannelItem.task_id.in_(task_ids)).all()
+        # Only delete non-running tasks; running tasks are protected
+        deletable = db.query(DBTask.id).filter(
+            DBTask.id.in_(task_ids),
+            DBTask.status != TaskStatus.RUNNING.value,
+        ).all()
+        deletable_ids = [t[0] for t in deletable]
+        if not deletable_ids:
+            return 0
+        # Reset channel items only for tasks that will actually be deleted
+        channel_items = db.query(ChannelItem).filter(ChannelItem.task_id.in_(deletable_ids)).all()
         for ci in channel_items:
             ci.status = "pending"
             ci.assigned_device_id = None
             ci.assigned_at = None
             ci.task_id = None
-        # Delete non-running tasks
         result = db.query(DBTask).filter(
-            DBTask.id.in_(task_ids),
-            DBTask.status != TaskStatus.RUNNING.value,
+            DBTask.id.in_(deletable_ids),
         ).delete(synchronize_session=False)
         db.commit()
         return result

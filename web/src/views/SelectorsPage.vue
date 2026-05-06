@@ -104,6 +104,7 @@ const categoryTabs = [
   { key: 'video', label: '视频相关' },
   { key: 'sort', label: '排序相关' },
   { key: 'system', label: '系统相关' },
+  { key: '', label: '未分类' },
 ]
 
 const categoryOptions = [
@@ -119,6 +120,19 @@ const categoryOptions = [
 function getCategoryLabel(cat) {
   const opt = categoryOptions.find(o => o.value === cat)
   return opt ? opt.label : '未分类'
+}
+
+const categoryColorMap = {
+  search: 'bg-blue-500/15 text-blue-300 border-blue-500/25',
+  comment: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25',
+  dm: 'bg-pink-500/15 text-pink-300 border-pink-500/25',
+  video: 'bg-amber-500/15 text-amber-300 border-amber-500/25',
+  sort: 'bg-violet-500/15 text-violet-300 border-violet-500/25',
+  system: 'bg-slate-500/15 text-slate-300 border-slate-500/25',
+}
+
+function getCategoryClass(cat) {
+  return categoryColorMap[cat] || 'bg-cyan-500/15 text-cyan-300 border-cyan-500/25'
 }
 
 const filteredSelectors = computed(() => {
@@ -447,7 +461,10 @@ onMounted(fetchSelectors)
               </span>
               <span
                 v-if="sel.category"
-                class="inline-flex items-center rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/25 px-2.5 py-0.5 text-xs font-medium"
+                :class="[
+                  'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium',
+                  getCategoryClass(sel.category),
+                ]"
                 :title="'操作分类：' + getCategoryLabel(sel.category)"
               >
                 {{ getCategoryLabel(sel.category) }}

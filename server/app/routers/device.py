@@ -1,6 +1,7 @@
 """Device-facing API — poll, report, heartbeat, selectors."""
 from fastapi import APIRouter, HTTPException, Query, Depends, UploadFile, File as FastAPIFile, WebSocket, Request
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
 from typing import Optional
 from sqlalchemy.orm import Session
 import asyncio
@@ -613,6 +614,55 @@ def report_risk(
         channel_service.on_risk_control(db, report.account_id)
         db.commit()
     return {"status": "acknowledged", "account_status": account.status}
+
+
+class CommentRepliedRequest(BaseModel):
+    author: str = Field(..., description="评论作者")
+    text: str = Field(..., description="评论内容")
+
+
+@router.post("/comment-check-replied")
+def check_comment_replied(
+    request: CommentRepliedRequest,
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_device_secret),
+):
+    """检查一条评论是否已被任何设备回复过（全局去重）"""
+    import hashlib
+    content_hash = hashlib.sha256(
+        (request.author + request.text).encode("utf-8")
+    ).hexdigest()
+    from app.db_models import RepliedComment
+    existing = db.query(RepliedComment).filter(
+        RepliedComment.content_hash == content_hash
+    ).first()
+    return {"replied": existing is not None, "hash": content_hash}
+
+
+@router.post("/comment-mark-replied")
+def mark_comment_replied(
+    request: CommentRepliedRequest,
+    db: Session = Depends(get_db),
+    authed_device_id: str = Depends(verify_device_secret),
+):
+    """标记一条评论已被回复（全局去重）"""
+    import hashlib
+    content_hash = hashlib.sha256(
+        (request.author + request.text).encode("utf-8")
+    ).hexdigest()
+    from app.db_models import RepliedComment
+    existing = db.query(RepliedComment).filter(
+        RepliedComment.content_hash == content_hash
+    ).first()
+    if not existing:
+        db.add(RepliedComment(
+            content_hash=content_hash,
+            author=request.author,
+            text=request.text,
+            replied_by_device=authed_device_id,
+        ))
+        db.commit()
+    return {"ok": True, "hash": content_hash}
 
 
 @router.post("/generate-content", response_model=DeviceGenerateResponse)

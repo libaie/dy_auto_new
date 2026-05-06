@@ -333,15 +333,23 @@ var apiClient = {
    * @param {string} riskType - 风控类型 (captcha, risk_control, verify)
    * @param {Object} detail - 风控详情
    */
+  checkCommentReplied: function (author, text) {
+    return this.post("/api/device/comment-check-replied", {
+      author: author,
+      text: text,
+    });
+  },
+
+  markCommentReplied: function (author, text) {
+    return this.post("/api/device/comment-mark-replied", {
+      author: author,
+      text: text,
+    });
+  },
+
   reportRiskControl: function (accountId, riskType, detail) {
     return this.post("/api/device/risk-report", {
       account_id: accountId,
-      risk_type: riskType,
-      detail: detail || {},
-      device_id: config.deviceId,
-      timestamp: new Date().toISOString(),
-    });
-  },
 
   isOnline: function () {
     return isOnline;

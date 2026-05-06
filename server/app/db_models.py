@@ -223,6 +223,17 @@ class ChainInstance(Base):
     tasks = relationship("Task", back_populates="chain_instance")
 
 
+class RepliedComment(Base):
+    """已回复的评论去重表 — 基于作者+内容哈希全局去重"""
+    __tablename__ = "replied_comments"
+
+    content_hash = Column(String(64), primary_key=True)  # SHA256 of author+text
+    author = Column(String(200), nullable=False)
+    text = Column(Text, nullable=False)
+    replied_by_device = Column(String(36), nullable=True)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+
+
 class SystemSetting(Base):
     __tablename__ = "system_settings"
 

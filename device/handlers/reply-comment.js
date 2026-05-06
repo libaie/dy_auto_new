@@ -4,6 +4,7 @@ var aiAnalyzer = require("../core/ai-analyzer");
 var uiOperator = require("../core/ui-operator");
 var selectorLoader = require("../core/selector-loader");
 var antiDetect = require("../core/anti-detect");
+var apiClient = require("../core/api-client");
 var logger = require("../utils/logger");
 
 var TAG = "评论回复";
@@ -144,6 +145,17 @@ ReplyCommentHandler.execute = function (params) {
           totalRead++; continue;
         }
 
+        // 全局去重：检查是否已被任何设备回复过
+        var alreadyReplied = false;
+        try {
+          var checkResult = apiClient.checkCommentReplied(comment.nickname, comment.text);
+          alreadyReplied = checkResult && checkResult.replied;
+        } catch (e) { /* 网络异常默认放行 */ }
+        if (alreadyReplied) {
+          logger.info(TAG, "评论已被回复过（全局去重）: " + comment.nickname);
+          totalRead++; continue;
+        }
+
         logger.info(TAG, "分析 " + (processed + 1) + "/" + count +
           ": [" + comment.nickname + "] " + comment.text.substring(0, 30));
 
@@ -175,6 +187,9 @@ ReplyCommentHandler.execute = function (params) {
         logger.info(TAG, "回复: '" + analysis.reply.substring(0, 30) + "...'");
         this._replyToComment(analysis.reply);
         stats.success_count++;
+
+        // 标记已回复（全局去重）
+        try { apiClient.markCommentReplied(comment.nickname, comment.text); } catch (e) { /* ignore */ }
 
         stats.details.push({
           video: v + 1, nickname: comment.nickname,

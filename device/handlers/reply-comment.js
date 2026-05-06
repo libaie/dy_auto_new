@@ -113,9 +113,9 @@ ReplyCommentHandler.execute = function (params) {
 
     var totalComments = items.length;
     logger.info(TAG, "评论可见 " + totalComments + " 条");
-    // 根据预判评论数限制滑动：每批约 5 条，总数不超过预判值
+    // 根据预判评论数限制滑动：每次滑动约加载 3 条（含二级评论）
     var maxBatches = commentCount > 0
-      ? Math.min(10, Math.ceil(commentCount / 4) + 1)
+      ? Math.min(10, Math.ceil(commentCount / 3) + 1)
       : Math.min(10, Math.ceil(count / 3) + 1);
 
     var processed = 0;

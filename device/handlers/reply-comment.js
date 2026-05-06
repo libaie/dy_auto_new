@@ -314,6 +314,8 @@ ReplyCommentHandler.execute = function (params) {
   }
 
   logger.info(TAG, "完成. " + JSON.stringify(stats));
+  // 关闭抖音，等待下一个任务
+  uiOperator.closeApp();
   return { success: true, result: stats };
 };
 

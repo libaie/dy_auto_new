@@ -40,8 +40,12 @@ var uiOperator = {
    * 关闭抖音
    */
   closeApp: function () {
-    logger.info(TAG, "正在关闭抖音...");
-    app.stop("com.ss.android.ugc.aweme");
+    logger.info(TAG, "正在返回桌面...");
+    try {
+      home();
+    } catch (e) {
+      // home() 失败不阻塞
+    }
     sleep(1000);
   },
 
@@ -80,7 +84,7 @@ var uiOperator = {
    * @returns {UiObject|null} 找到的控件，或 null
    */
   findElement: function (actionName, timeout) {
-    timeout = timeout || 5000;
+    timeout = timeout || 2000;
     var selector = selectorLoader.get(actionName);
     if (!selector) {
       logger.error(TAG, "未找到选择器配置: " + actionName);

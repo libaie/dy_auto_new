@@ -82,10 +82,10 @@ var BaseHandler = {
   _extractVideoText: function () {
     var parts = [];
     try {
-      var desc = id("com.ss.android.ugc.aweme:id/desc").findOnce();
+      var desc = id("com.ss.android.ugc.aweme:id/desc").findOne(2000);
       if (desc && desc.text()) parts.push(desc.text());
 
-      var author = id("com.ss.android.ugc.aweme:id/nickname").findOnce();
+      var author = id("com.ss.android.ugc.aweme:id/nickname").findOne(2000);
       if (author && author.text()) parts.push(author.text());
 
       var hashtags = className("android.widget.TextView").find();

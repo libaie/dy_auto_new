@@ -3,6 +3,7 @@ var BaseHandler = require("./base-handler");
 var uiOperator = require("../core/ui-operator");
 var antiDetect = require("../core/anti-detect");
 var logger = require("../utils/logger");
+var aiAnalyzer = require("../core/ai-analyzer");
 
 var TAG = "搜索";
 
@@ -27,11 +28,21 @@ SearchBaseHandler.execute = function (params) {
   var content = params.content || "";
   var sortBy = params.sort_by || "";
 
+  
+  aiAnalyzer.useTemplate(params.prompt_template_id);
+
   if (!keyword) {
     return { success: false, error: "缺少关键词" };
   }
 
   logger.info(TAG, "搜索: '" + keyword + "', 数量=" + count + ", 排序=" + sortBy);
+
+  var taskId = params.task_id || "";
+  var apiClient = require("../core/api-client");
+  function _reportProgress(step, detail, prog) {
+    if (taskId) { try { apiClient.reportProgress(taskId, step, detail, prog); } catch (e) {} }
+  }
+  _reportProgress("搜索: " + keyword, "开始搜索", 0);
 
   if (!this.ensureAppActive()) {
     return { success: false, error: "打开抖音失败" };
@@ -132,7 +143,7 @@ SearchBaseHandler._openSearch = function () {
  * 使用 setText 直接设置（测试验证可用）
  */
 SearchBaseHandler._inputKeyword = function (keyword) {
-  var editBox = className("EditText").findOnce();
+  var editBox = className("EditText").findOne(2000);
   if (!editBox) {
     logger.warn(TAG, "搜索输入框未找到");
     return false;

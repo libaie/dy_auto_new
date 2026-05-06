@@ -30,3 +30,5 @@ server/app/data/*.log
 # Node (AutoJS6 device scripts don't use node_modules, but just in case)
 node_modules/
 .gstack/
+*.db-shm
+*.db-wal

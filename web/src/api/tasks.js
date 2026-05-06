@@ -15,3 +15,11 @@ export function batchCreateTasks(data) {
 export function cancelTask(id) {
   return client.post(`/tasks/${id}/cancel`)
 }
+
+export function deleteTask(id) {
+  return client.delete(`/tasks/${id}`)
+}
+
+export function batchDeleteTasks(taskIds) {
+  return client.post('/tasks/batch-delete', { task_ids: taskIds })
+}

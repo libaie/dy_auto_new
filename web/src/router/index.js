@@ -67,6 +67,11 @@ const routes = [
         component: () => import('../views/ContentPage.vue'),
       },
       {
+        path: 'prompt-templates',
+        name: 'PromptTemplates',
+        component: () => import('../views/PromptTemplatesPage.vue'),
+      },
+      {
         path: 'settings',
         name: 'Settings',
         component: () => import('../views/SettingsPage.vue'),

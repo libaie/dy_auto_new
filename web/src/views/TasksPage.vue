@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import {
   Dialog,
   DialogPanel,
@@ -10,12 +10,13 @@ import {
 import DataTable from '../components/DataTable.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
-import { listTasks, createTask, batchCreateTasks, cancelTask } from '../api/tasks.js'
+import { listTasks, createTask, batchCreateTasks, cancelTask, deleteTask, batchDeleteTasks } from '../api/tasks.js'
 import { listChannels, updateChannel, deleteChannel as deleteChannelApi } from '../api/channels.js'
 import { listAccounts } from '../api/accounts.js'
 import { listGroups } from '../api/accountGroups.js'
 import { listDevices } from '../api/devices.js'
 import { listTemplates, generateKeywords } from '../api/content.js'
+import { listTemplates as listPromptTemplates } from '../api/promptTemplates.js'
 import { formatDate } from '../utils/format.js'
 import { useToastStore } from '../stores/toast.js'
 import TipIcon from '../components/TipIcon.vue'
@@ -69,6 +70,22 @@ const devices = ref([])
 // --- Templates for create form ---
 const templates = ref([])
 const selectedTemplateId = ref('')
+
+// --- Prompt templates ---
+const promptTemplates = ref([])
+const selectedPromptTemplateId = ref('')
+
+// --- Search & sort state ---
+const searchQuery = ref('')
+const typeFilter = ref('')
+const sortBy = ref('created_at')
+const sortOrder = ref('desc')
+const selectedTaskIds = ref([])
+const batchDeleting = ref(false)
+
+// --- Real-time state via WebSocket ---
+const taskProgress = reactive({})
+let adminWs = null
 
 // --- Create dialog state ---
 const showCreateDialog = ref(false)
@@ -176,33 +193,82 @@ const toast = useToastStore()
 
 // --- Table columns ---
 const columns = [
-  { key: 'type', label: '任务类型' },
+  { key: 'select', label: '', headerClass: 'w-8', cellClass: 'w-8' },
+  { key: 'type', label: '任务类型', sortable: true },
+  { key: 'keyword', label: '关键词' },
   { key: 'account_id', label: '账号ID' },
   { key: 'device_id', label: '执行设备' },
+  { key: 'progress', label: '执行进度' },
   { key: 'status', label: '状态' },
-  { key: 'created_at', label: '创建时间' },
+  { key: 'created_at', label: '创建时间', sortable: true },
   { key: 'actions', label: '操作', headerClass: 'text-right', cellClass: 'text-right' },
 ]
 
 // --- Fetch tasks ---
-async function fetchTasks() {
-  loading.value = true
+async function fetchTasks(silent) {
+  if (!silent) loading.value = true
   try {
     const skip = (page.value - 1) * pageSize
-    const params = { skip, limit: pageSize }
-    if (statusFilter.value) {
-      params.status = statusFilter.value
-    }
+    const params = { skip, limit: pageSize, sort_by: sortBy.value, sort_order: sortOrder.value }
+    if (statusFilter.value) params.status = statusFilter.value
+    if (typeFilter.value) params.type = typeFilter.value
+    if (searchQuery.value) params.search = searchQuery.value
     const res = await listTasks(params)
     tasks.value = res.data.tasks || []
     total.value = res.data.total || 0
+    selectedTaskIds.value = []
   } catch (e) {
-    toast.error('加载任务列表失败')
+    if (!silent) toast.error('加载任务列表失败')
     tasks.value = []
     total.value = 0
   } finally {
     loading.value = false
   }
+}
+
+const industryLabels = { health: '大健康', travel: '旅游', education: '教育', finance: '金融', beauty: '美妆' }
+function ptIndustryLabel(v) { return industryLabels[v] || v }
+
+async function fetchPromptTemplates_() {
+  try { const r = await listPromptTemplates(false); promptTemplates.value = r.data.templates.filter(t => t.enabled) || [] } catch {}
+}
+
+async function handleDeleteTask(row) {
+  try { await deleteTask(row.id); toast.success('已删除'); fetchTasks() } catch (e) { toast.error('删除失败') }
+}
+
+async function handleBatchDelete() {
+  if (!selectedTaskIds.value.length) { toast.error('请先选择任务'); return }
+  batchDeleting.value = true
+  try {
+    const res = await batchDeleteTasks(selectedTaskIds.value)
+    toast.success(`已删除 ${res.data.deleted} 个任务`)
+    fetchTasks()
+  } catch (e) { toast.error('批量删除失败') }
+  finally { batchDeleting.value = false }
+}
+
+function handleSort(col) { if (sortBy.value === col) { sortOrder.value = sortOrder.value === 'desc' ? 'asc' : 'desc' } else { sortBy.value = col; sortOrder.value = 'desc' } fetchTasks() }
+
+function toggleSelectAll() {
+  if (selectedTaskIds.value.length === tasks.value.length) { selectedTaskIds.value = [] }
+  else { selectedTaskIds.value = tasks.value.map(t => t.id) }
+}
+
+// --- Admin WebSocket ---
+function connectAdminWs() {
+  const token = localStorage.getItem('token') || ''
+  const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
+  adminWs = new WebSocket(`${protocol}//${location.host}/api/devices/ws/pair-events?token=${encodeURIComponent(token)}`)
+  adminWs.onmessage = (e) => {
+    try {
+      const msg = JSON.parse(e.data)
+      if (msg.event === 'task_updated') { fetchTasks(true) }
+      else if (msg.event === 'task_progress') { taskProgress[msg.task_id] = { step: msg.step, detail: msg.detail, progress: msg.progress } }
+    } catch {}
+  }
+  adminWs.onclose = () => { setTimeout(connectAdminWs, 5000) }
+  adminWs.onerror = () => { adminWs?.close() }
 }
 
 // --- Fetch channels ---
@@ -674,6 +740,12 @@ onMounted(() => {
   fetchGroups()
   fetchDevices()
   fetchTemplates()
+  fetchPromptTemplates_()
+  connectAdminWs()
+})
+
+onUnmounted(() => {
+  if (adminWs) { adminWs.onclose = null; adminWs.close(); adminWs = null }
 })
 </script>
 
@@ -705,10 +777,20 @@ onMounted(() => {
     <div class="flex items-center justify-between mb-6">
       <h1 class="text-2xl font-bold text-white">任务管理</h1>
       <div class="flex items-center gap-3">
+        <!-- Search -->
+        <input v-model="searchQuery" @keyup.enter="page=1;fetchTasks()" placeholder="搜索账号/设备/关键词..."
+          class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 w-48" />
+        <!-- Type filter -->
+        <select v-model="typeFilter" @change="page=1;fetchTasks()"
+          class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200">
+          <option value="">全部类型</option>
+          <option v-for="opt in taskTypeOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+        </select>
         <!-- Status filter -->
         <select
           v-model="statusFilter"
           class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200"
+          @change="page=1;fetchTasks()"
         >
           <option
             v-for="opt in statusFilterOptions"
@@ -718,6 +800,11 @@ onMounted(() => {
             {{ opt.label }}
           </option>
         </select>
+        <!-- Batch delete -->
+        <button v-if="selectedTaskIds.length > 0" class="px-3 py-2 text-sm font-medium text-red-400 hover:bg-red-400/10 rounded-lg"
+          @click="handleBatchDelete" :disabled="batchDeleting">
+          {{ batchDeleting ? '...' : `删除选中(${selectedTaskIds.length})` }}
+        </button>
         <!-- Keyword search button -->
         <button
           class="inline-flex items-center px-4 py-2 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white text-sm font-medium rounded-xl hover:from-emerald-500 hover:to-emerald-400 transition-all shadow-lg shadow-emerald-500/25"
@@ -751,9 +838,19 @@ onMounted(() => {
       :page-size="pageSize"
       @page-change="handlePageChange"
     >
+      <!-- Select column -->
+      <template #cell-select="{ row }">
+        <input type="checkbox" :value="row.id" v-model="selectedTaskIds" class="rounded" />
+      </template>
+
       <!-- Type column -->
       <template #cell-type="{ value }">
         {{ typeLabelMap[value] || value }}
+      </template>
+
+      <!-- Keyword column -->
+      <template #cell-keyword="{ row }">
+        <span class="text-slate-300 text-sm">{{ row.params?.keyword || row.params?.keywords?.[0] || '-' }}</span>
       </template>
 
       <!-- Account column -->
@@ -769,6 +866,15 @@ onMounted(() => {
           {{ devices.find(d => d.id === value)?.name || value }}
         </span>
         <span v-else class="text-slate-500">自动分配</span>
+      </template>
+
+      <!-- Progress column -->
+      <template #cell-progress="{ row }">
+        <div v-if="taskProgress[row.id]" class="flex flex-col gap-0.5 min-w-[140px]">
+          <span class="text-xs text-cyan-400">{{ taskProgress[row.id].step }}</span>
+          <span class="text-[11px] text-slate-500">{{ taskProgress[row.id].detail }}</span>
+        </div>
+        <span v-else class="text-xs text-slate-500">-</span>
       </template>
 
       <!-- Status column -->
@@ -791,6 +897,11 @@ onMounted(() => {
           >
             取消
           </button>
+          <button
+            v-if="row.status === 'failed' || row.status === 'cancelled'"
+            class="inline-flex items-center px-3 py-1 text-sm font-medium text-orange-400 hover:text-orange-300 hover:bg-orange-400/10 rounded-lg transition-colors"
+            @click="handleDeleteTask(row)"
+          >删除</button>
         </div>
       </template>
     </DataTable>

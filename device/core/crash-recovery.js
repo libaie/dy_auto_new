@@ -61,7 +61,7 @@ var crashRecovery = {
 
     for (var i = 0; i < dialogButtons.length; i++) {
       try {
-        var btn = text(dialogButtons[i]).findOnce();
+        var btn = text(dialogButtons[i]).findOne(2000);
         if (btn) {
           logger.info(TAG, "Found dialog button: " + dialogButtons[i]);
           btn.click();
@@ -83,7 +83,7 @@ var crashRecovery = {
       var pattern = riskPatterns[j];
       for (var k = 0; k < pattern.keywords.length; k++) {
         try {
-          var riskEl = textContains(pattern.keywords[k]).findOnce();
+          var riskEl = textContains(pattern.keywords[k]).findOne(2000);
           if (riskEl) {
             logger.warn(TAG, "Risk detected: " + pattern.type + " (" + pattern.keywords[k] + ")");
             // 上报服务端
@@ -110,7 +110,7 @@ var crashRecovery = {
 
   checkANR: function () {
     try {
-      var anrBtn = text("等待").findOnce();
+      var anrBtn = text("等待").findOne(2000);
       if (anrBtn) {
         logger.warn(TAG, "ANR detected, clicking 'Wait'");
         anrBtn.click();

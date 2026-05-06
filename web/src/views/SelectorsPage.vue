@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, onMounted, watch } from 'vue'
+import { ref, reactive, onMounted, watch, computed } from 'vue'
 import {
   Dialog,
   DialogPanel,
@@ -94,6 +94,47 @@ const selectors = ref([])
 const loading = ref(false)
 const includeDisabled = ref(false)
 
+// --- Category filter ---
+const categoryFilter = ref('all')
+const categoryTabs = [
+  { key: 'all', label: '全部' },
+  { key: 'search', label: '搜索相关' },
+  { key: 'comment', label: '评论相关' },
+  { key: 'dm', label: '私信相关' },
+  { key: 'video', label: '视频相关' },
+  { key: 'sort', label: '排序相关' },
+  { key: 'system', label: '系统相关' },
+]
+
+const categoryOptions = [
+  { value: '', label: '未分类' },
+  { value: 'search', label: '搜索相关' },
+  { value: 'comment', label: '评论相关' },
+  { value: 'dm', label: '私信相关' },
+  { value: 'video', label: '视频相关' },
+  { value: 'sort', label: '排序相关' },
+  { value: 'system', label: '系统相关' },
+]
+
+function getCategoryLabel(cat) {
+  const opt = categoryOptions.find(o => o.value === cat)
+  return opt ? opt.label : '未分类'
+}
+
+const filteredSelectors = computed(() => {
+  if (categoryFilter.value === 'all') return selectors.value
+  return selectors.value.filter(s => (s.category || '') === categoryFilter.value)
+})
+
+const categoryCounts = computed(() => {
+  const counts = { all: selectors.value.length }
+  for (const s of selectors.value) {
+    const cat = s.category || ''
+    counts[cat] = (counts[cat] || 0) + 1
+  }
+  return counts
+})
+
 // --- Form / Dialog state ---
 const showFormDialog = ref(false)
 const isEditing = ref(false)
@@ -105,6 +146,7 @@ const defaultForm = {
   description: '',
   platform_version: '',
   strategies: '[]',
+  category: '',
 }
 const form = reactive({ ...defaultForm })
 
@@ -194,8 +236,10 @@ function formatStrategies(strategies) {
 function openCreateDialog() {
   isEditing.value = false
   form.action_name = ''
+  form.description = ''
   form.platform_version = ''
   form.strategies = '[]'
+  form.category = ''
   editMode.value = 'form'
   strategyList.value = []
   formError.value = null
@@ -209,6 +253,7 @@ function openEditDialog(sel) {
   form.description = sel.description || ''
   form.platform_version = sel.platform_version || ''
   form.strategies = JSON.stringify(sel.strategies || [], null, 2)
+  form.category = sel.category || ''
   editMode.value = 'form'
   syncStrategiesToList()
   formError.value = null
@@ -241,6 +286,7 @@ async function handleSave() {
     strategies: parsedStrategies,
     platform_version: form.platform_version.trim() || undefined,
     description: form.description.trim() || '',
+    category: form.category || '',
   }
 
   try {
@@ -340,16 +386,36 @@ onMounted(fetchSelectors)
       </div>
     </div>
 
+    <!-- Category tabs -->
+    <div class="flex items-center gap-2 mb-4 overflow-x-auto pb-1">
+      <button
+        v-for="tab in categoryTabs"
+        :key="tab.key"
+        :class="[
+          'px-3 py-1.5 text-sm font-medium rounded-lg whitespace-nowrap transition-colors',
+          categoryFilter === tab.key
+            ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+            : 'text-slate-400 hover:text-slate-200 hover:bg-white/5 border border-transparent',
+        ]"
+        @click="categoryFilter = tab.key"
+      >
+        {{ tab.label }}
+        <span v-if="categoryCounts[tab.key]" class="ml-1 text-xs opacity-60">
+          ({{ categoryCounts[tab.key] || 0 }})
+        </span>
+      </button>
+    </div>
+
     <!-- Loading -->
     <LoadingSpinner v-if="loading" />
 
     <!-- Empty state -->
-    <EmptyState v-else-if="selectors.length === 0" message="暂无选择器" />
+    <EmptyState v-else-if="filteredSelectors.length === 0" :message="categoryFilter === 'all' ? '暂无选择器' : '当前分类暂无选择器'" />
 
     <!-- Selector cards -->
     <div v-else class="grid gap-4">
       <div
-        v-for="sel in selectors"
+        v-for="sel in filteredSelectors"
         :key="sel.action_name"
         :class="[
           'glass-card p-5 transition-opacity',
@@ -378,6 +444,13 @@ onMounted(fetchSelectors)
                 :title="'适配的抖音版本：' + sel.platform_version"
               >
                 平台 {{ sel.platform_version }}
+              </span>
+              <span
+                v-if="sel.category"
+                class="inline-flex items-center rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/25 px-2.5 py-0.5 text-xs font-medium"
+                :title="'操作分类：' + getCategoryLabel(sel.category)"
+              >
+                {{ getCategoryLabel(sel.category) }}
               </span>
               <span
                 v-if="!sel.enabled"
@@ -548,6 +621,23 @@ onMounted(fetchSelectors)
                       placeholder="例如 29.0.0（留空表示所有版本）"
                     />
                     <p class="mt-1 text-xs text-slate-500">抖音 App 版本号，用于多版本适配，留空表示通用</p>
+                  </div>
+
+                  <!-- category -->
+                  <div>
+                    <label for="sel-category" class="flex items-center gap-1.5 text-sm font-medium text-slate-300">
+                      操作分类
+                    </label>
+                    <select
+                      id="sel-category"
+                      v-model="form.category"
+                      class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200"
+                    >
+                      <option v-for="opt in categoryOptions" :key="opt.value" :value="opt.value">
+                        {{ opt.label }}
+                      </option>
+                    </select>
+                    <p class="mt-1 text-xs text-slate-500">选择此选择器所属的操作模块分类，方便筛选和维护</p>
                   </div>
 
                   <!-- strategies -->

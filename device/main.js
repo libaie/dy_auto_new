@@ -2,6 +2,7 @@
 var config = require("./config");
 var apiClient = require("./core/api-client");
 var selectorLoader = require("./core/selector-loader");
+var promptTemplateLoader = require("./core/prompt-template-loader");
 var taskExecutor = require("./core/task-executor");
 var logger = require("./utils/logger");
 var updateChecker = require("./core/update-checker");
@@ -290,6 +291,10 @@ function startMainLoop(serverUrl, secret) {
       logger.info(TAG, "选择器更新: v" + version);
       selectorLoader.checkAndUpdate(version);
     },
+    onPromptTemplatesUpdated: function (version) {
+      logger.info(TAG, "提示词模板更新: v" + version);
+      promptTemplateLoader.checkAndUpdate(version);
+    },
     onConfigUpdated: function (serverConfig, proxy) {
       if (serverConfig) applyServerConfig(serverConfig);
       if (proxy) apiClient.setProxy(proxy);
@@ -327,6 +332,7 @@ function startMainLoop(serverUrl, secret) {
   // 启动 WS
   // 初始化选择器（必须在 WS 连接前完成，否则 catch-up 任务找不到选择器）
   selectorLoader.init();
+  promptTemplateLoader.init();
 
   try {
     deviceWs.start();
@@ -393,6 +399,7 @@ function startMainLoop(serverUrl, secret) {
       if (response.device_config) applyServerConfig(response.device_config);
       if (response.anti_detect_config) antiDetect.updateFromServer(response.anti_detect_config);
       if (response.selectors_version) selectorLoader.checkAndUpdate(response.selectors_version);
+      if (response.prompt_templates_version) promptTemplateLoader.checkAndUpdate(response.prompt_templates_version);
 
       if (response.cancelled_task_id) {
         logger.info(TAG, "catch-up: 服务端取消任务: " + response.cancelled_task_id);
@@ -466,15 +473,15 @@ function applyServerConfig(serverConfig) {
         for (var i = 0; i < 10; i++) {
           sleep(500);
           try {
-            var btn = text("立即开始").findOnce();
+            var btn = text("立即开始").findOne(2000);
             if (btn) { btn.click(); break; }
           } catch (e) {}
           try {
-            var btn2 = text("允许").findOnce();
+            var btn2 = text("允许").findOne(2000);
             if (btn2) { btn2.click(); break; }
           } catch (e) {}
           try {
-            var btn3 = text("START NOW").findOnce();
+            var btn3 = text("START NOW").findOne(2000);
             if (btn3) { btn3.click(); break; }
           } catch (e) {}
         }

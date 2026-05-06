@@ -14,7 +14,7 @@ from contextlib import asynccontextmanager
 
 from app.database import get_db, init_db, SessionLocal
 from app.seed import seed_all
-from app.routers import device, tasks, accounts, devices, auth, selectors, stats, content, account_groups, chains, settings, channels
+from app.routers import device, tasks, accounts, devices, auth, selectors, stats, content, account_groups, chains, settings, channels, prompt_templates
 from app.services.ai_generator import ai_generator
 
 
@@ -114,6 +114,7 @@ app.include_router(account_groups.router)
 app.include_router(chains.router)
 app.include_router(settings.router)
 app.include_router(channels.router)
+app.include_router(prompt_templates.router)
 
 
 @app.get("/health")

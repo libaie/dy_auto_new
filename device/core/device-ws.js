@@ -123,6 +123,10 @@ var deviceWs = {
           logger.info(TAG, "选择器已更新: v" + msg.version);
           if (this._callbacks.onSelectorsUpdated) this._callbacks.onSelectorsUpdated(msg.version);
           break;
+        case "prompt_templates_updated":
+          logger.info(TAG, "提示词模板已更新: v" + msg.version);
+          if (this._callbacks.onPromptTemplatesUpdated) this._callbacks.onPromptTemplatesUpdated(msg.version);
+          break;
         case "config_updated":
           logger.info(TAG, "配置已更新");
           if (this._callbacks.onConfigUpdated) this._callbacks.onConfigUpdated(msg.config, msg.proxy);

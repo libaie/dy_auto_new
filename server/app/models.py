@@ -28,6 +28,7 @@ class Task(BaseModel):
     device_id: str = ""
     params: dict[str, Any] = Field(default_factory=dict)
     status: TaskStatus = TaskStatus.PENDING
+    created_at: Optional[datetime] = None
     scheduled_at: Optional[datetime] = None
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
@@ -166,6 +167,13 @@ TASK_PARAMS_VALIDATORS = {
 }
 
 
+class TaskProgressReport(BaseModel):
+    task_id: str
+    step: str = ""          # 当前步骤描述，如 "处理视频 2/3"
+    detail: str = ""        # 详情，如 "已回复 5/15 条评论"
+    progress: float = 0.0   # 0.0-1.0 进度
+
+
 class TaskResultReport(BaseModel):
     task_id: str
     status: TaskStatus
@@ -176,6 +184,7 @@ class TaskResultReport(BaseModel):
 class PollResponse(BaseModel):
     task: Optional[Task] = None
     selectors_version: int = 1
+    prompt_templates_version: int = 1
     proxy: Optional[dict[str, Any]] = None
     cancelled_task_id: Optional[str] = None
     anti_detect_config: Optional[dict[str, Any]] = None

@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy.orm import Session
-from sqlalchemy import update, or_, and_, null
+from sqlalchemy import update, or_, and_, null, String
 
 from app.db_models import Task as DBTask, Device as DBDevice
 from app.models import TaskType, TaskStatus, Task as PydanticTask
@@ -21,6 +21,7 @@ def _db_task_to_pydantic(task: DBTask) -> PydanticTask:
         device_id=task.device_id or "",
         params=task.params or {},
         status=TaskStatus(task.status),
+        created_at=task.created_at,
         scheduled_at=task.scheduled_at,
         started_at=task.started_at,
         completed_at=task.completed_at,
@@ -224,17 +225,39 @@ class TaskService:
         db.refresh(db_task)
         return _db_task_to_pydantic(db_task), channel_broadcast_info
 
-    def list_tasks(self, db: Session, status: Optional[TaskStatus] = None, skip: int = 0, limit: int = 50) -> list[PydanticTask]:
+    def list_tasks(self, db: Session, status=None, task_type: str = None, search: str = None,
+                   sort_by: str = "created_at", sort_order: str = "desc",
+                   skip: int = 0, limit: int = 50) -> list[PydanticTask]:
         query = db.query(DBTask)
         if status:
-            query = query.filter(DBTask.status == status.value)
-        db_tasks = query.order_by(DBTask.created_at.desc()).offset(skip).limit(limit).all()
+            query = query.filter(DBTask.status == (status.value if hasattr(status, 'value') else status))
+        if task_type:
+            query = query.filter(DBTask.type == task_type)
+        if search:
+            pattern = f"%{search}%"
+            query = query.filter(or_(
+                DBTask.account_id.like(pattern),
+                DBTask.device_id.like(pattern),
+                DBTask.params.like(pattern),
+            ))
+        col = getattr(DBTask, sort_by, DBTask.created_at)
+        order = col.desc() if sort_order == "desc" else col.asc()
+        db_tasks = query.order_by(order).offset(skip).limit(limit).all()
         return [_db_task_to_pydantic(t) for t in db_tasks]
 
-    def count_tasks(self, db: Session, status: Optional[TaskStatus] = None) -> int:
+    def count_tasks(self, db: Session, status=None, task_type: str = None, search: str = None) -> int:
         query = db.query(DBTask)
         if status:
-            query = query.filter(DBTask.status == status.value)
+            query = query.filter(DBTask.status == (status.value if hasattr(status, 'value') else status))
+        if task_type:
+            query = query.filter(DBTask.type == task_type)
+        if search:
+            pattern = f"%{search}%"
+            query = query.filter(or_(
+                DBTask.account_id.like(pattern),
+                DBTask.device_id.like(pattern),
+                DBTask.params.like(pattern),
+            ))
         return query.count()
 
     def cancel_task(self, db: Session, task_id: str):
@@ -259,6 +282,47 @@ class TaskService:
         db.commit()
         db.refresh(task)
         return _db_task_to_pydantic(task)
+
+    def delete_task(self, db: Session, task_id: str) -> bool:
+        """Delete a task. Only non-running tasks can be deleted. Resets ChannelItem."""
+        task = db.query(DBTask).filter(DBTask.id == task_id).first()
+        if not task:
+            raise ValueError(f"Task {task_id} not found")
+        if task.status == TaskStatus.RUNNING.value:
+            raise ValueError("Cannot delete a running task. Cancel it first.")
+
+        # Reset associated ChannelItem so the keyword can be re-dispatched
+        from app.db_models import ChannelItem
+        channel_item = db.query(ChannelItem).filter(ChannelItem.task_id == task_id).first()
+        if channel_item:
+            channel_item.status = "pending"
+            channel_item.assigned_device_id = None
+            channel_item.assigned_at = None
+            channel_item.task_id = None
+
+        db.delete(task)
+        db.commit()
+        return True
+
+    def delete_tasks_batch(self, db: Session, task_ids: list[str]) -> int:
+        """Delete multiple tasks in batch. Returns count of deleted tasks."""
+        if not task_ids:
+            return 0
+        from app.db_models import ChannelItem
+        # Reset associated channel items
+        channel_items = db.query(ChannelItem).filter(ChannelItem.task_id.in_(task_ids)).all()
+        for ci in channel_items:
+            ci.status = "pending"
+            ci.assigned_device_id = None
+            ci.assigned_at = None
+            ci.task_id = None
+        # Delete non-running tasks
+        result = db.query(DBTask).filter(
+            DBTask.id.in_(task_ids),
+            DBTask.status != TaskStatus.RUNNING.value,
+        ).delete(synchronize_session=False)
+        db.commit()
+        return result
 
     def check_cancelled_running(self, db: Session, device_id: str) -> Optional[PydanticTask]:
         """Check if device has a running task that was cancelled."""

@@ -14,6 +14,7 @@ def _to_dict(sel: UISelector) -> dict:
         "strategies": sel.strategies,
         "version": sel.version,
         "enabled": sel.enabled,
+        "category": sel.category or "",
     }
 
 
@@ -56,7 +57,7 @@ class SelectorService:
 
     def create_selector(self, db: Session, action_name: str, strategies: list,
                         platform_version: str = "default", version: int = 1,
-                        description: str = "") -> dict:
+                        description: str = "", category: str = "") -> dict:
         """Create a new UI selector."""
         existing = db.query(UISelector).filter(
             UISelector.action_name == action_name,
@@ -71,6 +72,7 @@ class SelectorService:
             platform_version=platform_version,
             strategies=strategies,
             version=version,
+            category=category or None,
         )
         db.add(sel)
         db.commit()
@@ -79,7 +81,7 @@ class SelectorService:
 
     def update_selector(self, db: Session, action_name: str,
                         strategies: list = None, platform_version: str = None,
-                        description: str = None) -> dict:
+                        description: str = None, category: str = None) -> dict:
         """Update an existing selector. Auto-bumps version on any change."""
         q = db.query(UISelector).filter(UISelector.action_name == action_name)
         if platform_version:
@@ -94,6 +96,8 @@ class SelectorService:
             sel.platform_version = platform_version
         if description is not None:
             sel.description = description
+        if category is not None:
+            sel.category = category or None
         # Auto-bump version on any change
         sel.version = (sel.version or 1) + 1
 
@@ -124,11 +128,14 @@ class SelectorService:
         db.refresh(sel)
         return _to_dict(sel)
 
-    def list_all_selectors(self, db: Session, include_disabled: bool = False) -> list[dict]:
-        """List all selectors (optionally including disabled ones)."""
+    def list_all_selectors(self, db: Session, include_disabled: bool = False,
+                           category: str = None) -> list[dict]:
+        """List all selectors (optionally including disabled ones and filtering by category)."""
         query = db.query(UISelector)
         if not include_disabled:
             query = query.filter(UISelector.enabled == True)
+        if category:
+            query = query.filter(UISelector.category == category)
         selectors = query.order_by(UISelector.action_name).all()
         return [_to_dict(s) for s in selectors]
 

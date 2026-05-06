@@ -118,6 +118,7 @@ class UISelector(Base):
     strategies = Column(JSON, nullable=False)  # list of {type, value, x_percent, y_percent, priority}
     version = Column(Integer, nullable=False, default=1)
     enabled = Column(Boolean, nullable=False, default=True)
+    category = Column(String(50), nullable=True, default=None, index=True)
     created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
@@ -287,3 +288,18 @@ class ChannelItem(Base):
     account = relationship("Account")
     device = relationship("Device")
     task = relationship("Task")
+
+
+class PromptTemplate(Base):
+    """AI 提示词模板 — 按行业可配置，设备端同步后按 template_id 加载"""
+    __tablename__ = "prompt_templates"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    name = Column(String(100), nullable=False, unique=True, index=True)
+    industry = Column(String(50), nullable=False, default="health", index=True)
+    description = Column(String(200), nullable=False, default="")
+    content = Column(JSON, nullable=False)  # 完整提示词结构: { identity, semanticGuide, analysis, ... }
+    version = Column(Integer, nullable=False, default=1)
+    enabled = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))

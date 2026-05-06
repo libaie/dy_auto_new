@@ -38,6 +38,9 @@ NurtureHandler._executeV2 = function (params) {
   // Store keyword matrix for content filtering
   this._keywordMatrix = params.keyword_matrix || [];
 
+  // 加载服务端提示词模板
+  aiAnalyzer.useTemplate(params.prompt_template_id);
+
   logger.info(TAG, "开始养号 V2, 子任务数=" + subTasks.length + ", 模式=" + completionMode +
     (this._keywordMatrix.length > 0 ? ", 关键词=" + this._keywordMatrix.length + "个" : ""));
 
@@ -203,20 +206,20 @@ NurtureHandler._isAdContent = function () {
       "小黄车", "商品橱窗", "去购买", "马上抢",
     ];
     for (var i = 0; i < adTexts.length; i++) {
-      var el = textContains(adTexts[i]).findOnce();
+      var el = textContains(adTexts[i]).findOne(2000);
       if (el) {
         logger.info(TAG, "发现广告标识: " + adTexts[i]);
         return true;
       }
     }
     // 检查是否在购物/商品页面（右下角有购物车图标）
-    var shopBtn = desc("购物车").findOnce();
+    var shopBtn = desc("购物车").findOne(2000);
     if (shopBtn) {
       logger.info(TAG, "发现购物车标识，判定为广告");
       return true;
     }
     // 检查带货标签
-    var sellTags = descContains("购物车").findOnce();
+    var sellTags = descContains("购物车").findOne(2000);
     if (sellTags) {
       logger.info(TAG, "发现带货标签，判定为广告");
       return true;
@@ -280,7 +283,7 @@ NurtureHandler._isKeywordRelevant = function (videoText) {
 NurtureHandler._assessContentQuality = function () {
   try {
     // 尝试读取点赞数（控件 id 可能随版本变化）
-    var likeCountEl = id("com.ss.android.ugc.aweme:id/like_count").findOnce();
+    var likeCountEl = id("com.ss.android.ugc.aweme:id/like_count").findOne(2000);
     if (likeCountEl) {
       var likeText = likeCountEl.text() || "";
       var likeNum = this._parseCount(likeText);
@@ -290,7 +293,7 @@ NurtureHandler._assessContentQuality = function () {
     }
 
     // 尝试读取评论数
-    var commentCountEl = id("com.ss.android.ugc.aweme:id/comment_count").findOnce();
+    var commentCountEl = id("com.ss.android.ugc.aweme:id/comment_count").findOne(2000);
     if (commentCountEl) {
       var commentText = commentCountEl.text() || "";
       var commentNum = this._parseCount(commentText);
@@ -340,7 +343,7 @@ NurtureHandler._ensureOnFeed = function () {
       if (likeBtn) return; // 已在推荐页
 
       // 检测是否在有底部 tab 的主页面（首页/朋友/消息/我的）
-      var homeTab = text("首页").findOnce();
+      var homeTab = text("首页").findOne(2000);
       if (homeTab) {
         // 在主页但不在推荐视频流，点击"首页" tab
         logger.info(TAG, "在主页面，点击首页 tab（第" + (attempt + 1) + "次）");

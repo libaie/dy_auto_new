@@ -18,12 +18,14 @@ class SelectorCreateRequest(BaseModel):
     strategies: list[dict]
     platform_version: str = "default"
     description: str = ""
+    category: str = ""
 
 
 class SelectorUpdateRequest(BaseModel):
     strategies: Optional[list[dict]] = None
     platform_version: Optional[str] = None
     description: Optional[str] = None
+    category: Optional[str] = None
     # Note: version is auto-bumped on any change, not user-settable
 
 
@@ -34,10 +36,11 @@ class SelectorToggleRequest(BaseModel):
 @router.get("")
 def list_selectors(
     include_disabled: bool = Query(False),
+    category: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     _: str = Depends(verify_admin_token),
 ):
-    selectors = selector_service.list_all_selectors(db, include_disabled=include_disabled)
+    selectors = selector_service.list_all_selectors(db, include_disabled=include_disabled, category=category)
     version = selector_service.get_version(db)
     return {"selectors": selectors, "total": len(selectors), "version": version}
 
@@ -66,6 +69,7 @@ async def create_selector(
             strategies=request.strategies,
             platform_version=request.platform_version,
             description=request.description,
+            category=request.category,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -92,6 +96,7 @@ async def update_selector(
             strategies=request.strategies,
             platform_version=request.platform_version,
             description=request.description,
+            category=request.category,
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))

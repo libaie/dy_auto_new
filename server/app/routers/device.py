@@ -7,12 +7,13 @@ from sqlalchemy.orm import Session
 import asyncio
 import io
 
-from app.models import TaskResultReport, PollResponse, DeviceRegisterRequest, DeviceRegisterResponse, RiskReport, DeviceGenerateRequest, DeviceGenerateResponse, DeviceAIProxyRequest, DeviceAIProxyResponse, PairRequestCreate, PairStatusResponse
+from app.models import TaskProgressReport, TaskResultReport, PollResponse, DeviceRegisterRequest, DeviceRegisterResponse, RiskReport, DeviceGenerateRequest, DeviceGenerateResponse, DeviceAIProxyRequest, DeviceAIProxyResponse, PairRequestCreate, PairStatusResponse
 from app.database import get_db
 from app.deps import verify_device_secret, verify_admin_token
 from app.services.task_service import task_service
 from app.config import ANTI_DETECT_CONFIG, ANTI_DETECT_CONFIG_VERSION, DEVICE_CONFIG
 from app.services.selector_service import selector_service
+from app.services.prompt_template_service import prompt_template_service
 from app.ws_manager import pair_ws_manager
 
 router = APIRouter(prefix="/api/device", tags=["device"])
@@ -397,6 +398,7 @@ def poll_tasks(
 
     task = task_service.get_pending_task(db, device_id)
     version = selector_service.get_version(db)
+    tmpl_version = prompt_template_service.get_version(db)
 
     from app.services.device_service import device_service
     device_info = device_service.get_device_status(db, device_id)
@@ -409,6 +411,7 @@ def poll_tasks(
     return PollResponse(
         task=task,
         selectors_version=version,
+        prompt_templates_version=tmpl_version,
         proxy=proxy,
         cancelled_task_id=cancelled_task.id if cancelled_task else None,
         anti_detect_config=ANTI_DETECT_CONFIG,
@@ -418,8 +421,24 @@ def poll_tasks(
     )
 
 
+@router.post("/progress")
+async def report_progress(
+    report: TaskProgressReport,
+    _: None = Depends(verify_device_secret),
+):
+    """Device reports task execution progress. Broadcast to admin WS for real-time UI."""
+    await pair_ws_manager.broadcast_to_admins({
+        "event": "task_progress",
+        "task_id": report.task_id,
+        "step": report.step,
+        "detail": report.detail,
+        "progress": report.progress,
+    })
+    return {"ok": True}
+
+
 @router.post("/report")
-def report_result(
+async def report_result(
     report: TaskResultReport,
     db: Session = Depends(get_db),
     authed_device_id: Optional[str] = Depends(verify_device_secret),
@@ -444,11 +463,18 @@ def report_result(
     except ValueError:
         raise HTTPException(status_code=404, detail="Task not found")
 
+    # Broadcast task status update to admin WS
+    await pair_ws_manager.broadcast_to_admins({
+        "event": "task_updated",
+        "task_id": str(report.task_id),
+        "status": str(report.status.value),
+        "result": report.result or {},
+    })
+
     # Broadcast channel progress via WS (BackgroundTasks runs after response)
     if channel_broadcast_info:
         from fastapi import BackgroundTasks
         bg = BackgroundTasks()
-        from app.ws_manager import pair_ws_manager
         bg.add_task(pair_ws_manager.broadcast_channel_progress,
                     channel_broadcast_info["channel_id"], channel_broadcast_info["stats"])
         if channel_broadcast_info.get("channel_completed"):
@@ -553,6 +579,23 @@ def get_selectors(
     return {
         "version": current_version,
         "selectors": selectors,
+        "changed": True,
+    }
+
+
+@router.get("/prompt-templates")
+def get_prompt_templates(
+    version: int = Query(0),
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_device_secret),
+):
+    current_version, templates = prompt_template_service.get_all_templates(db)
+    if version == current_version:
+        return {"version": current_version, "templates": None, "changed": False}
+
+    return {
+        "version": current_version,
+        "templates": templates,
         "changed": True,
     }
 

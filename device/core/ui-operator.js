@@ -118,31 +118,40 @@ var uiOperator = {
    * @returns {UiObject|null}
    */
   _findByStrategy: function (strategy) {
+    var all, j;
     switch (strategy.type) {
       case "text":
-        return text(strategy.value).findOnce();
+        all = text(strategy.value).find();
+        break;
       case "id":
-        return id(strategy.value).findOnce();
+        all = id(strategy.value).find();
+        break;
       case "desc":
-        return desc(strategy.value).findOnce();
+        all = desc(strategy.value).find();
+        break;
       case "className":
-        return className(strategy.value).findOnce();
+        all = className(strategy.value).find();
+        break;
       case "package":
         if (currentPackage() === strategy.value) {
           return { isPackage: true, packageName: strategy.value };
         }
         return null;
       case "coordinate":
-        // 坐标点击不返回控件对象，返回一个模拟对象
         var x = Math.round(strategy.x_percent * device.width);
         var y = Math.round(strategy.y_percent * device.height);
         return { isCoordinate: true, x: x, y: y };
       case "image":
-        // 以图找图，返回模拟对象包含点击坐标
         return this._findByImage(strategy.template, strategy.threshold || 0.8);
       default:
         return null;
     }
+    if (all && all.length > 0) {
+      for (j = 0; j < all.length; j++) {
+        if (this._isOnScreen(all[j])) return all[j];
+      }
+    }
+    return null;
   },
 
   /**

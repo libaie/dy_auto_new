@@ -1,7 +1,7 @@
 import client from './client.js'
 
-export function listSelectors(includeDisabled = false) {
-  return client.get('/selectors', { params: { include_disabled: includeDisabled } })
+export function listSelectors(includeDisabled = false, category = '') {
+  return client.get('/selectors', { params: { include_disabled: includeDisabled, category: category || undefined } })
 }
 
 export function createSelector(data) {

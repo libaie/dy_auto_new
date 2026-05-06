@@ -80,12 +80,20 @@ ReplyCommentHandler.execute = function (params) {
   var maxFollows = params.max_follows || 20;
   var maxDMs = params.max_dms || 10;
 
+  // 加载服务端提示词模板
+  aiAnalyzer.useTemplate(params.prompt_template_id);
+
   if (!keyword) {
     return { success: false, error: "缺少关键词" };
   }
 
   logger.info(TAG, "开始: 关键词='" + keyword + "', 视频数=" + videoCount +
     ", 每视频评论=" + count + ", 排序=" + sortBy + ", 最大天数=" + maxAgeDays + "天");
+
+  var taskId = params.task_id || "";
+  function _reportProgress(step, detail, prog) {
+    if (taskId) { try { apiClient.reportProgress(taskId, step, detail, prog); } catch (e) {} }
+  }
 
   if (!this.ensureAppActive()) {
     return { success: false, error: "打开抖音失败" };
@@ -108,6 +116,7 @@ ReplyCommentHandler.execute = function (params) {
 
   for (var v = 0; v < videoCount; v++) {
     logger.info(TAG, "=== 视频 " + (v + 1) + "/" + videoCount + " ===");
+    _reportProgress("视频 " + (v + 1) + "/" + videoCount, "关键词: " + keyword, (v / videoCount));
 
     // 验证在视频详情页 + 预判评论数
     var commentCount = 0;
@@ -280,6 +289,9 @@ ReplyCommentHandler.execute = function (params) {
 
         processed++;
         totalRead++;
+        _reportProgress("视频 " + (v + 1) + "/" + videoCount,
+          "已回复 " + stats.success_count + " 条，跳过 " + stats.skipped + " 条",
+          (v + processed / count) / videoCount);
         antiDetect.maybePause();
         } catch (e) {
           logger.error(TAG, "处理评论异常: " + e.message + "，跳过继续");
@@ -302,8 +314,8 @@ ReplyCommentHandler.execute = function (params) {
 
     // 当前视频处理完，切到下一个（最后一个不用切）
     if (v < videoCount - 1) {
-      back(); sleep(800);     // 关评论 → 视频页
-      uiOperator.swipeUp();    // 下一个视频
+      back(); sleep(800);
+      uiOperator.swipeUp();
       sleep(2500);
     }
   }

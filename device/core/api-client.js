@@ -294,8 +294,21 @@ var apiClient = {
     return this.post("/api/device/heartbeat", { device_id: config.deviceId });
   },
 
+  reportProgress: function (taskId, step, detail, progress) {
+    return this.post("/api/device/progress", {
+      task_id: taskId,
+      step: step || "",
+      detail: detail || "",
+      progress: progress || 0,
+    });
+  },
+
   fetchSelectors: function (currentVersion) {
     return this.get("/api/device/selectors", { version: currentVersion || 0 });
+  },
+
+  fetchPromptTemplates: function (currentVersion) {
+    return this.get("/api/device/prompt-templates", { version: currentVersion || 0 });
   },
 
   getScriptVersion: function () {

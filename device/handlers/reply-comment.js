@@ -627,16 +627,26 @@ ReplyCommentHandler._replyToComment = function (replyText) {
   }
   sleep(1000);
 
-  // 2. 点输入框 + 输入文字
+  // 2. 点输入框 + 输入文字（setText优先，剪贴板兜底）
   this.safeClick("comment_input", 2);
   sleep(800);
 
   var done = false;
+  // 优先 setText
   try {
     var et = className("EditText").findOne(3000);
     if (et) { et.setText(replyText); done = true; }
   } catch (e) { /* ignore */ }
-  if (!done) done = this.safeInput("comment_input", replyText);
+  // 兜底：剪贴板粘贴
+  if (!done) {
+    try {
+      setClip(replyText);
+      sleep(200);
+      shell("input keyevent 279", true);
+      sleep(300);
+      done = true;
+    } catch (e2) { /* ignore */ }
+  }
   if (!done) {
     logger.warn(TAG, "输入失败");
     back(); sleep(500);

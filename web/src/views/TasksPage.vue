@@ -397,6 +397,7 @@ function handlePageChange(p) {
 function openCreateDialog() {
   Object.assign(form, defaultForm)
   selectedTemplateId.value = ''
+  selectedPromptTemplateId.value = ''
   selectionMode.value = 'single'
   selectedGroupIds.value = []
   createError.value = null
@@ -457,6 +458,13 @@ function buildParams() {
     }
     if (selectedTemplateId.value) {
       params.content_template_id = selectedTemplateId.value
+    }
+  }
+
+  // Prompt template (applies to AI-powered task types)
+  if (['search_comment', 'search_dm', 'reply_comment', 'nurture'].includes(form.type)) {
+    if (selectedPromptTemplateId.value) {
+      params.prompt_template_id = selectedPromptTemplateId.value
     }
   }
 
@@ -1265,6 +1273,20 @@ onUnmounted(() => {
                       />
                     </div>
                   </template>
+
+                  <!-- Prompt template (all task types) -->
+                  <div v-if="promptTemplates.length > 0">
+                    <label class="block text-sm font-medium text-slate-300">提示词模版 <TipIcon text="选择 AI 提示词模版，控制 AI 分析评论、生成回复的风格策略。留空则使用设备端默认模版" /></label>
+                    <select
+                      v-model="selectedPromptTemplateId"
+                      class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200"
+                    >
+                      <option value="">设备默认模版</option>
+                      <option v-for="tpl in promptTemplates" :key="tpl.id" :value="tpl.id">
+                        {{ tpl.name }} ({{ tpl.industry }})
+                      </option>
+                    </select>
+                  </div>
 
                   <!-- Buttons -->
                   <div class="flex justify-end gap-3 pt-2">

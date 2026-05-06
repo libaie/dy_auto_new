@@ -350,31 +350,31 @@ ReplyCommentHandler._searchAndSort = function (keyword, sortBy) {
  * 打开评论区 — 点击视频评论入口按钮
  */
 ReplyCommentHandler._openComments = function () {
-  // 已在评论面板？
-  if (uiOperator.findElement("is_comment_view", 500)) {
-    logger.info(TAG, "评论区已打开");
+  // 检测评论区是否真正打开（comment_list 可见才算）
+  var items = uiOperator.findElements("comment_list", 500);
+  if (items && items.length > 0) {
+    logger.info(TAG, "评论区已打开 (" + items.length + " 条可见)");
     return true;
   }
 
-  // 点击评论区入口（视频评论按钮）
-  var clicked = this.safeClick("video_comment_btn", 3);
-  if (clicked) {
-    sleep(2000);
-  } else {
-    // 备用：旧版 comment_input
-    clicked = this.safeClick("comment_input", 3);
-    if (clicked) sleep(2000);
+  // 点视频评论按钮
+  this.safeClick("video_comment_btn", 3);
+  sleep(2000);
+
+  // 验证：评论列表是否加载
+  items = uiOperator.findElements("comment_list", 3000);
+  if (items && items.length > 0) {
+    logger.info(TAG, "评论区已打开 (" + items.length + " 条)");
+    return true;
   }
 
-  // 验证是否成功打开
-  if (clicked) {
-    var isOpen = uiOperator.findElement("is_comment_view", 2000);
-    if (isOpen) return true;
-    // 重试一次
-    clicked = this.safeClick("video_comment_btn", 2);
-    if (clicked) sleep(2000);
-    return !!uiOperator.findElement("is_comment_view", 2000);
-  }
+  // 重试：备用方式
+  this.safeClick("comment_input", 2);
+  sleep(2000);
+  items = uiOperator.findElements("comment_list", 3000);
+  if (items && items.length > 0) return true;
+
+  logger.warn(TAG, "评论区未能打开");
   return false;
 };
 

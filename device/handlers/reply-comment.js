@@ -616,72 +616,42 @@ ReplyCommentHandler._parseTime = function (timeStr) {
 };
 
 /**
- * 回复评论 — 键盘处理增强版
- * 核心：确保每次离开时键盘已关闭、在评论面板
- * @param {string} replyText - 回复内容
- * @returns {boolean}
+ * 回复评论 — 精简版
+ * 1. 点回复按钮  2. 找输入框 setText  3. 回车发送  4. 关键盘验证
  */
 ReplyCommentHandler._replyToComment = function (replyText) {
-  // 1. 点击回复按钮（键盘卡住先关键盘）
-  var replyClicked = this.safeClick("comment_reply_button", 2);
-  if (!replyClicked) {
-    back(); sleep(800);
-    replyClicked = this.safeClick("comment_reply_button", 2);
-    if (!replyClicked) {
-      // 彻底恢复：回视频详情重新开评论
-      logger.warn(TAG, "回复按钮未找到，尝试重新进入评论区");
-      back(); sleep(800);
-      this._openComments();
-      sleep(1000);
-      replyClicked = this.safeClick("comment_reply_button", 2);
-    }
-  }
-  if (!replyClicked) {
-    logger.warn(TAG, "回复按钮重试仍失败，跳过此评论");
+  // 1. 点回复按钮
+  if (!this.safeClick("comment_reply_button", 3)) {
+    logger.warn(TAG, "回复按钮未找到");
     return false;
   }
   sleep(1000);
 
-  // 2. 找输入框并输入文本
-  var inputOk = false;
+  // 2. 点输入框 + 输入文字
+  this.safeClick("comment_input", 2);
+  sleep(800);
+
+  var done = false;
   try {
-    // 点击输入区域激活
-    this.safeClick("comment_input", 1);
-    sleep(500);
-    var editText = className("EditText").findOne(3000);
-    if (editText) {
-      editText.setText(replyText);
-      sleep(300);
-      inputOk = true;
-    }
+    var et = className("EditText").findOne(3000);
+    if (et) { et.setText(replyText); done = true; }
   } catch (e) { /* ignore */ }
-  if (!inputOk) {
-    inputOk = this.safeInput("comment_input", replyText);
-  }
-  if (!inputOk) {
-    logger.warn(TAG, "输入内容失败，跳过");
+  if (!done) done = this.safeInput("comment_input", replyText);
+  if (!done) {
+    logger.warn(TAG, "输入失败");
+    back(); sleep(500);
     return false;
   }
-  sleep(300);
+  sleep(500);
 
-  // 3. 发送
-  uiOperator.submitViaKeyboard("comment_submit");
-  sleep(1000);
+  // 3. 回车发送
+  try { shell("input keyevent 66", true); } catch (e) { /* ignore */ }
+  try { keyCode(66); } catch (e) { /* ignore */ }
+  sleep(1200);
 
-  // 4. ★ 关键：强制关闭键盘并恢复到评论面板
-  // back() 一次关闭键盘，如果是评论面板则再 back 一次回到评论区
+  // 4. 关键盘回到评论区
   back(); sleep(600);
-  // 如果 back 后还开着键盘（罕见），再 back 一次
   back(); sleep(600);
-
-  // 5. 验证回到评论区，否则尝试恢复
-  for (var retry = 0; retry < 3; retry++) {
-    if (uiOperator.findElement("is_comment_view", 1000)) break;
-    logger.info(TAG, "键盘关闭后不在评论面板，尝试恢复 (" + (retry+1) + "/3)");
-    back(); sleep(800);
-    this._openComments();
-    sleep(1500);
-  }
 
   logger.info(TAG, "回复完成: '" + replyText.substring(0, 20) + "'");
   return true;

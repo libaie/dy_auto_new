@@ -137,7 +137,7 @@ ReplyCommentHandler.execute = function (params) {
         this._dismissKeyboard();
 
         var comment = this._parseCommentItem(items[i]);
-        if (!comment) { totalRead++; continue; }
+        if (!comment) { stats.skipped++; totalRead++; continue; }
 
         // 跳过假评论（占位符/空昵称/空文本）
         if (comment.nickname === "unknown" || !comment.text ||
@@ -156,13 +156,13 @@ ReplyCommentHandler.execute = function (params) {
           totalRead++; continue;
         }
 
-        // 全局去重：检查是否已被任何设备回复过
-        var alreadyReplied = false;
+        // 全局去重：原子检查+标记
+        var canReply = true;
         try {
-          var checkResult = apiClient.checkCommentReplied(comment.nickname, comment.text);
-          alreadyReplied = checkResult && checkResult.replied;
+          var claimResult = apiClient.claimCommentReply(comment.nickname, comment.text);
+          canReply = claimResult && claimResult.claimed;
         } catch (e) { /* 网络异常默认放行 */ }
-        if (alreadyReplied) {
+        if (!canReply) {
           logger.info(TAG, "评论已被回复过（全局去重）: " + comment.nickname);
           totalRead++; continue;
         }
@@ -198,9 +198,6 @@ ReplyCommentHandler.execute = function (params) {
         logger.info(TAG, "回复: '" + analysis.reply.substring(0, 30) + "...'");
         this._replyToComment(analysis.reply);
         stats.success_count++;
-
-        // 标记已回复（全局去重）
-        try { apiClient.markCommentReplied(comment.nickname, comment.text); } catch (e) { /* ignore */ }
 
         stats.details.push({
           video: v + 1, nickname: comment.nickname,
@@ -690,12 +687,15 @@ ReplyCommentHandler._sendDM = function (content) {
   }
   sleep(500);
 
-  // 通过键盘回车发送
+  // 通过键盘回车发送（回退点击按钮）
   sleep(500);
-  this.submitViaKeyboard("dm_send");
+  var sent = uiOperator.submitViaKeyboard("dm_send");
+  if (!sent) {
+    sent = this.safeClick("dm_send", 2);
+  }
   sleep(1000);
-  logger.info(TAG, "私信已发送: '" + content.substring(0, 20) + "'");
-  return true;
+  logger.info(TAG, "私信" + (sent ? "已发送" : "发送可能失败") + ": '" + content.substring(0, 20) + "'");
+  return sent;
 };
 
 /**

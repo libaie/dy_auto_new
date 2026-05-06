@@ -333,15 +333,8 @@ var apiClient = {
    * @param {string} riskType - 风控类型 (captcha, risk_control, verify)
    * @param {Object} detail - 风控详情
    */
-  checkCommentReplied: function (author, text) {
-    return this.post("/api/device/comment-check-replied", {
-      author: author,
-      text: text,
-    });
-  },
-
-  markCommentReplied: function (author, text) {
-    return this.post("/api/device/comment-mark-replied", {
+  claimCommentReply: function (author, text) {
+    return this.post("/api/device/comment-claim-reply", {
       author: author,
       text: text,
     });

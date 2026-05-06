@@ -110,9 +110,10 @@ ReplyCommentHandler.execute = function (params) {
         break;
       }
     } else {
-      // 后续视频：关评论面板 → 滑动到下一个
-      back(); sleep(800);
-      uiOperator.swipeUp();
+      // 后续视频：先归位到评论面板 → 关评论 → 滑动到下一个
+      this._returnToComments();  // 不管在哪，先回到评论面板
+      back(); sleep(800);        // 关评论面板，回到视频页
+      uiOperator.swipeUp();       // 下一个视频
     }
     sleep(2000);
 

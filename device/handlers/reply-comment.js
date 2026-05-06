@@ -313,9 +313,6 @@ ReplyCommentHandler.execute = function (params) {
     antiDetect.maybePause();
   }
 
-  // 所有视频处理完毕，返回搜索列表页
-  this._backToSearchResults();
-
   logger.info(TAG, "完成. " + JSON.stringify(stats));
   return { success: true, result: stats };
 };

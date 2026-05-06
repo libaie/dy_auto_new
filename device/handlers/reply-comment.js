@@ -99,38 +99,28 @@ ReplyCommentHandler.execute = function (params) {
   var stats = { videos_processed: 0, success_count: 0, fail_count: 0, skipped: 0,
     follow_count: 0, dm_count: 0, details: [] };
 
-  // 2. 逐个视频处理（第一个从搜索列表点击，后续滑动切换）
+  // 2. 逐个视频处理
+  // 第一个视频从搜索结果点击进入
+  if (!this._clickSearchResult(0)) {
+    return { success: false, error: "点击第一个视频失败" };
+  }
+  sleep(2000);
+
   for (var v = 0; v < videoCount; v++) {
     logger.info(TAG, "=== 视频 " + (v + 1) + "/" + videoCount + " ===");
 
-    if (v === 0) {
-      // 第一个视频：从搜索结果点击进入
-      if (!this._clickSearchResult(0)) {
-        logger.warn(TAG, "点击第一个视频失败，停止处理");
-        break;
-      }
-    } else {
-      // 后续视频：先归位到评论面板 → 关评论 → 滑动到下一个
-      this._returnToComments();  // 不管在哪，先回到评论面板
-      back(); sleep(800);        // 关评论面板，回到视频页
-      uiOperator.swipeUp();       // 下一个视频
-    }
-    sleep(2000);
-
-    // 验证进入了视频详情页
+    // 验证在视频详情页
     if (!ensurePage("video", null, 3)) {
       logger.warn(TAG, "未进入视频详情页，跳过");
       continue;
     }
 
-    // 2b. 通过 video_comment_btn 的 desc 预判评论数
+    // 预判评论数
     var commentCount = 0;
     try {
       var commentBtn = uiOperator.findElement("video_comment_btn", 3000);
       if (commentBtn && !commentBtn.isImage && !commentBtn.isCoordinate) {
-        var desc = commentBtn.desc() || "";
-        // 匹配数字: "评论 123"、"123条评论"、"123" 等
-        var numMatch = desc.match(/(\d+)/);
+        var numMatch = (commentBtn.desc() || "").match(/(\d+)/);
         if (numMatch) commentCount = parseInt(numMatch[1]);
       }
     } catch (e) { /* ignore */ }
@@ -138,8 +128,7 @@ ReplyCommentHandler.execute = function (params) {
 
     if (commentCount === 0) {
       logger.info(TAG, "该视频无评论，跳过");
-      back();
-      sleep(1000);
+      if (v < videoCount - 1) { uiOperator.swipeUp(); sleep(2000); }
       continue;
     }
 
@@ -297,6 +286,14 @@ ReplyCommentHandler.execute = function (params) {
 
     stats.videos_processed++;
     antiDetect.maybePause();
+
+    // 当前视频处理完，切到下一个（最后一个不用切）
+    if (v < videoCount - 1) {
+      // 我们确定在评论面板（_returnToComments 保证了）
+      back(); sleep(800);     // 关评论 → 视频详情页
+      uiOperator.swipeUp();    // 下一个视频
+      sleep(2000);
+    }
   }
 
   logger.info(TAG, "完成. " + JSON.stringify(stats));

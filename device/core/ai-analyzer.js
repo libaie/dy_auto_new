@@ -11,7 +11,8 @@ var TAG = "AI";
  */
 var aiAnalyzer = {
   // 阈值：达到此分数才触发回复
-  SCORE_THRESHOLD: 60,
+  // consult_intent(30)+positive(10)=40 为最低有效回复线
+  SCORE_THRESHOLD: 40,
 
   /**
    * 调用服务端 AI 代理

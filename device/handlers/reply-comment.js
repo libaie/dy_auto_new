@@ -111,19 +111,22 @@ ReplyCommentHandler.execute = function (params) {
       }
       sleep(2000);
     } else {
-      // 后续视频：退出评论区 → 滑动到下一个视频
-      // 检测当前页面决定是否需要 back
-      if (uiOperator.findElement("is_comment_view", 500)) {
-        back(); sleep(600);  // 关评论面板回到视频页
+      // 后续视频：先 back 退出评论面板，再滑动到下一个
+      back(); sleep(600);  // 关闭评论面板/键盘（不管在哪个页面）
+      // 如果不在视频页，再 back 一次
+      if (!uiOperator.findElement("is_video_view", 1000)) {
+        back(); sleep(800);
       }
-      // 确保在视频页后滑动
+      // 现在应该在视频页，滑动到下一个
       if (uiOperator.findElement("is_video_view", 1000)) {
         uiOperator.swipeUp();
         sleep(2500);
       } else {
-        logger.warn(TAG, "不在视频页无法滑动，尝试 back 恢复");
-        back(); sleep(1000);
-        continue;
+        // 仍然不在？再试一次
+        logger.warn(TAG, "不在视频页，尝试 force back+swipe");
+        back(); sleep(800);
+        uiOperator.swipeUp();
+        sleep(2500);
       }
     }
 

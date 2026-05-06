@@ -131,9 +131,9 @@ class ChannelService:
 
         now = datetime.now(timezone.utc).replace(tzinfo=None)
 
-        # Stale recovery: reset items assigned > 10 min ago
+        # Stale recovery: reset items assigned > 3 min ago (matches task_service stale threshold)
         from datetime import timedelta
-        stale_threshold = now - timedelta(seconds=600)
+        stale_threshold = now - timedelta(seconds=180)
         db.execute(
             update(ChannelItem)
             .where(

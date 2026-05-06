@@ -59,9 +59,21 @@ async def _notify_pending_tasks(db: Session, device_id: str):
         or_(DBTask.scheduled_at.is_(None), DBTask.scheduled_at <= now),
     ).all()
 
-    logger.info(f"[notify] 设备 {device_id} 找到 {len(pending_tasks)} 个待执行任务")
+    # Also check pending channel items for this device
+    from app.db_models import ChannelItem, Channel
+    channel_item_query = db.query(ChannelItem).filter(
+        ChannelItem.status == "pending",
+        ChannelItem.channel_id.in_(
+            db.query(Channel.id).filter(Channel.status == "active", Channel.deleted_at.is_(None))
+        ),
+    )
+    if device.bound_account_id:
+        channel_item_query = channel_item_query.filter(ChannelItem.account_id == device.bound_account_id)
+    pending_channel_count = channel_item_query.count()
 
-    if pending_tasks:
+    logger.info(f"[notify] 设备 {device_id} 找到 {len(pending_tasks)} 个待执行任务, {pending_channel_count} 个待分发通道项")
+
+    if pending_tasks or pending_channel_count > 0:
         sent = await pair_ws_manager.send_to_device(device_id, {"event": "new_task_available"})
         logger.info(f"[notify] 向设备 {device_id} 推送 new_task_available: {'成功' if sent else '失败'}")
 

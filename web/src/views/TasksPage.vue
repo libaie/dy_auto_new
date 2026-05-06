@@ -216,7 +216,16 @@ async function fetchTasks(silent) {
     const res = await listTasks(params)
     tasks.value = res.data.tasks || []
     total.value = res.data.total || 0
-    selectedTaskIds.value = []
+    // Only reset selection on explicit (non-silent) refresh
+    if (!silent) selectedTaskIds.value = []
+    // Clean up progress entries for tasks no longer in the list
+    var currentIds = {}
+    for (var i = 0; i < tasks.value.length; i++) {
+      currentIds[tasks.value[i].id] = true
+    }
+    for (var key in taskProgress) {
+      if (!currentIds[key]) delete taskProgress[key]
+    }
   } catch (e) {
     if (!silent) toast.error('加载任务列表失败')
     tasks.value = []

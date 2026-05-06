@@ -114,6 +114,13 @@ class TaskService:
             stale.device_id = None
             stale.started_at = None
         if stale_running:
+            # Reset associated channel items so keywords can be re-dispatched
+            from app.db_models import ChannelItem
+            stale_ids = [t.id for t in stale_running]
+            db.query(ChannelItem).filter(ChannelItem.task_id.in_(stale_ids)).update(
+                {"status": "pending", "assigned_device_id": None, "assigned_at": None, "task_id": None},
+                synchronize_session=False,
+            )
             db.flush()
 
         # 4. Find candidate tasks with routing and scheduled_at applied
@@ -200,8 +207,7 @@ class TaskService:
                 stats_service.increment(db, db_task.account_id, "search_dm", count=dm_count)
         elif status == TaskStatus.FAILED:
             db_task.retry_count += 1
-            # Channel tasks: skip retry, fail immediately (channel redistributes naturally)
-            if channel_item or db_task.retry_count >= MAX_RETRIES:
+            if db_task.retry_count >= MAX_RETRIES:
                 db_task.status = TaskStatus.FAILED.value
                 db_task.result = result
                 db_task.completed_at = datetime.now(timezone.utc)
@@ -209,6 +215,11 @@ class TaskService:
                 db_task.status = TaskStatus.PENDING.value  # re-queue for retry
                 db_task.device_id = None
                 db_task.started_at = None
+                # Keep ChannelItem assigned — prevents channel from re-dispatching
+                # the same keyword while the task retries via the direct queue.
+                # Refresh assigned_at to extend the stale recovery window.
+                if channel_item:
+                    channel_item.assigned_at = datetime.now(timezone.utc)
 
         # Advance chain if this task is part of one
         if db_task.chain_instance_id and db_task.status in ("completed", "failed"):

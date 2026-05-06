@@ -119,6 +119,12 @@ ReplyCommentHandler.execute = function (params) {
         var comment = this._parseCommentItem(items[i]);
         if (!comment) { totalRead++; continue; }
 
+        // 跳过假评论（占位符/空昵称/空文本）
+        if (comment.nickname === "unknown" || !comment.text ||
+            comment.text.indexOf("发条评论") !== -1) {
+          totalRead++; continue;
+        }
+
         // 跳过作者自己的评论
         if (comment.isAuthor) {
           logger.info(TAG, "跳过作者评论: " + comment.nickname);

@@ -58,8 +58,23 @@ var uiOperator = {
   },
 
   /**
-   * 使用选择器查找控件
-   * 按策略优先级依次尝试：text -> id -> desc -> coordinate
+   * 判断元素是否在当前屏幕内
+   */
+  _isOnScreen: function (el) {
+    if (!el) return false;
+    // 坐标类型（图片匹配、坐标策略）视为在屏幕内
+    if (el.isImage || el.isCoordinate || el.isPackage) return true;
+    try {
+      var b = el.bounds();
+      if (!b) return false;
+      var cx = b.centerX();
+      var cy = b.centerY();
+      return cx >= 0 && cy >= 0 && cx < device.width && cy < device.height;
+    } catch (e) { return false; }
+  },
+
+  /**
+   * 使用选择器查找控件（仅返回屏幕内的元素，避免 RecyclerView 复用导致的离屏匹配）
    * @param {string} actionName - 操作名称
    * @param {number} timeout - 超时时间（毫秒），默认 5000
    * @returns {UiObject|null} 找到的控件，或 null
@@ -81,7 +96,7 @@ var uiOperator = {
       for (var i = 0; i < strategies.length; i++) {
         var s = strategies[i];
         var element = this._findByStrategy(s);
-        if (element) {
+        if (element && this._isOnScreen(element)) {
           logger.debug(TAG, "通过 " + s.type + " 找到元素: '" + actionName + "'");
           return element;
         }
@@ -142,8 +157,7 @@ var uiOperator = {
   },
 
   /**
-   * 使用选择器查找多个控件（返回数组）
-   * 按策略优先级依次尝试，返回第一个非空结果
+   * 使用选择器查找多个控件（仅返回屏幕内的，避免 RecyclerView 离屏元素）
    * @param {string} actionName - 操作名称
    * @param {number} timeout - 超时时间（毫秒），默认 5000
    * @returns {Array} UiObject 数组，找不到返回空数组
@@ -160,14 +174,19 @@ var uiOperator = {
       return a.priority - b.priority;
     });
 
+    var self = this;
     var startTime = Date.now();
     while (Date.now() - startTime < timeout) {
       for (var i = 0; i < strategies.length; i++) {
         var s = strategies[i];
-        var results = this._findManyByStrategy(s);
-        if (results && results.length > 0) {
-          logger.debug(TAG, "通过 " + s.type + " 找到 " + results.length + " 个元素: '" + actionName + "'");
-          return results;
+        var all = this._findManyByStrategy(s);
+        if (all && all.length > 0) {
+          // 只保留屏幕内的元素
+          var visible = all.filter(function (el) { return self._isOnScreen(el); });
+          if (visible.length > 0) {
+            logger.debug(TAG, "通过 " + s.type + " 找到 " + visible.length + "/" + all.length + " 个可见元素: '" + actionName + "'");
+            return visible;
+          }
         }
       }
       sleep(500);

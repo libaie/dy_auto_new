@@ -131,11 +131,9 @@ ReplyCommentHandler.execute = function (params) {
       }
       prevItemCount = items.length;
 
-      // 处理本批新评论
+      // 处理本批新评论（每条独立 try-catch，失败不级联）
       for (var i = totalRead; i < items.length && processed < count; i++) {
-        // 每次操作前确保键盘已关闭
-        this._dismissKeyboard();
-
+        try {
         var comment = this._parseCommentItem(items[i]);
         if (!comment) { stats.skipped++; totalRead++; continue; }
 
@@ -237,6 +235,12 @@ ReplyCommentHandler.execute = function (params) {
         processed++;
         totalRead++;
         antiDetect.maybePause();
+        } catch (e) {
+          logger.error(TAG, "处理评论异常: " + e.message + "，跳过继续");
+          totalRead++;
+          // 尝试恢复到评论面板
+          try { back(); sleep(500); } catch (e2) { /* ignore */ }
+        }
       }
 
       // 还需更多评论，滑动加载
@@ -287,17 +291,30 @@ ReplyCommentHandler._searchAndSort = function (keyword, sortBy) {
  * 打开评论区 — 点击视频评论入口按钮
  */
 ReplyCommentHandler._openComments = function () {
+  // 已在评论面板？
+  if (uiOperator.findElement("is_comment_view", 500)) {
+    logger.info(TAG, "评论区已打开");
+    return true;
+  }
+
   // 点击评论区入口（视频评论按钮）
   var clicked = this.safeClick("video_comment_btn", 3);
   if (clicked) {
     sleep(2000);
-    return true;
+  } else {
+    // 备用：旧版 comment_input
+    clicked = this.safeClick("comment_input", 3);
+    if (clicked) sleep(2000);
   }
-  // 备用：旧版 comment_input
-  clicked = this.safeClick("comment_input", 3);
+
+  // 验证是否成功打开
   if (clicked) {
-    sleep(2000);
-    return true;
+    var isOpen = uiOperator.findElement("is_comment_view", 2000);
+    if (isOpen) return true;
+    // 重试一次
+    clicked = this.safeClick("video_comment_btn", 2);
+    if (clicked) sleep(2000);
+    return !!uiOperator.findElement("is_comment_view", 2000);
   }
   return false;
 };
@@ -623,7 +640,16 @@ ReplyCommentHandler._replyToComment = function (replyText) {
 /**
  * 关闭输入键盘
  */
+/**
+ * 安全关闭键盘 — 仅在非评论区页面使用 back
+ * 评论区用 back 会关闭评论面板，所以评论面板内不调用此方法
+ */
 ReplyCommentHandler._dismissKeyboard = function () {
+  // 如果在评论面板，不用 back（会退出评论）
+  if (uiOperator.findElement("is_comment_view", 300)) {
+    return;
+  }
+  // 在视频详情页/个人主页/私信页，back 安全
   try { back(); sleep(500); } catch (e) { /* ignore */ }
 };
 

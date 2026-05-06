@@ -157,21 +157,21 @@ ReplyCommentHandler.execute = function (params) {
       continue;
     }
 
-    // 2c. 打开评论区
-    if (!this._openComments()) {
-      logger.warn(TAG, "视频 " + (v + 1) + " 打开评论区失败");
-      back();
-      sleep(1000);
-      continue;
+    // 2c. 打开评论区（带重试）
+    var commentsOpened = false;
+    for (var retry = 0; retry < 2; retry++) {
+      // 点击评论入口
+      this.safeClick("video_comment_btn", 2);
+      sleep(2000);
+      // 验证是否真正打开
+      if (ensurePage("comment", null, 1)) {
+        commentsOpened = true;
+        break;
+      }
+      logger.info(TAG, "评论区未打开，重试 (" + (retry + 1) + "/2)");
     }
-    // 验证评论区已打开
-    if (!ensurePage("comment", function () {
-      // 没打开？退到视频页重开评论区
-      back(); sleep(800);
-      this._openComments();
-      sleep(1500);
-    }.bind(this), 2)) {
-      logger.warn(TAG, "无法进入评论区，跳过此视频");
+    if (!commentsOpened) {
+      logger.warn(TAG, "评论区打开失败，跳过此视频");
       back(); sleep(1000);
       continue;
     }

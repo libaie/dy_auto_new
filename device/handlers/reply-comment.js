@@ -109,17 +109,20 @@ ReplyCommentHandler.execute = function (params) {
   for (var v = 0; v < videoCount; v++) {
     logger.info(TAG, "=== 视频 " + (v + 1) + "/" + videoCount + " ===");
 
-    // 验证在视频详情页
-    if (!ensurePage("video", null, 3)) {
+    // 验证在视频详情页 + 预判评论数
+    var commentCount = 0;
+    var commentBtn = null;
+    for (var wait = 0; wait < 5; wait++) {
+      commentBtn = uiOperator.findElement("video_comment_btn", 2000);
+      if (commentBtn) break;
+      logger.info(TAG, "等待进入视频页 (" + (wait + 1) + "/5)");
+    }
+    if (!commentBtn) {
       logger.warn(TAG, "未进入视频详情页，跳过");
       continue;
     }
-
-    // 预判评论数
-    var commentCount = 0;
     try {
-      var commentBtn = uiOperator.findElement("video_comment_btn", 3000);
-      if (commentBtn && !commentBtn.isImage && !commentBtn.isCoordinate) {
+      if (!commentBtn.isImage && !commentBtn.isCoordinate) {
         var numMatch = (commentBtn.desc() || "").match(/(\d+)/);
         if (numMatch) commentCount = parseInt(numMatch[1]);
       }
@@ -299,10 +302,9 @@ ReplyCommentHandler.execute = function (params) {
 
     // 当前视频处理完，切到下一个（最后一个不用切）
     if (v < videoCount - 1) {
-      // 我们确定在评论面板（_returnToComments 保证了）
-      back(); sleep(800);     // 关评论 → 视频详情页
+      back(); sleep(800);     // 关评论 → 视频页
       uiOperator.swipeUp();    // 下一个视频
-      sleep(2000);
+      sleep(2500);
     }
   }
 

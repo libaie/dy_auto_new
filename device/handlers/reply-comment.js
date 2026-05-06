@@ -767,34 +767,47 @@ ReplyCommentHandler._sendDM = function (content) {
  *   is_user_view     — 当前在个人主页？
  */
 ReplyCommentHandler._returnToComments = function () {
-  // 先关闭可能存在的键盘
-  this._dismissKeyboard();
-
   var maxBacks = 5;
   for (var i = 0; i < maxBacks; i++) {
-    // 已在评论面板？
+    // 已在评论面板 → 完成
     if (uiOperator.findElement("is_comment_view", 500)) {
-      logger.info(TAG, "已在评论面板 (back " + i + " 次)");
+      logger.info(TAG, "回到评论区 (back " + i + " 次)");
       return;
     }
 
-    // 已在视频详情页？
+    // 已在视频详情页 → 打开评论区
     if (uiOperator.findElement("is_video_view", 500) ||
         uiOperator.findElement("video_comment_btn", 500)) {
-      logger.info(TAG, "回到视频详情页 (back " + i + " 次)，打开评论区");
+      logger.info(TAG, "在视频页，打开评论区 (back " + i + " 次)");
       this._openComments();
       return;
     }
 
-    // 不在目标页面，继续 back
-    logger.info(TAG, "第 " + (i + 1) + " 次 back，当前位置: " +
-      (uiOperator.findElement("is_user_view", 300) ? "个人主页" : "私信/其他"));
+    // 在私信页 → back 到个人主页
+    var onDMPage = uiOperator.findElement("dm_input", 300)
+                || uiOperator.findElement("dm_send", 300);
+    if (onDMPage) {
+      logger.info(TAG, "在私信页，back 到个人主页");
+      back(); sleep(800);
+      continue;
+    }
+
+    // 在个人主页 → back 到评论区
+    if (uiOperator.findElement("is_user_view", 300)) {
+      logger.info(TAG, "在个人主页，back 到评论区");
+      back(); sleep(800);
+      // back 后应该在视频页，打开评论区
+      this._openComments();
+      return;
+    }
+
+    // 未知页面，back 重试
+    logger.info(TAG, "第 " + (i + 1) + " 次 back，未知页面");
     back();
     sleep(1000);
   }
 
-  // 兜底
-  logger.warn(TAG, "back " + maxBacks + " 次后尚未确认位置，尝试打开评论区");
+  logger.warn(TAG, "无法回到评论区，兜底打开");
   this._openComments();
 };
 

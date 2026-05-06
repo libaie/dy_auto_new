@@ -80,7 +80,27 @@ ReplyCommentHandler.execute = function (params) {
       continue;
     }
 
-    // 2b. 打开评论区
+    // 2b. 通过 video_comment_btn 的 desc 预判评论数
+    var commentCount = 0;
+    try {
+      var commentBtn = uiOperator.findElement("video_comment_btn", 3000);
+      if (commentBtn && !commentBtn.isImage && !commentBtn.isCoordinate) {
+        var desc = commentBtn.desc() || "";
+        // 匹配数字: "评论 123"、"123条评论"、"123" 等
+        var numMatch = desc.match(/(\d+)/);
+        if (numMatch) commentCount = parseInt(numMatch[1]);
+      }
+    } catch (e) { /* ignore */ }
+    logger.info(TAG, "视频 " + (v + 1) + " 评论数: " + (commentCount || "未知"));
+
+    if (commentCount === 0) {
+      logger.info(TAG, "该视频无评论，跳过");
+      back();
+      sleep(1000);
+      continue;
+    }
+
+    // 2c. 打开评论区
     if (!this._openComments()) {
       logger.warn(TAG, "视频 " + (v + 1) + " 打开评论区失败");
       back();
@@ -88,19 +108,15 @@ ReplyCommentHandler.execute = function (params) {
       continue;
     }
 
-    // 2c. 逐批读取+处理评论
-    var items = uiOperator.findElements("comment_list", 3000);
-    if (!items || items.length === 0) {
-      logger.info(TAG, "该视频无评论，跳过");
-      back();
-      sleep(1000);
-      continue;
+    // 2d. 逐批读取+处理评论
     }
 
     var totalComments = items.length;
     logger.info(TAG, "评论可见 " + totalComments + " 条");
-    // 估算需要多少批滑动：每滑动一次大约加载 5 条
-    var maxBatches = Math.min(10, Math.ceil(count / 3) + 1);
+    // 根据预判评论数限制滑动：每批约 5 条，总数不超过预判值
+    var maxBatches = commentCount > 0
+      ? Math.min(10, Math.ceil(commentCount / 4) + 1)
+      : Math.min(10, Math.ceil(count / 3) + 1);
 
     var processed = 0;
     var totalRead = 0;

@@ -99,22 +99,28 @@ ReplyCommentHandler.execute = function (params) {
   var stats = { videos_processed: 0, success_count: 0, fail_count: 0, skipped: 0,
     follow_count: 0, dm_count: 0, details: [] };
 
-  // 2. 逐个视频处理
+  // 2. 逐个视频处理（第一个从搜索列表点击，后续滑动切换）
   for (var v = 0; v < videoCount; v++) {
     logger.info(TAG, "=== 视频 " + (v + 1) + "/" + videoCount + " ===");
 
-    // 2a. 点击第 v 个视频（_clickSearchResult 内部自动滑动定位）
-    if (!this._clickSearchResult(v)) {
-      logger.warn(TAG, "点击视频 " + (v + 1) + " 失败，停止处理");
-      break;
+    if (v === 0) {
+      // 第一个视频：从搜索结果点击进入
+      if (!this._clickSearchResult(0)) {
+        logger.warn(TAG, "点击第一个视频失败，停止处理");
+        break;
+      }
+      sleep(2000);
+    } else {
+      // 后续视频：关闭评论区 → 滑动到下一个视频
+      back(); sleep(600);  // 关评论面板
+      uiOperator.swipeUp();  // 滑到下一个视频
+      sleep(2500);
     }
-    sleep(2000);
 
     // 验证是否进入了视频详情页
     if (!uiOperator.findElement("is_video_view", 3000)) {
-      logger.warn(TAG, "未进入视频详情页，可能点击失败，跳过此视频");
-      back();
-      sleep(1000);
+      logger.warn(TAG, "未进入视频详情页，跳过此视频");
+      back(); sleep(1000);
       continue;
     }
 
@@ -296,15 +302,12 @@ ReplyCommentHandler.execute = function (params) {
       }
     }
 
-    // 容错返回：连续 back 直到回到搜索视频列表页
-    if (!this._backToSearchResults()) {
-      logger.warn(TAG, "无法回到搜索列表页，停止后续视频处理");
-      break;
-    }
-
     stats.videos_processed++;
     antiDetect.maybePause();
   }
+
+  // 所有视频处理完毕，返回搜索列表页
+  this._backToSearchResults();
 
   logger.info(TAG, "完成. " + JSON.stringify(stats));
   return { success: true, result: stats };

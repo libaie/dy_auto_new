@@ -67,31 +67,31 @@ SearchBaseHandler.execute = function (params) {
     sleep(2000);
   }
 
-  // 6. 逐个打开结果并互动
+  // 6. 逐个视频处理（第一个点击，后续滑动切换）
   var stats = { success_count: 0, fail_count: 0, details: [] };
 
   for (var i = 0; i < count; i++) {
     logger.info(TAG, "处理第 " + (i + 1) + "/" + count + " 个结果");
 
-    if (!this._clickSearchResult(i)) {
-      logger.warn(TAG, "点击第 " + (i + 1) + " 个结果失败，跳过");
-      stats.fail_count++;
-      continue;
+    if (i === 0) {
+      // 第一个视频：从搜索结果点击
+      if (!this._clickSearchResult(0)) {
+        logger.warn(TAG, "点击第一个视频失败，停止处理");
+        break;
+      }
+      sleep(2000);
+    } else {
+      // 后续视频：滑动切换
+      back(); sleep(500);
+      uiOperator.swipeUp();
+      sleep(2500);
     }
-
-    sleep(2000);
 
     var interactResult = this._interactWithVideo(content, stats);
     if (interactResult) {
       stats.success_count++;
     } else {
       stats.fail_count++;
-    }
-
-    // 容错返回：连续 back 直到回到搜索视频列表页
-    if (!this._backToSearchResults()) {
-      logger.warn(TAG, "无法回到搜索列表页，停止后续视频处理");
-      break;
     }
 
     antiDetect.maybePause();

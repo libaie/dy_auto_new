@@ -172,7 +172,6 @@ ReplyCommentHandler.execute = function (params) {
     }
     if (!commentsOpened) {
       logger.warn(TAG, "评论区打开失败，跳过此视频");
-      back(); sleep(1000);
       continue;
     }
 

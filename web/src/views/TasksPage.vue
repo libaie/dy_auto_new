@@ -145,6 +145,7 @@ const keywordSingleAccountId = ref('')
 const keywordDeviceId = ref('')
 const keywordSortBy = ref('')
 const keywordTemplateId = ref('')
+const keywordPromptTemplateId = ref('')
 const keywordContent = ref('')
 const keywordMaxAgeDays = ref(5)
 const keywordGenerateCount = ref(10)
@@ -595,6 +596,7 @@ function openKeywordDialog() {
   keywordDeviceId.value = ''
   keywordSortBy.value = ''
   keywordTemplateId.value = ''
+  keywordPromptTemplateId.value = ''
   keywordContent.value = ''
   keywordMaxAgeDays.value = 5
   keywordGenerateCount.value = 10
@@ -671,6 +673,9 @@ function buildKeywordParams(kw) {
   } else if (keywordContent.value) {
     params.content = keywordContent.value
   }
+  if (keywordPromptTemplateId.value) {
+    params.prompt_template_id = keywordPromptTemplateId.value
+  }
   return params
 }
 
@@ -705,6 +710,9 @@ async function handleBatchCreateKeywordTasks() {
         params.content_template_id = keywordTemplateId.value
       } else if (keywordContent.value) {
         params.content = keywordContent.value
+      }
+      if (keywordPromptTemplateId.value) {
+        params.prompt_template_id = keywordPromptTemplateId.value
       }
       const resp = await batchCreateTasks({
         type: keywordActionType.value,
@@ -1486,6 +1494,20 @@ onUnmounted(() => {
                       />
                     </div>
                   </template>
+
+                  <!-- Prompt template -->
+                  <div v-if="promptTemplates.length > 0">
+                    <label class="block text-sm font-medium text-slate-300">提示词模版 <TipIcon text="选择 AI 提示词模版，留空则使用设备端默认模版" /></label>
+                    <select
+                      v-model="keywordPromptTemplateId"
+                      class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200"
+                    >
+                      <option value="">设备默认模版</option>
+                      <option v-for="tpl in promptTemplates" :key="tpl.id" :value="tpl.id">
+                        {{ tpl.name }} ({{ tpl.industry }})
+                      </option>
+                    </select>
+                  </div>
 
                   <!-- Device -->
                   <div>

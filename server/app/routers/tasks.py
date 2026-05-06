@@ -110,6 +110,10 @@ async def batch_create_tasks(
 
         accounts = db.query(Account).filter(Account.group == gid, Account.status == "active").all()
         if keywords:
+            # Store common params (prompt_template_id, sort_by, etc.) as template
+            # so claim_channel_item can merge them with each item's keyword
+            channel.params_template = {k: v for k, v in params.items() if k not in ("keyword", "keywords", "keyword_matrix")}
+            db.flush()
             from app.db_models import ChannelItem
             for kw in keywords:
                 if not kw or not kw.strip():

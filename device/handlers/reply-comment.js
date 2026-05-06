@@ -257,7 +257,17 @@ ReplyCommentHandler.execute = function (params) {
               if (this._sendDM(dmContent)) stats.dm_count++;
               sleep(1000);
             }
+            // 确保回到评论区（第一次尝试）
             this._returnToComments();
+            // 二次确认，不在评论区就重试
+            if (!ensurePage("comment", function () {
+              back(); sleep(800);
+              this._openComments();
+              sleep(1500);
+            }.bind(this), 2)) {
+              logger.warn(TAG, "返回评论区失败，跳过后续评论");
+              break;
+            }
           } else {
             logger.warn(TAG, "进入主页失败，跳过关注+私信");
             this._dismissKeyboard();

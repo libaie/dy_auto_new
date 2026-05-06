@@ -119,6 +119,12 @@ ReplyCommentHandler.execute = function (params) {
         var comment = this._parseCommentItem(items[i]);
         if (!comment) { totalRead++; continue; }
 
+        // 跳过作者自己的评论
+        if (comment.isAuthor) {
+          logger.info(TAG, "跳过作者评论: " + comment.nickname);
+          totalRead++; continue;
+        }
+
         // 时效筛选
         if (!this._filterByTime([comment], maxAgeDays).length) {
           totalRead++; continue;
@@ -333,11 +339,19 @@ ReplyCommentHandler._parseCommentItem = function (item) {
     var timeEl = this._findChildBySelector(item, "comment_time");
     var timeStr = timeEl ? timeEl.text() : "";
 
+    // 检测是否为作者自己的评论（有 "作者" 标签）
+    var isAuthor = false;
+    try {
+      var authorTag = item.findOne(text("作者"));
+      if (authorTag) isAuthor = true;
+    } catch (e) { /* ignore */ }
+
     return {
       nickname: nickname,
       text: text,
       time: timeStr,
       element: item,
+      isAuthor: isAuthor,
     };
   } catch (e) {
     logger.warn(TAG, "解析评论项出错: " + e.message);

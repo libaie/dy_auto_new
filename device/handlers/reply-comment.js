@@ -108,31 +108,23 @@ ReplyCommentHandler.execute = function (params) {
       continue;
     }
 
-    // 2d. 逐批读取+处理评论
-    }
-
-    var totalComments = items.length;
-    logger.info(TAG, "评论可见 " + totalComments + " 条");
-    // 根据预判评论数限制滑动：每次滑动约加载 3 条（含二级评论）
-    var maxBatches = commentCount > 0
-      ? Math.min(10, Math.ceil(commentCount / 3) + 1)
-      : Math.min(10, Math.ceil(count / 3) + 1);
-
+    // 2d. 逐批读取+处理评论（不限批次，直到读完所有或达成目标）
     var processed = 0;
     var totalRead = 0;
     var prevItemCount = 0;
 
-    for (var batch = 0; batch < maxBatches && processed < count; batch++) {
-      if (batch > 0) {
-        // 需要更多评论才滑动
-        if (items.length <= prevItemCount) {
-          logger.info(TAG, "评论已到底（" + items.length + " 条），停止");
-          break;
-        }
-        logger.info(TAG, "加载更多评论 (" + (batch + 1) + "/" + maxBatches + ")...");
-        uiOperator.swipeUp();
-        sleep(1500);
-        items = uiOperator.findElements("comment_list", 3000);
+    var items = uiOperator.findElements("comment_list", 3000);
+    if (!items || items.length === 0) {
+      logger.info(TAG, "评论列表为空，跳过");
+      back();
+      sleep(1000);
+      continue;
+    }
+
+    while (processed < count && (commentCount === 0 || totalRead < commentCount)) {
+      if (items.length <= prevItemCount && prevItemCount > 0) {
+        logger.info(TAG, "评论已到底（" + items.length + " 条），停止");
+        break;
       }
       prevItemCount = items.length;
 
@@ -241,6 +233,13 @@ ReplyCommentHandler.execute = function (params) {
         processed++;
         totalRead++;
         antiDetect.maybePause();
+      }
+
+      // 还需更多评论，滑动加载
+      if (processed < count && (commentCount === 0 || totalRead < commentCount)) {
+        uiOperator.swipeUp();
+        sleep(1500);
+        items = uiOperator.findElements("comment_list", 3000);
       }
     }
 

@@ -181,12 +181,6 @@ ReplyCommentHandler.execute = function (params) {
     var prevItemCount = 0;
 
     var items = uiOperator.findElements("comment_list", 3000);
-    if (!items || items.length === 0) {
-      logger.info(TAG, "评论列表为空，跳过");
-      back();
-      sleep(1000);
-      continue;
-    }
 
     while (processed < count && (commentCount === 0 || totalRead < commentCount)) {
       if (items.length <= prevItemCount && prevItemCount > 0) {

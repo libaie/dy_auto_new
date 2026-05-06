@@ -9,6 +9,41 @@ var logger = require("../utils/logger");
 
 var TAG = "评论回复";
 
+// 页面检测动作名映射
+var PAGE_DETECTORS = {
+  search:    ["search_video_list", "search_video_tab"],
+  video:     ["is_video_view"],
+  comment:   ["is_comment_view"],
+  profile:   ["is_user_view"],
+};
+
+/**
+ * 确保当前在指定页面，不在则自动恢复
+ * @param {string} page - "search"|"video"|"comment"|"profile"
+ * @param {Function} recoverFn - 恢复函数，返回 true 表示恢复成功
+ * @param {number} maxRetries - 最大重试次数
+ * @returns {boolean} 是否已在目标页面
+ */
+function ensurePage(page, recoverFn, maxRetries) {
+  maxRetries = maxRetries || 3;
+  var detectors = PAGE_DETECTORS[page] || [];
+  for (var attempt = 0; attempt < maxRetries; attempt++) {
+    for (var d = 0; d < detectors.length; d++) {
+      if (uiOperator.findElement(detectors[d], 1000)) {
+        if (attempt > 0) logger.info(TAG, "页面恢复: " + page + " (尝试 " + attempt + ")");
+        return true;
+      }
+    }
+    // 不在目标页面，执行恢复
+    if (recoverFn && attempt < maxRetries - 1) {
+      logger.info(TAG, "不在 " + page + " 页面，尝试恢复 (" + (attempt + 1) + "/" + maxRetries + ")");
+      recoverFn();
+    }
+  }
+  logger.warn(TAG, "无法恢复到 " + page + " 页面");
+  return false;
+}
+
 /**
  * 评论回复 + 关注 + 私信 Handler
  * 继承 SearchBaseHandler，复用搜索导航逻辑
@@ -108,6 +143,16 @@ ReplyCommentHandler.execute = function (params) {
       logger.warn(TAG, "视频 " + (v + 1) + " 打开评论区失败");
       back();
       sleep(1000);
+      continue;
+    }
+    // 验证评论区已打开
+    if (!ensurePage("comment", function () {
+      // 没打开？可能点击了但没反应，重试
+      uiOperator.findElement("video_comment_btn", 1000);
+      back(); sleep(1000);
+    }, 2)) {
+      logger.warn(TAG, "无法进入评论区，跳过此视频");
+      back(); sleep(1000);
       continue;
     }
 

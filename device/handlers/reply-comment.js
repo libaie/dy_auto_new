@@ -111,10 +111,20 @@ ReplyCommentHandler.execute = function (params) {
       }
       sleep(2000);
     } else {
-      // 后续视频：关闭评论区 → 滑动到下一个视频
-      back(); sleep(600);  // 关评论面板
-      uiOperator.swipeUp();  // 滑到下一个视频
-      sleep(2500);
+      // 后续视频：退出评论区 → 滑动到下一个视频
+      // 检测当前页面决定是否需要 back
+      if (uiOperator.findElement("is_comment_view", 500)) {
+        back(); sleep(600);  // 关评论面板回到视频页
+      }
+      // 确保在视频页后滑动
+      if (uiOperator.findElement("is_video_view", 1000)) {
+        uiOperator.swipeUp();
+        sleep(2500);
+      } else {
+        logger.warn(TAG, "不在视频页无法滑动，尝试 back 恢复");
+        back(); sleep(1000);
+        continue;
+      }
     }
 
     // 验证是否进入了视频详情页
@@ -153,10 +163,11 @@ ReplyCommentHandler.execute = function (params) {
     }
     // 验证评论区已打开
     if (!ensurePage("comment", function () {
-      // 没打开？可能点击了但没反应，重试
-      uiOperator.findElement("video_comment_btn", 1000);
-      back(); sleep(1000);
-    }, 2)) {
+      // 没打开？退到视频页重开评论区
+      back(); sleep(800);
+      this._openComments();
+      sleep(1500);
+    }.bind(this), 2)) {
       logger.warn(TAG, "无法进入评论区，跳过此视频");
       back(); sleep(1000);
       continue;
@@ -289,8 +300,8 @@ ReplyCommentHandler.execute = function (params) {
         } catch (e) {
           logger.error(TAG, "处理评论异常: " + e.message + "，跳过继续");
           totalRead++;
-          // 尝试恢复到评论面板
-          try { back(); sleep(500); } catch (e2) { /* ignore */ }
+          // 恢复到评论面板
+          try { this._returnToComments(); } catch (e2) { /* ignore */ }
         }
       }
 
@@ -646,9 +657,11 @@ ReplyCommentHandler._replyToComment = function (replyText) {
       setClip(replyText);
       sleep(200);
       shell("input keyevent 279", true);
-      sleep(300);
-      done = true;
-    } catch (e2) { /* ignore */ }
+      sleep(500);
+      done = true; // 粘贴无法验证结果，假设成功
+    } catch (e2) {
+      logger.warn(TAG, "剪贴板粘贴异常: " + e2.message);
+    }
   }
   if (!done) {
     logger.warn(TAG, "输入失败");

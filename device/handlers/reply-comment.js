@@ -37,10 +37,13 @@ var ReplyCommentHandler = Object.create(SearchBaseHandler);
 ReplyCommentHandler.execute = function (params) {
   var keyword = params.keyword;
   var content = params.content || "";
-  var count = params.count || 5; // 每个视频处理的评论数
-  var videoCount = params.video_count || 3; // 处理的视频数
+  var count = params.count || 5;
+  var videoCount = params.video_count || 3;
   var sortBy = params.sort_by || "latest";
   var maxAgeDays = params.max_age_days || 5;
+  // 每日上限（从服务端下发或设备配置获取）
+  var maxFollows = params.max_follows || 20;
+  var maxDMs = params.max_dms || 10;
 
   if (!keyword) {
     return { success: false, error: "缺少关键词" };
@@ -206,27 +209,31 @@ ReplyCommentHandler.execute = function (params) {
           reply: analysis.reply,
         });
 
-        // 关注+私信
+        // 关注+私信（检查每日上限）
         sleep(1000);
-        if (this._enterCommenterProfile(comment.nickname)) {
-          if (this._followUser()) stats.follow_count++;
-          sleep(1000);
-          if (content) {
-            var dmContent = content;
-            if (analysis.tier === "high") {
-              var aiDM = aiAnalyzer.generateDM({
-                searchKeyword: keyword, nickname: comment.nickname,
-                commentText: comment.text, tier: analysis.tier || "high",
-              });
-              if (aiDM) dmContent = aiDM;
-            }
-            if (this._sendDM(dmContent)) stats.dm_count++;
+        var canFollow = stats.follow_count < maxFollows;
+        var canDM = stats.dm_count < maxDMs;
+        if (canFollow || canDM) {
+          if (this._enterCommenterProfile(comment.nickname)) {
+            if (canFollow && this._followUser()) stats.follow_count++;
             sleep(1000);
+            if (canDM && content) {
+              var dmContent = content;
+              if (analysis.tier === "high") {
+                var aiDM = aiAnalyzer.generateDM({
+                  searchKeyword: keyword, nickname: comment.nickname,
+                  commentText: comment.text, tier: analysis.tier || "high",
+                });
+                if (aiDM) dmContent = aiDM;
+              }
+              if (this._sendDM(dmContent)) stats.dm_count++;
+              sleep(1000);
+            }
+            this._returnToComments();
+          } else {
+            logger.warn(TAG, "进入主页失败，跳过关注+私信");
+            this._dismissKeyboard();
           }
-          this._returnToComments();
-        } else {
-          logger.warn(TAG, "进入主页失败，跳过关注+私信");
-          this._dismissKeyboard();
         }
         sleep(1000);
 

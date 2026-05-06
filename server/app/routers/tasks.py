@@ -122,6 +122,16 @@ async def create_task(
 
     params = await _maybe_expand_keywords(params, request.type.value, db=db)
     params = await _maybe_resolve_template(db, params, request.type.value)
+
+    # 注入账号每日剩余配额到任务参数（reply_comment 需要关注和私信上限）
+    if request.type.value == "reply_comment":
+        from app.services.stats_service import stats_service
+        remaining = stats_service.get_remaining_quotas(db, request.account_id)
+        if "max_follows" not in params:
+            params["max_follows"] = remaining.get("follows", 20)
+        if "max_dms" not in params:
+            params["max_dms"] = remaining.get("dms", 10)
+
     task = task_service.create_task(
         db=db,
         task_type=request.type,

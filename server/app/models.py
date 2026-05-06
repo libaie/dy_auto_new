@@ -142,6 +142,8 @@ class ReplyCommentParams(BaseModel):
     video_count: int = Field(default=3, ge=1, le=10, description="处理视频数")
     sort_by: Optional[str] = Field(None, pattern="^(latest|most_liked)$")
     max_age_days: int = Field(default=5, ge=1, le=30, description="评论最大天数")
+    max_follows: int = Field(default=20, ge=1, le=50, description="每日关注上限")
+    max_dms: int = Field(default=10, ge=1, le=30, description="每日私信上限")
 
 
 def _validate_nurture_params(params: dict) -> dict:

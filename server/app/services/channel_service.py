@@ -233,6 +233,13 @@ class ChannelService:
             # Task is created as RUNNING to prevent get_pending_task from stealing it
             params = dict(ch.params_template or {})
             params["keyword"] = item.keyword
+            # 注入账号剩余配额（reply_comment 设备端需要关注和私信上限）
+            if ch.task_type == "reply_comment":
+                remaining = stats_service.get_remaining_quotas(db, item.account_id)
+                if "max_follows" not in params:
+                    params["max_follows"] = remaining.get("follows", 20)
+                if "max_dms" not in params:
+                    params["max_dms"] = remaining.get("dms", 10)
             task = DBTask(
                 type=ch.task_type,
                 account_id=item.account_id,

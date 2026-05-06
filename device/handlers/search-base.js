@@ -392,6 +392,7 @@ SearchBaseHandler._backToSearchResults = function () {
     var where = "未知";
     if (uiOperator.findElement("is_comment_view", 300)) where = "评论面板";
     else if (uiOperator.findElement("is_user_view", 300)) where = "个人主页";
+    else if (uiOperator.findElement("is_video_view", 300)) where = "视频详情页";
     logger.info(TAG, "第 " + (i + 1) + " 次 back，当前位置: " + where);
     back();
     sleep(1000);

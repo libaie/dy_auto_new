@@ -71,6 +71,14 @@ ReplyCommentHandler.execute = function (params) {
     }
     sleep(2000);
 
+    // 验证是否进入了视频详情页
+    if (!uiOperator.findElement("is_video_view", 3000)) {
+      logger.warn(TAG, "未进入视频详情页，可能点击失败，跳过此视频");
+      back();
+      sleep(1000);
+      continue;
+    }
+
     // 2b. 打开评论区
     if (!this._openComments()) {
       logger.warn(TAG, "视频 " + (v + 1) + " 打开评论区失败");
@@ -673,9 +681,9 @@ ReplyCommentHandler._returnToComments = function () {
       return;
     }
 
-    // 已在视频详情页？（检测评论入口按钮，重新打开评论区）
-    var commentBtn = uiOperator.findElement("video_comment_btn", 500);
-    if (commentBtn) {
+    // 已在视频详情页？
+    if (uiOperator.findElement("is_video_view", 500) ||
+        uiOperator.findElement("video_comment_btn", 500)) {
       logger.info(TAG, "回到视频详情页 (back " + i + " 次)，打开评论区");
       this._openComments();
       return;

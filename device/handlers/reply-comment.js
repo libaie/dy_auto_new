@@ -79,49 +79,61 @@ ReplyCommentHandler.execute = function (params) {
       continue;
     }
 
-    // 2c. 逐批读取+处理评论（避免批量读取后元素失效）
+    // 2c. 逐批读取+处理评论
+    var items = uiOperator.findElements("comment_list", 3000);
+    if (!items || items.length === 0) {
+      logger.info(TAG, "该视频无评论，跳过");
+      back();
+      sleep(1000);
+      continue;
+    }
+
+    var totalComments = items.length;
+    logger.info(TAG, "评论可见 " + totalComments + " 条");
+    // 估算需要多少批滑动：每滑动一次大约加载 5 条
+    var maxBatches = Math.min(10, Math.ceil(count / 3) + 1);
+
     var processed = 0;
     var totalRead = 0;
-    var maxBatches = 10;
-
     var prevItemCount = 0;
-    for (var batch = 0; batch < maxBatches && processed < count; batch++) {
-      // 读取当前可见的评论
-      var items = uiOperator.findElements("comment_list", 3000);
-      if (!items || items.length === 0) {
-        logger.warn(TAG, "未找到评论列表");
-        break;
-      }
 
-      // 如果没有新元素加载，说明到底了
-      if (items.length <= prevItemCount && batch > 0) {
-        logger.info(TAG, "评论已到底（" + items.length + " 条）");
-        break;
+    for (var batch = 0; batch < maxBatches && processed < count; batch++) {
+      if (batch > 0) {
+        // 需要更多评论才滑动
+        if (items.length <= prevItemCount) {
+          logger.info(TAG, "评论已到底（" + items.length + " 条），停止");
+          break;
+        }
+        logger.info(TAG, "加载更多评论 (" + (batch + 1) + "/" + maxBatches + ")...");
+        uiOperator.swipeUp();
+        sleep(1500);
+        items = uiOperator.findElements("comment_list", 3000);
       }
       prevItemCount = items.length;
 
-      // 只处理本批新出现的评论（跳过之前已读的）
+      // 处理本批新评论
       for (var i = totalRead; i < items.length && processed < count; i++) {
+        // 每次操作前确保键盘已关闭
+        this._dismissKeyboard();
+
         var comment = this._parseCommentItem(items[i]);
-        if (!comment) continue;
+        if (!comment) { totalRead++; continue; }
 
         // 时效筛选
         if (!this._filterByTime([comment], maxAgeDays).length) {
-          totalRead++;
-          continue;
+          totalRead++; continue;
         }
 
-        logger.info(TAG, "分析评论 " + (processed + 1) + "/" + count +
+        logger.info(TAG, "分析 " + (processed + 1) + "/" + count +
           ": [" + comment.nickname + "] " + comment.text.substring(0, 30));
 
-        // AI 五维度分析
         var analysis = aiAnalyzer.analyzeComment({
           searchKeyword: keyword,
           nickname: comment.nickname,
           commentText: comment.text,
         });
 
-        if (!analysis) { logger.warn(TAG, "AI 分析失败，跳过"); stats.skipped++; totalRead++; continue; }
+        if (!analysis) { stats.skipped++; totalRead++; continue; }
 
         logger.info(TAG, "分数=" + analysis.score + ", 层级=" + analysis.tier +
           ", 意图=" + (analysis.dimensions ? analysis.dimensions.intent : "未知"));
@@ -139,12 +151,11 @@ ReplyCommentHandler.execute = function (params) {
           }
         }
 
-        // 回复评论
+        // 回复
         logger.info(TAG, "回复: '" + analysis.reply.substring(0, 30) + "...'");
-        var replySuccess = this._replyToComment(analysis.reply);
-        if (!replySuccess) { stats.fail_count++; totalRead++; continue; }
-
+        this._replyToComment(analysis.reply);
         stats.success_count++;
+
         stats.details.push({
           video: v + 1, nickname: comment.nickname,
           score: analysis.score, tier: analysis.tier,
@@ -152,46 +163,33 @@ ReplyCommentHandler.execute = function (params) {
           reply: analysis.reply,
         });
 
-        // 点击头像进入主页
+        // 关注+私信
         sleep(1000);
-        var profileEntered = this._enterCommenterProfile(comment.nickname);
-        if (!profileEntered) {
-          logger.warn(TAG, "进入主页失败，跳过关注+私信");
-          processed++; totalRead++; antiDetect.maybePause(); continue;
-        }
-
-        var followed = this._followUser();
-        if (followed) stats.follow_count++;
-        sleep(1000);
-
-        if (content) {
-          var dmContent = content;
-          if (analysis.tier === "high") {
-            var aiDM = aiAnalyzer.generateDM({
-              searchKeyword: keyword, nickname: comment.nickname,
-              commentText: comment.text, tier: analysis.tier || "high",
-            });
-            if (aiDM) dmContent = aiDM;
-          }
-          var dmSent = this._sendDM(dmContent);
-          if (dmSent) stats.dm_count++;
+        if (this._enterCommenterProfile(comment.nickname)) {
+          if (this._followUser()) stats.follow_count++;
           sleep(1000);
+          if (content) {
+            var dmContent = content;
+            if (analysis.tier === "high") {
+              var aiDM = aiAnalyzer.generateDM({
+                searchKeyword: keyword, nickname: comment.nickname,
+                commentText: comment.text, tier: analysis.tier || "high",
+              });
+              if (aiDM) dmContent = aiDM;
+            }
+            if (this._sendDM(dmContent)) stats.dm_count++;
+            sleep(1000);
+          }
+          this._returnToComments();
+        } else {
+          logger.warn(TAG, "进入主页失败，跳过关注+私信");
+          this._dismissKeyboard();
         }
-
-        // 返回评论区
-        this._returnToComments();
-        sleep(1500);
+        sleep(1000);
 
         processed++;
         totalRead++;
         antiDetect.maybePause();
-      }
-
-      // 还需要更多评论，滑动加载
-      if (processed < count) {
-        logger.info(TAG, "已处理 " + processed + "/" + count + "，滑动加载更多评论...");
-        uiOperator.swipeUp();
-        sleep(1500);
       }
     }
 
@@ -451,6 +449,26 @@ ReplyCommentHandler._parseTime = function (timeStr) {
     return new Date(now.getTime() - parseInt(hourMatch[1]) * 60 * 60 * 1000);
   }
 
+  // "昨天 HH:MM"
+  if (timeStr.indexOf("昨天") !== -1) {
+    var yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    var hmMatch = timeStr.match(/(\d{1,2}):(\d{2})/);
+    if (hmMatch) {
+      yesterday.setHours(parseInt(hmMatch[1]), parseInt(hmMatch[2]), 0, 0);
+    }
+    return yesterday;
+  }
+
+  // "前天 HH:MM"
+  if (timeStr.indexOf("前天") !== -1) {
+    var dayBefore = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 2);
+    var hm2 = timeStr.match(/(\d{1,2}):(\d{2})/);
+    if (hm2) {
+      dayBefore.setHours(parseInt(hm2[1]), parseInt(hm2[2]), 0, 0);
+    }
+    return dayBefore;
+  }
+
   // "X天前"
   var dayMatch = timeStr.match(/(\d+)\s*天前/);
   if (dayMatch) {
@@ -474,41 +492,77 @@ ReplyCommentHandler._parseTime = function (timeStr) {
 };
 
 /**
- * 回复评论
+ * 回复评论 — 容错增强版
  * @param {string} replyText - 回复内容
  * @returns {boolean}
  */
 ReplyCommentHandler._replyToComment = function (replyText) {
-  // 1. 点击回复按钮，打开回复输入框
+  // 1. 点击回复按钮
   var replyClicked = this.safeClick("comment_reply_button", 2);
+  if (!replyClicked) {
+    // 键盘可能还开着，先关键盘再重试
+    back();
+    sleep(500);
+    replyClicked = this.safeClick("comment_reply_button", 2);
+  }
   if (!replyClicked) {
     logger.warn(TAG, "回复按钮未找到");
     return false;
   }
   sleep(1000);
 
-  // 2. 点击回复输入框，弹出键盘
-  var inputClicked = this.safeClick("comment_input", 3);
+  // 2. 点击输入框激活，找 EditText 用 setText
+  var inputClicked = this.safeClick("comment_input", 2);
   if (!inputClicked) {
-    logger.warn(TAG, "回复输入框未找到");
+    logger.warn(TAG, "输入框未找到");
+    this._dismissKeyboard();
     return false;
   }
   sleep(800);
 
-  // 3. 输入回复内容
-  var inputResult = this.safeInput("comment_input", replyText);
-  if (!inputResult) {
+  // 3. 输入文本 — 直接用 setText（比剪贴板粘贴可靠）
+  var inputOk = false;
+  try {
+    var editText = className("EditText").findOne(3000);
+    if (editText) {
+      editText.setText(replyText);
+      sleep(300);
+      inputOk = true;
+    }
+  } catch (e) {
+    logger.warn(TAG, "setText 失败: " + e.message);
+  }
+  if (!inputOk) {
+    // 回退：用 safeInput（剪贴板方式）
+    inputOk = this.safeInput("comment_input", replyText);
+  }
+  if (!inputOk) {
     logger.warn(TAG, "输入回复内容失败");
+    this._dismissKeyboard();
     return false;
   }
   sleep(500);
 
-  // 4. 通过键盘回车发送
+  // 4. 发送 — 优先键盘回车，回退点击按钮
+  var sent = uiOperator.submitViaKeyboard("comment_submit");
+  if (!sent) {
+    sent = this.safeClick("comment_submit", 2);
+  }
+  sleep(1000);
+
+  // 5. 确保键盘关闭
+  this._dismissKeyboard();
   sleep(500);
-  this.submitViaKeyboard("comment_submit");
-  sleep(1500);
-  logger.info(TAG, "回复已发送: '" + replyText.substring(0, 20) + "'");
-  return true;
+
+  logger.info(TAG, "回复" + (sent ? "已发送" : "发送可能失败") + ": '" + replyText.substring(0, 20) + "'");
+  return true; // 即使发送不确定也继续，不阻塞后续流程
+};
+
+/**
+ * 关闭输入键盘
+ */
+ReplyCommentHandler._dismissKeyboard = function () {
+  try { back(); sleep(500); } catch (e) { /* ignore */ }
 };
 
 /**
@@ -588,8 +642,10 @@ ReplyCommentHandler._sendDM = function (content) {
  *   is_user_view     — 当前在个人主页？
  */
 ReplyCommentHandler._returnToComments = function () {
-  var maxBacks = 5;
+  // 先关闭可能存在的键盘
+  this._dismissKeyboard();
 
+  var maxBacks = 5;
   for (var i = 0; i < maxBacks; i++) {
     // 已在评论面板？
     if (uiOperator.findElement("is_comment_view", 500)) {

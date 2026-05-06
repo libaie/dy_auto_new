@@ -278,30 +278,36 @@ var uiOperator = {
     }
     sleep(500);
 
-    // 通过剪贴板粘贴
-    try {
-      setClip(text);
-      sleep(200);
-      // 尝试多种粘贴方式
-      try { shell("input keyevent 279", true); } catch (e1) { /* ignore */ }
-      try { keyCode(279); } catch (e2) { /* ignore */ }
-      sleep(300);
-      logger.debug(TAG, "已粘贴文本: '" + text.substring(0, 20) + "'");
-      return true;
-    } catch (e) {
-      logger.warn(TAG, "剪贴板粘贴失败: " + e.message);
-    }
-
-    // 回退: setText
+    // 优先 setText（最可靠）
     try {
       if (!element.isImage && !element.isCoordinate) {
         element.setText(text);
+        logger.debug(TAG, "setText: '" + text.substring(0, 20) + "'");
         return true;
       }
+    } catch (e1) { /* ignore */ }
+
+    // 找 EditText 控件 setText
+    try {
       var editText = className("EditText").findOne(2000);
-      if (editText) { editText.setText(text); return true; }
-    } catch (e2) {
-      logger.warn(TAG, "setText 回退也失败: " + e2.message);
+      if (editText) {
+        editText.setText(text);
+        logger.debug(TAG, "EditText.setText: '" + text.substring(0, 20) + "'");
+        return true;
+      }
+    } catch (e2) { /* ignore */ }
+
+    // 最后兜底: 剪贴板粘贴
+    try {
+      setClip(text);
+      sleep(200);
+      try { shell("input keyevent 279", true); } catch (e3) { /* ignore */ }
+      try { keyCode(279); } catch (e4) { /* ignore */ }
+      sleep(200);
+      logger.debug(TAG, "剪贴板粘贴: '" + text.substring(0, 20) + "'");
+      return true;
+    } catch (e5) {
+      logger.warn(TAG, "所有输入方式均失败");
     }
     return false;
   },

@@ -109,31 +109,16 @@ ReplyCommentHandler.execute = function (params) {
         logger.warn(TAG, "点击第一个视频失败，停止处理");
         break;
       }
-      sleep(2000);
     } else {
-      // 后续视频：先 back 退出评论面板，再滑动到下一个
-      back(); sleep(600);  // 关闭评论面板/键盘（不管在哪个页面）
-      // 如果不在视频页，再 back 一次
-      if (!uiOperator.findElement("is_video_view", 1000)) {
-        back(); sleep(800);
-      }
-      // 现在应该在视频页，滑动到下一个
-      if (uiOperator.findElement("is_video_view", 1000)) {
-        uiOperator.swipeUp();
-        sleep(2500);
-      } else {
-        // 仍然不在？再试一次
-        logger.warn(TAG, "不在视频页，尝试 force back+swipe");
-        back(); sleep(800);
-        uiOperator.swipeUp();
-        sleep(2500);
-      }
+      // 后续视频：关评论面板 → 滑动到下一个
+      back(); sleep(800);
+      uiOperator.swipeUp();
     }
+    sleep(2000);
 
-    // 验证是否进入了视频详情页
-    if (!uiOperator.findElement("is_video_view", 3000)) {
-      logger.warn(TAG, "未进入视频详情页，跳过此视频");
-      back(); sleep(1000);
+    // 验证进入了视频详情页
+    if (!ensurePage("video", null, 3)) {
+      logger.warn(TAG, "未进入视频详情页，跳过");
       continue;
     }
 

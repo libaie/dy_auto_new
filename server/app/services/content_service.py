@@ -205,20 +205,16 @@ class ContentService:
     async def generate_regex(self, db: Session, description: str) -> str:
         """Generate a regex pattern from natural language description."""
         from app.services.ai_generator import ai_generator
-        import logging
-        _log = logging.getLogger(__name__)
         system_prompt = (
             "你是一个正则表达式专家。用户用大白话描述需求，你只返回对应的正则表达式，"
             "不要加引号、不要解释、不要 markdown 代码块。"
         )
-        result = await ai_generator.generate_custom(
+        return await ai_generator.generate_custom(
             db, system_prompt,
             f"请生成一个正则表达式：{description}",
             max_tokens=512, temperature=0.2,
             thinking_enabled=False,
         )
-        _log.info("generate_regex raw result: %r", result)
-        return result
 
     # --- Clean Prompt Generation ---
 

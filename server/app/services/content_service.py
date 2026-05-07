@@ -126,7 +126,7 @@ class ContentService:
         """Check if text contains any sensitive word.
 
         Loads all words from DB on each call (no cache) to ensure freshness.
-        Uses substring match (not word-boundary) — intentional for Douyin's
+        Uses substring match (not word-boundary) -- intentional for Douyin's
         aggressive content policy. False positives trigger a retry, which is
         acceptable since the AI prompt already avoids sensitive content.
         """
@@ -199,6 +199,37 @@ class ContentService:
         except (json.JSONDecodeError, TypeError):
             pass
         return [keyword]
+
+    # --- Regex Generation ---
+
+    async def generate_regex(self, db: Session, description: str) -> str:
+        """Generate a regex pattern from natural language description."""
+        from app.services.ai_generator import ai_generator
+        system_prompt = (
+            "你是一个正则表达式专家。用户用大白话描述需求，你只返回对应的正则表达式，"
+            "不要加引号、不要解释、不要 markdown 代码块。"
+        )
+        return await ai_generator.generate_custom(
+            db, system_prompt,
+            f"请生成一个正则表达式：{description}",
+            max_tokens=256, temperature=0.2,
+        )
+
+    # --- Clean Prompt Generation ---
+
+    async def generate_clean_prompt(self, db: Session, description: str) -> str:
+        """Generate an AI cleaning prompt from natural language description."""
+        from app.services.ai_generator import ai_generator
+        system_prompt = (
+            "你是一个数据清洗专家。用户描述需要从一段文本中提取或清洗什么信息，"
+            "你返回一个清晰的清洗提示词，这个提示词会被用于 AI 清洗从抖音控件中提取的原始数据。"
+            "只返回提示词本身，不要加引号、不要解释、不要 markdown 代码块。"
+        )
+        return await ai_generator.generate_custom(
+            db, system_prompt,
+            f"请生成一个清洗提示词：{description}",
+            max_tokens=512, temperature=0.3,
+        )
 
 
 content_service = ContentService()

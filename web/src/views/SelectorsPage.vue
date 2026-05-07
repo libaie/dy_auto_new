@@ -20,6 +20,8 @@ import {
   updateSelector,
   deleteSelector,
   toggleSelector,
+  generateRegex,
+  generateCleanPrompt,
 } from '../api/selectors.js'
 import { useToastStore } from '../stores/toast.js'
 
@@ -186,6 +188,42 @@ const defaultForm = {
   strategies: '[]',
   category: '',
 }
+// --- AI generation state ---
+const generatingRegex = ref(false)
+const generatingPrompt = ref(false)
+
+async function generateRegexAI() {
+  if (!form.description.trim()) {
+    formError.value = '请先在说明字段中描述取值需求'
+    return
+  }
+  generatingRegex.value = true
+  try {
+    const res = await generateRegex(form.description.trim())
+    form.clean_pattern = res.data.regex || res.data.pattern || ''
+  } catch (e) {
+    formError.value = '正则生成失败: ' + (e.response?.data?.detail || e.message)
+  } finally {
+    generatingRegex.value = false
+  }
+}
+
+async function generateCleanPromptAI() {
+  if (!form.description.trim()) {
+    formError.value = '请先在说明字段中描述清洗需求'
+    return
+  }
+  generatingPrompt.value = true
+  try {
+    const res = await generateCleanPrompt(form.description.trim())
+    form.clean_prompt = res.data.prompt || ''
+  } catch (e) {
+    formError.value = '提示词生成失败: ' + (e.response?.data?.detail || e.message)
+  } finally {
+    generatingPrompt.value = false
+  }
+}
+
 const form = reactive({ ...defaultForm })
 
 // --- Strategy card builder state ---
@@ -284,6 +322,11 @@ function openCreateDialog() {
   form.platform_version = ''
   form.strategies = '[]'
   form.category = ''
+  form.purpose = 'locate'
+  form.extract_field = 'text'
+  form.clean_mode = 'raw'
+  form.clean_pattern = ''
+  form.clean_prompt = ''
   editMode.value = 'form'
   strategyList.value = []
   formError.value = null
@@ -298,6 +341,11 @@ function openEditDialog(sel) {
   form.platform_version = sel.platform_version || ''
   form.strategies = JSON.stringify(sel.strategies || [], null, 2)
   form.category = sel.category || ''
+  form.purpose = sel.purpose || 'locate'
+  form.extract_field = sel.extract_field || 'text'
+  form.clean_mode = sel.clean_mode || 'raw'
+  form.clean_pattern = sel.clean_pattern || ''
+  form.clean_prompt = sel.clean_prompt || ''
   editMode.value = 'form'
   syncStrategiesToList()
   formError.value = null
@@ -331,6 +379,11 @@ async function handleSave() {
     platform_version: form.platform_version.trim() || undefined,
     description: form.description.trim() || '',
     category: form.category || '',
+    purpose: form.purpose || 'locate',
+    extract_field: form.purpose === 'extract' ? (form.extract_field || 'text') : undefined,
+    clean_mode: form.purpose === 'extract' ? (form.clean_mode || 'raw') : undefined,
+    clean_pattern: form.purpose === 'extract' && form.clean_mode === 'regex' ? (form.clean_pattern || undefined) : undefined,
+    clean_prompt: form.purpose === 'extract' && form.clean_mode === 'ai' ? (form.clean_prompt || undefined) : undefined,
   }
 
   try {
@@ -702,6 +755,125 @@ onMounted(fetchSelectors)
                       </option>
                     </select>
                     <p class="mt-1 text-xs text-slate-500">选择此选择器所属的操作模块分类，方便筛选和维护</p>
+                  </div>
+
+                  <!-- purpose: locate vs extract -->
+                  <div>
+                    <label class="flex items-center gap-1.5 text-sm font-medium text-slate-300">
+                      控件用途
+                    </label>
+                    <div class="mt-2 flex rounded-lg border border-white/10 overflow-hidden">
+                      <button
+                        type="button"
+                        :class="form.purpose === 'locate' ? 'bg-indigo-500/20 text-indigo-300' : 'text-slate-500 hover:text-slate-300'"
+                        class="flex-1 px-4 py-2 text-sm font-medium transition-colors"
+                        @click="form.purpose = 'locate'"
+                      >
+                        定位（点击/操作控件）
+                      </button>
+                      <button
+                        type="button"
+                        :class="form.purpose === 'extract' ? 'bg-emerald-500/20 text-emerald-300' : 'text-slate-500 hover:text-slate-300'"
+                        class="flex-1 px-4 py-2 text-sm font-medium transition-colors"
+                        @click="form.purpose = 'extract'"
+                      >
+                        取值（读取控件内容）
+                      </button>
+                    </div>
+                    <p class="mt-1 text-xs text-slate-500">定位：查找控件并点击/输入；取值：查找控件并读取其属性值</p>
+                  </div>
+
+                  <!-- extract fields (shown when purpose=extract) -->
+                  <div v-if="form.purpose === 'extract'" class="space-y-3">
+                    <div>
+                      <label class="text-sm font-medium text-slate-300">取值字段</label>
+                      <select
+                        v-model="form.extract_field"
+                        class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200"
+                      >
+                        <option value="text">text（文本内容）</option>
+                        <option value="desc">desc（描述内容）</option>
+                        <option value="id">id（资源ID）</option>
+                        <option value="className">className（类名）</option>
+                      </select>
+                      <p class="mt-1 text-xs text-slate-500">从找到的控件中读取此属性</p>
+                    </div>
+
+                    <div>
+                      <label class="text-sm font-medium text-slate-300">清洗方式</label>
+                      <div class="mt-2 flex gap-2">
+                        <button
+                          type="button"
+                          :class="form.clean_mode === 'raw' ? 'bg-slate-500/20 text-slate-200 border-slate-500/30' : 'text-slate-500 hover:text-slate-300 border-transparent'"
+                          class="px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors"
+                          @click="form.clean_mode = 'raw'"
+                        >
+                          不处理（原始值）
+                        </button>
+                        <button
+                          type="button"
+                          :class="form.clean_mode === 'regex' ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30' : 'text-slate-500 hover:text-slate-300 border-transparent'"
+                          class="px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors"
+                          @click="form.clean_mode = 'regex'"
+                        >
+                          正则清洗
+                        </button>
+                        <button
+                          type="button"
+                          :class="form.clean_mode === 'ai' ? 'bg-purple-500/20 text-purple-300 border-purple-500/30' : 'text-slate-500 hover:text-slate-300 border-transparent'"
+                          class="px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors"
+                          @click="form.clean_mode = 'ai'"
+                        >
+                          AI 清洗
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- Regex mode -->
+                    <div v-if="form.clean_mode === 'regex'">
+                      <div class="flex items-end gap-2">
+                        <div class="flex-1">
+                          <label class="text-xs text-slate-400 mb-1 block">正则表达式</label>
+                          <input
+                            v-model="form.clean_pattern"
+                            type="text"
+                            placeholder="例如：\d+ 提取数字"
+                            class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 font-mono focus:border-cyan-500/50 focus:outline-none"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          class="btn-aurora rounded-lg px-3 py-2 text-xs font-medium whitespace-nowrap"
+                          @click="generateRegexAI"
+                          :disabled="generatingRegex"
+                        >
+                          <span class="relative z-10">{{ generatingRegex ? '生成中...' : 'AI 生成' }}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- AI mode -->
+                    <div v-if="form.clean_mode === 'ai'">
+                      <div class="flex items-end gap-2">
+                        <div class="flex-1">
+                          <label class="text-xs text-slate-400 mb-1 block">清洗提示词</label>
+                          <textarea
+                            v-model="form.clean_prompt"
+                            rows="3"
+                            placeholder="例如：提取评论中的数值，去掉单位和多余文字"
+                            class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:border-purple-500/50 focus:outline-none"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          class="btn-aurora rounded-lg px-3 py-2 text-xs font-medium whitespace-nowrap"
+                          @click="generateCleanPromptAI"
+                          :disabled="generatingPrompt"
+                        >
+                          <span class="relative z-10">{{ generatingPrompt ? '生成中...' : 'AI 生成' }}</span>
+                        </button>
+                      </div>
+                    </div>
                   </div>
 
                   <!-- strategies -->

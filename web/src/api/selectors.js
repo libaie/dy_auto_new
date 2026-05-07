@@ -36,3 +36,10 @@ export function listTemplates() {
 export function deleteTemplate(filename) {
   return client.delete(`/selectors/templates/${filename}`)
 }
+export function generateRegex(description) {
+  return client.post('/content/generate-regex', { description })
+}
+
+export function generateCleanPrompt(description) {
+  return client.post('/content/generate-clean-prompt', { description })
+}

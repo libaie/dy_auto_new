@@ -19,6 +19,11 @@ class SelectorCreateRequest(BaseModel):
     platform_version: str = "default"
     description: str = ""
     category: str = ""
+    purpose: str = "locate"
+    extract_field: Optional[str] = None
+    clean_mode: Optional[str] = None
+    clean_pattern: Optional[str] = None
+    clean_prompt: Optional[str] = None
 
 
 class SelectorUpdateRequest(BaseModel):
@@ -26,6 +31,11 @@ class SelectorUpdateRequest(BaseModel):
     platform_version: Optional[str] = None
     description: Optional[str] = None
     category: Optional[str] = None
+    purpose: Optional[str] = None
+    extract_field: Optional[str] = None
+    clean_mode: Optional[str] = None
+    clean_pattern: Optional[str] = None
+    clean_prompt: Optional[str] = None
     # Note: version is auto-bumped on any change, not user-settable
 
 
@@ -70,6 +80,11 @@ async def create_selector(
             platform_version=request.platform_version,
             description=request.description,
             category=request.category,
+            purpose=request.purpose,
+            extract_field=request.extract_field,
+            clean_mode=request.clean_mode,
+            clean_pattern=request.clean_pattern,
+            clean_prompt=request.clean_prompt,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -97,6 +112,11 @@ async def update_selector(
             platform_version=request.platform_version,
             description=request.description,
             category=request.category,
+            purpose=request.purpose,
+            extract_field=request.extract_field,
+            clean_mode=request.clean_mode,
+            clean_pattern=request.clean_pattern,
+            clean_prompt=request.clean_prompt,
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))

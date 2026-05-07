@@ -295,7 +295,7 @@ class DeviceGenerateResponse(BaseModel):
 
 class DeviceAIProxyRequest(BaseModel):
     prompt: str
-    max_tokens: int = 512
+    max_tokens: int = 4096
     temperature: float = 0.7
 
 
@@ -434,6 +434,14 @@ class NurtureParamsV2(BaseModel):
 class KeywordMatrixRequest(BaseModel):
     keyword: str = Field(..., min_length=1, max_length=50)
     count: int = Field(default=10, ge=1, le=30)
+
+
+class GenerateRegexRequest(BaseModel):
+    description: str = Field(..., min_length=1, max_length=200)
+
+
+class GenerateCleanPromptRequest(BaseModel):
+    description: str = Field(..., min_length=1, max_length=200)
 
 
 # --- 系统设置 ---

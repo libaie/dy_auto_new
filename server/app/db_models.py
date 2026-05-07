@@ -119,6 +119,11 @@ class UISelector(Base):
     version = Column(Integer, nullable=False, default=1)
     enabled = Column(Boolean, nullable=False, default=True)
     category = Column(String(50), nullable=True, default=None, index=True)
+    purpose = Column(String(20), nullable=False, default="locate")  # locate | extract
+    extract_field = Column(String(20), nullable=True)  # text | desc | id | className
+    clean_mode = Column(String(20), nullable=True)     # raw | regex | ai
+    clean_pattern = Column(Text, nullable=True)         # regex pattern
+    clean_prompt = Column(Text, nullable=True)          # AI clean prompt
     created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 

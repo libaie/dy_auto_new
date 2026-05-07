@@ -546,7 +546,73 @@ var uiOperator = {
   },
 
   /**
+   * 从控件提取值（按选择器配置的 extract_field 读取属性）
+   * @param {UiObject} element - 已找到的控件
+   * @param {Object} selector - 选择器配置 (含 purpose, extract_field, clean_mode, clean_pattern, clean_prompt)
+   * @returns {string|null} 提取并清洗后的值
+   */
+  extractValue: function (element, selector) {
+    if (!element || !selector || selector.purpose !== "extract") return null;
+
+    var field = selector.extract_field || "text";
+    var rawValue = null;
+    try {
+      switch (field) {
+        case "text": rawValue = element.text(); break;
+        case "desc": rawValue = element.desc(); break;
+        case "id": rawValue = element.id(); break;
+        case "className": rawValue = element.className(); break;
+        default: return null;
+      }
+    } catch (e) {
+      logger.warn(TAG, "提取值失败: " + e.message);
+      return null;
+    }
+
+    if (!rawValue) return "";
+
+    var cleanMode = selector.clean_mode || "raw";
+    if (cleanMode === "raw") return rawValue;
+
+    // 正则清洗
+    if (cleanMode === "regex" && selector.clean_pattern) {
+      try {
+        var re = new RegExp(selector.clean_pattern);
+        var match = rawValue.match(re);
+        return match ? (match[1] || match[0]) : rawValue;
+      } catch (e) {
+        logger.warn(TAG, "正则清洗失败: " + e.message);
+        return rawValue;
+      }
+    }
+
+    // AI 清洗
+    if (cleanMode === "ai" && selector.clean_prompt) {
+      try {
+        var apiClient = require("./api-client");
+        var result = apiClient.post("/api/device/ai-proxy", {
+          prompt: selector.clean_prompt + "
+
+原始数据：" + rawValue,
+          max_tokens: 256,
+          temperature: 0.2,
+        });
+        if (result && result.content) {
+          logger.debug(TAG, "AI 清洗: '" + rawValue.substring(0, 20) + "' -> '" + result.content.substring(0, 20) + "'");
+          return result.content.trim();
+        }
+      } catch (e) {
+        logger.warn(TAG, "AI 清洗失败: " + e.message);
+      }
+      return rawValue;
+    }
+
+    return rawValue;
+  },
+
+  /**
    * 截取当前页面控件树快照（用于选择器调试）
+
    * @returns {Object} 控件树摘要
    */
   captureUISnapshot: function () {

@@ -436,18 +436,20 @@ ReplyCommentHandler._readComments = function (maxCount) {
  */
 ReplyCommentHandler._parseCommentItem = function (item) {
   try {
-    // 使用选择器系统查找昵称
-    var nicknameEl = this._findChildBySelector(item, "comment_author");
-    // 备用：第一个可点击的 TextView
-    if (!nicknameEl) {
-      nicknameEl = item.findOne(clickable(true).className("android.widget.TextView"));
-    }
-    var nickname = nicknameEl ? nicknameEl.text() : "unknown";
+    var uiOperator = require("../core/ui-operator");
 
-    // 使用选择器系统查找评论文本
+    // 使用选择器系统提取昵称
+    var nicknameEl = this._findChildBySelector(item, "comment_author");
+    var nickname = nicknameEl ? this._extractChildValue(nicknameEl, "comment_author", "unknown") : null;
+    if (!nickname) {
+      nicknameEl = item.findOne(clickable(true).className("android.widget.TextView"));
+      nickname = nicknameEl ? this._extractChildValue(nicknameEl, "comment_author", "unknown") : "unknown";
+    }
+
+    // 使用选择器系统提取评论文本
     var textEl = this._findChildBySelector(item, "comment_text");
-    // 备用：最长的 TextView
-    if (!textEl) {
+    var text = textEl ? this._extractChildValue(textEl, "comment_text", "") : "";
+    if (!textEl && !text) {
       var textViews = item.find(className("android.widget.TextView"));
       var maxLen = 0;
       for (var i = 0; i < textViews.length; i++) {
@@ -457,13 +459,13 @@ ReplyCommentHandler._parseCommentItem = function (item) {
           textEl = textViews[i];
         }
       }
+      text = textEl ? this._extractChildValue(textEl, "comment_text", "") : "";
     }
-    var text = textEl ? textEl.text() : "";
     if (!text) return null;
 
-    // 使用选择器系统查找时间
+    // 使用选择器系统提取时间
     var timeEl = this._findChildBySelector(item, "comment_time");
-    var timeStr = timeEl ? timeEl.text() : "";
+    var timeStr = timeEl ? this._extractChildValue(timeEl, "comment_time", "") : "";
 
     // 检测是否为作者自己的评论（有 "作者" 标签）
     var isAuthor = false;
@@ -519,6 +521,24 @@ ReplyCommentHandler._findChildBySelector = function (parent, actionName) {
     if (element) return element;
   }
   return null;
+};
+
+/**
+ * 从子元素提取值（支持选择器的 purpose=extract 配置）
+ * @param {UiObject} el - 子元素
+ * @param {string} actionName - 选择器动作名
+ * @param {string} fallback - 回退值（选择器不是 extract 类型时直接读 text）
+ * @returns {string}
+ */
+ReplyCommentHandler._extractChildValue = function (el, actionName, fallback) {
+  var uiOperator = require("../core/ui-operator");
+  var selector = selectorLoader.get(actionName);
+  if (selector && selector.purpose === "extract") {
+    var val = uiOperator.extractValue(el, selector);
+    if (val != null) return val;
+  }
+  // 回退：直接读 text
+  try { return el.text() || fallback; } catch (e) { return fallback; }
 };
 
 /**

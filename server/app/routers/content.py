@@ -11,6 +11,7 @@ from app.models import (
     SensitiveWordCreate, SensitiveWordResponse,
     GenerateRequest, GenerateResponse,
     KeywordMatrixRequest,
+    GenerateRegexRequest, GenerateCleanPromptRequest,
 )
 from app.database import get_db
 from app.deps import verify_admin_token
@@ -156,3 +157,34 @@ async def generate_keywords(
             raise HTTPException(status_code=503, detail="AI service not configured.")
         raise HTTPException(status_code=502, detail=f"AI service error: {e}")
     return {"keywords": keywords, "seed": request.keyword}
+
+# --- AI Regex & Clean Prompt Generation ---
+
+@router.post(/generate-regex)
+async def generate_regex(
+    request: GenerateRegexRequest,
+    db: Session = Depends(get_db),
+    _: str = Depends(verify_admin_token),
+):
+    try:
+        regex = await content_service.generate_regex(db, request.description)
+    except RuntimeError as e:
+        if "not configured" in str(e):
+            raise HTTPException(status_code=503, detail="AI service not configured.")
+        raise HTTPException(status_code=502, detail=f"AI service error: {e}")
+    return {"regex": regex}
+
+
+@router.post(/generate-clean-prompt)
+async def generate_clean_prompt(
+    request: GenerateCleanPromptRequest,
+    db: Session = Depends(get_db),
+    _: str = Depends(verify_admin_token),
+):
+    try:
+        prompt = await content_service.generate_clean_prompt(db, request.description)
+    except RuntimeError as e:
+        if "not configured" in str(e):
+            raise HTTPException(status_code=503, detail="AI service not configured.")
+        raise HTTPException(status_code=502, detail=f"AI service error: {e}")
+    return {"prompt": prompt}

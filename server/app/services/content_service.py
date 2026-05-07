@@ -213,6 +213,7 @@ class ContentService:
             db, system_prompt,
             f"请生成一个正则表达式：{description}",
             max_tokens=256, temperature=0.2,
+            thinking_enabled=False,
         )
 
     # --- Clean Prompt Generation ---
@@ -229,6 +230,7 @@ class ContentService:
             db, system_prompt,
             f"请生成一个清洗提示词：{description}",
             max_tokens=512, temperature=0.3,
+            thinking_enabled=False,
         )
 
 

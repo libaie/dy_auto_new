@@ -154,12 +154,19 @@ class AiGeneratorService:
     async def generate_custom(
         self, db, system_prompt: str, user_prompt: str,
         max_tokens: int = 4096, temperature: float = 0.7,
+        thinking_enabled: bool = None,
     ) -> str:
-        """Generate content with custom system prompt and parameters. No sensitive word filtering."""
+        """Generate content with custom system prompt and parameters. No sensitive word filtering.
+
+        Args:
+            thinking_enabled: If not None, overrides the global AI thinking config.
+        """
         from app.config import get_ai_config_with_key, AI_MAX_RETRIES
         ai_cfg = get_ai_config_with_key(db)
         if not ai_cfg or not ai_cfg.get("api_key"):
             raise RuntimeError("AI API not configured")
+
+        use_thinking = ai_cfg.get("thinking_enabled") if thinking_enabled is None else thinking_enabled
 
         api_url = ai_cfg.get("api_url", "")
         client = self._get_client()

@@ -309,7 +309,7 @@ function formatStrategies(strategies) {
   if (!strategies || strategies.length === 0) return '无策略'
   const parts = strategies.map((s) => {
     if (s.type === "chain" && s.steps) {
-      const stepStrs = s.steps.map(st => st.type + ":" + (st.value || "").slice(0, 10))
+      const stepStrs = s.steps.map(st => (st.nav === "parent" ? "parent" : st.nav === "child" ? "child:" + st.type : st.type + ":" + (st.value || "").slice(0, 8)))
       return "chain[" + stepStrs.join(" -> ") + "]"
     }
     if (s.conditions && s.conditions.length > 0) {

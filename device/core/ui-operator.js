@@ -363,46 +363,111 @@ var uiOperator = {
    */
   _findByChain: function (steps) {
     if (!steps || steps.length === 0) return null;
-    // Build chained selector: e.g. className("Button").text("视频").id("title")
+
+    // Phase 1: build selector chain for initial filter steps (nav="filter" or default)
     var sel = null;
+    var navStartIdx = steps.length;  // index of first nav step
     for (var i = 0; i < steps.length; i++) {
+      var nav = steps[i].nav || "filter";
+      if (nav !== "filter") { navStartIdx = i; break; }
       var step = steps[i];
       if (!sel) {
-        // First step: create the initial selector
-        switch (step.type) {
-          case "text":      sel = text(step.value); break;
-          case "id":        sel = id(step.value); break;
-          case "desc":      sel = desc(step.value); break;
-          case "className": sel = className(step.value); break;
-          case "textContains":      sel = textContains(step.value); break;
-          case "descContains":      sel = descContains(step.value); break;
-          case "idContains":        sel = idContains(step.value); break;
-          case "classNameContains": sel = classNameContains(step.value); break;
-          default: return null;
-        }
+        sel = this._makeSelector(step);
+        if (!sel) return null;
       } else {
-        // Subsequent steps: chain onto existing selector
-        switch (step.type) {
-          case "text":      sel = sel.text(step.value); break;
-          case "id":        sel = sel.id(step.value); break;
-          case "desc":      sel = sel.desc(step.value); break;
-          case "className": sel = sel.className(step.value); break;
-          case "textContains":      sel = sel.textContains(step.value); break;
-          case "descContains":      sel = sel.descContains(step.value); break;
-          case "idContains":        sel = sel.idContains(step.value); break;
-          case "classNameContains": sel = sel.classNameContains(step.value); break;
-          default: return null;
+        sel = this._chainSelector(sel, step);
+        if (!sel) return null;
+      }
+    }
+
+    // If all steps are filter, just find from selector
+    if (navStartIdx >= steps.length) {
+      if (!sel) return null;
+      var all = sel.find();
+      if (all && all.length > 0) {
+        for (var j = 0; j < all.length; j++) {
+          if (this._isOnScreen(all[j])) return all[j];
         }
       }
+      return null;
     }
-    if (!sel) return null;
-    var all = sel.find();
-    if (all && all.length > 0) {
-      for (var j = 0; j < all.length; j++) {
-        if (this._isOnScreen(all[j])) return all[j];
+
+    // Phase 2: find first matching element from filter chain, then navigate
+    var el = null;
+    if (sel) {
+      var candidates = sel.find();
+      if (candidates && candidates.length > 0) {
+        for (var k = 0; k < candidates.length; k++) {
+          if (this._isOnScreen(candidates[k])) { el = candidates[k]; break; }
+        }
+      }
+    } else {
+      // First step is a nav step with no prior filter: start from root
+      try { el = className("android.widget.FrameLayout").findOne(1000); } catch (e) {}
+    }
+    if (!el) return null;
+
+    // Phase 3: walk the tree
+    for (var m = navStartIdx; m < steps.length; m++) {
+      var navStep = steps[m];
+      var navAction = navStep.nav || "filter";
+      if (navAction === "parent") {
+        try { el = el.parent(); } catch (e) { return null; }
+        if (!el) return null;
+      } else if (navAction === "child") {
+        var childSel = this._makeSelector(navStep);
+        if (!childSel) return null;
+        try { el = el.findOne(childSel); } catch (e) { return null; }
+        if (!el) return null;
+      } else if (navAction === "filter") {
+        // filter at current element level: check if this element matches
+        if (!this._elementMatchesStep(el, navStep)) return null;
       }
     }
-    return null;
+
+    return this._isOnScreen(el) ? el : null;
+  },
+
+  _makeSelector: function (step) {
+    switch (step.type) {
+      case "text":      return text(step.value);
+      case "id":        return id(step.value);
+      case "desc":      return desc(step.value);
+      case "className": return className(step.value);
+      case "textContains":      return textContains(step.value);
+      case "descContains":      return descContains(step.value);
+      case "idContains":        return idContains(step.value);
+      case "classNameContains": return classNameContains(step.value);
+      default: return null;
+    }
+  },
+
+  _chainSelector: function (sel, step) {
+    switch (step.type) {
+      case "text":      return sel.text(step.value);
+      case "id":        return sel.id(step.value);
+      case "desc":      return sel.desc(step.value);
+      case "className": return sel.className(step.value);
+      case "textContains":      return sel.textContains(step.value);
+      case "descContains":      return sel.descContains(step.value);
+      case "idContains":        return sel.idContains(step.value);
+      case "classNameContains": return sel.classNameContains(step.value);
+      default: return null;
+    }
+  },
+
+  _elementMatchesStep: function (el, step) {
+    var actual;
+    try {
+      switch (step.type) {
+        case "text": actual = el.text(); break;
+        case "desc": actual = el.desc(); break;
+        case "id": actual = el.id(); break;
+        case "className": actual = el.className(); break;
+        default: return false;
+      }
+    } catch (e) { return false; }
+    return actual && actual.indexOf(step.value) !== -1;
   },
 
   /**

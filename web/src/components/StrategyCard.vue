@@ -121,6 +121,11 @@ function addStep() {
   const steps = [...(props.strategy.steps || []), { type: 'text', value: '' }]
   emit('update', { ...props.strategy, steps })
 }
+function addNavStep(nav) {
+  const step = nav === 'parent' ? { nav: 'parent' } : { nav: 'child', type: 'text', value: '' }
+  const steps = [...(props.strategy.steps || []), step]
+  emit('update', { ...props.strategy, steps })
+}
 function removeStep(index) {
   const steps = props.strategy.steps.filter((_, i) => i !== index)
   emit('update', { ...props.strategy, steps })
@@ -323,41 +328,64 @@ async function onImageFileSelect(e) {
       <div v-if="typeConfig.fields === 'chain'" class="space-y-2">
         <div class="flex items-center justify-between">
           <label class="text-xs text-slate-400">链式步骤</label>
-          <span class="text-xs text-slate-500">AutoJS 原生链式语法，所有条件必须匹配同一元素</span>
+          <span class="text-xs text-slate-500">filter=同行过滤 | parent=父节点 | child=找子节点</span>
         </div>
         <div
           v-for="(step, si) in (strategy.steps || [])"
           :key="si"
-          class="flex items-center gap-2 p-2 rounded-lg border border-white/10 bg-white/[0.03]"
+          class="space-y-1.5 p-2 rounded-lg border border-white/10 bg-white/[0.03]"
         >
-          <span class="text-xs text-slate-500 font-mono w-5">#{{ si + 1 }}</span>
-          <select
-            :value="step.type"
-            @change="updateStep(si, 'type', $event.target.value)"
-            class="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-200 focus:border-purple-500/50 focus:outline-none"
-          >
-            <option value="className">类名</option>
-            <option value="id">资源 ID</option>
-            <option value="text">文本</option>
-            <option value="desc">描述</option>
-            <option value="classNameContains">类名包含</option>
-            <option value="idContains">ID 包含</option>
-            <option value="textContains">文本包含</option>
-            <option value="descContains">描述包含</option>
-          </select>
-          <input
-            :value="step.value"
-            @input="updateStep(si, 'value', $event.target.value)"
-            placeholder="值"
-            class="flex-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-200 placeholder-slate-500 focus:border-purple-500/50 focus:outline-none font-mono"
-          />
-          <button type="button" class="text-slate-500 hover:text-red-400" @click="removeStep(si)">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-slate-500 font-mono w-5">#{{ si + 1 }}</span>
+            <!-- nav mode -->
+            <select
+              :value="step.nav || 'filter'"
+              @change="updateStep(si, 'nav', $event.target.value)"
+              class="rounded-lg border border-white/10 px-2 py-1 text-xs focus:border-purple-500/50 focus:outline-none"
+              :class="(step.nav || 'filter') === 'parent' ? 'bg-amber-500/10 text-amber-300' : (step.nav || 'filter') === 'child' ? 'bg-emerald-500/10 text-emerald-300' : 'bg-white/5 text-slate-200'"
+            >
+              <option value="filter">filter 过滤</option>
+              <option value="parent">parent 父节点</option>
+              <option value="child">child 子节点</option>
+            </select>
+            <!-- type + value (hidden for parent nav) -->
+            <template v-if="(step.nav || 'filter') !== 'parent'">
+              <select
+                :value="step.type"
+                @change="updateStep(si, 'type', $event.target.value)"
+                class="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-200 focus:border-purple-500/50 focus:outline-none"
+              >
+                <option value="className">类名</option>
+                <option value="id">资源 ID</option>
+                <option value="text">文本</option>
+                <option value="desc">描述</option>
+                <option value="classNameContains">类名包含</option>
+                <option value="idContains">ID 包含</option>
+                <option value="textContains">文本包含</option>
+                <option value="descContains">描述包含</option>
+              </select>
+              <input
+                :value="step.value"
+                @input="updateStep(si, 'value', $event.target.value)"
+                placeholder="值"
+                class="flex-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-200 placeholder-slate-500 focus:border-purple-500/50 focus:outline-none font-mono"
+              />
+            </template>
+            <span v-else class="flex-1 text-xs text-slate-500">不需要参数</span>
+          </div>
+          <button type="button" class="w-full text-xs text-slate-500 hover:text-red-400" @click="removeStep(si)">删除此步骤</button>
+        </div>
+        <div class="flex gap-2">
+          <button type="button" class="flex-1 py-1.5 border border-dashed border-white/20 rounded-lg text-xs text-slate-400 hover:text-purple-300" @click="addStep">
+            + filter 步骤
+          </button>
+          <button type="button" class="px-3 py-1.5 border border-dashed border-amber-500/20 rounded-lg text-xs text-amber-400 hover:text-amber-300" @click="addNavStep('parent')">
+            + 父节点
+          </button>
+          <button type="button" class="px-3 py-1.5 border border-dashed border-emerald-500/20 rounded-lg text-xs text-emerald-400 hover:text-emerald-300" @click="addNavStep('child')">
+            + 子节点
           </button>
         </div>
-        <button type="button" class="w-full py-1.5 border border-dashed border-white/20 rounded-lg text-xs text-slate-400 hover:text-purple-300" @click="addStep">
-          + 添加步骤
-        </button>
       </div>
 
       <!-- coordinate: x + y inputs -->

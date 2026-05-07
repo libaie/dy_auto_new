@@ -104,7 +104,7 @@ async def batch_create_tasks(
     for gid in request.group_ids:
         channel = db.query(Channel).filter(Channel.id == gid).first()
         if not channel:
-            channel = Channel(id=gid, name=f"group-{gid[:8]}", group_id=gid, status="active")
+            channel = Channel(id=gid, group_id=gid, status="active", task_type=ttype)
             db.add(channel)
             db.flush()
 

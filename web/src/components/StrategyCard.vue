@@ -18,6 +18,7 @@ const STRATEGY_TYPES = [
   { value: 'package', label: '包名', placeholder: 'com.ss.android.ugc.aweme', fields: 'value', mono: true },
   { value: 'coordinate', label: '坐标', fields: 'xy' },
   { value: 'image', label: '图片匹配', fields: 'image' },
+  { value: 'chain', label: '链式查找', fields: 'chain' },
 ]
 
 const CONDITION_TYPES = [
@@ -50,6 +51,8 @@ function onTypeChange(newType) {
   if (newType === 'coordinate') {
     base.x_percent = props.strategy.x_percent || 50
     base.y_percent = props.strategy.y_percent || 50
+  } else if (newType === 'chain') {
+    base.steps = props.strategy.steps || [{ type: 'text', value: '' }]
   } else if (newType === 'image') {
     base.template = props.strategy.template || ''
     base.threshold = props.strategy.threshold || 0.8
@@ -112,6 +115,21 @@ function onCondTypeChange(index, newType) {
     i === index ? { type: newType, value: '', match_mode: 'exact' } : c
   )
   emit('update', { ...props.strategy, conditions: conds })
+}
+
+function addStep() {
+  const steps = [...(props.strategy.steps || []), { type: 'text', value: '' }]
+  emit('update', { ...props.strategy, steps })
+}
+function removeStep(index) {
+  const steps = props.strategy.steps.filter((_, i) => i !== index)
+  emit('update', { ...props.strategy, steps })
+}
+function updateStep(index, key, value) {
+  const steps = props.strategy.steps.map((s, i) =>
+    i === index ? { ...s, [key]: value } : s
+  )
+  emit('update', { ...props.strategy, steps })
 }
 
 async function onImageFileSelect(e) {
@@ -298,6 +316,47 @@ async function onImageFileSelect(e) {
           @click="addCondition"
         >
           + 添加条件
+        </button>
+      </div>
+
+            <!-- chain: step builder -->
+      <div v-if="typeConfig.fields === 'chain'" class="space-y-2">
+        <div class="flex items-center justify-between">
+          <label class="text-xs text-slate-400">链式步骤</label>
+          <span class="text-xs text-slate-500">AutoJS 原生链式语法，所有条件必须匹配同一元素</span>
+        </div>
+        <div
+          v-for="(step, si) in (strategy.steps || [])"
+          :key="si"
+          class="flex items-center gap-2 p-2 rounded-lg border border-white/10 bg-white/[0.03]"
+        >
+          <span class="text-xs text-slate-500 font-mono w-5">#{{ si + 1 }}</span>
+          <select
+            :value="step.type"
+            @change="updateStep(si, 'type', $event.target.value)"
+            class="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-200 focus:border-purple-500/50 focus:outline-none"
+          >
+            <option value="className">类名</option>
+            <option value="id">资源 ID</option>
+            <option value="text">文本</option>
+            <option value="desc">描述</option>
+            <option value="classNameContains">类名包含</option>
+            <option value="idContains">ID 包含</option>
+            <option value="textContains">文本包含</option>
+            <option value="descContains">描述包含</option>
+          </select>
+          <input
+            :value="step.value"
+            @input="updateStep(si, 'value', $event.target.value)"
+            placeholder="值"
+            class="flex-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-200 placeholder-slate-500 focus:border-purple-500/50 focus:outline-none font-mono"
+          />
+          <button type="button" class="text-slate-500 hover:text-red-400" @click="removeStep(si)">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+        <button type="button" class="w-full py-1.5 border border-dashed border-white/20 rounded-lg text-xs text-slate-400 hover:text-purple-300" @click="addStep">
+          + 添加步骤
         </button>
       </div>
 

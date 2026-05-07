@@ -249,6 +249,8 @@ var uiOperator = {
           return { isCoordinate: true, x: x, y: y };
         case "image":
           return this._findByImage(strategy.template, strategy.threshold || 0.8);
+        case "chain":
+          return this._findByChain(strategy.steps || []);
         default:
           return null;
       }
@@ -349,6 +351,57 @@ var uiOperator = {
 
     tpl.recycle();
     screen.recycle();
+    return null;
+  },
+
+  /**
+   * 链式查找：按 steps 顺序构建 AutoJS 选择器链
+   * 例如 steps: [{type:"className",value:"Button"},{type:"text",value:"视频"}]
+   *   等价于 className("Button").text("视频").find()
+   * @param {Array} steps
+   * @returns {UiObject|null}
+   */
+  _findByChain: function (steps) {
+    if (!steps || steps.length === 0) return null;
+    // Build chained selector: e.g. className("Button").text("视频").id("title")
+    var sel = null;
+    for (var i = 0; i < steps.length; i++) {
+      var step = steps[i];
+      if (!sel) {
+        // First step: create the initial selector
+        switch (step.type) {
+          case "text":      sel = text(step.value); break;
+          case "id":        sel = id(step.value); break;
+          case "desc":      sel = desc(step.value); break;
+          case "className": sel = className(step.value); break;
+          case "textContains":      sel = textContains(step.value); break;
+          case "descContains":      sel = descContains(step.value); break;
+          case "idContains":        sel = idContains(step.value); break;
+          case "classNameContains": sel = classNameContains(step.value); break;
+          default: return null;
+        }
+      } else {
+        // Subsequent steps: chain onto existing selector
+        switch (step.type) {
+          case "text":      sel = sel.text(step.value); break;
+          case "id":        sel = sel.id(step.value); break;
+          case "desc":      sel = sel.desc(step.value); break;
+          case "className": sel = sel.className(step.value); break;
+          case "textContains":      sel = sel.textContains(step.value); break;
+          case "descContains":      sel = sel.descContains(step.value); break;
+          case "idContains":        sel = sel.idContains(step.value); break;
+          case "classNameContains": sel = sel.classNameContains(step.value); break;
+          default: return null;
+        }
+      }
+    }
+    if (!sel) return null;
+    var all = sel.find();
+    if (all && all.length > 0) {
+      for (var j = 0; j < all.length; j++) {
+        if (this._isOnScreen(all[j])) return all[j];
+      }
+    }
     return null;
   },
 

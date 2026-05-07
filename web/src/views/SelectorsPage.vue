@@ -86,6 +86,7 @@ const tooltips = {
       { type: 'package', value: '通过包名查找', fields: 'value: 应用包名，如 com.ss.android.ugc.aweme' },
       { type: 'coordinate', value: '通过固定坐标点击', fields: 'x_percent: X 百分比(0-100)，y_percent: Y 百分比(0-100)' },
       { type: 'image', value: '通过图片模板匹配', fields: 'template: 模板图片路径，threshold: 匹配阈值(0-1，默认0.8)' },
+      { type: 'chain', value: '链式查找（原生语法）', fields: 'steps: [{type,value}] 按顺序链式匹配，所有步骤必须匹配同一元素，比 AND 更快更精准' },
     ],
     commonFields: '通用字段：type、value、priority（数字越小越优先）、match_mode（exact/contains，默认 exact）。多条件模式：conditions（条件数组）+ logic（and/or），每个条件含 type/value/match_mode。',
   },
@@ -307,6 +308,10 @@ watch(includeDisabled, () => {
 function formatStrategies(strategies) {
   if (!strategies || strategies.length === 0) return '无策略'
   const parts = strategies.map((s) => {
+    if (s.type === "chain" && s.steps) {
+      const stepStrs = s.steps.map(st => st.type + ":" + (st.value || "").slice(0, 10))
+      return "chain[" + stepStrs.join(" -> ") + "]"
+    }
     if (s.conditions && s.conditions.length > 0) {
       const logic = s.logic === 'or' ? ' OR ' : ' AND '
       const condStrs = s.conditions.map(c => `${c.type}:${(c.value || '').slice(0, 15)}`)

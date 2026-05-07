@@ -503,17 +503,21 @@ function applyServerConfig(serverConfig) {
     if (pairing.isConfigured()) {
       logger.info(TAG, "设备已配对，直接启动");
       floatingWindow.setStatus("idle");
-      startMainLoop(); // 认证失败时会返回，需要保持脚本存活
+      global.__paired = true;
+      startMainLoop();
     } else {
       logger.info(TAG, "设备未配对，显示配对界面");
       startPairingFlow();
+      // 阻塞等待配对完成
+      global.__paired = false;
+      while (!global.__paired) {
+        sleep(500);
+      }
     }
 
-    // 阻塞等待：配对完成后 startMainLoop 会接管 while(true)
-    // 认证失败时 handleAuthFailure 会重新显示配对 UI
-    global.__paired = false;
-    while (!global.__paired) {
-      sleep(500);
+    // 保持脚本存活（定时器和 WS 在后台运行）
+    while (true) {
+      sleep(60000);
     }
   } catch (e) {
     console.error("启动失败: " + e.message + "\n" + e.stack);

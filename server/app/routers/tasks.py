@@ -102,7 +102,11 @@ async def batch_create_tasks(
     raw_keywords = params.get("keywords", []) or ([params.get("keyword")] if params.get("keyword") else [])
     keywords = [k.strip() for k in raw_keywords if k and k.strip()]
 
+    if not keywords and not request.params.get("keyword"):
+        raise HTTPException(status_code=400, detail="关键词不能为空")
+
     created_tasks = []
+    total_accounts = 0
     for gid in request.group_ids:
         channel = db.query(Channel).filter(Channel.id == gid).first()
         if not channel:
@@ -118,6 +122,7 @@ async def batch_create_tasks(
             db.flush()
 
         accounts = db.query(Account).filter(Account.group == gid, Account.status == "active").all()
+        total_accounts += len(accounts)
         if not accounts:
             logger.warning("分组 %s 没有活跃账号，跳过", gid)
         if keywords:
@@ -148,19 +153,24 @@ async def batch_create_tasks(
                 )
                 created_tasks.append({"id": task.id, "account_id": acc.id})
 
+    if total_accounts == 0:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="所选分组没有活跃账号，请先添加活跃账号到分组")
+
     db.commit()
 
-    from app.db_models import Device
-    from app.ws_manager import pair_ws_manager
-    if any(t.get("id") for t in created_tasks):
-        unbound_accounts = [
-            t["account_id"] for t in created_tasks if t.get("id")
-            if not db.query(Device).filter(Device.bound_account_id == t["account_id"]).first()
-        ]
-        if unbound_accounts:
+    if created_tasks:
+        from app.db_models import Device
+        from app.ws_manager import pair_ws_manager
+        if any(t.get("id") for t in created_tasks):
+            unbound_accounts = [
+                t["account_id"] for t in created_tasks if t.get("id")
+                if not db.query(Device).filter(Device.bound_account_id == t["account_id"]).first()
+            ]
+            if unbound_accounts:
+                await pair_ws_manager.broadcast_to_devices({"event": "new_task_available"})
+        else:
             await pair_ws_manager.broadcast_to_devices({"event": "new_task_available"})
-    else:
-        await pair_ws_manager.broadcast_to_devices({"event": "new_task_available"})
 
     return {"created": len(created_tasks), "mode": "channel" if keywords else "direct"}
 

@@ -94,6 +94,17 @@ const selectors = ref([])
 const loading = ref(false)
 const includeDisabled = ref(false)
 
+// --- Version filter ---
+const versionFilter = ref('default')
+
+const availableVersions = computed(() => {
+  const versions = new Set()
+  for (const s of selectors.value) {
+    versions.add(s.platform_version || 'default')
+  }
+  return Array.from(versions).sort()
+})
+
 // --- Category filter ---
 const categoryFilter = ref('all')
 const categoryTabs = [
@@ -135,14 +146,27 @@ function getCategoryClass(cat) {
   return categoryColorMap[cat] || 'bg-cyan-500/15 text-cyan-300 border-cyan-500/25'
 }
 
+function _matchVersion(s) {
+  return (s.platform_version || 'default')
+}
+
 const filteredSelectors = computed(() => {
-  if (categoryFilter.value === 'all') return selectors.value
-  return selectors.value.filter(s => (s.category || '') === categoryFilter.value)
+  let list = selectors.value
+  if (versionFilter.value !== 'all') {
+    list = list.filter(s => _matchVersion(s) === versionFilter.value)
+  }
+  if (categoryFilter.value !== 'all') {
+    list = list.filter(s => (s.category || '') === categoryFilter.value)
+  }
+  return list
 })
 
 const categoryCounts = computed(() => {
-  const counts = { all: selectors.value.length }
-  for (const s of selectors.value) {
+  let base = versionFilter.value === 'all'
+    ? selectors.value
+    : selectors.value.filter(s => _matchVersion(s) === versionFilter.value)
+  const counts = { all: base.length }
+  for (const s of base) {
     const cat = s.category || ''
     counts[cat] = (counts[cat] || 0) + 1
   }
@@ -404,6 +428,23 @@ onMounted(fetchSelectors)
           <span class="relative z-10">添加选择器</span>
         </button>
       </div>
+    </div>
+
+    <!-- Version filter tabs -->
+    <div class="flex items-center gap-2 mb-3 overflow-x-auto pb-1">
+      <button
+        v-for="ver in ['all', ...availableVersions]"
+        :key="ver"
+        :class="[
+          'px-3 py-1.5 text-sm font-medium rounded-lg whitespace-nowrap transition-colors',
+          versionFilter === ver
+            ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+            : 'text-slate-400 hover:text-slate-200 hover:bg-white/5 border border-transparent',
+        ]"
+        @click="versionFilter = ver"
+      >
+        {{ ver === 'all' ? '全部版本' : ver === 'default' ? '默认版本' : 'v' + ver }}
+      </button>
     </div>
 
     <!-- Category tabs -->

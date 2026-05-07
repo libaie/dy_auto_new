@@ -84,6 +84,16 @@
       @close="detailChannel = null"
       @refresh="fetchChannels"
     />
+
+    <!-- Confirm dialog -->
+    <ConfirmDialog
+      :open="confirmOpen"
+      :title="confirmTitle"
+      :message="confirmMessage"
+      :danger="confirmDanger"
+      @confirm="handleConfirm"
+      @cancel="confirmOpen = false"
+    />
   </div>
 </template>
 
@@ -92,11 +102,17 @@ import { ref, onMounted } from 'vue'
 import { listChannels, updateChannel, deleteChannel as deleteChannelApi } from '../api/channels.js'
 import CreateChannelDialog from '../components/CreateChannelDialog.vue'
 import ChannelDetail from '../components/ChannelDetail.vue'
+import ConfirmDialog from '../components/ConfirmDialog.vue'
 
 const channels = ref([])
 const loading = ref(true)
 const showCreateDialog = ref(false)
 const detailChannel = ref(null)
+const confirmOpen = ref(false)
+const confirmTitle = ref('')
+const confirmMessage = ref('')
+const confirmAction = ref(null)
+const confirmDanger = ref(false)
 
 const taskTypeLabel = (type) => ({
   search_comment: '评论搜索',
@@ -142,16 +158,28 @@ async function resumeChannel(ch) {
   await fetchChannels()
 }
 
-async function cancelChannel(ch) {
-  if (!confirm('确定取消此通道？')) return
-  await updateChannel(ch.id, { status: 'cancelled' })
+function openConfirm(title, message, action, danger) {
+  confirmTitle.value = title
+  confirmMessage.value = message
+  confirmAction.value = action
+  confirmDanger.value = danger
+  confirmOpen.value = true
+}
+
+async function handleConfirm() {
+  if (confirmAction.value) await confirmAction.value()
+  confirmOpen.value = false
   await fetchChannels()
 }
 
+async function cancelChannel(ch) {
+  openConfirm('取消通道', '确定取消此通道？已分发的任务将继续执行，未分发的关键词将被跳过。',
+    () => updateChannel(ch.id, { status: 'cancelled' }), false)
+}
+
 async function deleteChannel(ch) {
-  if (!confirm('确定删除此通道？')) return
-  await deleteChannelApi(ch.id)
-  await fetchChannels()
+  openConfirm('删除通道', `确定要删除通道「${ch.group_name || ch.id}」吗？此操作不可撤销。`,
+    () => deleteChannelApi(ch.id), true)
 }
 
 function openDetail(ch) {

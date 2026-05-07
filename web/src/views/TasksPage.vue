@@ -305,16 +305,34 @@ async function resumeChannel(ch) {
   await fetchChannels()
 }
 
-async function cancelChannel(ch) {
-  if (!confirm('确定取消此通道？')) return
-  await updateChannel(ch.id, { status: 'cancelled' })
+const channelConfirmOpen = ref(false)
+const channelConfirmTitle = ref('')
+const channelConfirmMessage = ref('')
+const channelConfirmAction = ref(null)
+const channelConfirmDanger = ref(false)
+
+function openChannelConfirm(title, message, action, danger) {
+  channelConfirmTitle.value = title
+  channelConfirmMessage.value = message
+  channelConfirmAction.value = action
+  channelConfirmDanger.value = danger
+  channelConfirmOpen.value = true
+}
+
+async function handleChannelConfirm() {
+  if (channelConfirmAction.value) await channelConfirmAction.value()
+  channelConfirmOpen.value = false
   await fetchChannels()
 }
 
+async function cancelChannel(ch) {
+  openChannelConfirm('取消通道', '确定取消此通道？已分发的任务将继续执行，未分发的关键词将被跳过。',
+    () => updateChannel(ch.id, { status: 'cancelled' }), false)
+}
+
 async function deleteChannel(ch) {
-  if (!confirm('确定删除此通道？')) return
-  await deleteChannelApi(ch.id)
-  await fetchChannels()
+  openChannelConfirm('删除通道', `确定要删除此通道吗？此操作不可撤销。`,
+    () => deleteChannelApi(ch.id), true)
 }
 
 function openChannelDetail(ch) {
@@ -1624,6 +1642,16 @@ onUnmounted(() => {
         :channel="detailChannel"
         @close="detailChannel = null"
         @refresh="fetchChannels"
+      />
+    </div>
+      <!-- Channel confirm dialog -->
+      <ConfirmDialog
+        :open="channelConfirmOpen"
+        :title="channelConfirmTitle"
+        :message="channelConfirmMessage"
+        :danger="channelConfirmDanger"
+        @confirm="handleChannelConfirm"
+        @cancel="channelConfirmOpen = false"
       />
     </div>
     <!-- ==================== End 任务通道 Tab ==================== -->

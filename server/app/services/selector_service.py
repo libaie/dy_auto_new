@@ -83,10 +83,7 @@ class SelectorService:
                         strategies: list = None, platform_version: str = None,
                         description: str = None, category: str = None) -> dict:
         """Update an existing selector. Auto-bumps version on any change."""
-        q = db.query(UISelector).filter(UISelector.action_name == action_name)
-        if platform_version:
-            q = q.filter(UISelector.platform_version == platform_version)
-        sel = q.first()
+        sel = db.query(UISelector).filter(UISelector.action_name == action_name).first()
         if not sel:
             raise ValueError(f"Selector '{action_name}' not found")
 

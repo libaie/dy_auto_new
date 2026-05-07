@@ -371,6 +371,14 @@ async function onImageFileSelect(e) {
                 placeholder="值"
                 class="flex-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-200 placeholder-slate-500 focus:border-purple-500/50 focus:outline-none font-mono"
               />
+              <input
+                v-if="(step.nav || 'filter') === 'child' || (step.nav || 'filter') === 'sibling'"
+                type="number" min="0"
+                :value="step.index || 0"
+                @input="updateStep(si, 'index', Number($event.target.value))"
+                class="w-10 rounded-lg border border-white/10 bg-white/5 px-1 py-1 text-xs text-slate-200 text-center"
+                title="第几个（0=第一个）"
+              />
             </template>
             <span v-else class="flex-1 text-xs text-slate-500">不需要参数</span>
           </div>

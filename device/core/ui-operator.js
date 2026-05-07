@@ -417,8 +417,20 @@ var uiOperator = {
       } else if (navAction === "child") {
         var childSel = this._makeSelector(navStep);
         if (!childSel) return null;
-        try { el = el.findOne(childSel); } catch (e) { return null; }
-        if (!el) return null;
+        try {
+          var children = el.find(childSel);
+          if (!children || children.length === 0) return null;
+          var idx = navStep.index || 0;
+          el = null;
+          var found = 0;
+          for (var c = 0; c < children.length; c++) {
+            if (this._isOnScreen(children[c])) {
+              if (found === idx) { el = children[c]; break; }
+              found++;
+            }
+          }
+          if (!el) return null;
+        } catch (e) { return null; }
       } else if (navAction === "sibling") {
         // Go to parent, then find a different child matching the step
         try {
@@ -429,8 +441,13 @@ var uiOperator = {
           var siblings = parentEl.find(siblingSel);
           el = null;
           if (siblings && siblings.length > 0) {
+            var sibIdx = navStep.index || 0;
+            var sibFound = 0;
             for (var s = 0; s < siblings.length; s++) {
-              if (this._isOnScreen(siblings[s])) { el = siblings[s]; break; }
+              if (this._isOnScreen(siblings[s])) {
+                if (sibFound === sibIdx) { el = siblings[s]; break; }
+                sibFound++;
+              }
             }
           }
           if (!el) return null;

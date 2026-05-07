@@ -157,8 +157,9 @@ async function onImageFileSelect(e) {
       <!-- Priority number -->
       <span class="text-xs font-mono text-slate-500 w-6 text-center">#{{ index + 1 }}</span>
 
-      <!-- Type selector -->
+      <!-- Type selector (hidden in multi-condition mode) -->
       <select
+        v-if="!isMultiCondition"
         :value="strategy.type"
         @change="onTypeChange($event.target.value)"
         class="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-slate-200 focus:border-purple-500/50 focus:outline-none"

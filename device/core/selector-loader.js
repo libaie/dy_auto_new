@@ -98,14 +98,34 @@ var selectorLoader = global.__selectorLoader || {
 
   /**
    * 应用选择器配置到缓存
+   * 同名 action 择优保留：精确匹配当前抖音版本 > default > 其他版本
+   * 这样 _cache 每个 action 只存一条，不会膨胀
    * @param {Array} selectors
    */
   _applySelectors: function (selectors) {
+    var douyinVersion = this._douyinVersion;
+    if (douyinVersion === undefined) {
+      try {
+        douyinVersion = context.getPackageManager()
+          .getPackageInfo("com.ss.android.ugc.aweme", 0).versionName;
+      } catch (e) { douyinVersion = ""; }
+      this._douyinVersion = douyinVersion;
+    }
+
+    function _priority(platformVer) {
+      if (platformVer === douyinVersion) return 3;
+      if (platformVer === "default" || !platformVer) return 2;
+      return 1;
+    }
+
     for (var i = 0; i < selectors.length; i++) {
       var s = selectors[i];
-      this._cache[s.action_name] = s;
+      var existing = this._cache[s.action_name];
+      if (!existing || _priority(s.platform_version) > _priority(existing.platform_version)) {
+        this._cache[s.action_name] = s;
+      }
     }
-    logger.debug(TAG, "已应用选择器配置，当前缓存 " + Object.keys(this._cache).length + " 个选择器");
+    logger.debug(TAG, "已应用选择器配置，_cache " + Object.keys(this._cache).length + " 个选择器 (抖音 " + douyinVersion + ")");
   },
 
   /**

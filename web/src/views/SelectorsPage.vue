@@ -667,7 +667,7 @@ onMounted(fetchSelectors)
               leave-to="opacity-0 scale-95"
             >
               <DialogPanel
-                class="w-full max-w-lg glass-card p-6 gradient-border"
+                class="w-full max-w-2xl glass-card p-6 gradient-border"
               >
                 <DialogTitle class="text-lg font-medium text-white">
                   {{ isEditing ? '编辑选择器' : '添加选择器' }}

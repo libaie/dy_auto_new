@@ -158,44 +158,16 @@ SearchBaseHandler._inputKeyword = function (keyword) {
 
 /**
  * 点击联想词
- * 在 recycler_view 中查找包含关键词的联想词并点击
- * 优先使用选择器系统，回退到硬编码 ID
+ * 通过 search_suggestion_list 选择器策略查找联想词列表，点击第一个
  */
 SearchBaseHandler._clickSuggestion = function (keyword) {
-  // 尝试使用选择器系统
-  var rv = null;
-  var selector = require("../core/selector-loader").get("search_suggestion_list");
-  if (selector) {
-    var strategies = selector.strategies.slice().sort(function (a, b) { return a.priority - b.priority; });
-    for (var s = 0; s < strategies.length; s++) {
-      try {
-        switch (strategies[s].type) {
-          case "id": rv = id(strategies[s].value).findOne(3000); break;
-          case "className": rv = className(strategies[s].value).findOne(3000); break;
-        }
-      } catch (e) {}
-      if (rv) break;
-    }
+  var uiOperator = require("../core/ui-operator");
+  var item = uiOperator.findElement("search_suggestion_list", 3000);
+  if (item) {
+    logger.info(TAG, "点击联想词");
+    return uiOperator.clickElement(item);
   }
-  // 回退：硬编码 ID
-  if (!rv) {
-    rv = id("recycler_view").findOne(3000);
-  }
-  if (!rv) {
-    logger.warn(TAG, "联想词列表未找到");
-    return false;
-  }
-  var children = rv.children();
-  for (var i = 0; i < children.length; i++) {
-    var t = children[i].findOne(text(keyword));
-    if (t) {
-      logger.info(TAG, "点击联想词: '" + t.text() + "'");
-      t.parent().parent().click();
-      sleep(1000);
-      return true;
-    }
-  }
-  logger.warn(TAG, "未找到匹配联想词: '" + keyword + "'");
+  logger.warn(TAG, "联想词列表未找到");
   return false;
 };
 

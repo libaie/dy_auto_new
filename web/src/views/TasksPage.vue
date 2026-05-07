@@ -114,6 +114,7 @@ const maxDuration = ref(60)
 const nurtureKeywords = ref('')
 const nurtureKeywordMatrix = ref([])
 const nurtureKeywordGenerating = ref(false)
+const nurtureKeywordExpandCount = ref(8)
 
 const subTaskTypeOptions = [
   { value: 'browse', label: '浏览' },
@@ -404,6 +405,7 @@ function openCreateDialog() {
   createError.value = null
   nurtureKeywords.value = ''
   nurtureKeywordMatrix.value = []
+  nurtureKeywordExpandCount.value = 8
   showCreateDialog.value = true
 }
 
@@ -571,7 +573,7 @@ async function expandNurtureKeywords() {
   try {
     const allExpanded = []
     for (const seed of seeds) {
-      const res = await generateKeywords(seed, 8)
+      const res = await generateKeywords(seed, nurtureKeywordExpandCount.value)
       allExpanded.push(...(res.data.keywords || []))
     }
     // Deduplicate
@@ -1149,6 +1151,14 @@ onUnmounted(() => {
                           type="text"
                           class="flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 placeholder-slate-500"
                           placeholder="输入种子关键词，逗号分隔，如：养生,中医,食疗"
+                        />
+                        <input
+                          v-model.number="nurtureKeywordExpandCount"
+                          type="number"
+                          min="3"
+                          max="30"
+                          class="w-16 rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-sm text-slate-200 text-center"
+                          title="扩展数量"
                         />
                         <button
                           type="button"

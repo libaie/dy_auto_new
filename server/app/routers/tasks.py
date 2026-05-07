@@ -99,7 +99,8 @@ async def batch_create_tasks(
     import uuid
 
     params = await _maybe_expand_keywords(request.params, ttype, db=db)
-    keywords = params.get("keywords", []) or ([params.get("keyword")] if params.get("keyword") else [])
+    raw_keywords = params.get("keywords", []) or ([params.get("keyword")] if params.get("keyword") else [])
+    keywords = [k.strip() for k in raw_keywords if k and k.strip()]
 
     created_tasks = []
     for gid in request.group_ids:
@@ -108,14 +109,17 @@ async def batch_create_tasks(
             channel = Channel(id=gid, group_id=gid, status="active", task_type=ttype)
             db.add(channel)
             db.flush()
-        elif channel.status != "active":
-            channel.status = "active"
+        else:
+            # Reuse existing channel: always reset deleted_at and update task_type / params
             channel.deleted_at = None
             channel.task_type = ttype
-            channel.params_template = {}
+            if channel.status != "active":
+                channel.status = "active"
             db.flush()
 
         accounts = db.query(Account).filter(Account.group == gid, Account.status == "active").all()
+        if not accounts:
+            logger.warning("分组 %s 没有活跃账号，跳过", gid)
         if keywords:
             # Store common params (prompt_template_id, sort_by, etc.) as template
             # so claim_channel_item can merge them with each item's keyword
@@ -123,8 +127,6 @@ async def batch_create_tasks(
             db.flush()
             from app.db_models import ChannelItem
             for kw in keywords:
-                if not kw or not kw.strip():
-                    continue
                 for acc in accounts:
                     ci = ChannelItem(
                         channel_id=channel.id,

@@ -186,7 +186,7 @@ class AiGeneratorService:
                         json={
                             "model": ai_cfg.get("model", "claude-3-haiku-20240307"),
                             "max_tokens": max_tokens,
-                            **({} if not ai_cfg.get("thinking_enabled") else {"thinking": {"type": "enabled", "budget_tokens": ai_cfg.get("thinking_budget", 8192)}}),
+                            **({} if not use_thinking else {"thinking": {"type": "enabled", "budget_tokens": ai_cfg.get("thinking_budget", 8192)}}),
                             "system": system_prompt,
                             "messages": [{"role": "user", "content": user_prompt}],
                         },
@@ -205,7 +205,7 @@ class AiGeneratorService:
                             "model": ai_cfg.get("model", "deepseek-chat"),
                             "max_tokens": max_tokens,
                             "temperature": temperature,
-                            **({} if not ai_cfg.get("thinking_enabled") else {"thinking": {"type": "enabled"}}),
+                            **({} if not use_thinking else {"thinking": {"type": "enabled"}}),
                             "messages": [
                                 {"role": "system", "content": system_prompt},
                                 {"role": "user", "content": user_prompt},

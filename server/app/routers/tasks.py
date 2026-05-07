@@ -121,7 +121,14 @@ async def batch_create_tasks(
                 channel.status = "active"
             db.flush()
 
-        accounts = db.query(Account).filter(Account.group == gid, Account.status == "active").all()
+        from app.db_models import AccountGroupMember
+        member_account_ids = db.query(AccountGroupMember.account_id).filter(
+            AccountGroupMember.group_id == gid
+        ).scalar_subquery()
+        accounts = db.query(Account).filter(
+            Account.id.in_(member_account_ids),
+            Account.status == "active",
+        ).all()
         total_accounts += len(accounts)
         if not accounts:
             logger.warning("分组 %s 没有活跃账号，跳过", gid)

@@ -107,6 +107,12 @@ async def batch_create_tasks(
             channel = Channel(id=gid, group_id=gid, status="active", task_type=ttype)
             db.add(channel)
             db.flush()
+        elif channel.status != "active":
+            channel.status = "active"
+            channel.deleted_at = None
+            channel.task_type = ttype
+            channel.params_template = {}
+            db.flush()
 
         accounts = db.query(Account).filter(Account.group == gid, Account.status == "active").all()
         if keywords:

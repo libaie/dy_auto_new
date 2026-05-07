@@ -1644,7 +1644,6 @@ onUnmounted(() => {
         @close="detailChannel = null"
         @refresh="fetchChannels"
       />
-    </div>
       <!-- Channel confirm dialog -->
       <ConfirmDialog
         :open="channelConfirmOpen"

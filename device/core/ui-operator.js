@@ -101,6 +101,9 @@ var uiOperator = {
         var s = strategies[i];
         var element = this._findByStrategy(s);
         if (element && this._isOnScreen(element)) {
+          // 将策略的 x/y 偏移附加到元素上，clickElement 中使用
+          if (s.x_percent != null) element._offsetX = s.x_percent;
+          if (s.y_percent != null) element._offsetY = s.y_percent;
           logger.debug(TAG, "通过 " + s.type + " 找到元素: '" + actionName + "'");
           return element;
         }
@@ -375,21 +378,32 @@ var uiOperator = {
     }
 
     // 控件点击
-    if (element.clickable()) {
-      return element.click();
-    } else {
-      // 控件不可点击，尝试坐标点击
+    // 计算点击坐标：优先用元素 _offsetX/_offsetY（策略的高级偏移），否则用中心点
+    var cx, cy;
+    try {
       var bounds = element.bounds();
       if (bounds) {
-        var cx = bounds.centerX();
-        var cy = bounds.centerY();
-        // 坐标必须在屏幕内
-        if (cx < 0 || cy < 0 || cx >= device.width || cy >= device.height) {
-          logger.warn(TAG, "坐标 (" + cx + "," + cy + ") 在屏幕外，跳过点击");
-          return false;
-        }
-        return click(cx, cy);
+        var elW = bounds.right - bounds.left;
+        var elH = bounds.bottom - bounds.top;
+        // x_percent 相对于元素宽度：50=中心, 0=左边缘, 100=右边缘, 150=右侧1.5倍宽
+        var offsetX = (element._offsetX != null) ? element._offsetX : 50;
+        var offsetY = (element._offsetY != null) ? element._offsetY : 50;
+        cx = bounds.left + Math.round(elW * offsetX / 100);
+        cy = bounds.top + Math.round(elH * offsetY / 100);
       }
+    } catch (e) { /* bounds() 失败则走 clickable 分支 */ }
+
+    if (cx != null && cy != null) {
+      if (cx < 0 || cy < 0 || cx >= device.width || cy >= device.height) {
+        logger.warn(TAG, "坐标 (" + cx + "," + cy + ") 在屏幕外，跳过点击");
+        return false;
+      }
+      return click(cx, cy);
+    }
+
+    // 兜底：直接调用控件 click()
+    if (element.clickable()) {
+      return element.click();
     }
     return false;
   },

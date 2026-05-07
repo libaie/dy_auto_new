@@ -449,7 +449,7 @@ ReplyCommentHandler._parseCommentItem = function (item) {
     // 使用选择器系统提取评论文本
     var textEl = this._findChildBySelector(item, "comment_text");
     var text = textEl ? this._extractChildValue(textEl, "comment_text", "") : "";
-    if (!textEl && !text) {
+    if (!text) {
       var textViews = item.find(className("android.widget.TextView"));
       var maxLen = 0;
       for (var i = 0; i < textViews.length; i++) {

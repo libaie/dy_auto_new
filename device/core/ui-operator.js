@@ -1,4 +1,5 @@
 var selectorLoader = require("./selector-loader");
+var apiClient = require("./api-client");
 var logger = require("../utils/logger");
 
 var TAG = "界面操作";
@@ -589,12 +590,12 @@ var uiOperator = {
     // AI 清洗
     if (cleanMode === "ai" && selector.clean_prompt) {
       try {
-        var apiClient = require("./api-client");
-        var result = apiClient.post("/api/device/ai-proxy", {
-          prompt: selector.clean_prompt + "
+        var promptText = selector.clean_prompt + "
 
-原始数据：" + rawValue,
-          max_tokens: 256,
+原始数据：" + rawValue;
+        var result = apiClient.post("/api/device/ai-proxy", {
+          prompt: promptText,
+          max_tokens: 128,
           temperature: 0.2,
         });
         if (result && result.content) {

@@ -89,7 +89,7 @@ class AiGeneratorService:
 
     async def generate_custom_stream(
         self, db, system_prompt: str, user_prompt: str,
-        max_tokens: int = 512, temperature: float = 0.7,
+        max_tokens: int = 4096, temperature: float = 0.7,
     ):
         """Generate content with streaming — yields text chunks as they arrive from the AI API.
         Only supports OpenAI-compatible streaming (DeepSeek, OpenAI, etc.).
@@ -117,6 +117,7 @@ class AiGeneratorService:
                         "max_tokens": max_tokens,
                         "temperature": temperature,
                         "stream": True,
+                        "thinking": {"type": "enabled"},
                         "messages": [
                             {"role": "system", "content": system_prompt},
                             {"role": "user", "content": user_prompt},
@@ -152,7 +153,7 @@ class AiGeneratorService:
 
     async def generate_custom(
         self, db, system_prompt: str, user_prompt: str,
-        max_tokens: int = 512, temperature: float = 0.7,
+        max_tokens: int = 4096, temperature: float = 0.7,
     ) -> str:
         """Generate content with custom system prompt and parameters. No sensitive word filtering."""
         from app.config import get_ai_config_with_key, AI_MAX_RETRIES
@@ -178,6 +179,7 @@ class AiGeneratorService:
                         json={
                             "model": ai_cfg.get("model", "claude-3-haiku-20240307"),
                             "max_tokens": max_tokens,
+                            "thinking": {"type": "enabled", "budget_tokens": 8192},
                             "system": system_prompt,
                             "messages": [{"role": "user", "content": user_prompt}],
                         },
@@ -196,6 +198,7 @@ class AiGeneratorService:
                             "model": ai_cfg.get("model", "deepseek-chat"),
                             "max_tokens": max_tokens,
                             "temperature": temperature,
+                            "thinking": {"type": "enabled"},
                             "messages": [
                                 {"role": "system", "content": system_prompt},
                                 {"role": "user", "content": user_prompt},
@@ -232,7 +235,8 @@ class AiGeneratorService:
             },
             json={
                 "model": cfg.get("model", "claude-3-haiku-20240307"),
-                "max_tokens": 200,
+                "max_tokens": 512,
+                "thinking": {"type": "enabled", "budget_tokens": 8192},
                 "system": SYSTEM_PROMPT,
                 "messages": [{"role": "user", "content": user_prompt}],
             },
@@ -252,7 +256,8 @@ class AiGeneratorService:
             },
             json={
                 "model": cfg.get("model", "deepseek-chat"),
-                "max_tokens": 200,
+                "max_tokens": 512,
+                "thinking": {"type": "enabled"},
                 "messages": [
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": user_prompt},

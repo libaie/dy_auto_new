@@ -779,6 +779,7 @@ async def ai_proxy(
                     "model": ai_cfg.get("model", "deepseek-chat"),
                     "max_tokens": request.max_tokens,
                     "temperature": request.temperature,
+                    "thinking": {"type": "enabled"},
                     "messages": [{"role": "user", "content": request.prompt}],
                 },
             )

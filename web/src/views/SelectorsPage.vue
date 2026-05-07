@@ -191,6 +191,10 @@ const defaultForm = {
 // --- AI generation state ---
 const generatingRegex = ref(false)
 const generatingPrompt = ref(false)
+const regexAiPrompt = ref('')
+const cleanAiPrompt = ref('')
+const regexAiPrompt = ref('')
+const cleanAiPrompt = ref('')
 
 async function generateRegexAI() {
   if (!form.description.trim()) {
@@ -209,13 +213,13 @@ async function generateRegexAI() {
 }
 
 async function generateCleanPromptAI() {
-  if (!form.description.trim()) {
-    formError.value = '请先在说明字段中描述清洗需求'
+  if (!cleanAiPrompt.value.trim()) {
+    formError.value = '请输入清洗需求描述'
     return
   }
   generatingPrompt.value = true
   try {
-    const res = await generateCleanPrompt(form.description.trim())
+    const res = await generateCleanPrompt(cleanAiPrompt.value.trim())
     form.clean_prompt = res.data.prompt || ''
   } catch (e) {
     formError.value = '提示词生成失败: ' + (e.response?.data?.detail || e.message)
@@ -327,6 +331,8 @@ function openCreateDialog() {
   form.clean_mode = 'raw'
   form.clean_pattern = ''
   form.clean_prompt = ''
+  regexAiPrompt.value = ''
+  cleanAiPrompt.value = ''
   editMode.value = 'form'
   strategyList.value = []
   formError.value = null
@@ -830,48 +836,66 @@ onMounted(fetchSelectors)
                     </div>
 
                     <!-- Regex mode -->
-                    <div v-if="form.clean_mode === 'regex'">
-                      <div class="flex items-end gap-2">
-                        <div class="flex-1">
-                          <label class="text-xs text-slate-400 mb-1 block">正则表达式</label>
-                          <input
-                            v-model="form.clean_pattern"
-                            type="text"
-                            placeholder="例如：\d+ 提取数字"
-                            class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 font-mono focus:border-cyan-500/50 focus:outline-none"
+                    <div v-if="form.clean_mode === 'regex'" class="space-y-2">
+                      <div>
+                        <label class="text-xs text-slate-400 mb-1 block">AI 需求描述（用大白话告诉 AI 要提取什么，可粘贴原始数据）</label>
+                        <div class="flex items-end gap-2">
+                          <textarea
+                            v-model="regexAiPrompt"
+                            rows="3"
+                            placeholder="描述要提取的内容，可粘贴多条原始数据示例"
+                            class="flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-200 placeholder-slate-500 focus:border-cyan-500/50 focus:outline-none"
                           />
+                          <button
+                            type="button"
+                            class="btn-aurora rounded-lg px-3 py-2 text-xs font-medium whitespace-nowrap"
+                            @click="generateRegexAI"
+                            :disabled="generatingRegex"
+                          >
+                            <span class="relative z-10">{{ generatingRegex ? '生成中...' : 'AI 生成' }}</span>
+                          </button>
                         </div>
-                        <button
-                          type="button"
-                          class="btn-aurora rounded-lg px-3 py-2 text-xs font-medium whitespace-nowrap"
-                          @click="generateRegexAI"
-                          :disabled="generatingRegex"
-                        >
-                          <span class="relative z-10">{{ generatingRegex ? '生成中...' : 'AI 生成' }}</span>
-                        </button>
+                      </div>
+                      <div>
+                        <label class="text-xs text-slate-400 mb-1 block">正则表达式</label>
+                        <input
+                          v-model="form.clean_pattern"
+                          type="text"
+                          placeholder="AI 生成后自动填入，也可手动填写"
+                          class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 font-mono focus:border-cyan-500/50 focus:outline-none"
+                        />
                       </div>
                     </div>
 
                     <!-- AI mode -->
-                    <div v-if="form.clean_mode === 'ai'">
-                      <div class="flex items-end gap-2">
-                        <div class="flex-1">
-                          <label class="text-xs text-slate-400 mb-1 block">清洗提示词</label>
+                    <div v-if="form.clean_mode === 'ai'" class="space-y-2">
+                      <div>
+                        <label class="text-xs text-slate-400 mb-1 block">AI 需求描述（用大白话告诉 AI 怎么清洗数据）</label>
+                        <div class="flex items-end gap-2">
                           <textarea
-                            v-model="form.clean_prompt"
+                            v-model="cleanAiPrompt"
                             rows="3"
-                            placeholder="例如：提取评论中的数值，去掉单位和多余文字"
-                            class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:border-purple-500/50 focus:outline-none"
+                            placeholder="例如：提取评论中的血糖数值，去掉单位和多余文字"
+                            class="flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-200 placeholder-slate-500 focus:border-purple-500/50 focus:outline-none"
                           />
+                          <button
+                            type="button"
+                            class="btn-aurora rounded-lg px-3 py-2 text-xs font-medium whitespace-nowrap"
+                            @click="generateCleanPromptAI"
+                            :disabled="generatingPrompt"
+                          >
+                            <span class="relative z-10">{{ generatingPrompt ? '生成中...' : 'AI 生成' }}</span>
+                          </button>
                         </div>
-                        <button
-                          type="button"
-                          class="btn-aurora rounded-lg px-3 py-2 text-xs font-medium whitespace-nowrap"
-                          @click="generateCleanPromptAI"
-                          :disabled="generatingPrompt"
-                        >
-                          <span class="relative z-10">{{ generatingPrompt ? '生成中...' : 'AI 生成' }}</span>
-                        </button>
+                      </div>
+                      <div>
+                        <label class="text-xs text-slate-400 mb-1 block">清洗提示词</label>
+                        <textarea
+                          v-model="form.clean_prompt"
+                          rows="3"
+                          placeholder="AI 生成后自动填入，也可手动填写"
+                          class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:border-purple-500/50 focus:outline-none"
+                        />
                       </div>
                     </div>
                   </div>

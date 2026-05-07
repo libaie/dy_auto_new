@@ -193,17 +193,15 @@ const generatingRegex = ref(false)
 const generatingPrompt = ref(false)
 const regexAiPrompt = ref('')
 const cleanAiPrompt = ref('')
-const regexAiPrompt = ref('')
-const cleanAiPrompt = ref('')
 
 async function generateRegexAI() {
-  if (!form.description.trim()) {
-    formError.value = '请先在说明字段中描述取值需求'
+  if (!regexAiPrompt.value.trim()) {
+    formError.value = '请输入正则需求描述'
     return
   }
   generatingRegex.value = true
   try {
-    const res = await generateRegex(form.description.trim())
+    const res = await generateRegex(regexAiPrompt.value.trim())
     form.clean_pattern = res.data.regex || res.data.pattern || ''
   } catch (e) {
     formError.value = '正则生成失败: ' + (e.response?.data?.detail || e.message)

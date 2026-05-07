@@ -378,18 +378,17 @@ var uiOperator = {
     }
 
     // 控件点击
-    // 计算点击坐标：优先用元素 _offsetX/_offsetY（策略的高级偏移），否则用中心点
+    // 计算点击坐标：默认中心点；有 _offsetX/_offsetY 时相对中心偏移（% 元素宽高）
     var cx, cy;
     try {
       var bounds = element.bounds();
       if (bounds) {
         var elW = bounds.right - bounds.left;
         var elH = bounds.bottom - bounds.top;
-        // x_percent 相对于元素宽度：50=中心, 0=左边缘, 100=右边缘, 150=右侧1.5倍宽
-        var offsetX = (element._offsetX != null) ? element._offsetX : 50;
-        var offsetY = (element._offsetY != null) ? element._offsetY : 50;
-        cx = bounds.left + Math.round(elW * offsetX / 100);
-        cy = bounds.top + Math.round(elH * offsetY / 100);
+        cx = bounds.centerX();
+        cy = bounds.centerY();
+        if (element._offsetX != null) cx += Math.round(elW * element._offsetX / 100);
+        if (element._offsetY != null) cy += Math.round(elH * element._offsetY / 100);
       }
     } catch (e) { /* bounds() 失败则走 clickable 分支 */ }
 

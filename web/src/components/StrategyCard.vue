@@ -122,7 +122,7 @@ function addStep() {
   emit('update', { ...props.strategy, steps })
 }
 function addNavStep(nav) {
-  const step = nav === 'parent' ? { nav: 'parent' } : { nav: 'child', type: 'text', value: '' }
+  const step = nav === 'parent' ? { nav: 'parent' } : { nav, type: 'text', value: '' }
   const steps = [...(props.strategy.steps || []), step]
   emit('update', { ...props.strategy, steps })
 }
@@ -328,7 +328,7 @@ async function onImageFileSelect(e) {
       <div v-if="typeConfig.fields === 'chain'" class="space-y-2">
         <div class="flex items-center justify-between">
           <label class="text-xs text-slate-400">链式步骤</label>
-          <span class="text-xs text-slate-500">filter=同行过滤 | parent=父节点 | child=找子节点</span>
+          <span class="text-xs text-slate-500">filter=同元素 | parent=父 | child=子 | sibling=兄弟</span>
         </div>
         <div
           v-for="(step, si) in (strategy.steps || [])"
@@ -342,11 +342,12 @@ async function onImageFileSelect(e) {
               :value="step.nav || 'filter'"
               @change="updateStep(si, 'nav', $event.target.value)"
               class="rounded-lg border border-white/10 px-2 py-1 text-xs focus:border-purple-500/50 focus:outline-none"
-              :class="(step.nav || 'filter') === 'parent' ? 'bg-amber-500/10 text-amber-300' : (step.nav || 'filter') === 'child' ? 'bg-emerald-500/10 text-emerald-300' : 'bg-white/5 text-slate-200'"
+              :class="(step.nav || 'filter') === 'parent' ? 'bg-amber-500/10 text-amber-300' : (step.nav || 'filter') === 'child' ? 'bg-emerald-500/10 text-emerald-300' : (step.nav || 'filter') === 'sibling' ? 'bg-cyan-500/10 text-cyan-300' : 'bg-white/5 text-slate-200'"
             >
               <option value="filter">filter 过滤</option>
               <option value="parent">parent 父节点</option>
               <option value="child">child 子节点</option>
+              <option value="sibling">sibling 兄弟节点</option>
             </select>
             <!-- type + value (hidden for parent nav) -->
             <template v-if="(step.nav || 'filter') !== 'parent'">
@@ -381,6 +382,9 @@ async function onImageFileSelect(e) {
           </button>
           <button type="button" class="px-3 py-1.5 border border-dashed border-amber-500/20 rounded-lg text-xs text-amber-400 hover:text-amber-300" @click="addNavStep('parent')">
             + 父节点
+          </button>
+          <button type="button" class="px-3 py-1.5 border border-dashed border-cyan-500/20 rounded-lg text-xs text-cyan-400 hover:text-cyan-300" @click="addNavStep('sibling')">
+            + 兄弟
           </button>
           <button type="button" class="px-3 py-1.5 border border-dashed border-emerald-500/20 rounded-lg text-xs text-emerald-400 hover:text-emerald-300" @click="addNavStep('child')">
             + 子节点

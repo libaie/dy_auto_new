@@ -419,6 +419,22 @@ var uiOperator = {
         if (!childSel) return null;
         try { el = el.findOne(childSel); } catch (e) { return null; }
         if (!el) return null;
+      } else if (navAction === "sibling") {
+        // Go to parent, then find a different child matching the step
+        try {
+          var parentEl = el.parent();
+          if (!parentEl) return null;
+          var siblingSel = this._makeSelector(navStep);
+          if (!siblingSel) return null;
+          var siblings = parentEl.find(siblingSel);
+          el = null;
+          if (siblings && siblings.length > 0) {
+            for (var s = 0; s < siblings.length; s++) {
+              if (this._isOnScreen(siblings[s])) { el = siblings[s]; break; }
+            }
+          }
+          if (!el) return null;
+        } catch (e) { return null; }
       } else if (navAction === "filter") {
         // filter at current element level: check if this element matches
         if (!this._elementMatchesStep(el, navStep)) return null;

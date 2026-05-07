@@ -41,7 +41,8 @@ async def _maybe_expand_keywords(params: dict, task_type: str, db=None) -> dict:
     try:
         all_expanded = []
         for seed in seeds[:3]:
-            expanded = await content_service.generate_keyword_matrix(seed, 8, db=db)
+            expand_count = int(params.get("expand_count", 8))
+            expanded = await content_service.generate_keyword_matrix(seed, expand_count, db=db)
             all_expanded.extend(expanded)
         unique = list(dict.fromkeys(seeds + all_expanded))
         params["keyword_matrix"] = unique

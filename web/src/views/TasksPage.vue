@@ -455,6 +455,7 @@ function buildParams() {
       const seeds = nurtureKeywords.value.split(/[,，\s]+/).map(s => s.trim()).filter(Boolean)
       if (seeds.length > 0) {
         params.keywords = seeds
+        params.expand_count = nurtureKeywordExpandCount.value
       }
       return params
     }

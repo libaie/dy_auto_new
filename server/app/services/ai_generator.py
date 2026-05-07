@@ -38,18 +38,6 @@ class AiGeneratorService:
             )
         return self._client
 
-    @staticmethod
-    def _build_thinking(cfg: dict) -> dict | None:
-        """Build thinking parameter from AI config. Returns None if thinking is disabled."""
-        if not cfg.get("thinking_enabled"):
-            return None
-        budget = cfg.get("thinking_budget", 8192)
-        # Anthropic path uses budget_tokens, OpenAI-compatible uses type:enabled
-        api_url = cfg.get("api_url", "")
-        if "/v1/messages" in api_url:
-            return {"type": "enabled", "budget_tokens": budget}
-        return {"type": "enabled"}
-
     async def aclose(self):
         """Close the httpx client. Call during app shutdown."""
         if self._client and not self._client.is_closed:

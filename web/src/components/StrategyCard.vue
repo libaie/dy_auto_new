@@ -328,7 +328,7 @@ async function onImageFileSelect(e) {
       <div v-if="typeConfig.fields === 'chain'" class="space-y-2">
         <div class="flex items-center justify-between">
           <label class="text-xs text-slate-400">链式步骤</label>
-          <span class="text-xs text-slate-500">filter=同元素 | parent=父 | child=子 | sibling=兄弟</span>
+          <span class="text-xs text-slate-500">filter=同元素 | parent=父 | child=子[0] | sibling=兄弟[0] （[0]内为索引，0=第1个）</span>
         </div>
         <div
           v-for="(step, si) in (strategy.steps || [])"
@@ -376,8 +376,8 @@ async function onImageFileSelect(e) {
                 type="number" min="0"
                 :value="step.index || 0"
                 @input="updateStep(si, 'index', Number($event.target.value))"
-                class="w-10 rounded-lg border border-white/10 bg-white/5 px-1 py-1 text-xs text-slate-200 text-center"
-                title="第几个（0=第一个）"
+                class="w-12 rounded-lg border border-white/10 bg-white/5 px-1 py-1 text-xs text-slate-200 text-center" placeholder="#"
+                title="索引从0开始：0=第1个, 1=第2个, 2=第3个..."
               />
             </template>
             <span v-else class="flex-1 text-xs text-slate-500">不需要参数</span>

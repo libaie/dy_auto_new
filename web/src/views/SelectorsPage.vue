@@ -436,7 +436,7 @@ onMounted(fetchSelectors)
     <div v-else class="grid gap-4">
       <div
         v-for="sel in filteredSelectors"
-        :key="sel.action_name"
+        :key="sel.action_name + '_' + (sel.platform_version || 'default')"
         :class="[
           'glass-card p-5 transition-opacity',
           !sel.enabled && 'opacity-50',

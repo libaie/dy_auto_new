@@ -383,32 +383,34 @@ async function onImageFileSelect(e) {
           :class="{ 'rotate-90': showAdvanced }"
           fill="none" stroke="currentColor" viewBox="0 0 24 24"
         ><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
-        高级选项（可选偏移）
+        点击位置偏移
       </button>
-      <div v-if="showAdvanced" class="mt-2 flex gap-3">
-        <div class="flex-1">
-          <label class="text-xs text-slate-400 mb-1 block">X 偏移 %</label>
-          <input
-            type="number"
-            min="0"
-            max="100"
-            :value="strategy.x_percent"
-            @input="updateField('x_percent', $event.target.value ? Number($event.target.value) : undefined)"
-            placeholder="留空不偏移"
-            class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:border-purple-500/50 focus:outline-none"
-          />
-        </div>
-        <div class="flex-1">
-          <label class="text-xs text-slate-400 mb-1 block">Y 偏移 %</label>
-          <input
-            type="number"
-            min="0"
-            max="100"
-            :value="strategy.y_percent"
-            @input="updateField('y_percent', $event.target.value ? Number($event.target.value) : undefined)"
-            placeholder="留空不偏移"
-            class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:border-purple-500/50 focus:outline-none"
-          />
+      <div v-if="showAdvanced" class="mt-2 space-y-2">
+        <p class="text-xs text-slate-500 leading-relaxed">
+          相对控件<strong class="text-slate-400">中心点</strong>的偏移量，按<strong class="text-slate-400">控件自身宽高百分比</strong>计算，不受分辨率影响。<br/>
+          不填=点中心 &middot; 正数=右/下 &middot; 负数=左/上 &middot; 例如填 <code class="text-purple-400">150</code> 向右偏移 1.5 倍控件宽
+        </p>
+        <div class="flex gap-3">
+          <div class="flex-1">
+            <label class="text-xs text-slate-400 mb-1 block">水平偏移 %</label>
+            <input
+              type="number"
+              :value="strategy.x_percent"
+              @input="updateField('x_percent', $event.target.value !== '' ? Number($event.target.value) : undefined)"
+              placeholder="0"
+              class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:border-purple-500/50 focus:outline-none"
+            />
+          </div>
+          <div class="flex-1">
+            <label class="text-xs text-slate-400 mb-1 block">垂直偏移 %</label>
+            <input
+              type="number"
+              :value="strategy.y_percent"
+              @input="updateField('y_percent', $event.target.value !== '' ? Number($event.target.value) : undefined)"
+              placeholder="0"
+              class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:border-purple-500/50 focus:outline-none"
+            />
+          </div>
         </div>
       </div>
     </div>

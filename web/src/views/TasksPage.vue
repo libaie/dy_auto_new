@@ -29,6 +29,7 @@ const typeLabelMap = {
   search_like: '搜索点赞',
   search_dm: '搜索私信',
   reply_comment: '评论回复',
+  collect: '数据采集',
 }
 
 const taskTypeOptions = [
@@ -37,6 +38,7 @@ const taskTypeOptions = [
   { value: 'search_like', label: '搜索点赞' },
   { value: 'search_dm', label: '搜索私信' },
   { value: 'reply_comment', label: '评论回复' },
+  { value: 'collect', label: '数据采集' },
 ]
 
 const statusFilterOptions = [
@@ -174,6 +176,7 @@ const channelTaskTypeLabel = (type) => ({
   search_like: '点赞搜索',
   search_dm: '私信搜索',
   reply_comment: '回复评论',
+  collect: '采集',
   nurture: '养号',
 }[type] || type)
 
@@ -428,7 +431,7 @@ function openCreateDialog() {
 }
 
 // --- Computed: is search-type task ---
-const isSearchType = computed(() => ['search_comment', 'search_like', 'search_dm', 'reply_comment'].includes(form.type))
+const isSearchType = computed(() => ['search_comment', 'search_like', 'search_dm', 'reply_comment', 'collect'].includes(form.type))
 
 // --- Watch account change: reset device when account changes ---
 watch(() => form.account_id, () => {
@@ -474,7 +477,7 @@ function buildParams() {
   }
 
   // Content tasks
-  if (['search_comment', 'search_dm', 'reply_comment'].includes(form.type)) {
+  if (['search_comment', 'search_dm', 'reply_comment', 'collect'].includes(form.type)) {
     if (form.content) {
       params.content = form.content
     }
@@ -1282,7 +1285,7 @@ onUnmounted(() => {
                   </template>
 
                   <!-- 内容类任务的私信/评论内容 -->
-                  <template v-if="['search_comment', 'search_dm', 'reply_comment'].includes(form.type)">
+                  <template v-if="['search_comment', 'search_dm', 'reply_comment', 'collect'].includes(form.type)">
                     <!-- Template -->
                     <div v-if="filteredTemplates.length > 0">
                       <label class="block text-sm font-medium text-slate-300">内容模板 <TipIcon text="选择预设的评论/私信模板，模板中的变量会自动替换为实际值" /></label>
@@ -1431,6 +1434,7 @@ onUnmounted(() => {
                         <option value="search_like">搜索点赞</option>
                         <option value="search_dm">搜索私信</option>
                         <option value="reply_comment">评论回复</option>
+                        <option value="collect">数据采集</option>
                       </select>
                     </div>
                     <div>

@@ -1,150 +1,323 @@
-# UI 选择器配置 — 抖音 UI 变更时在此修改
-# 策略类型: text(控件文本), id(控件ID), desc(内容描述), className(类名), package(包名),
-#           coordinate(坐标百分比), image(以图找图, template=文件名, threshold=阈值)
-version: 2
 selectors:
-  - action_name: "back_btn"
-    strategies:
-      - { type: "desc", value: "返回", priority: 1 }
-      - { type: "id", value: "com.ss.android.ugc.aweme:id/back_btn", priority: 2 }
-
-  - action_name: "open_app"
-    strategies:
-      - { type: "package", value: "com.ss.android.ugc.aweme", priority: 1 }
-
-  - action_name: "search_tab"
-    strategies:
-      - { type: "text", value: "搜索", priority: 1 }
-      - { type: "desc", value: "搜索", priority: 2 }
-      - { type: "id", value: "com.ss.android.ugc.aweme:id/content_container", priority: 3 }
-
-  - action_name: "search_input"
-    strategies:
-      - { type: "className", value: "android.widget.EditText", priority: 1 }
-
-  - action_name: "search_button"
-    strategies:
-      - { type: "text", value: "搜索", priority: 1 }
-      - { type: "desc", value: "搜索", priority: 2 }
-
-  - action_name: "search_suggestion"
-    strategies:
-      - { type: "id", value: "recycler_view", priority: 1 }
-
-  - action_name: "search_suggestion_list"
-    strategies:
-      - { type: "id", value: "recycler_view", priority: 1 }
-
-  - action_name: "video_tab"
-    strategies:
-      - { type: "id", value: "text1", priority: 1 }
-
-  - action_name: "search_video_tab"
-    strategies:
-      - { type: "text", value: "视频", priority: 1 }
-      - { type: "id", value: "text1", priority: 2 }
-
-  - action_name: "sort_button"
-    strategies:
-      - { type: "id", value: "ivu", priority: 1 }
-
-  # 排序选项（弹出框内）
-  - action_name: "sort_latest"
-    strategies:
-      - { type: "text", value: "最新发布", priority: 1 }
-      - { type: "image", template: "sort_latest.png", threshold: 0.8, priority: 2 }
-
-  - action_name: "sort_most_liked"
-    strategies:
-      - { type: "text", value: "最多点赞", priority: 1 }
-      - { type: "image", template: "sort_most_liked.png", threshold: 0.8, priority: 2 }
-
-  - action_name: "sort_default"
-    strategies:
-      - { type: "text", value: "综合排序", priority: 1 }
-      - { type: "image", template: "sort_default.png", threshold: 0.8, priority: 2 }
-
-  - action_name: "like_button"
-    strategies:
-      - { type: "id", value: "com.ss.android.ugc.aweme:id/gle", priority: 1 }
-      - { type: "text", value: "赞", priority: 2 }
-      - { type: "desc", value: "点赞", priority: 3 }
-
-  - action_name: "comment_input"
-    strategies:
-      - { type: "text", value: "善语结善缘，恶语伤人心", priority: 1 }
-      - { type: "id", value: "com.ss.android.ugc.aweme:id/comment_et", priority: 2 }
-      - { type: "desc", value: "评论", priority: 3 }
-
-  - action_name: "comment_submit"
-    strategies:
-      - { type: "text", value: "发送", priority: 1 }
-      - { type: "desc", value: "发送", priority: 2 }
-
-  - action_name: "follow_button"
-    strategies:
-      - { type: "id", value: "com.ss.android.ugc.aweme:id/jym", priority: 1 }
-      - { type: "text", value: "关注", priority: 2 }
-      - { type: "desc", value: "关注", priority: 3 }
-
-  - action_name: "profile_more"
-    strategies:
-      - { type: "desc", value: "更多", priority: 1 }
-      - { type: "id", value: "com.ss.android.ugc.aweme:id/detail_right_arrow", priority: 2 }
-
-  - action_name: "message_button"
-    strategies:
-      - { type: "text", value: "私信", priority: 1 }
-      - { type: "desc", value: "私信", priority: 2 }
-
-  - action_name: "dm_input"
-    strategies:
-      - { type: "id", value: "com.ss.android.ugc.aweme:id/et_input", priority: 1 }
-      - { type: "className", value: "android.widget.EditText", priority: 2 }
-
-  - action_name: "dm_send"
-    strategies:
-      - { type: "text", value: "发送", priority: 1 }
-      - { type: "desc", value: "发送", priority: 2 }
-
-  - action_name: "comment_reply_button"
-    strategies:
-      - { type: "text", value: "回复", priority: 1 }
-      - { type: "desc", value: "回复", priority: 2 }
-
-  - action_name: "video_author_avatar"
-    strategies:
-      - { type: "desc", value: "头像", priority: 1 }
-      - { type: "id", value: "com.ss.android.ugc.aweme:id/author_avatar", priority: 2 }
-      - { type: "coordinate", x_percent: 0.9, y_percent: 0.6, priority: 3 }
-
-  # 评论区选择器
-  - action_name: "comment_list"
-    strategies:
-      - { type: "id", value: "com.ss.android.ugc.aweme:id/comment_list", priority: 1 }
-      - { type: "className", value: "androidx.recyclerview.widget.RecyclerView", priority: 2 }
-
-  - action_name: "comment_text"
-    strategies:
-      - { type: "id", value: "com.ss.android.ugc.aweme:id/comment_text", priority: 1 }
-      - { type: "id", value: "com.ss.android.ugc.aweme:id/content", priority: 2 }
-
-  - action_name: "comment_author"
-    strategies:
-      - { type: "id", value: "com.ss.android.ugc.aweme:id/nickname", priority: 1 }
-      - { type: "id", value: "com.ss.android.ugc.aweme:id/user_name", priority: 2 }
-
-  - action_name: "comment_time"
-    strategies:
-      - { type: "id", value: "com.ss.android.ugc.aweme:id/create_time", priority: 1 }
-      - { type: "id", value: "com.ss.android.ugc.aweme:id/time", priority: 2 }
-
-  - action_name: "comment_like_count"
-    strategies:
-      - { type: "id", value: "com.ss.android.ugc.aweme:id/like_count", priority: 1 }
-
-  # 评论区作者头像（用于进入评论者主页）
-  - action_name: "comment_author_avatar"
-    strategies:
-      - { type: "id", value: "com.ss.android.ugc.aweme:id/avatar", priority: 1 }
-      - { type: "desc", value: "头像", priority: 2 }
+- action_name: back_btn
+  strategies:
+  - priority: 1
+    type: desc
+    value: 返回
+  - priority: 2
+    type: id
+    value: com.ss.android.ugc.aweme:id/back_btn
+- action_name: open_app
+  strategies:
+  - priority: 1
+    type: package
+    value: com.ss.android.ugc.aweme
+- action_name: search_tab
+  strategies:
+  - priority: 1
+    type: text
+    value: 搜索
+  - priority: 2
+    type: desc
+    value: 搜索
+  - priority: 3
+    type: id
+    value: com.ss.android.ugc.aweme:id/content_container
+- action_name: search_input
+  strategies:
+  - priority: 1
+    type: className
+    value: android.widget.EditText
+- action_name: search_button
+  strategies:
+  - priority: 1
+    type: text
+    value: 搜索
+  - priority: 2
+    type: desc
+    value: 搜索
+- action_name: search_suggestion
+  strategies:
+  - priority: 1
+    type: id
+    value: recycler_view
+- action_name: search_suggestion_list
+  strategies:
+  - priority: 1
+    type: id
+    value: recycler_view
+- action_name: video_tab
+  strategies:
+  - priority: 1
+    type: id
+    value: text1
+- action_name: search_video_tab
+  strategies:
+  - priority: 1
+    type: text
+    value: 视频
+  - priority: 2
+    type: id
+    value: text1
+- action_name: sort_button
+  strategies:
+  - priority: 1
+    type: id
+    value: ivu
+- action_name: sort_latest
+  strategies:
+  - priority: 1
+    type: text
+    value: 最新发布
+  - priority: 2
+    template: sort_latest.png
+    threshold: 0.8
+    type: image
+- action_name: sort_most_liked
+  strategies:
+  - priority: 1
+    type: text
+    value: 最多点赞
+  - priority: 2
+    template: sort_most_liked.png
+    threshold: 0.8
+    type: image
+- action_name: sort_default
+  strategies:
+  - priority: 1
+    type: text
+    value: 综合排序
+  - priority: 2
+    template: sort_default.png
+    threshold: 0.8
+    type: image
+- action_name: like_button
+  strategies:
+  - priority: 1
+    type: id
+    value: com.ss.android.ugc.aweme:id/gle
+  - priority: 2
+    type: text
+    value: 赞
+  - priority: 3
+    type: desc
+    value: 点赞
+- action_name: comment_input
+  strategies:
+  - priority: 1
+    type: text
+    value: 善语结善缘，恶语伤人心
+  - priority: 2
+    type: id
+    value: com.ss.android.ugc.aweme:id/comment_et
+  - priority: 3
+    type: desc
+    value: 评论
+- action_name: comment_submit
+  strategies:
+  - priority: 1
+    type: text
+    value: 发送
+  - priority: 2
+    type: desc
+    value: 发送
+- action_name: follow_button
+  strategies:
+  - priority: 1
+    type: id
+    value: com.ss.android.ugc.aweme:id/jym
+  - priority: 2
+    type: text
+    value: 关注
+  - priority: 3
+    type: desc
+    value: 关注
+- action_name: profile_more
+  strategies:
+  - priority: 1
+    type: desc
+    value: 更多
+  - priority: 2
+    type: id
+    value: com.ss.android.ugc.aweme:id/detail_right_arrow
+- action_name: message_button
+  strategies:
+  - priority: 1
+    type: text
+    value: 私信
+  - priority: 2
+    type: desc
+    value: 私信
+- action_name: dm_input
+  strategies:
+  - priority: 1
+    type: id
+    value: com.ss.android.ugc.aweme:id/et_input
+  - priority: 2
+    type: className
+    value: android.widget.EditText
+- action_name: dm_send
+  strategies:
+  - priority: 1
+    type: text
+    value: 发送
+  - priority: 2
+    type: desc
+    value: 发送
+- action_name: comment_reply_button
+  strategies:
+  - priority: 1
+    type: text
+    value: 回复
+  - priority: 2
+    type: desc
+    value: 回复
+- action_name: video_author_avatar
+  strategies:
+  - priority: 1
+    type: desc
+    value: 头像
+  - priority: 2
+    type: id
+    value: com.ss.android.ugc.aweme:id/author_avatar
+  - priority: 3
+    type: coordinate
+    x_percent: 0.9
+    y_percent: 0.6
+- action_name: comment_list
+  strategies:
+  - priority: 1
+    type: id
+    value: com.ss.android.ugc.aweme:id/comment_list
+  - priority: 2
+    type: className
+    value: androidx.recyclerview.widget.RecyclerView
+- action_name: comment_text
+  strategies:
+  - priority: 1
+    type: id
+    value: com.ss.android.ugc.aweme:id/comment_text
+  - priority: 2
+    type: id
+    value: com.ss.android.ugc.aweme:id/content
+- action_name: comment_author
+  strategies:
+  - priority: 1
+    type: id
+    value: com.ss.android.ugc.aweme:id/nickname
+  - priority: 2
+    type: id
+    value: com.ss.android.ugc.aweme:id/user_name
+- action_name: comment_time
+  strategies:
+  - priority: 1
+    type: id
+    value: com.ss.android.ugc.aweme:id/create_time
+  - priority: 2
+    type: id
+    value: com.ss.android.ugc.aweme:id/time
+- action_name: comment_like_count
+  strategies:
+  - priority: 1
+    type: id
+    value: com.ss.android.ugc.aweme:id/like_count
+- action_name: comment_author_avatar
+  strategies:
+  - priority: 1
+    type: id
+    value: com.ss.android.ugc.aweme:id/avatar
+  - priority: 2
+    type: desc
+    value: 头像
+- action_name: comment_reply_count
+  category: collect
+  platform_version: default
+  strategies:
+  - priority: 1
+    type: text
+    value: ''
+- action_name: comment_dislike_count
+  category: collect
+  platform_version: default
+  strategies:
+  - priority: 1
+    type: text
+    value: ''
+- action_name: comment_location
+  category: collect
+  platform_version: default
+  strategies:
+  - priority: 1
+    type: text
+    value: ''
+- action_name: user_nickname
+  category: collect
+  platform_version: default
+  strategies:
+  - priority: 1
+    type: id
+    value: com.ss.android.ugc.aweme:id/title
+- action_name: user_douyin_id
+  category: collect
+  platform_version: default
+  strategies:
+  - priority: 1
+    type: id
+    value: com.ss.android.ugc.aweme:id/title
+- action_name: user_likes_count
+  category: collect
+  platform_version: default
+  strategies:
+  - priority: 1
+    type: text
+    value: ''
+- action_name: user_follow_count
+  category: collect
+  platform_version: default
+  strategies:
+  - priority: 1
+    type: text
+    value: ''
+- action_name: user_fans_count
+  category: collect
+  platform_version: default
+  strategies:
+  - priority: 1
+    type: text
+    value: ''
+- action_name: user_works_count
+  category: collect
+  platform_version: default
+  strategies:
+  - priority: 1
+    type: text
+    value: ''
+- action_name: user_gender
+  category: collect
+  platform_version: default
+  strategies:
+  - priority: 1
+    type: text
+    value: ''
+- action_name: user_age
+  category: collect
+  platform_version: default
+  strategies:
+  - priority: 1
+    type: text
+    value: ''
+- action_name: user_ip_location
+  category: collect
+  platform_version: default
+  strategies:
+  - priority: 1
+    type: text
+    value: ''
+- action_name: user_is_private
+  category: collect
+  platform_version: default
+  strategies:
+  - priority: 1
+    type: text
+    value: ''
+version: 2

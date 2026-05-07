@@ -12,6 +12,7 @@ var handlers = {
   search_like: require("../handlers/search-like"),
   search_dm: require("../handlers/search-dm"),
   reply_comment: require("../handlers/reply-comment"),
+  collect: require("../handlers/search-collect"),
 };
 
 var taskExecutor = {

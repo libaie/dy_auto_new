@@ -11,6 +11,7 @@ class TaskType(str, Enum):
     SEARCH_LIKE = "search_like"
     SEARCH_DM = "search_dm"
     REPLY_COMMENT = "reply_comment"
+    COLLECT = "collect"
 
 
 class TaskStatus(str, Enum):
@@ -520,3 +521,36 @@ class ChannelResponse(BaseModel):
 
 class ChannelDetailResponse(ChannelResponse):
     items: list[ChannelItemResponse] = []
+
+# --- 采集上报 ---
+
+class CollectCommentData(BaseModel):
+    nickname: str
+    content: str
+    time_str: str = ""
+    reply_count: str = ""
+    like_count: str = ""
+    dislike_count: str = ""
+    location: str = ""
+    is_author: bool = False
+
+
+class CollectUserData(BaseModel):
+    nickname: str
+    douyin_id: str = ""
+    likes_count: str = ""
+    follow_count: str = ""
+    fans_count: str = ""
+    works_count: str = ""
+    gender: str = ""
+    age: str = ""
+    ip_location: str = ""
+    is_private: str = ""
+
+
+class CollectReportRequest(BaseModel):
+    task_id: str
+    keyword: str
+    comment: CollectCommentData
+    user: CollectUserData | None = None
+

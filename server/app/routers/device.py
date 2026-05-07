@@ -794,3 +794,56 @@ async def ai_proxy(
         raise HTTPException(status_code=504, detail="AI API timeout")
     except (KeyError, IndexError) as e:
         raise HTTPException(status_code=502, detail=f"Invalid AI response: {e}")
+
+# --- 采集数据上报 ---
+
+from app.models import CollectReportRequest, CollectCommentData, CollectUserData
+
+
+@router.post("/collect-report")
+def collect_report(
+    request: CollectReportRequest,
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_device_secret),
+):
+    from app.db_models import CollectedComment, CollectedUser
+
+    # 1. 保存评论数据
+    comment = CollectedComment(
+        task_id=request.task_id,
+        keyword=request.keyword,
+        nickname=request.comment.nickname,
+        content=request.comment.content,
+        time_str=request.comment.time_str,
+        reply_count=request.comment.reply_count,
+        like_count=request.comment.like_count,
+        dislike_count=request.comment.dislike_count,
+        location=request.comment.location,
+        is_author=request.comment.is_author,
+    )
+    db.add(comment)
+
+    user_new = False
+    if request.user and request.user.douyin_id:
+        existing = db.query(CollectedUser).filter(
+            CollectedUser.douyin_id == request.user.douyin_id
+        ).first()
+        if not existing:
+            db.add(CollectedUser(
+                task_id=request.task_id,
+                nickname=request.user.nickname,
+                douyin_id=request.user.douyin_id,
+                likes_count=request.user.likes_count,
+                follow_count=request.user.follow_count,
+                fans_count=request.user.fans_count,
+                works_count=request.user.works_count,
+                gender=request.user.gender,
+                age=request.user.age,
+                ip_location=request.user.ip_location,
+                is_private=request.user.is_private,
+            ))
+            user_new = True
+
+    db.commit()
+    return {"comment_saved": True, "user_new": user_new}
+

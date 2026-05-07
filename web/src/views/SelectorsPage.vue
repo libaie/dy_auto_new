@@ -117,6 +117,7 @@ const categoryTabs = [
   { key: 'video', label: '视频相关' },
   { key: 'sort', label: '排序相关' },
   { key: 'system', label: '系统相关' },
+  { key: 'collect', label: '采集相关' },
   { key: '', label: '未分类' },
 ]
 
@@ -128,6 +129,7 @@ const categoryOptions = [
   { value: 'video', label: '视频相关' },
   { value: 'sort', label: '排序相关' },
   { value: 'system', label: '系统相关' },
+  { value: 'collect', label: '采集相关' },
 ]
 
 function getCategoryLabel(cat) {
@@ -142,6 +144,7 @@ const categoryColorMap = {
   video: 'bg-amber-500/15 text-amber-300 border-amber-500/25',
   sort: 'bg-violet-500/15 text-violet-300 border-violet-500/25',
   system: 'bg-slate-500/15 text-slate-300 border-slate-500/25',
+  collect: 'bg-orange-500/15 text-orange-300 border-orange-500/25',
 }
 
 function getCategoryClass(cat) {

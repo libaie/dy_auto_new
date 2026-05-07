@@ -308,3 +308,42 @@ class PromptTemplate(Base):
     enabled = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+
+class CollectedComment(Base):
+    """采集的评论数据"""
+    __tablename__ = "collected_comments"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    task_id = Column(String(36), ForeignKey("tasks.id"), nullable=True, index=True)
+    device_id = Column(String(36), ForeignKey("devices.id"), nullable=True)
+    keyword = Column(String(200), nullable=False)
+    nickname = Column(String(100), nullable=False)
+    content = Column(Text, nullable=False)
+    time_str = Column(String(50), nullable=True)        # 评论发布时间（原始字符串）
+    reply_count = Column(String(20), nullable=True)      # 回复数
+    like_count = Column(String(20), nullable=True)       # 点赞数
+    dislike_count = Column(String(20), nullable=True)    # 踩数
+    location = Column(String(100), nullable=True)        # IP属地
+    is_author = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+
+
+class CollectedUser(Base):
+    """采集的用户数据 — 按 douyin_id 去重"""
+    __tablename__ = "collected_users"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    task_id = Column(String(36), ForeignKey("tasks.id"), nullable=True, index=True)
+    device_id = Column(String(36), ForeignKey("devices.id"), nullable=True)
+    nickname = Column(String(100), nullable=False)
+    douyin_id = Column(String(100), nullable=False, unique=True, index=True)  # 抖音数字ID，去重键
+    likes_count = Column(String(20), nullable=True)     # 获赞数
+    follow_count = Column(String(20), nullable=True)    # 关注数
+    fans_count = Column(String(20), nullable=True)      # 粉丝数
+    works_count = Column(String(20), nullable=True)     # 作品数
+    gender = Column(String(10), nullable=True)          # 性别
+    age = Column(String(10), nullable=True)             # 年龄
+    ip_location = Column(String(100), nullable=True)    # IP属地
+    is_private = Column(String(10), nullable=True)      # 是否私密账号
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))

@@ -20,10 +20,25 @@ const STRATEGY_TYPES = [
   { value: 'image', label: '图片匹配', fields: 'image' },
 ]
 
+const CONDITION_TYPES = [
+  { value: 'text', label: '文本', placeholder: '例如：评论' },
+  { value: 'id', label: '资源 ID', placeholder: 'com.ss.android.ugc.aweme:id/title' },
+  { value: 'desc', label: '描述', placeholder: '例如：按钮' },
+  { value: 'className', label: '类名', placeholder: 'android.widget.TextView' },
+]
+
 const showAdvanced = ref(false)
+
+const isMultiCondition = computed(() =>
+  !!(props.strategy.conditions && props.strategy.conditions.length > 0)
+)
 
 const typeConfig = computed(() =>
   STRATEGY_TYPES.find(t => t.value === props.strategy.type) || STRATEGY_TYPES[0]
+)
+
+const canHaveMatchMode = computed(() =>
+  ['text', 'id', 'desc', 'className'].includes(props.strategy.type) && !isMultiCondition.value
 )
 
 function updateField(key, value) {
@@ -42,6 +57,61 @@ function onTypeChange(newType) {
     base.value = props.strategy.value || ''
   }
   emit('update', base)
+}
+
+// --- Multi-condition helpers ---
+
+function toggleConditionMode() {
+  if (isMultiCondition.value) {
+    const first = props.strategy.conditions[0]
+    const { conditions, logic, ...rest } = props.strategy
+    rest.type = first.type || 'text'
+    rest.value = first.value || ''
+    rest.match_mode = first.match_mode || 'exact'
+    emit('update', rest)
+  } else {
+    const firstCond = {
+      type: props.strategy.type || 'text',
+      value: props.strategy.value || '',
+      match_mode: props.strategy.match_mode || 'exact',
+    }
+    const { match_mode, value, type, ...rest } = props.strategy
+    rest.conditions = [firstCond]
+    rest.logic = 'and'
+    emit('update', rest)
+  }
+}
+
+function setLogic(val) {
+  emit('update', { ...props.strategy, logic: val })
+}
+
+function addCondition() {
+  const conds = [...(props.strategy.conditions || []), { type: 'text', value: '', match_mode: 'exact' }]
+  emit('update', { ...props.strategy, conditions: conds })
+}
+
+function removeCondition(index) {
+  const conds = props.strategy.conditions.filter((_, i) => i !== index)
+  if (conds.length === 0) {
+    toggleConditionMode()
+    return
+  }
+  emit('update', { ...props.strategy, conditions: conds })
+}
+
+function updateCondition(index, key, value) {
+  const conds = props.strategy.conditions.map((c, i) =>
+    i === index ? { ...c, [key]: value } : c
+  )
+  emit('update', { ...props.strategy, conditions: conds })
+}
+
+function onCondTypeChange(index, newType) {
+  const conds = props.strategy.conditions.map((c, i) =>
+    i === index ? { type: newType, value: '', match_mode: 'exact' } : c
+  )
+  emit('update', { ...props.strategy, conditions: conds })
 }
 
 async function onImageFileSelect(e) {
@@ -115,7 +185,7 @@ async function onImageFileSelect(e) {
     <!-- Fields based on type -->
     <div class="space-y-2">
       <!-- text / id / desc / className / package: single value input -->
-      <div v-if="typeConfig.fields === 'value'">
+      <div v-if="typeConfig.fields === 'value' && !isMultiCondition">
         <label class="text-xs text-slate-400 mb-1 block">查找值</label>
         <input
           :value="strategy.value"
@@ -126,6 +196,108 @@ async function onImageFileSelect(e) {
             typeConfig.mono && 'font-mono',
           ]"
         />
+      </div>
+
+      <!-- match_mode dropdown (single-condition text/id/desc/className only) -->
+      <div v-if="canHaveMatchMode" class="mt-2">
+        <label class="text-xs text-slate-400 mb-1 block">匹配模式</label>
+        <select
+          :value="strategy.match_mode || 'exact'"
+          @change="updateField('match_mode', $event.target.value)"
+          class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 focus:border-purple-500/50 focus:outline-none"
+        >
+          <option value="exact">精确匹配</option>
+          <option value="contains">包含</option>
+        </select>
+      </div>
+
+      <!-- Toggle: single <-> multi condition -->
+      <div v-if="['text','id','desc','className'].includes(strategy.type) || isMultiCondition" class="mt-2">
+        <button
+          type="button"
+          class="text-xs text-purple-400 hover:text-purple-300 transition-colors"
+          @click="toggleConditionMode"
+        >
+          {{ isMultiCondition ? '← 切换为单条件' : '→ 切换为多条件组合（AND/OR）' }}
+        </button>
+      </div>
+
+      <!-- Multi-condition mode -->
+      <div v-if="isMultiCondition" class="mt-3 space-y-3">
+        <!-- AND/OR toggle -->
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-slate-400">逻辑关系：</span>
+          <button
+            type="button"
+            :class="(strategy.logic || 'and') === 'and'
+              ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'
+              : 'text-slate-500 hover:text-slate-300 border-transparent'"
+            class="px-3 py-1 text-xs font-medium rounded-lg border transition-colors"
+            @click="setLogic('and')"
+          >
+            并且 (AND)
+          </button>
+          <button
+            type="button"
+            :class="(strategy.logic || 'and') === 'or'
+              ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+              : 'text-slate-500 hover:text-slate-300 border-transparent'"
+            class="px-3 py-1 text-xs font-medium rounded-lg border transition-colors"
+            @click="setLogic('or')"
+          >
+            或者 (OR)
+          </button>
+        </div>
+
+        <!-- Condition rows -->
+        <div
+          v-for="(cond, ci) in strategy.conditions"
+          :key="ci"
+          class="p-3 rounded-lg border border-white/10 bg-white/[0.03] space-y-2"
+        >
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-slate-500 font-mono w-5">#{{ ci + 1 }}</span>
+            <select
+              :value="cond.type"
+              @change="onCondTypeChange(ci, $event.target.value)"
+              class="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-200 focus:border-purple-500/50 focus:outline-none"
+            >
+              <option v-for="ct in CONDITION_TYPES" :key="ct.value" :value="ct.value">
+                {{ ct.label }}
+              </option>
+            </select>
+            <button
+              type="button"
+              class="ml-auto text-slate-500 hover:text-red-400 transition-colors"
+              @click="removeCondition(ci)"
+              title="删除此条件"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          </div>
+          <input
+            :value="cond.value"
+            @input="updateCondition(ci, 'value', $event.target.value)"
+            :placeholder="CONDITION_TYPES.find(ct => ct.value === cond.type)?.placeholder || ''"
+            class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:border-purple-500/50 focus:outline-none"
+          />
+          <select
+            :value="cond.match_mode || 'exact'"
+            @change="updateCondition(ci, 'match_mode', $event.target.value)"
+            class="w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-200 focus:border-purple-500/50 focus:outline-none"
+          >
+            <option value="exact">精确匹配</option>
+            <option value="contains">包含</option>
+          </select>
+        </div>
+
+        <button
+          type="button"
+          class="w-full py-2 border border-dashed border-white/20 rounded-lg text-sm text-slate-400 hover:text-purple-300 hover:border-purple-500/30 transition-colors"
+          @click="addCondition"
+        >
+          + 添加条件
+        </button>
       </div>
 
       <!-- coordinate: x + y inputs -->

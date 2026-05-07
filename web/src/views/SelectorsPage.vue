@@ -75,17 +75,17 @@ const tooltips = {
   },
   strategies: {
     title: '选择策略数组（必填）',
-    desc: 'JSON 数组，定义如何在屏幕上定位目标 UI 元素。每个策略是一种查找方式，系统按 priority 顺序依次尝试，直到找到元素为止。',
+    desc: 'JSON 数组，定义如何在屏幕上定位目标 UI 元素。每个策略是一种查找方式，系统按 priority 顺序依次尝试，直到找到元素为止。支持单条件匹配、多条件 AND/OR 组合匹配。',
     types: [
-      { type: 'text', value: '通过文本内容查找', fields: 'value: 要匹配的文本（支持部分匹配）' },
-      { type: 'id', value: '通过资源 ID 查找', fields: 'value: Android 资源 ID，如 com.ss.android.ugc.aweme:id/like_btn' },
-      { type: 'desc', value: '通过内容描述查找', fields: 'value: 元素的 contentDescription 属性值' },
-      { type: 'className', value: '通过类名查找', fields: 'value: Android 控件类名，如 android.widget.TextView' },
+      { type: 'text', value: '通过文本内容查找', fields: 'value: 要匹配的文本，match_mode: 匹配模式（exact 精确/contains 包含）' },
+      { type: 'id', value: '通过资源 ID 查找', fields: 'value: Android 资源 ID，match_mode: 匹配模式（exact/contains）' },
+      { type: 'desc', value: '通过内容描述查找', fields: 'value: contentDescription 属性值，match_mode: 匹配模式（exact/contains）' },
+      { type: 'className', value: '通过类名查找', fields: 'value: Android 控件类名，match_mode: 匹配模式（exact/contains）' },
       { type: 'package', value: '通过包名查找', fields: 'value: 应用包名，如 com.ss.android.ugc.aweme' },
-      { type: 'coordinate', value: '通过固定坐标点击', fields: 'x_percent: X 坐标百分比(0-100)，y_percent: Y 坐标百分比(0-100)' },
-      { type: 'image', value: '通过图片模板匹配', fields: 'template: 模板图片路径或 base64，threshold: 匹配阈值(0-1，默认0.8)' },
+      { type: 'coordinate', value: '通过固定坐标点击', fields: 'x_percent: X 百分比(0-100)，y_percent: Y 百分比(0-100)' },
+      { type: 'image', value: '通过图片模板匹配', fields: 'template: 模板图片路径，threshold: 匹配阈值(0-1，默认0.8)' },
     ],
-    commonFields: '通用字段：type（策略类型）、value（查找值）、priority（优先级，数字越小越优先）、x_percent/y_percent（可选，点击偏移百分比）',
+    commonFields: '通用字段：type、value、priority（数字越小越优先）、match_mode（exact/contains，默认 exact）。多条件模式：conditions（条件数组）+ logic（and/or），每个条件含 type/value/match_mode。',
   },
 }
 
@@ -240,8 +240,14 @@ watch(includeDisabled, () => {
 function formatStrategies(strategies) {
   if (!strategies || strategies.length === 0) return '无策略'
   const parts = strategies.map((s) => {
+    if (s.conditions && s.conditions.length > 0) {
+      const logic = s.logic === 'or' ? ' OR ' : ' AND '
+      const condStrs = s.conditions.map(c => `${c.type}:${(c.value || '').slice(0, 15)}`)
+      return `[${condStrs.join(logic)}]`
+    }
     const val = s.value && s.value.length > 20 ? s.value.slice(0, 20) + '...' : s.value
-    return `${s.type}:${val}`
+    const mode = s.match_mode === 'contains' ? '~' : ''
+    return `${mode}${s.type}:${val}`
   })
   return `${strategies.length} 个策略: ${parts.join(', ')}`
 }
@@ -670,7 +676,7 @@ onMounted(fetchSelectors)
                           type="button"
                           :class="editMode === 'form' ? 'bg-purple-500/20 text-purple-300' : 'text-slate-500 hover:text-slate-300'"
                           class="px-3 py-1 text-xs font-medium transition-colors"
-                          @click="editMode = 'form'"
+                          @click="editMode = 'form'; syncStrategiesToList()"
                         >
                           可视化
                         </button>

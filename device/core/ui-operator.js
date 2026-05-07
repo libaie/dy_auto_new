@@ -113,38 +113,141 @@ var uiOperator = {
   },
 
   /**
+   * 按条件查找元素（支持 text/id/desc/className 类型 + match_mode）
+   */
+  _findByCondition: function (cond) {
+    var matchMode = cond.match_mode || "exact";
+    if (matchMode === "contains") {
+      switch (cond.type) {
+        case "text": return textContains(cond.value).find();
+        case "desc": return descContains(cond.value).find();
+        case "id": return idContains(cond.value).find();
+        case "className": return classNameContains(cond.value).find();
+        default: return null;
+      }
+    }
+    switch (cond.type) {
+      case "text": return text(cond.value).find();
+      case "desc": return desc(cond.value).find();
+      case "id": return id(cond.value).find();
+      case "className": return className(cond.value).find();
+      default: return null;
+    }
+  },
+
+  /**
+   * 检查单个元素是否匹配条件
+   */
+  _elementMatchesCondition: function (el, cond) {
+    var matchMode = cond.match_mode || "exact";
+    var actual;
+    try {
+      switch (cond.type) {
+        case "text": actual = el.text(); break;
+        case "desc": actual = el.desc(); break;
+        case "id": actual = el.id(); break;
+        case "className": actual = el.className(); break;
+        default: return false;
+      }
+    } catch (e) { return false; }
+    if (!actual) return false;
+    if (matchMode === "contains") return actual.indexOf(cond.value) !== -1;
+    return actual === cond.value;
+  },
+
+  /**
+   * 多条件组合查找（AND/OR 逻辑）
+   */
+  _findByConditions: function (strategy) {
+    var conditions = strategy.conditions;
+    var logic = strategy.logic || "and";
+
+    if (!conditions || conditions.length === 0) return null;
+
+    // Single condition: short-circuit regardless of logic
+    if (conditions.length === 1) {
+      var single = this._findByCondition(conditions[0]);
+      if (single) {
+        for (var i = 0; i < single.length; i++) {
+          if (this._isOnScreen(single[i])) return single[i];
+        }
+      }
+      return null;
+    }
+
+    if (logic === "or") {
+      // OR: return first on-screen element matching ANY condition (not just conditions[0])
+      for (var j = 0; j < conditions.length; j++) {
+        var condCandidates = this._findByCondition(conditions[j]);
+        if (!condCandidates) continue;
+        for (var k = 0; k < condCandidates.length; k++) {
+          if (this._isOnScreen(condCandidates[k])) return condCandidates[k];
+        }
+      }
+      return null;
+    }
+
+    // AND: all conditions must match the same element
+    var candidates = this._findByCondition(conditions[0]);
+    if (!candidates || candidates.length === 0) return null;
+
+    for (var m = 0; m < candidates.length; m++) {
+      var el = candidates[m];
+      if (!this._isOnScreen(el)) continue;
+
+      var allMatch = true;
+      for (var n = 1; n < conditions.length; n++) {
+        if (!this._elementMatchesCondition(el, conditions[n])) {
+          allMatch = false;
+          break;
+        }
+      }
+      if (allMatch) return el;
+    }
+    return null;
+  },
+
+  /**
    * 按策略类型查找单个控件
-   * @param {Object} strategy - { type, value, x_percent, y_percent, template, threshold }
+   * @param {Object} strategy - { type, value, match_mode, conditions, logic, ... }
    * @returns {UiObject|null}
    */
   _findByStrategy: function (strategy) {
+    // Multi-condition mode
+    if (strategy.conditions && strategy.conditions.length > 0) {
+      return this._findByConditions(strategy);
+    }
+
     var all, j;
-    switch (strategy.type) {
-      case "text":
-        all = text(strategy.value).find();
-        break;
-      case "id":
-        all = id(strategy.value).find();
-        break;
-      case "desc":
-        all = desc(strategy.value).find();
-        break;
-      case "className":
-        all = className(strategy.value).find();
-        break;
-      case "package":
-        if (currentPackage() === strategy.value) {
-          return { isPackage: true, packageName: strategy.value };
-        }
-        return null;
-      case "coordinate":
-        var x = Math.round(strategy.x_percent * device.width);
-        var y = Math.round(strategy.y_percent * device.height);
-        return { isCoordinate: true, x: x, y: y };
-      case "image":
-        return this._findByImage(strategy.template, strategy.threshold || 0.8);
-      default:
-        return null;
+    var matchMode = strategy.match_mode || "exact";
+    if (matchMode === "contains") {
+      switch (strategy.type) {
+        case "text": all = textContains(strategy.value).find(); break;
+        case "id": all = idContains(strategy.value).find(); break;
+        case "desc": all = descContains(strategy.value).find(); break;
+        case "className": all = classNameContains(strategy.value).find(); break;
+        default: return null;
+      }
+    } else {
+      switch (strategy.type) {
+        case "text": all = text(strategy.value).find(); break;
+        case "id": all = id(strategy.value).find(); break;
+        case "desc": all = desc(strategy.value).find(); break;
+        case "className": all = className(strategy.value).find(); break;
+        case "package":
+          if (currentPackage() === strategy.value) {
+            return { isPackage: true, packageName: strategy.value };
+          }
+          return null;
+        case "coordinate":
+          var x = Math.round(strategy.x_percent * device.width);
+          var y = Math.round(strategy.y_percent * device.height);
+          return { isCoordinate: true, x: x, y: y };
+        case "image":
+          return this._findByImage(strategy.template, strategy.threshold || 0.8);
+        default:
+          return null;
+      }
     }
     if (all && all.length > 0) {
       for (j = 0; j < all.length; j++) {

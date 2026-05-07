@@ -12,6 +12,8 @@ const form = reactive({
   ai_api_key: '',
   ai_base_url: 'https://api.deepseek.com',
   ai_model: 'deepseek-chat',
+  ai_thinking: 'enabled',
+  ai_thinking_budget: 8192,
 })
 
 async function fetchSettings() {
@@ -22,6 +24,8 @@ async function fetchSettings() {
     form.ai_api_key = data.ai_api_key || ''
     form.ai_base_url = data.ai_base_url || 'https://api.deepseek.com'
     form.ai_model = data.ai_model || 'deepseek-chat'
+    form.ai_thinking = data.ai_thinking || 'enabled'
+    form.ai_thinking_budget = parseInt(data.ai_thinking_budget) || 8192
   } catch {
     toast.error('加载设置失败')
   } finally {
@@ -36,6 +40,8 @@ async function handleSave() {
       ai_api_key: form.ai_api_key,
       ai_base_url: form.ai_base_url,
       ai_model: form.ai_model,
+      ai_thinking: form.ai_thinking,
+      ai_thinking_budget: String(form.ai_thinking_budget),
     })
     toast.success('设置已保存')
   } catch {
@@ -101,6 +107,39 @@ onMounted(fetchSettings)
               class="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30 transition-all"
             />
             <p class="mt-1 text-xs text-slate-500">例如 deepseek-chat、gpt-4o-mini 等</p>
+          </div>
+
+          <!-- Thinking mode -->
+          <div class="pt-2 border-t border-white/5">
+            <label class="block text-sm font-medium text-slate-300 mb-3">思考模式</label>
+            <div class="flex items-center gap-4 mb-4">
+              <label class="flex items-center gap-3 cursor-pointer">
+                <div class="relative">
+                  <input
+                    v-model="form.ai_thinking"
+                    type="checkbox"
+                    true-value="enabled"
+                    false-value="disabled"
+                    class="sr-only peer"
+                  />
+                  <div class="w-10 h-6 rounded-full bg-slate-600 peer-checked:bg-gradient-to-r peer-checked:from-purple-500 peer-checked:to-cyan-500 transition-all duration-200" />
+                  <div class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow peer-checked:translate-x-4 transition-transform duration-200" />
+                </div>
+                <span class="text-sm text-slate-300">{{ form.ai_thinking === 'enabled' ? '已开启' : '已关闭' }}</span>
+              </label>
+            </div>
+            <div v-if="form.ai_thinking === 'enabled'">
+              <label class="block text-sm font-medium text-slate-300 mb-2">思考预算 (tokens)</label>
+              <input
+                v-model.number="form.ai_thinking_budget"
+                type="number"
+                min="1024"
+                max="32768"
+                step="1024"
+                class="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/30 transition-all"
+              />
+              <p class="mt-1 text-xs text-slate-500">控制 AI 思考深度，值越大思考越深入（默认 8192，范围 1024-32768）</p>
+            </div>
           </div>
         </div>
 

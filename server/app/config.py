@@ -134,6 +134,8 @@ AI_BASE_URL = os.getenv("AI_BASE_URL", "https://api.deepseek.com")
 AI_MODEL = os.getenv("AI_MODEL", "deepseek-chat")
 AI_PROVIDER = os.getenv("AI_PROVIDER", "deepseek")  # deepseek / openai / anthropic
 AI_MAX_RETRIES = int(os.getenv("AI_MAX_RETRIES", "3"))
+AI_THINKING = os.getenv("AI_THINKING", "enabled")  # enabled / disabled
+AI_THINKING_BUDGET = int(os.getenv("AI_THINKING_BUDGET", "8192"))
 
 
 def _resolve_ai_config(db=None):
@@ -142,6 +144,9 @@ def _resolve_ai_config(db=None):
     base_url = AI_BASE_URL
     model = AI_MODEL
 
+    thinking = AI_THINKING
+    thinking_budget = AI_THINKING_BUDGET
+
     if db:
         try:
             from app.db_models import SystemSetting
@@ -149,6 +154,8 @@ def _resolve_ai_config(db=None):
             api_key = settings.get("ai_api_key") or api_key
             base_url = settings.get("ai_base_url") or base_url
             model = settings.get("ai_model") or model
+            thinking = settings.get("ai_thinking", thinking)
+            thinking_budget = int(settings.get("ai_thinking_budget", str(thinking_budget)))
         except Exception:
             pass
 
@@ -156,6 +163,8 @@ def _resolve_ai_config(db=None):
         "api_key": api_key,
         "api_url": f"{base_url}/v1/chat/completions",
         "model": model,
+        "thinking_enabled": thinking == "enabled",
+        "thinking_budget": thinking_budget,
     }
 
 

@@ -38,6 +38,18 @@ class AiGeneratorService:
             )
         return self._client
 
+    @staticmethod
+    def _build_thinking(cfg: dict) -> dict | None:
+        """Build thinking parameter from AI config. Returns None if thinking is disabled."""
+        if not cfg.get("thinking_enabled"):
+            return None
+        budget = cfg.get("thinking_budget", 8192)
+        # Anthropic path uses budget_tokens, OpenAI-compatible uses type:enabled
+        api_url = cfg.get("api_url", "")
+        if "/v1/messages" in api_url:
+            return {"type": "enabled", "budget_tokens": budget}
+        return {"type": "enabled"}
+
     async def aclose(self):
         """Close the httpx client. Call during app shutdown."""
         if self._client and not self._client.is_closed:
@@ -117,7 +129,7 @@ class AiGeneratorService:
                         "max_tokens": max_tokens,
                         "temperature": temperature,
                         "stream": True,
-                        "thinking": {"type": "enabled"},
+                        **({} if not ai_cfg.get("thinking_enabled") else {"thinking": {"type": "enabled"}}),
                         "messages": [
                             {"role": "system", "content": system_prompt},
                             {"role": "user", "content": user_prompt},
@@ -179,7 +191,7 @@ class AiGeneratorService:
                         json={
                             "model": ai_cfg.get("model", "claude-3-haiku-20240307"),
                             "max_tokens": max_tokens,
-                            "thinking": {"type": "enabled", "budget_tokens": 8192},
+                            **({} if not ai_cfg.get("thinking_enabled") else {"thinking": {"type": "enabled", "budget_tokens": ai_cfg.get("thinking_budget", 8192)}}),
                             "system": system_prompt,
                             "messages": [{"role": "user", "content": user_prompt}],
                         },
@@ -198,7 +210,7 @@ class AiGeneratorService:
                             "model": ai_cfg.get("model", "deepseek-chat"),
                             "max_tokens": max_tokens,
                             "temperature": temperature,
-                            "thinking": {"type": "enabled"},
+                            **({} if not ai_cfg.get("thinking_enabled") else {"thinking": {"type": "enabled"}}),
                             "messages": [
                                 {"role": "system", "content": system_prompt},
                                 {"role": "user", "content": user_prompt},
@@ -236,7 +248,7 @@ class AiGeneratorService:
             json={
                 "model": cfg.get("model", "claude-3-haiku-20240307"),
                 "max_tokens": 512,
-                "thinking": {"type": "enabled", "budget_tokens": 8192},
+                **({} if not cfg.get("thinking_enabled") else {"thinking": {"type": "enabled", "budget_tokens": cfg.get("thinking_budget", 8192)}}),
                 "system": SYSTEM_PROMPT,
                 "messages": [{"role": "user", "content": user_prompt}],
             },
@@ -257,7 +269,7 @@ class AiGeneratorService:
             json={
                 "model": cfg.get("model", "deepseek-chat"),
                 "max_tokens": 512,
-                "thinking": {"type": "enabled"},
+                **({} if not cfg.get("thinking_enabled") else {"thinking": {"type": "enabled"}}),
                 "messages": [
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": user_prompt},

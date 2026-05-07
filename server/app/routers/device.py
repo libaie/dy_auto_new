@@ -769,19 +769,21 @@ async def ai_proxy(
 
     try:
         async with httpx.AsyncClient(timeout=60) as client:
+            json_body = {
+                "model": ai_cfg.get("model", "deepseek-chat"),
+                "max_tokens": request.max_tokens,
+                "temperature": request.temperature,
+                "messages": [{"role": "user", "content": request.prompt}],
+            }
+            if ai_cfg.get("thinking_enabled"):
+                json_body["thinking"] = {"type": "enabled"}
             resp = await client.post(
                 ai_cfg["api_url"],
                 headers={
                     "Content-Type": "application/json",
                     "Authorization": f"Bearer {ai_cfg.get('api_key', '')}",
                 },
-                json={
-                    "model": ai_cfg.get("model", "deepseek-chat"),
-                    "max_tokens": request.max_tokens,
-                    "temperature": request.temperature,
-                    "thinking": {"type": "enabled"},
-                    "messages": [{"role": "user", "content": request.prompt}],
-                },
+                json=json_body,
             )
         if resp.status_code != 200:
             raise HTTPException(status_code=502, detail=f"AI API error: {resp.status_code}")

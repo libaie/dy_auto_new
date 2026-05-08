@@ -102,7 +102,20 @@ var uiOperator = {
         var s = strategies[i];
         var element = this._findByStrategy(s);
         if (element && this._isOnScreen(element)) {
-          // UiObject 是 Java 对象不能挂 JS 属性，偏移直接算坐标返回
+          // press 模式：找到元素后用真实触摸按压代替点击
+          if (s.click_mode === "press" && !element.isCoordinate && !element.isImage && !element.isPackage) {
+            var pb = element.bounds();
+            if (pb) {
+              var pcx = pb.centerX();
+              var pcy = pb.centerY();
+              if (s.x_percent != null) pcx += Math.round((pb.right - pb.left) * s.x_percent / 100);
+              if (s.y_percent != null) pcy += Math.round((pb.bottom - pb.top) * s.y_percent / 100);
+              logger.debug(TAG, "通过 " + s.type + " +press 找到: '" + actionName + "'");
+              return { isPress: true, x: pcx, y: pcy, duration: s.press_duration || 150 };
+            }
+          }
+
+          // 偏移处理：UiObject 不能挂 JS 属性，直接算坐标返回
           if ((s.x_percent != null || s.y_percent != null) && !element.isCoordinate && !element.isImage && !element.isPackage) {
             var b = element.bounds();
             if (b) {
@@ -521,6 +534,12 @@ var uiOperator = {
    */
   clickElement: function (element) {
     if (!element) return false;
+
+    // 按压触摸（press 模式）
+    if (element.isPress) {
+      logger.debug(TAG, "按压: (" + element.x + ", " + element.y + "), " + (element.duration || 150) + "ms");
+      return press(element.x, element.y, element.duration || 150);
+    }
 
     // 坐标点击
     if (element.isCoordinate) {

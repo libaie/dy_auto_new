@@ -165,13 +165,6 @@ SearchBaseHandler._clickSuggestion = function (keyword) {
   var item = uiOperator.findElement("search_suggestion_list", 3000);
   if (item) {
     logger.info(TAG, "点击联想词");
-    // 联想词条目 accessibility click 可能无效，用坐标按压
-    try {
-      var b = item.bounds();
-      if (b) {
-        return press(b.centerX(), b.centerY(), 150);
-      }
-    } catch (e) {}
     return uiOperator.clickElement(item);
   }
   logger.warn(TAG, "联想词列表未找到");

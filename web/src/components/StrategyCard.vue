@@ -235,6 +235,32 @@ async function onImageFileSelect(e) {
         </select>
       </div>
 
+            <!-- click_mode dropdown -->
+      <div v-if="canHaveMatchMode || ['text','id','desc','className','package','image'].includes(strategy.type)" class="mt-2">
+        <label class="text-xs text-slate-400 mb-1 block">点击方式</label>
+        <select
+          :value="strategy.click_mode || 'click'"
+          @change="updateField('click_mode', $event.target.value)"
+          class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 focus:border-purple-500/50 focus:outline-none"
+        >
+          <option value="click">普通点击 (click)</option>
+          <option value="press">按压 (press)</option>
+        </select>
+      </div>
+
+            <!-- press_duration (shown when click_mode=press) -->
+      <div v-if="strategy.click_mode === 'press'" class="mt-2">
+        <label class="text-xs text-slate-400 mb-1 block">按压时长 (ms)</label>
+        <input
+          type="number"
+          min="50"
+          max="1000"
+          :value="strategy.press_duration || 150"
+          @input="updateField('press_duration', Number($event.target.value) || 150)"
+          class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 focus:border-purple-500/50 focus:outline-none"
+        />
+      </div>
+
       <!-- Toggle: single <-> multi condition -->
       <div v-if="['text','id','desc','className'].includes(strategy.type) || isMultiCondition" class="mt-2">
         <button

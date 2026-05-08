@@ -741,9 +741,7 @@ var uiOperator = {
     // AI 清洗
     if (cleanMode === "ai" && selector.clean_prompt) {
       try {
-        var promptText = selector.clean_prompt + "
-
-原始数据：" + rawValue;
+        var promptText = selector.clean_prompt + "\n\n原始数据：" + rawValue;
         var result = apiClient.post("/api/device/ai-proxy", {
           prompt: promptText,
           max_tokens: 128,

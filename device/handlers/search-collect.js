@@ -156,6 +156,12 @@ SearchCollectHandler.execute = function (params) {
   this._clickVideoTab();
   sleep(2000);
 
+  var sortBy = params.sort_by || '';
+  if (sortBy) {
+    this._sortResults(sortBy);
+    sleep(1500);
+  }
+
   var stats = { success_count: 0, fail_count: 0, details: [], _taskId: taskId, _keyword: keyword };
   for (var i = 0; i < count; i++) {
     logger.info(TAG, "第 " + (i + 1) + "/" + count + " 个视频");

@@ -182,7 +182,18 @@ SearchBaseHandler._clickSuggestion = function (keyword) {
 
   // 路径2: 硬编码兜底 — RecyclerView + 遍历匹配 + 爷爷节点
   logger.info(TAG, "策略未找到联想词，尝试硬编码兜底");
-  var rv = id("recycler_view").findOne(3000);
+  var rv = id("recycler_view").findOne(2000);
+  if (!rv) {
+    var allRVs = className("androidx.recyclerview.widget.RecyclerView").find();
+    if (allRVs.length === 0) allRVs = className("android.support.v7.widget.RecyclerView").find();
+    for (var ri = 0; ri < allRVs.length; ri++) {
+      var rvb = allRVs[ri].bounds();
+      // 联想词列表通常在搜索框下方，取较小的那个
+      if (rvb && rvb.height() < device.height * 0.5 && rvb.top < device.height * 0.4) {
+        rv = allRVs[ri]; break;
+      }
+    }
+  }
   if (rv) {
     var children = rv.children();
     for (var c = 0; c < children.length; c++) {
@@ -317,16 +328,28 @@ SearchBaseHandler._clickSearchResult = function (index) {
     return false;
   }
 
-  // 路径1: 选择器查找
+  function findRecyclerView() {
+    var rv = id("recycler_view").findOne(500);
+    if (rv) return rv;
+    var all = className("androidx.recyclerview.widget.RecyclerView").find();
+    if (all.length === 0) all = className("android.support.v7.widget.RecyclerView").find();
+    for (var i = 0; i < all.length; i++) {
+      var b = all[i].bounds();
+      if (b && b.height() > 200 && b.width() > 200) return all[i];
+    }
+    return null;
+  }
+
   var maxScroll = 10;
   for (var scroll = 0; scroll < maxScroll; scroll++) {
+    // 路径1: 选择器
     var items = uiOperator.findElements("search_video_list", 3000);
     var seenCount = 0;
     for (var i = 0; i < items.length; i++) {
       if (isVisible(items[i])) {
         if (seenCount === index) {
           if (tryClick(items[i])) {
-            logger.info(TAG, "点击视频(策略): 第" + (index+1) + "个"); sleep(2000);
+            logger.info(TAG, "点击视频: 第" + (index+1) + "个(策略)"); sleep(2000);
             this.safeClick("off_video", 2);
             return true;
           }
@@ -335,15 +358,9 @@ SearchBaseHandler._clickSearchResult = function (index) {
         seenCount++;
       }
     }
-    if (scroll < maxScroll - 1) {
-      uiOperator.swipeUp(); sleep(2000);
-    }
-  }
 
-  // 路径2: 硬编码兜底 — RecyclerView + 按坐标点击
-  logger.info(TAG, "策略未找到视频列表，尝试硬编码兜底");
-  for (var s2 = 0; s2 < maxScroll; s2++) {
-    var rv = id("recycler_view").findOne(3000);
+    // 路径2: RecyclerView 兜底
+    var rv = findRecyclerView();
     if (rv) {
       var children = rv.children();
       var cnt = 0;
@@ -351,7 +368,7 @@ SearchBaseHandler._clickSearchResult = function (index) {
         if (isVisible(children[c])) {
           if (cnt === index) {
             if (tryClick(children[c])) {
-              logger.info(TAG, "点击视频(兜底): 第" + (index+1) + "个"); sleep(2000);
+              logger.info(TAG, "点击视频: 第" + (index+1) + "个(兜底)"); sleep(2000);
               this.safeClick("off_video", 2);
               return true;
             }
@@ -361,7 +378,8 @@ SearchBaseHandler._clickSearchResult = function (index) {
         }
       }
     }
-    if (s2 < maxScroll - 1) { uiOperator.swipeUp(); sleep(2000); }
+
+    if (scroll < maxScroll - 1) { uiOperator.swipeUp(); sleep(2000); }
   }
 
   logger.warn(TAG, "目标视频 " + (index + 1) + " 未找到");

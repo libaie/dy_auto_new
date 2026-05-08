@@ -110,6 +110,39 @@ var BaseHandler = {
     }
     return parts.join(" | ");
   },
+
+  /**
+   * 在父元素内按选择器策略查找子元素
+   */
+  _findChildBySelector: function (parent, actionName) {
+    var selector = selectorLoader.get(actionName);
+    if (!selector) return null;
+    var strategies = selector.strategies.slice().sort(function (a, b) { return a.priority - b.priority; });
+    for (var i = 0; i < strategies.length; i++) {
+      var s = strategies[i];
+      var element = null;
+      switch (s.type) {
+        case "id": element = parent.findOne(id(s.value)); break;
+        case "text": element = parent.findOne(text(s.value)); break;
+        case "desc": element = parent.findOne(desc(s.value)); break;
+        case "className": element = parent.findOne(className(s.value)); break;
+      }
+      if (element) return element;
+    }
+    return null;
+  },
+
+  /**
+   * 从子元素提取值（支持选择器的 purpose=extract 配置）
+   */
+  _extractChildValue: function (el, actionName, fallback) {
+    var selector = selectorLoader.get(actionName);
+    if (selector && selector.purpose === "extract") {
+      var val = uiOperator.extractValue(el, selector);
+      if (val != null) return val;
+    }
+    try { return el.text() || fallback; } catch (e) { return fallback; }
+  },
 };
 
 module.exports = BaseHandler;

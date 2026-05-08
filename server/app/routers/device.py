@@ -804,13 +804,15 @@ from app.models import CollectReportRequest, CollectCommentData, CollectUserData
 def collect_report(
     request: CollectReportRequest,
     db: Session = Depends(get_db),
-    _: None = Depends(verify_device_secret),
+    device_id: str = Depends(verify_device_secret),
 ):
     from app.db_models import CollectedComment, CollectedUser
+    from sqlalchemy.exc import IntegrityError
 
     # 1. 保存评论数据
     comment = CollectedComment(
         task_id=request.task_id,
+        device_id=device_id,
         keyword=request.keyword,
         nickname=request.comment.nickname,
         content=request.comment.content,
@@ -831,6 +833,7 @@ def collect_report(
         if not existing:
             db.add(CollectedUser(
                 task_id=request.task_id,
+                device_id=device_id,
                 nickname=request.user.nickname,
                 douyin_id=request.user.douyin_id,
                 likes_count=request.user.likes_count,
@@ -844,6 +847,11 @@ def collect_report(
             ))
             user_new = True
 
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        user_new = False
+
     return {"comment_saved": True, "user_new": user_new}
 

@@ -165,12 +165,22 @@ SearchBaseHandler._inputKeyword = function (keyword) {
  */
 SearchBaseHandler._clickSuggestion = function (keyword) {
   var uiOperator = require("../core/ui-operator");
-  var item = uiOperator.findElement("search_suggestion_list", 3000);
-  if (item) {
-    logger.info(TAG, "点击联想词");
-    return uiOperator.clickElement(item);
+  // 用选择器策略找联想词容器，遍历子元素匹配关键词，点爷爷节点
+  var items = uiOperator.findElements("search_suggestion_list", 3000);
+  for (var i = 0; i < items.length; i++) {
+    var t = items[i].findOne(text(keyword));
+    if (t) {
+      logger.info(TAG, "点击联想词: '" + t.text() + "'");
+      var gp = t.parent().parent();
+      var b = gp.bounds();
+      if (b) {
+        press(b.centerX(), b.centerY(), 150);
+        sleep(500);
+        return true;
+      }
+    }
   }
-  logger.warn(TAG, "联想词列表未找到");
+  logger.warn(TAG, "未找到匹配联想词: '" + keyword + "'");
   return false;
 };
 

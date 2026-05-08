@@ -143,6 +143,7 @@ SearchCollectHandler.execute = function (params) {
   if (!this.ensureAppActive()) return { success: false, error: "打开抖音失败" };
   if (!this._openSearch()) return { success: false, error: "打开搜索页失败" };
   if (!this._inputKeyword(keyword)) return { success: false, error: "输入关键词失败" };
+  sleep(2000);
   if (!this._clickSuggestion(keyword)) {
     if (!this._submitSearch()) return { success: false, error: "提交搜索失败" };
   }

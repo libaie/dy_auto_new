@@ -58,6 +58,9 @@ SearchBaseHandler.execute = function (params) {
     return { success: false, error: "输入关键词失败" };
   }
 
+  // 等待联想词列表加载
+  sleep(2000);
+
   // 3. 点击联想词
   if (!this._clickSuggestion(keyword)) {
     // 联想词没找到，尝试直接搜索

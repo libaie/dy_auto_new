@@ -165,21 +165,37 @@ SearchBaseHandler._inputKeyword = function (keyword) {
  */
 SearchBaseHandler._clickSuggestion = function (keyword) {
   var uiOperator = require("../core/ui-operator");
-  // 用选择器策略找联想词容器，遍历子元素匹配关键词，点爷爷节点
+
+  // 路径1: 选择器策略查找
   var items = uiOperator.findElements("search_suggestion_list", 3000);
-  for (var i = 0; i < items.length; i++) {
-    var t = items[i].findOne(text(keyword));
-    if (t) {
-      logger.info(TAG, "点击联想词: '" + t.text() + "'");
-      var gp = t.parent().parent();
-      var b = gp.bounds();
-      if (b) {
-        press(b.centerX(), b.centerY(), 150);
-        sleep(500);
-        return true;
+  if (items.length > 0) {
+    for (var i = 0; i < items.length; i++) {
+      var t = items[i].findOne(text(keyword));
+      if (t) {
+        logger.info(TAG, "点击联想词(策略): '" + t.text() + "'");
+        var gp = t.parent().parent();
+        var b = gp.bounds();
+        if (b) { press(b.centerX(), b.centerY(), 150); sleep(500); return true; }
       }
     }
   }
+
+  // 路径2: 硬编码兜底 — RecyclerView + 遍历匹配 + 爷爷节点
+  logger.info(TAG, "策略未找到联想词，尝试硬编码兜底");
+  var rv = id("recycler_view").findOne(3000);
+  if (rv) {
+    var children = rv.children();
+    for (var c = 0; c < children.length; c++) {
+      var ct = children[c].findOne(text(keyword));
+      if (ct) {
+        logger.info(TAG, "点击联想词(兜底): '" + ct.text() + "'");
+        var gpp = ct.parent().parent();
+        var bb = gpp.bounds();
+        if (bb) { press(bb.centerX(), bb.centerY(), 150); sleep(500); return true; }
+      }
+    }
+  }
+
   logger.warn(TAG, "未找到匹配联想词: '" + keyword + "'");
   return false;
 };
@@ -294,30 +310,23 @@ SearchBaseHandler._clickSearchResult = function (index) {
     } catch (e) { return false; }
   }
 
-  // 循环滑动直到目标元素出现在可见区域
+  function tryClick(el) {
+    if (el.clickable()) return el.click();
+    var b = el.bounds();
+    if (b) return click(b.centerX(), b.centerY());
+    return false;
+  }
+
+  // 路径1: 选择器查找
   var maxScroll = 10;
   for (var scroll = 0; scroll < maxScroll; scroll++) {
     var items = uiOperator.findElements("search_video_list", 3000);
     var seenCount = 0;
-
     for (var i = 0; i < items.length; i++) {
       if (isVisible(items[i])) {
         if (seenCount === index) {
-          var target = items[i];
-          var clicked = false;
-          if (target.clickable()) {
-            logger.info(TAG, "点击第 " + (index + 1) + " 个可见视频列表项(总数 " + items.length + ")");
-            clicked = target.click();
-          } else {
-            var bounds = target.bounds();
-            if (bounds) {
-              logger.info(TAG, "点击第 " + (index + 1) + " 个可见视频列表项(坐标, 总数 " + items.length + ")");
-              clicked = click(bounds.centerX(), bounds.centerY());
-            }
-          }
-          if (clicked) {
-            sleep(2000);
-            // 关闭视频自动播放
+          if (tryClick(items[i])) {
+            logger.info(TAG, "点击视频(策略): 第" + (index+1) + "个"); sleep(2000);
             this.safeClick("off_video", 2);
             return true;
           }
@@ -326,18 +335,36 @@ SearchBaseHandler._clickSearchResult = function (index) {
         seenCount++;
       }
     }
-
-    // 目标不可见，连续滑动两次加快加载
     if (scroll < maxScroll - 1) {
-      logger.info(TAG, "第 " + (index + 1) + " 个目标不可见(已见 " + seenCount + ")，滑动...");
-      uiOperator.swipeUp();
-      sleep(1500);
-      uiOperator.swipeUp();
-      sleep(1500);
+      uiOperator.swipeUp(); sleep(2000);
     }
   }
 
-  logger.warn(TAG, "目标视频 " + (index + 1) + " 未找到（最多滑动 10 次）");
+  // 路径2: 硬编码兜底 — RecyclerView + 按坐标点击
+  logger.info(TAG, "策略未找到视频列表，尝试硬编码兜底");
+  for (var s2 = 0; s2 < maxScroll; s2++) {
+    var rv = id("recycler_view").findOne(3000);
+    if (rv) {
+      var children = rv.children();
+      var cnt = 0;
+      for (var c = 0; c < children.length; c++) {
+        if (isVisible(children[c])) {
+          if (cnt === index) {
+            if (tryClick(children[c])) {
+              logger.info(TAG, "点击视频(兜底): 第" + (index+1) + "个"); sleep(2000);
+              this.safeClick("off_video", 2);
+              return true;
+            }
+            return false;
+          }
+          cnt++;
+        }
+      }
+    }
+    if (s2 < maxScroll - 1) { uiOperator.swipeUp(); sleep(2000); }
+  }
+
+  logger.warn(TAG, "目标视频 " + (index + 1) + " 未找到");
   return false;
 };
 

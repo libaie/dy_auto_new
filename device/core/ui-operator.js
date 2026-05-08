@@ -102,9 +102,20 @@ var uiOperator = {
         var s = strategies[i];
         var element = this._findByStrategy(s);
         if (element && this._isOnScreen(element)) {
-          // 将策略的 x/y 偏移附加到元素上，clickElement 中使用
-          if (s.x_percent != null) element._offsetX = s.x_percent;
-          if (s.y_percent != null) element._offsetY = s.y_percent;
+          // UiObject 是 Java 对象不能挂 JS 属性，偏移直接算坐标返回
+          if ((s.x_percent != null || s.y_percent != null) && !element.isCoordinate && !element.isImage && !element.isPackage) {
+            var b = element.bounds();
+            if (b) {
+              var cx = b.centerX();
+              var cy = b.centerY();
+              var elW = b.right - b.left;
+              var elH = b.bottom - b.top;
+              if (s.x_percent != null) cx += Math.round(elW * s.x_percent / 100);
+              if (s.y_percent != null) cy += Math.round(elH * s.y_percent / 100);
+              logger.debug(TAG, "通过 " + s.type + " +偏移 找到: '" + actionName + "'");
+              return { isCoordinate: true, x: cx, y: cy };
+            }
+          }
           logger.debug(TAG, "通过 " + s.type + " 找到元素: '" + actionName + "'");
           return element;
         }
@@ -530,32 +541,20 @@ var uiOperator = {
     }
 
     // 控件点击
-    // 计算点击坐标：默认中心点；有 _offsetX/_offsetY 时相对中心偏移（% 元素宽高）
-    var cx, cy;
-    try {
-      var bounds = element.bounds();
-      if (bounds) {
-        var elW = bounds.right - bounds.left;
-        var elH = bounds.bottom - bounds.top;
-        cx = bounds.centerX();
-        cy = bounds.centerY();
-        if (element._offsetX != null) cx += Math.round(elW * element._offsetX / 100);
-        if (element._offsetY != null) cy += Math.round(elH * element._offsetY / 100);
-      }
-    } catch (e) { /* bounds() 失败则走 clickable 分支 */ }
-
-    if (cx != null && cy != null) {
-      if (cx < 0 || cy < 0 || cx >= device.width || cy >= device.height) {
-        logger.warn(TAG, "坐标 (" + cx + "," + cy + ") 在屏幕外，跳过点击");
-        return false;
-      }
-      return click(cx, cy);
-    }
-
-    // 兜底：直接调用控件 click()
     if (element.clickable()) {
       return element.click();
     }
+    // 控件不可点击，坐标点击
+    try {
+      var bounds = element.bounds();
+      if (bounds) {
+        var cx = bounds.centerX();
+        var cy = bounds.centerY();
+        if (cx >= 0 && cy >= 0 && cx < device.width && cy < device.height) {
+          return click(cx, cy);
+        }
+      }
+    } catch (e) {}
     return false;
   },
 

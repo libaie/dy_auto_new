@@ -4,6 +4,7 @@ var uiOperator = require("../core/ui-operator");
 var aiAnalyzer = require("../core/ai-analyzer");
 var selectorLoader = require("../core/selector-loader");
 var apiClient = require("../core/api-client");
+var antiDetect = require("../core/anti-detect");
 var logger = require("../utils/logger");
 var ReplyCommentHandler = require("./reply-comment");
 
@@ -59,10 +60,20 @@ SearchCollectHandler._interactWithVideo = function (content, stats) {
 
 SearchCollectHandler._openComments = function () {
   var commentBtn = uiOperator.findElement("video_comment_btn", 2000);
-  if (!commentBtn) { logger.warn(TAG, "评论入口未找到"); return false; }
-  uiOperator.clickElement(commentBtn);
+  if (commentBtn) {
+    uiOperator.clickElement(commentBtn);
+    sleep(1500);
+    return true;
+  }
+  // 兜底：评论按钮通常在屏幕右侧，坐标点击
+  logger.info(TAG, "策略未找到评论入口，坐标兜底");
+  click(device.width * 0.92, device.height * 0.55);
   sleep(1500);
-  return true;
+  // 验证是否打开了评论面板
+  if (uiOperator.findElement("is_comment_view", 2000)) return true;
+  if (uiOperator.findElement("comment_list", 2000)) return true;
+  logger.warn(TAG, "评论入口打开失败");
+  return false;
 };
 
 SearchCollectHandler._aiQualify = function (comment) {
@@ -174,6 +185,7 @@ SearchCollectHandler.execute = function (params) {
       sleep(2500);
     }
     if (!this._interactWithVideo("", stats)) stats.fail_count++;
+    antiDetect.maybePause();
   }
   logger.info(TAG, "采集完成: " + JSON.stringify(stats));
   uiOperator.closeApp();

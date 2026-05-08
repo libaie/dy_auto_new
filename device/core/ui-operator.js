@@ -298,8 +298,23 @@ var uiOperator = {
       case "id": return id(strategy.value).find();
       case "desc": return desc(strategy.value).find();
       case "className": return className(strategy.value).find();
+      case "chain": return this._findByChainAll(strategy.steps || []);
       default: return [];
     }
+  },
+
+  _findByChainAll: function (steps) {
+    if (!steps || steps.length === 0) return [];
+    // Build selector chain from filter steps (same as _findByChain)
+    var sel = null;
+    for (var i = 0; i < steps.length; i++) {
+      var nav = steps[i].nav || "filter";
+      if (nav !== "filter") break;  // only filter steps can build selectors
+      if (!sel) { sel = this._makeSelector(steps[i]); }
+      else { sel = this._chainSelector(sel, steps[i]); }
+      if (!sel) return [];
+    }
+    return sel ? sel.find() : [];
   },
 
   /**

@@ -1,6 +1,7 @@
 // device/handlers/base-handler.js
 var uiOperator = require("../core/ui-operator");
 var antiDetect = require("../core/anti-detect");
+var selectorLoader = require("../core/selector-loader");
 var logger = require("../utils/logger");
 
 var TAG = "处理器";

@@ -30,7 +30,8 @@ SearchCollectHandler._interactWithVideo = function (content, stats) {
       if (collected >= maxComments) break;
       var comment = ReplyCommentHandler._parseCommentItem(items[i]);
       if (!comment) continue;
-      if (!this._aiQualify(comment.text)) continue;
+      comment._keyword = keyword;
+      if (!this._aiQualify(comment)) continue;
 
       logger.info(TAG, "符合: " + comment.nickname);
       var commentData = this._collectCommentData(items[i], comment);
@@ -64,10 +65,14 @@ SearchCollectHandler._openComments = function () {
   return true;
 };
 
-SearchCollectHandler._aiQualify = function (text) {
-  if (!text) return false;
+SearchCollectHandler._aiQualify = function (comment) {
+  if (!comment || !comment.text) return false;
   try {
-    var result = aiAnalyzer.analyze(text);
+    var result = aiAnalyzer.analyzeComment({
+      searchKeyword: (comment._keyword || ""),
+      nickname: comment.nickname,
+      commentText: comment.text,
+    });
     if (result && typeof result.score === "number") return result.score >= 50;
     return result && result.qualified === true;
   } catch (e) { logger.warn(TAG, "AI分析失败: " + e.message); return false; }

@@ -224,23 +224,15 @@ SearchBaseHandler._sortResults = function (sortBy) {
   var clicked = this.safeClick(actionName, 3);
   if (clicked) {
     logger.info(TAG, "排序方式: " + sortBy);
-    sleep(800);
-    // 检测弹窗是否还在（看排序选项是否仍可见），在的话点排序按钮关闭
-    var stillOpen = uiOperator.findElement("sort_latest", 500)
-                 || uiOperator.findElement("sort_most_liked", 500)
-                 || uiOperator.findElement("sort_default", 500);
-    if (stillOpen) {
-      logger.info(TAG, "排序弹窗未自动关闭，点击排序按钮关闭");
-      this.safeClick("sort_button", 2);
-      sleep(500);
-    } else {
-      logger.info(TAG, "排序弹窗已关闭");
-    }
+    sleep(500);
+    // back() 关闭弹窗，不依赖不准确的元素检测
+    back();
+    sleep(500);
     return true;
   }
 
   logger.warn(TAG, "点击排序选项失败: " + sortBy + "，尝试关闭弹窗");
-  this.safeClick("sort_button", 2);
+  back();
   sleep(500);
   return false;
 };

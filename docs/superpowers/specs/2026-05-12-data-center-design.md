@@ -44,6 +44,9 @@ CREATE TABLE conversations (
     last_dm_content TEXT,
     last_dm_at      DATETIME,
     
+    -- claim 超时恢复
+    claimed_at      DATETIME,       -- claim 时间，超 30min 未 send 则自动释放
+    
     -- 状态
     status          VARCHAR(20) NOT NULL DEFAULT 'active',
                     -- active / replied / closed
@@ -91,7 +94,7 @@ CREATE INDEX ix_conversations_status ON conversations(status);
 { "claimed": false, "conversation_id": null }
 ```
 
-原子操作：INSERT INTO conversations WHERE NOT EXISTS (account_id, douyin_id)。claimed=false 意味着已有活跃会话，不应重复 DM。
+原子操作：先 SELECT 查是否已有活跃会话，无则 INSERT。SQLite WAL 模式下两个并发请求可能同时通过 SELECT → 第二个 INSERT 触发 UNIQUE 约束的 IntegrityError → 必须捕获并返回 `claimed=false`（与 collect-report [device.py:901] 模式一致）。
 
 #### POST /api/device/dm-send-report
 
@@ -121,7 +124,13 @@ CREATE INDEX ix_conversations_status ON conversations(status);
 { "released": true }
 ```
 
-DM 发送失败时调用，删除会话记录（原子回滚）。
+DM 发送失败时调用，删除会话记录（原子回滚）。**必须校验 `device_id`**：仅当 `conversation.device_id == authed_device_id` 时才删除，防止设备 A 的失败释放误删设备 B 的成功会话（与 comment-claim-release [device.py:750] 模式一致）。
+
+### 2.3 claim 超时恢复
+
+`conversations` 表增加 `claimed_at` 字段（DateTime, nullable）。设备 claim 时写入当前时间。
+
+`claim_channel_item` 的 stale recovery（[channel_service.py:134-146]）已处理 ChannelItem 超时。`conversations` 同理：定时任务或 `dm-claim-recipient` 被调用时，清理 `claimed_at < now - 30min` 且 `status = 'active'` 且 `last_dm_at IS NULL` 的孤儿会话（设备 claim 后崩溃未发送）。
 
 ### 2.2 管理端（3 个端点）
 
@@ -147,7 +156,7 @@ Query: `?account_id=&stage=&status=&search=&task_id=&skip=0&limit=50`
 
 ### 2.3 WS 事件
 
-数据入库后推送：
+数据入库后推送（广播位置：`collect-report` 端点、`dm-send-report` 端点、`dm-claim-recipient` 端点）：
 
 ```json
 // 新评论

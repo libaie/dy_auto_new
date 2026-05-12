@@ -6,24 +6,123 @@ Pixelle-Video 已通过透明代理整合到 dy_auto（spec 2026-05-12），Seed
 
 用户的核心业务是**可商业化的多角色连续短剧**，质量优先，不计成本。全流程中每个环节使用的 AI 模型均可通过前端自主配置，不硬编码。
 
-## 总体架构（五层设计）
+## 运行模式
+
+系统支持两种运行模式，通过一个开关切换：
+
+### 模式 A：逐步确认（默认）
 
 ```
-┌──────────────────────────────────────────────────────────────────────────┐
-│                          dy_auto 管理后台                                  │
-│                                                                          │
-│  ┌────────────┐  管理入口  ┌──────────────────────────────────────────┐  │
-│  │ AI 模型配置  │←────────→│         AI 视频生产线                      │  │
-│  │ (全局)      │  所有模型  │                                          │  │
-│  │            │  可替换    │  ①资产工坊 → ②故事工坊 → ③导演工坊         │  │
-│  │ 每个环节用   │           │       ↓          ↓          ↓             │  │
-│  │ 什么模型由   │           │  ④质量管理(审图) ← → ⑤渲染 & 后期          │  │
-│  │ 用户选择     │           │                                          │  │
-│  └────────────┘           └──────────────────────────────────────────┘  │
-│                                                                          │
-│  /api/ai-config  /api/assets  /api/series  /api/director  /api/audit     │
-│  /api/pixelle-proxy  /api/seedance  /api/kling                            │
-└──────────────────────────────────────────────────────────────────────────┘
+人工输入故事创意 → AI生成角色图 → [审图+人工确认] → AI生成场景图 → [审图+人工确认]
+→ AI生成剧本 → [人工确认分镜] → 渲染 → [审图+人工确认] → 后期 → 成品
+```
+
+### 模式 B：全自动一键生成
+
+```
+人工输入一句话 → 全自动六层流水线 → 成品
+  "生成一个30集的都市爱情短剧，男主是高冷总裁，女主是活泼实习生"
+          ↓
+  ┌───────────────────────────────────────────────────────┐
+  │  ⓪ 自动生成角色图(FLUX) → ① 审图(自动) → ② 自动生成场景  │
+  │  → ③ AI生成30集剧本 → ④ AI分镜(自动)                    │
+  │  → ⑤ 批量渲染(Seedance/Kling) → ⑥ 审图(自动,失败重试)   │
+  │  → ⑦ 合成+包装 → 30个mp4 + 质量报告                     │
+  └───────────────────────────────────────────────────────┘
+```
+
+## 总体架构（六层设计）
+
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                            dy_auto 管理后台                                    │
+│                                                                              │
+│  ┌────────────┐  管理入口  ┌──────────────────────────────────────────────┐  │
+│  │ AI 模型配置  │←────────→│           AI 视频生产线 (六层)                  │  │
+│  │ (全局)      │  所有模型  │                                              │  │
+│  │            │  可替换    │  ⓪ 资产自动生成 → ① 资产工坊 → ② 故事工坊      │  │
+│  │ 每个环节用   │           │       ↓              ↓           ↓            │  │
+│  │ 什么模型由   │           │  ③ 导演工坊 → ④ 质量管理(审图) → ⑤ 渲染&后期   │  │
+│  │ 用户选择     │           │                                              │  │
+│  └────────────┘           └──────────────────────────────────────────────┘  │
+│                                                                              │
+│  /api/ai-config  /api/assets  /api/series  /api/director  /api/audit         │
+│  /api/pixelle-proxy  /api/seedance  /api/kling                               │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 第 ⓪ 层：资产自动生成（Asset Auto-Generator）
+
+> **触发条件：** 运行模式选择「全自动」或角色/场景尚未上传参考图时自动触发。
+> **使用模型：** 从 `ai_models.asset_generation` 读取，默认 FLUX（通过 RunningHub/ComfyUI）。
+
+### 角色图自动生成
+
+**输入：** 角色文字描述（appearance + personality + outfit）
+**输出：** 4 张多角度参考图（正面/侧面/3/4侧脸/全身）
+
+**模型：** `ai_models.asset_generation.character_model`（默认 FLUX via RunningHub `image_flux.json`）
+
+**后处理：** 生成后自动送入审图节点①，不通过（<70分）自动重试最多 3 次，每次调整 prompt 增加一致性约束。3 次仍不通过 → 标记「需人工上传」。
+
+### 场景图自动生成
+
+**输入：** 场景文字描述（description + lighting + mood）
+**输出：** 2-3 张不同角度场景参考图（广角/中景/俯拍）
+
+**模型：** `ai_models.asset_generation.scene_model`（默认 FLUX）
+
+**后处理：** 同类审图+自动重试流程。
+
+### 自动生成配置
+
+```yaml
+# Pixelle-Video/config.yaml — ai_models 段新增
+ai_models:
+  asset_generation:
+    character_model:
+      provider: "runninghub"
+      workflow: "runninghub/image_flux.json"
+    scene_model:
+      provider: "runninghub"
+      workflow: "runninghub/image_flux.json"
+    max_retry: 3
+```
+
+### 全自动流水线 API
+
+```
+POST /api/pipeline/auto-generate
+  Body: {
+    "logline": "30集都市爱情短剧，高冷总裁vs活泼实习生",
+    "genre": "urban_romance",
+    "mode": "fully_automatic"
+  }
+  → pipeline_run_id → GET /api/pipeline/status/{id} → SSE 进度推送
+```
+
+**执行流程：**
+```
+1. LLM 解析 logline → 角色列表 + 场景列表 + 系列大纲
+2. FLUX 生成所有角色多角度图 → 审图(自动重试)
+3. FLUX 生成所有场景参考图 → 审图(自动重试)
+4. LLM 生成逐集剧本
+5. LLM 生成分镜表 + 自动模型路由
+6. Seedance/Kling 批量渲染（并发控制）
+7. 审图抽查 → 不通过帧自动重渲染
+8. FFmpeg 合成 + 后期包装
+9. 输出 N 个 mp4 + 跨集质量报告
+```
+
+### 进度事件 (SSE/WebSocket)
+
+```
+event: pipeline_start   data: {"total_layers": 6}
+event: layer_progress   data: {"layer": 0, "step": "generating_characters", "current": 2, "total": 5}
+event: audit_result     data: {"layer": 0, "audit_score": 92, "passed": true}
+event: pipeline_done    data: {"result": {...}, "quality_report": {...}}
 ```
 
 ---
@@ -308,8 +407,10 @@ async def _step_generate_media(frame, config):
 | `pixelle_video/pipelines/director.py` | **新文件** 导演流水线 (~200行) |
 | `pixelle_video/services/post_production.py` | **新文件** 转场/片头尾/字幕 (~150行) |
 | `pixelle_video/services/ai_model_registry.py` | **新文件** 读取 ai_models 配置 + 模型路由 (~100行) |
-| `pixelle_video/config.py` | 解析 ai_models + characters 完整配置 (~80行) |
-| `config.yaml` | ai_models 完整配置模板 |
+| `pixelle_video/services/asset_generator.py` | **新文件** 角色/场景图自动生成 + prompt 模板 (~150行) |
+| `pixelle_video/config.py` | 解析 ai_models + characters + asset_generation 配置 (~100行) |
+| `pixelle_video/pipelines/auto_pipeline.py` | **新文件** 全自动流水线编排器 (~250行) |
+| `config.yaml` | ai_models 完整配置模板（含 asset_generation） |
 
 ### dy_auto 后端
 
@@ -322,6 +423,7 @@ async def _step_generate_media(frame, config):
 | `server/app/routers/director.py` | 分镜编排 API (~150行) |
 | `server/app/routers/audit.py` | **新文件** 审图 API (~200行) |
 | `server/app/routers/ai_config.py` | **新文件** AI 模型配置 CRUD (~150行) |
+| `server/app/routers/pipeline.py` | **新文件** 全自动流水线 API (~200行) |
 | `server/app/services/audit_service.py` | **新文件** 审图引擎 (~250行) |
 | `server/app/routers/kling.py` | **新文件** Kling 3.0 代理 (~200行) |
 | `server/app/main.py` | 注册 audit/kling/ai_config 路由 |
@@ -340,7 +442,7 @@ async def _step_generate_media(frame, config):
 | `web/src/router/index.js` | 新增 5 个路由 |
 | `web/src/constants/navigation.js` | 新增 5 个菜单项 |
 
-**总估算：≈ 4200 行，12-15 天。**
+**总估算：≈ 5000 行，15-18 天。**
 
 ---
 

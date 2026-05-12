@@ -1,4 +1,4 @@
-# 多模型分镜视频 + 角色档案 + 系列生成 — 行业最高标准架构
+# 多模型分镜视频 + 角色档案 + 系列生成 — 行业最高标准架构 v4
 
 ## 背景
 
@@ -7,8 +7,6 @@ Pixelle-Video 已通过透明代理整合到 dy_auto（spec 2026-05-12），Seed
 用户的核心业务是**可商业化的多角色连续短剧**，质量优先，不计成本。全流程中每个环节使用的 AI 模型均可通过前端自主配置，不硬编码。
 
 ## 运行模式
-
-系统支持两种运行模式，通过一个开关切换：
 
 ### 模式 A：逐步确认（默认）
 
@@ -20,52 +18,33 @@ Pixelle-Video 已通过透明代理整合到 dy_auto（spec 2026-05-12），Seed
 ### 模式 B：全自动一键生成
 
 ```
-人工输入一句话 → 全自动六层流水线 → 成品
+人工输入一句话 → 全自动七层流水线 → 成品
   "生成一个30集的都市爱情短剧，男主是高冷总裁，女主是活泼实习生"
           ↓
-  ┌───────────────────────────────────────────────────────┐
-  │  ⓪ 自动生成角色图(FLUX) → ① 审图(自动) → ② 自动生成场景  │
-  │  → ③ AI生成30集剧本 → ④ AI分镜(自动)                    │
-  │  → ⑤ 批量渲染(Seedance/Kling) → ⑥ 审图(自动,失败重试)   │
-  │  → ⑦ 合成+包装 → 30个mp4 + 质量报告                     │
-  └───────────────────────────────────────────────────────┘
-```
-
-## 总体架构（六层设计）
-
-```
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                            dy_auto 管理后台                                    │
-│                                                                              │
-│  ┌────────────┐  管理入口  ┌──────────────────────────────────────────────┐  │
-│  │ AI 模型配置  │←────────→│           AI 视频生产线 (六层)                  │  │
-│  │ (全局)      │  所有模型  │                                              │  │
-│  │            │  可替换    │  ⓪ 资产自动生成 → ① 资产工坊 → ② 故事工坊      │  │
-│  │ 每个环节用   │           │       ↓              ↓           ↓            │  │
-│  │ 什么模型由   │           │  ③ 导演工坊 → ④ 质量管理(审图) → ⑤ 渲染&后期   │  │
-│  │ 用户选择     │           │                                              │  │
-│  └────────────┘           └──────────────────────────────────────────────┘  │
-│                                                                              │
-│  /api/ai-config  /api/assets  /api/series  /api/director  /api/audit         │
-│  /api/pixelle-proxy  /api/seedance  /api/kling                               │
-└──────────────────────────────────────────────────────────────────────────────┘
+  ┌───────────────────────────────────────────────────────────────┐
+  │  ⓪ 自动生成角色图(FLUX) → ① 审图(自动,失败重试3次)             │
+  │  → ② 自动生成场景图(FLUX) → ③ 审图(自动)                     │
+  │  → ④ LLM生成30集剧本(含钩子+故事圣经)                         │
+  │  → ⑤ LLM生成分镜表 + 模型路由 + 音频策略                      │
+  │  → ⑥ 批量渲染(Seedance/Kling,并发3-5,断点续传)                │
+  │  → ⑦ 审图抽查(视频关键帧提取) → 不通过自动重渲染              │
+  │  → ⑧ FFmpeg合成 + 钩子衔接 + 后期包装                         │
+  │  → ⑨ 30个mp4 + 跨集质量报告 + 成本报表                        │
+  └───────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
 ## 第 ⓪ 层：资产自动生成（Asset Auto-Generator）
 
-> **触发条件：** 运行模式选择「全自动」或角色/场景尚未上传参考图时自动触发。
-> **使用模型：** 从 `ai_models.asset_generation` 读取，默认 FLUX（通过 RunningHub/ComfyUI）。
-
 ### 角色图自动生成
 
 **输入：** 角色文字描述（appearance + personality + outfit）
 **输出：** 4 张多角度参考图（正面/侧面/3/4侧脸/全身）
 
-**模型：** `ai_models.asset_generation.character_model`（默认 FLUX via RunningHub `image_flux.json`）
+**模型：** `ai_models.asset_generation.character_model`（默认 FLUX via RunningHub）
 
-**后处理：** 生成后自动送入审图节点①，不通过（<70分）自动重试最多 3 次，每次调整 prompt 增加一致性约束。3 次仍不通过 → 标记「需人工上传」。
+**后处理：** 生成后自动送入审图节点①，不通过（<70分）自动重试最多 3 次。3 次仍不通过 → 降级为「需人工上传」。
 
 ### 场景图自动生成
 
@@ -74,509 +53,501 @@ Pixelle-Video 已通过透明代理整合到 dy_auto（spec 2026-05-12），Seed
 
 **模型：** `ai_models.asset_generation.scene_model`（默认 FLUX）
 
-**后处理：** 同类审图+自动重试流程。
+### CDN/OSS 自动上传（Critical — 解决 Seedance 公网 URL 需求）
 
-### 自动生成配置
+> **问题：** FLUX 生成的参考图存在本地，Seedance/Kling API 需要**公网可访问的 HTTP URL**，无法直接使用本地路径。
 
-```yaml
-# Pixelle-Video/config.yaml — ai_models 段新增
-ai_models:
-  asset_generation:
-    character_model:
-      provider: "runninghub"
-      workflow: "runninghub/image_flux.json"
-    scene_model:
-      provider: "runninghub"
-      workflow: "runninghub/image_flux.json"
-    max_retry: 3
-```
-
-### 全自动流水线 API
+**方案：**
+- 集成 OSS/CDN SDK（默认：阿里云 OSS / 火山引擎 TOS）
+- 资产生成后自动上传到 OSS，获得公网 URL
+- 公网 URL 写入 `characters.avatar_*_url` 和 `scenes.reference_urls_json`
+- OSS 配置通过 `/ai-config` 页面管理（endpoint/bucket/access_key）
 
 ```
-POST /api/pipeline/auto-generate
-  Body: {
-    "logline": "30集都市爱情短剧，高冷总裁vs活泼实习生",
-    "genre": "urban_romance",
-    "mode": "fully_automatic"
-  }
-  → pipeline_run_id → GET /api/pipeline/status/{id} → SSE 进度推送
+FLUX 生成本地图 → OSS SDK 上传 → 获得公网 URL → 写入 DB → Seedance API 可用
 ```
 
-**执行流程：**
-```
-1. LLM 解析 logline → 角色列表 + 场景列表 + 系列大纲
-2. FLUX 生成所有角色多角度图 → 审图(自动重试)
-3. FLUX 生成所有场景参考图 → 审图(自动重试)
-4. LLM 生成 30 集剧本（含钩子设计）
-5. LLM 生成分镜表 + 自动模型路由
-6. Seedance 逐帧渲染（每帧 5-60s，多帧拼接 = 90-120s/集）
-7. 审图抽查 → 不通过帧自动重渲染
-8. FFmpeg 合成 + 钩子衔接 + 后期包装
-9. 输出 30 个 mp4 + 跨集质量报告
-```
-
-### 进度事件 (SSE/WebSocket)
-
-```
-event: pipeline_start   data: {"total_layers": 6}
-event: layer_progress   data: {"layer": 0, "step": "generating_characters", "current": 2, "total": 5}
-event: audit_result     data: {"layer": 0, "audit_score": 92, "passed": true}
-event: pipeline_done    data: {"result": {...}, "quality_report": {...}}
-```
-
-### 长剧集处理（90-120s/集）
-
-**约束：** Seedance 2.0 单次最大 60s，Kling 3.0 单次最大 15s。
-
-**方案：多帧拼接 = 一集**
-
-```
-一集 120s 的结构:
-  开场(5s)   → Seedance 广角建立镜头
-  对话A(15s) → Seedance 小明特写 + 场景参考图
-  对话B(12s) → Seedance 小红特写 + 场景参考图
-  冲突(20s)  → Kling 3.0 双人镜头 (AI导演运镜)
-  高潮(18s)  → Kling 3.0 4K 电影感
-  钩子(8s)   → Seedance 悬念镜头 (为下一集埋伏笔)
-  结尾(5s)   → 黑屏 + 字幕 "未完待续..."
-  ─────────────────
-  合计: ~83s AI画面 + 片头尾/转场/字幕 = 90-120s
-```
-
-**技术实现：**
-- LLM 将每集拆分为 6-12 个分镜帧，每个帧独立调 Seedance/Kling
-- 每帧时长由 TTS 音频长度决定（narration 长度 = 帧时长）
-- FFmpeg 拼接所有帧 + 片头尾 → 最终 90-120s 剧集
-- 30 集 × 10 帧/集 = 300 次 Seedance 调用（并发 3-5，约 2-3 小时完成）
-
-### 剧本钩子引擎（Cliffhanger Engine）
-
-> **目标：** 每集结尾生成一个"钩子"，激发观众追剧欲望。这是短剧商业模式的核心。
-
-**LLM Prompt 模板（可配置，可在前端查看/编辑）：**
-
-```yaml
-# ai_models 配置新增 cliffhanger 段
-ai_models:
-  cliffhanger:
-    prompt_template: |
-      你是一个短视频编剧。为以下剧集编写结尾钩子（cliffhanger）。
-      
-      前情概要: {previous_summary}
-      本集剧情: {episode_plot}
-      下一集预告: {next_episode_preview}
-      
-      钩子要求：
-      1. 必须在情感高潮或悬念处戛然而止
-      2. 时长 8-15 秒
-      3. 使用以下类型之一：
-         - 信息揭示型: 角色发现关键线索
-         - 命运悬念型: 角色陷入危险/困境
-         - 关系反转型: 角色关系发生意外变化
-         - 时间紧迫型: 制造 deadline 压力
-      4. 必须与下一集开头形成连贯
-      
-      输出格式：钩子类型 + 场景描述 + 角色台词 + 镜头建议
-```
-
-**跨集衔接：** LLM 生成第 N 集时必须看到第 N+1 集的开头，保证钩子与下一集无缝连接。
-
-### 全透明可观测性（Observability Dashboard）
-
-> **原则：** AI 的每一步操作、每一个 prompt、每一个中间产物都必须对用户可见。零黑盒。
-
-**「流水线监控」页面（/pipeline/{run_id}）：**
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│  流水线 #run_20260513_001 — "高冷总裁vs活泼实习生"           │
-│  模式: 全自动 | 状态: 运行中 (当前: ⓪ 生成角色)              │
-│  总进度: ████████░░░░░░░░░░░░ 32% (3/9 步骤完成)            │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  ⓪ 资产生成 ✅ (2m 13s)                                     │
-│  ├── 生成角色图: 5/5 ✅                                     │
-│  │   ├── 小明 (正面/侧面/3/4/全身) [查看] [原始Prompt]       │
-│  │   ├── 小红 (正面/侧面/3/4/全身) [查看] [原始Prompt]       │
-│  │   ├── 总裁 (正面/侧面/3/4/全身) [查看] [原始Prompt]       │
-│  │   └── ...                                                │
-│  ├── 审图报告: 平均 91.2 分 ✅ [查看详细报告]                 │
-│  └── 生成场景图: 8/8 ✅  [查看所有]                          │
-│                                                             │
-│  ① 故事工坊 🔄 (3.2s 已过)                                   │
-│  ├── 系列大纲: 已生成 [查看大纲] [原始Prompt]                 │
-│  ├── 逐集剧本: 12/30 已完成                                  │
-│  │   ├── 第1集 "命运的相遇" [查看剧本] [查看Prompt]           │
-│  │   ├── 第2集 "误会" [查看剧本] [查看Prompt]                 │
-│  │   └── ...                                                │
-│  └── 钩子设计: 12/30 已完成 [查看所有钩子]                    │
-│                                                             │
-│  ② 导演工坊 ⏳ (等待中)                                      │
-│  ③ 批量渲染 ⏳ (等待中)                                      │
-│  ④ 审图 ⏳ (等待中)                                          │
-│  ⑤ 后期包装 ⏳ (等待中)                                      │
-│                                                             │
-│  ┌─ 产出物预览 ─────────────────────────────────────────┐   │
-│  │ 已完成剧集: [第1集▶] [第2集▶] [第3集▶] ...           │   │
-│  │ 最新渲染帧: [帧预览] [帧预览] [帧预览]                 │   │
-│  └──────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
-```
-
-**可查看的内容清单：**
-
-| 环节 | 可查看项 | 格式 |
-|------|----------|------|
-| 资产生成 | 每张生成的角色/场景图 + 原始 FLUX prompt | 图片 + 文本 |
-| 审图 | 一致性评分 + 逐项差异 + 通过/不通过原因 | JSON + 可视化 |
-| 剧本生成 | 大纲 + 每集剧本 + 每个 LLM 调用的原始 prompt + response | 文本 |
-| 钩子 | 每集的钩子类型 + 场景脚本 + 与下一集的衔接说明 | 文本 |
-| 分镜 | 每帧的镜头类型/机位/角色/时长 + 模型路由决策 | 表格 + 可视化 |
-| 渲染 | 每帧的原始 Seedance/Kling prompt + 生成结果 | 图片/视频 + 文本 |
-| 合成 | FFmpeg 命令 + 各帧时间轴 | 命令 + 时间线 |
-| 成品 | 可播放 mp4 + 下载 + 质量报告 | 视频 + JSON |
-
-**「Prompt 调试器」组件：**
-- 每个 AI 调用的 prompt 都是可点击展开的
-- 支持在流水线运行前预览/编辑 prompt 模板
-- 支持 A/B 对比：同一帧用不同 prompt 生成，选择更好的
-- 所有 prompt 自动存入「Prompt 历史库」，可复用
+> **降级方案：** OSS 未配置时，角色图仍可手动上传到图床后粘贴 URL。
 
 ---
 
-## 第 0 层：AI 模型配置中心（全局基础设施）
-
-> **核心原则：** 生产线上每个环节的 AI 模型，用户可从前端自主选择/切换。不硬编码任何模型名。
-
-### 配置存储
-
-`Pixelle-Video/config.yaml` 新增 `ai_models` 段 + dy_auto DB `ai_model_configs` 表：
-
-```yaml
-# Pixelle-Video/config.yaml — ai_models 段
-ai_models:
-  # ---- ① 故事工坊 ----
-  script_llm:           # 剧本生成
-    provider: "deepseek"       # deepseek / openai / anthropic / qwen / custom
-    model: "deepseek-chat"
-    api_key: "${DEEPSEEK_API_KEY}"
-    base_url: "https://api.deepseek.com/v1"
-    temperature: 0.8
-    max_tokens: 4096
-
-  # ---- ② 导演工坊 ----
-  storyboard_llm:       # 分镜拆分
-    provider: "deepseek"
-    model: "deepseek-chat"
-    api_key: "${DEEPSEEK_API_KEY}"
-    base_url: "https://api.deepseek.com/v1"
-
-  # ---- ③ 渲染 ----
-  video_models:         # 视频生成模型列表（前端下拉框来源）
-    - id: "seedance_2.0"
-      name: "Seedance 2.0"
-      provider: "volcengine"
-      endpoint: "https://ark.cn-beijing.volces.com/api/v3"
-      api_key: "${SEEDANCE_API_KEY}"
-      strengths: ["人脸", "多角色", "60s长视频"]
-      enabled: true
-    - id: "kling_3.0"
-      name: "Kling 3.0"
-      provider: "kuaishou"
-      access_key: "${KLING_ACCESS_KEY}"
-      secret_key: "${KLING_SECRET_KEY}"
-      strengths: ["4K", "AI导演", "电影感"]
-      enabled: true
-    - id: "wan_2.7"
-      name: "Wan 2.7"
-      provider: "runninghub"
-      workflow: "runninghub/video_wan2.7.json"
-      strengths: ["开源", "无限制", "自部署"]
-      enabled: true
-
-  # ---- ④ 审图 ----
-  audit_models:
-    multi_image_compare:  # 多图一致性对比
-      provider: "google"
-      model: "gemini-2.5-pro"
-      api_key: "${GEMINI_API_KEY}"
-    single_image_detail:  # 单图细节审核
-      provider: "openai"
-      model: "gpt-4o"
-      api_key: "${OPENAI_API_KEY}"
-    batch_quick_scan:      # 批量快速筛查
-      provider: "google"
-      model: "gemini-2.5-flash"
-      api_key: "${GEMINI_API_KEY}"
-
-  # ---- ⑤ TTS ----
-  tts_models:
-    - id: "edge-tts"
-      name: "Microsoft Edge-TTS"
-      type: "local"
-      voices: ["zh-CN-XiaoxiaoNeural", "zh-CN-YunjianNeural", ...]
-    - id: "index-tts"
-      name: "Index-TTS (声音克隆)"
-      type: "runninghub"
-      workflow: "runninghub/tts_index2.json"
-```
-
-### 管理 UI
-
-`/ai-config` 页面 — 全局 AI 模型配置：
-- 每个环节显示当前使用的模型（名称 + provider logo）
-- 下拉选择预设模型或填入自定义端点
-- **API Key 管理：** 每个 provider 的 Key 独立配置，加密存储
-- **模型测试：** 每行一个「测试连接」按钮，发测试请求验证连通性
-- **预设模板：** "行业最高标准" / "预算优先" / "开源自部署" 一键切换所有模型
-
-### 数据流
-
-```
-前端 /ai-config → PUT /api/pixelle/config (更新 ai_models 段)
-                → Pixelle-Video ConfigManager.reload()
-                → 所有下游服务读取最新 ai_models 配置
-```
-
----
-
-## 第 1 层：资产工坊（Asset Workshop）
+## 第 ① 层：资产工坊（Asset Workshop）
 
 ### 1.1 角色管理
 
-**数据库：** `characters` 表（dy_auto DB）
+**数据库：**
 ```sql
 characters (
   id, name, display_name,
+  -- 多角度参考图（自动生成后上传 OSS 获得公网 URL）
   avatar_front_url, avatar_profile_url,
   avatar_three_quarter_url, avatar_full_body_url,
+  -- TTS 绑定
   voice_id, voice_speed,
+  -- 描述
   appearance, personality, outfit,
+  -- 审图状态
   audit_status,           -- pending/approved/warning/rejected
-  audit_score,            -- AI 审图评分 0-100
-  audit_issues_json,      -- 审图发现的差异项
+  audit_score,
+  audit_issues_json,
+  -- 元数据
+  series_id,              -- 所属系列 (FK)
   created_at, updated_at
 )
 ```
-
-**管理 UI：** `/characters` 页面
-- 角色卡片网格（多角度照片缩略图 + 审图状态标签）
-- 上传多角度照片后**自动触发 AI 审图**，不通过则阻止使用
-- 审图结果展示：一致性评分 + 差异项清单 + 通过/警告/拒绝
 
 ### 1.2 场景管理
 
 ```sql
 scenes (
   id, name, display_name,
-  reference_urls_json,
+  reference_urls_json,    -- OSS 公网 URL 列表
   description, lighting,
   audit_status, audit_score, audit_issues_json,
+  series_id,
   created_at, updated_at
 )
 ```
 
-### 1.3 AI 审图引擎（Quality Audit）
+### 1.3 AI 审图引擎
 
 **三层审查节点：**
 
 ```
 节点① — 入库审查 (Pre-ingestion)
-  时机: 用户上传角色/场景参考图后
+  时机: 上传或自动生成角色/场景参考图后
   模型: ai_models.audit_models.multi_image_compare (默认 Gemini 2.5 Pro)
-  输入: 多张参考图 (正面+侧面+3/4+全身)
+  输入: 多张静态参考图
   审核: 人脸匹配度 / 服装一致性 / 关键特征
   输出: 一致性评分 (0-100) + 逐项差异 + 通过(≥85)/警告(70-84)/拒绝(<70)
-  行动: 拒绝 → 阻止使用，提示重传
+  行动: 拒绝 → 阻止使用，自动重试或提示人工
 
 节点② — 生成审查 (Post-generation)
-  时机: Seedance/Kling 生成分镜帧后，FFmpeg 合成前
+  时机: Seedance/Kling 生成分镜帧后
+  ⚠️ 生成的是视频，不是图片。处理方式:
+    1. FFmpeg 提取首帧+中间帧+尾帧 3 张静态图
+    2. 3 张静态图分别与角色参考图组对比
+    3. 评分取 3 张图的平均分
   模型: ai_models.audit_models.single_image_detail (默认 GPT-4o)
-  输入: 生成帧 + 角色参考图组
-  审核: 生成画面与参考图的匹配度
   抽样: 首帧必审 + 随机 20% + 角色首次出场帧
   行动: 不通过 → 自动重新生成 (最多 2 次)，仍不通过 → 标记人工审核
 
 节点③ — 跨集审查 (Cross-episode)
   时机: 系列全部渲染完成后
   模型: ai_models.audit_models.batch_quick_scan (默认 Gemini Flash)
-  输入: 每集角色首次出场帧
+  输入: 每集角色首次出场帧（提取的静态图）
   审核: 同角色跨集长相一致性、同场景跨集环境一致性
   输出: 跨集一致性报告
 ```
 
-**审图 API 端点：**
-
+**审图 API：**
 ```python
-# dy_auto 后端新增: server/app/routers/audit.py
-POST /api/audit/characters/{id}/validate   # 节点① — 上传后手动/自动触发
-POST /api/audit/frames/{frame_id}/check    # 节点② — 渲染后触发
-POST /api/audit/series/{id}/cross-check    # 节点③ — 系列完成后触发
-GET  /api/audit/reports/{id}               # 查看审图报告
+POST /api/audit/characters/{id}/validate
+POST /api/audit/frames/{frame_id}/check
+POST /api/audit/series/{id}/cross-check
+GET  /api/audit/reports/{id}
 ```
 
-**审图服务实现：**
-- `server/app/services/audit_service.py` — 读取 `ai_models.audit_models` 配置，调用对应模型 API
-- 所有审图模型通过配置中心可替换（GPT-4o → Claude Opus 4、Gemini → Qwen-VL-Max）
+**审图服务：** `server/app/services/audit_service.py` — 从 `ai_models.audit_models` 读取模型配置，所有模型可通过 `/ai-config` 替换。
 
 ---
 
-## 第 2 层：故事工坊（Story Workshop）
+## 第 ② 层：故事工坊（Story Workshop）
 
-### 2.1 剧本生成 LLM 链
+### 2.1 故事圣经（Story Bible）— Critical
 
-三层 LLM 链，每层使用的模型从 `ai_models.script_llm` 读取：
+> **问题：** LLM 上下文窗口装不下 30 集完整剧本，逐集生成时后期剧集会"忘记"前期设定。
+
+**方案：** 在系列剧本生成前，先创建一个「故事圣经」文档，贯穿所有 LLM 调用。
 
 ```
-第 1 层 — 系列大纲
-  模型: ai_models.script_llm.model (默认 deepseek-chat)
-  输入: logline + genre + tone + characters
-  输出: N 集大纲
+故事圣经 (Story Bible):
+  ├── 世界观 (World Rules): "现代都市，2024年上海，无超自然元素"
+  ├── 角色档案 (Character Sheets):
+  │   ├── 小明: {性格/外貌/口头禅/关系网/成长弧光}
+  │   └── 小红: {性格/外貌/口头禅/关系网/成长弧光}
+  ├── 情节时间线 (Plot Timeline):
+  │   ├── 第1-5集: 相遇与误会
+  │   ├── 第6-15集: 感情升温与外部冲突
+  │   └── ...
+  ├── 伏笔追踪 (Chekhov's Gun Tracker):
+  │   ├── 第3集埋下: 总裁的家族秘密
+  │   └── 第25集回收: ...
+  └── 角色出场表 (Character Appearance Map):
+      ├── 第1集: 小明✓ 小红✓ 总裁✗
+      └── ...
+```
 
-第 2 层 — 逐集剧本
+**LLM 调用时注入：** 每次生成剧本/分镜时，将圣经摘要（~2K tokens）注入 system prompt。
+
+**圣经更新：** 每生成 5 集剧本后，LLM 自动更新圣经（追加新伏笔、更新角色状态）。
+
+### 2.2 剧本生成 LLM 链
+
+```
+第 1 层 — 圣经创建
   模型: ai_models.script_llm.model
-  输入: 大纲 + 角色档案 + 场景档案
-  输出: 完整剧本 (角色标注 + 场景标注 + 情绪标注)
+  输入: logline + genre + characters
+  输出: 故事圣经 (角色档案+世界观+情节时间线)
 
-第 3 层 — 分镜拆分
-  模型: ai_models.storyboard_llm.model (可与 script_llm 不同)
-  输入: 逐集剧本
-  输出: StoryboardFrame[]
+第 2 层 — 系列大纲
+  输入: 圣经摘要 + logline
+  输出: N 集大纲，每集 5-8 句话
+
+第 3 层 — 逐集剧本（分批生成，每批 5 集）
+  输入: 圣经摘要 + 大纲 + 前一批的剧情摘要
+  输出: 完整剧本 (角色标注+场景标注+情绪标注+钩子)
+
+第 4 层 — 分镜拆分
+  模型: ai_models.storyboard_llm.model
+  输入: 逐集剧本 + 圣经摘要
+  输出: StoryboardFrame[] (含镜头设计+音频策略)
 ```
 
-### 2.2 系列 & 剧集管理
+### 2.3 系列 & 剧集管理
 
-数据库和 UI 同上一版 spec。
+```sql
+series (
+  id, title, logline, genre, tone,
+  story_bible_json,          -- 故事圣经结构化数据
+  characters_json, scenes_json,
+  target_duration_per_episode,
+  status, created_at, updated_at
+)
+
+episodes (
+  id, series_id, episode_number, title,
+  outline, script,
+  hook_json,                 -- {type, scene, dialogue, next_episode_link}
+  storyboard_json,           -- 分镜表
+  media_workflow,            -- 本集视频模型
+  audio_mode,                -- "tts" | "seedance_native" | "hybrid"
+  tts_workflow,
+  status, result_video_path, duration,
+  version,                   -- 生成版本号 (支持 A/B 迭代)
+  created_at
+)
+
+pipeline_runs (              -- 流水线运行状态（持久化 + 断点续传）
+  id, series_id, mode,       -- "step_by_step" | "fully_automatic"
+  current_layer,             -- 当前执行到第几层
+  layers_json,               -- 每层状态 {layer: 0, status: "completed", checkpoint: {...}}
+  total_cost_estimate,       -- 预估总成本
+  actual_cost_so_far,        -- 已产生成本
+  started_at, paused_at, completed_at,
+  status                     -- running/paused/completed/failed
+)
+
+audit_reports (
+  id, audit_node,            -- "ingestion" | "generation" | "cross_episode"
+  target_type, target_id,    -- character/scene/frame/series
+  model_used, score, passed,
+  details_json,              -- 逐项差异
+  created_at
+)
+
+prompt_history (             -- Prompt 调试器存储
+  id, pipeline_run_id, step, -- "asset_generation" | "script_writing" | ...
+  model_used, prompt_text, response_text,
+  tokens_used, cost,
+  created_at
+)
+```
 
 ---
 
-## 第 3 层：导演工坊（Director Workshop）
+## 第 ③ 层：导演工坊（Director Workshop）
 
-### 3.1 分镜设计
+### 3.1 分镜设计（含音频策略）
 
 ```python
 class DirectorFrame:
+    # 基础
     index: int
     narration: str
     character_ids: list[str]
     scene_id: str
+
+    # 镜头设计
     shot_type: str           # close_up/medium/wide/tracking/aerial
     camera_angle: str        # eye_level/low_angle/high_angle/dutch
     camera_movement: str     # static/pan_left/zoom_in/dolly
-    composition: str         # rule_of_thirds/center/leading_lines
     target_duration: float
-    color_grade: str         # warm/cool/cinematic/natural
-    lighting_mood: str       # bright/moody/dramatic/soft
+
+    # ⚠️ 音频策略 — 每帧独立决策
+    audio_mode: str          # "tts" | "seedance_native" | "bgm_only" | "silent"
+    # "tts":              TTS 配音 + 视频静音轨道
+    # "seedance_native":  Seedance 原生声画同步 (该帧跳过 TTS)
+    # "bgm_only":         仅背景音乐 (过渡/空镜/开场帧)
+    # "silent":           无声 (结尾黑屏帧)
+
+    voice_id: str            # audio_mode=tts 时使用
+    bgm_track: str           # 背景音乐轨道名称（可选，覆盖系列默认 BGM）
+
+    # 视频模型
+    media_workflow: str      # seedance_2.0 / kling_3.0 / wan_2.7 / flux
 ```
 
-### 3.2 模型路由器
+### 3.2 音频策略规则
 
-不同镜头类型自动路由到 `ai_models.video_models` 中的最优模型：
+> **原则：** 一集内统一音频策略，避免频繁切换导致听感不一致。
 
-| 镜头类型 | 路由规则 |
-|----------|----------|
-| 人物特写/对话 | → 标记 `strengths: ["人脸"]` 的模型 |
-| 广角/建立/高潮 | → 标记 `strengths: ["4K", "电影感"]` 的模型 |
-| 动作场景 | → 标记 `strengths: ["多角色", "60s长视频"]` 的模型 |
-| 静态文字帧 | → FLUX + HTML（本地） |
+| 系列级别 | 每集可独立选择 `audio_mode` |
+|----------|---------------------------|
+| `tts_only` | 全系列用 TTS 配音（Edge-TTS 多角色），Seedance 生成静音视频 |
+| `seedance_native` | 全系列用 Seedance 原生声画同步（该模式下 TTS 配置无效） |
+| `hybrid` | 对话帧用 TTS，过渡/空镜/高潮帧用 Seedance 原生 |
 
-> 自动路由规则可由用户在 `/ai-config` 页面自定义。每帧的模型选择可在导演工坊手动覆盖。
+**BGM 配置：**
+```
+ai_models.audio.bgm:
+  default_track: "bgm/calm_piano.mp3"    # 默认背景音乐
+  per_scene_overrides:                   # 场景级别覆盖
+    climax: "bgm/intense_orchestra.mp3"
+    cliffhanger: "bgm/tense_drone.mp3"
+    romantic: "bgm/soft_guitar.mp3"
+```
+
+### 3.3 模型路由器
+
+| 镜头类型 | 路由规则 | 音频策略 |
+|----------|----------|----------|
+| 人物特写/对话 | → strengths:["人脸"] | tts（多角色配音） |
+| 广角/建立 | → strengths:["4K","电影感"] | bgm_only |
+| 动作/高潮 | → strengths:["多角色","60s"] | seedance_native |
+| 钩子/悬念 | → strengths:["电影感"] | bgm_only + 紧张 BGM |
+| 静态文字 | → FLUX + HTML | silent |
 
 ---
 
-## 第 4 层：渲染引擎（Render Engine）
+## 第 ④ 层：渲染引擎（Render Engine）
 
-### 4.1 多模型渲染
+### 4.1 多模型渲染 + 断点续传
 
-Pixelle-Video `frame_processor._step_generate_media()` 读取 `ai_models.video_models` 中 `enabled: true` 的模型列表，动态路由：
+Pixelle-Video `frame_processor._step_generate_media()` 动态路由，所有模型从 `ai_models.video_models` 读取：
 
 ```python
 async def _step_generate_media(frame, config):
-    model_config = get_model_config(config.media_workflow)  # 从 ai_models 读取
+    model_config = get_model_config(config.media_workflow)
+    audio_mode = frame.audio_mode
 
-    if model_config.provider == "volcengine":
-        return await _seedance_render(frame, config, model_config)
-    elif model_config.provider == "kuaishou":
-        return await _kling_render(frame, config, model_config)
-    elif model_config.provider == "runninghub":
-        return await self.core.media(workflow=model_config.workflow, ...)
-    elif model_config.provider == "custom":
-        return await _custom_endpoint_render(frame, config, model_config)
+    # 根据 audio_mode 决定视频是否需要原生音频
+    if audio_mode == "seedance_native":
+        # Seedance 原生声画同步
+        return await _seedance_render(frame, config, model_config, with_audio=True)
+    elif audio_mode == "tts":
+        # 先生成 TTS 音频，再生成静音视频
+        return await _seedance_render(frame, config, model_config, with_audio=False)
+    elif audio_mode == "bgm_only":
+        return await _render_with_bgm_only(frame, config, model_config)
 ```
 
-**关键：** 不硬编码模型名，所有模型元数据（endpoint/auth/provider）从 `ai_models.video_models` 读取。
+### 4.2 流水线持久化与断点续传
 
-### 4.2 后期包装
+```python
+class PipelineRun:
+    """流水线运行时状态，每一步完成后写入 DB"""
 
-转场/片头尾/字幕配置同上一版 spec。
+    async def run_layer(self, layer: int):
+        checkpoint = self.load_checkpoint(layer)
+        if checkpoint and checkpoint["status"] == "completed":
+            logger.info(f"Layer {layer} already completed, skipping")
+            return checkpoint["result"]
+
+        # 执行这层的所有任务
+        for task in self.get_tasks(layer):
+            if task.id in checkpoint.get("completed_tasks", []):
+                continue  # 跳过已完成的任务
+            result = await task.execute()
+            checkpoint["completed_tasks"].append(task.id)
+            self.save_checkpoint(layer, checkpoint)  # 每个任务完成后立即写 checkpoint
+
+    async def resume(self):
+        """从最后一个 checkpoint 恢复"""
+        last_layer = self.load_last_completed_layer()
+        for layer in range(last_layer + 1, TOTAL_LAYERS):
+            await self.run_layer(layer)
+```
+
+### 4.3 长剧集处理（90-120s/集）
+
+一集 = 6-12 个分镜帧 → 每帧 5-60s → FFmpeg 拼接 + 片头尾 = 90-120s
+
+```
+30 集 × 10 帧/集 = 300 次 Seedance 调用
+并发 3-5 个，约 2-3 小时完成
+每 5 集自动写 checkpoint，崩溃后从上一个 checkpoint 恢复
+```
+
+### 4.4 错误预算与降级策略
+
+| 错误类型 | 预估概率 | 降级策略 |
+|----------|----------|----------|
+| Seedance API rate limit | 5% | 指数退避重试 (1s→2s→4s→8s)，最多 5 次 |
+| Seedance 任务失败 | 10% | 自动重试最多 2 次，仍失败 → 切换备用模型 |
+| Kling 队列超时 | 15% | 超时后降级到 Seedance |
+| FLUX 出图异常 | 3% | 重试最多 3 次，调整 prompt 增加约束 |
+| OSS 上传失败 | 1% | 重试 3 次，仍失败 → 暂停流水线 |
+
+**成本实时监控：** 每 10 次 API 调用更新 `pipeline_runs.actual_cost_so_far`，UI 实时展示。
 
 ---
 
-## 文件改动清单 (更新)
+## 第 ⑤ 层：后期包装（Post Production）
+
+- FFmpeg xfade 转场（dissolve/wipe/zoom）
+- 片头/片尾 HTML 模板渲染
+- 字幕叠加（可配置字体/大小/颜色/动画）
+- BGM 混音（场景级别切换）
+
+---
+
+## 全自动流水线 API
+
+```
+POST /api/pipeline/auto-generate
+  Body: {
+    "logline": "...",
+    "genre": "urban_romance",
+    "mode": "fully_automatic",
+    "audio_strategy": "tts_only",       # 系列级音频策略
+    "pilot_first": true                 # 是否先生成 1 集试点
+  }
+  → pipeline_run_id
+
+GET  /api/pipeline/status/{id}          # 进度 + 成本
+POST /api/pipeline/{id}/pause           # 暂停
+POST /api/pipeline/{id}/resume          # 恢复（断点续传）
+POST /api/pipeline/{id}/retry_layer     # 重跑某一层
+GET  /api/pipeline/{id}/cost            # 成本明细
+WS   /ws/pipeline/{id}                  # SSE 进度事件
+```
+
+### 试点生成（Pilot Mode）
+
+```
+pilot_first: true
+  → 先生成 1 集完整剧集
+  → 人工审核质量（审图报告+成品预览）
+  → 确认后批量生成剩余 29 集
+  → 不满意 → 调整参数 → 重新试点
+```
+
+### 版本管理
+
+- 每集支持多个 `version`（同一集的不同生成尝试）
+- UI 可切换版本对比
+- 保留最近 3 个版本，旧版本可手动删除
+
+---
+
+## 全透明可观测性
+
+```
+「流水线监控」页面 (/pipeline/{run_id}):
+  ├── 总进度条 + 当前步骤 + 预估剩余时间 + 当前成本
+  ├── 每层展开：
+  │   ├── 状态 + 耗时 + 完成/总数
+  │   ├── 每个子任务: [查看产物] [查看原始Prompt] [查看响应]
+  │   └── 审图结果: 评分 + 差异项
+  ├── 产出物预览
+  └── 成本报表 (预估 vs 实际)
+
+「Prompt 调试器」组件:
+  ├── 所有 AI 调用的 prompt 可点击展开
+  ├── 支持运行前预览/编辑 prompt 模板
+  ├── A/B 对比模式
+  └── Prompt 历史库 (prompt_history 表)
+```
+
+---
+
+## AI 模型配置中心
+
+所有环节的模型通过 `/ai-config` 页面 + `Pixelle-Video/config.yaml` 的 `ai_models` 段管理：
+
+```yaml
+ai_models:
+  script_llm:        # 剧本生成
+  storyboard_llm:    # 分镜拆分
+  asset_generation:  # 资产生成（角色/场景图）
+    character_model: {...}
+    scene_model: {...}
+    oss:             # CDN/OSS 配置
+      provider: "aliyun_oss"
+      endpoint: "oss-cn-shanghai.aliyuncs.com"
+      bucket: "dy-auto-assets"
+      access_key: "${OSS_ACCESS_KEY}"
+      secret_key: "${OSS_SECRET_KEY}"
+  video_models: []   # 视频生成模型列表
+  audit_models:      # 审图模型
+  tts_models: []     # TTS 模型列表
+  audio:             # BGM 配置
+    bgm: {...}
+  cliffhanger:       # 钩子 prompt 模板
+```
+
+---
+
+## 文件改动清单
 
 ### Pixelle-Video
 
-| 文件 | 改动 | 工作量 |
-|------|------|--------|
-| `pixelle_video/services/frame_processor.py` | 多模型动态路由器（读 ai_models 配置）(~150行) |
-| `pixelle_video/models/storyboard.py` | DirectorFrame + StoryboardFrame 扩展 (~50行) |
-| `pixelle_video/pipelines/standard.py` | 导演参数注入 + 角色多图注入 (~100行) |
-| `pixelle_video/pipelines/director.py` | **新文件** 导演流水线 (~200行) |
-| `pixelle_video/services/post_production.py` | **新文件** 转场/片头尾/字幕 (~150行) |
-| `pixelle_video/services/ai_model_registry.py` | **新文件** 读取 ai_models 配置 + 模型路由 (~100行) |
-| `pixelle_video/services/asset_generator.py` | **新文件** 角色/场景图自动生成 + prompt 模板 (~150行) |
-| `pixelle_video/config.py` | 解析 ai_models + characters + asset_generation 配置 (~100行) |
-| `pixelle_video/pipelines/auto_pipeline.py` | **新文件** 全自动流水线编排器 (~250行) |
-| `config.yaml` | ai_models 完整配置模板（含 asset_generation） |
+| 文件 | 改动说明 |
+|------|----------|
+| `pixelle_video/services/frame_processor.py` | 多模型路由器 + audio_mode 分支 |
+| `pixelle_video/services/ai_model_registry.py` | **新** 读取 ai_models 配置 |
+| `pixelle_video/services/asset_generator.py` | **新** 角色/场景图生成 + OSS 上传 |
+| `pixelle_video/services/kling_render.py` | **新** Kling 3.0 渲染 |
+| `pixelle_video/services/seedance_render.py` | **新** Seedance 渲染 (with_audio 参数) |
+| `pixelle_video/pipelines/auto_pipeline.py` | **新** 全自动编排器 + 断点续传 |
+| `pixelle_video/pipelines/director.py` | **新** 导演流水线 |
+| `pixelle_video/services/post_production.py` | **新** 转场/片头尾/字幕/BGM |
+| `pixelle_video/models/storyboard.py` | DirectorFrame + audio_mode |
+| `pixelle_video/config.py` | 解析 ai_models 完整配置 |
 
 ### dy_auto 后端
 
-| 文件 | 改动 | 工作量 |
-|------|------|--------|
-| `server/app/db_models.py` | Character + Scene + Series + Episode + AuditReport 表 (~180行) |
-| `server/app/routers/characters.py` | 角色 CRUD + 多角度图上传 (~150行) |
-| `server/app/routers/scenes.py` | 场景 CRUD (~100行) |
-| `server/app/routers/series.py` | 系列+剧集 CRUD + LLM 剧本 (~250行) |
-| `server/app/routers/director.py` | 分镜编排 API (~150行) |
-| `server/app/routers/audit.py` | **新文件** 审图 API (~200行) |
-| `server/app/routers/ai_config.py` | **新文件** AI 模型配置 CRUD (~150行) |
-| `server/app/routers/pipeline.py` | **新文件** 全自动流水线 API (~200行) |
-| `server/app/services/audit_service.py` | **新文件** 审图引擎 (~250行) |
-| `server/app/routers/kling.py` | **新文件** Kling 3.0 代理 (~200行) |
-| `server/app/main.py` | 注册 audit/kling/ai_config 路由 |
+| 文件 | 改动说明 |
+|------|----------|
+| `server/app/db_models.py` | Character/Scene/Series/Episode/PipelineRun/AuditReport/PromptHistory |
+| `server/app/routers/pipeline.py` | **新** 流水线 API + 断点续传 |
+| `server/app/routers/audit.py` | **新** 审图 API |
+| `server/app/routers/ai_config.py` | **新** AI 模型配置 CRUD |
+| `server/app/routers/characters.py` | 角色 CRUD + OSS 上传回调 |
+| `server/app/routers/scenes.py` | 场景 CRUD |
+| `server/app/routers/series.py` | 系列+剧集 CRUD + LLM 剧本 |
+| `server/app/routers/director.py` | 分镜编排 API |
+| `server/app/services/audit_service.py` | **新** 审图引擎 |
+| `server/app/services/pipeline_service.py` | **新** 流水线编排引擎 |
+| `server/app/services/oss_service.py` | **新** OSS/CDN 上传服务 |
 
 ### dy_auto 前端
 
-| 文件 | 改动 | 工作量 |
-|------|------|--------|
-| `web/src/views/AiConfigPage.vue` | **新页面** AI 模型配置 (~350行) |
-| `web/src/views/CharactersPage.vue` | 角色管理 + 审图状态展示 (~350行) |
-| `web/src/views/ScenesPage.vue` | 场景管理 + 审图状态 (~250行) |
-| `web/src/views/SeriesPage.vue` | 系列管理 + 剧本生成 (~400行) |
-| `web/src/views/DirectorPage.vue` | **新页面** 分镜导演时间线 (~500行) |
-| `web/src/components/video-studio/AuditReport.vue` | **新组件** 审图报告面板 (~200行) |
-| `web/src/components/video-studio/ModelRouter.vue` | **新组件** 模型路由配置 (~150行) |
-| `web/src/router/index.js` | 新增 5 个路由 |
-| `web/src/constants/navigation.js` | 新增 5 个菜单项 |
+| 文件 | 改动说明 |
+|------|----------|
+| `web/src/views/AiConfigPage.vue` | **新** AI 模型配置 |
+| `web/src/views/PipelineMonitorPage.vue` | **新** 流水线监控 + 成本 |
+| `web/src/views/CharactersPage.vue` | 角色管理 + 审图状态 |
+| `web/src/views/ScenesPage.vue` | 场景管理 |
+| `web/src/views/SeriesPage.vue` | 系列管理 + 剧本生成 |
+| `web/src/views/DirectorPage.vue` | **新** 导演时间线 |
+| `web/src/components/video-studio/AuditReport.vue` | **新** 审图报告面板 |
+| `web/src/components/video-studio/ModelRouter.vue` | **新** 模型路由配置 |
+| `web/src/components/video-studio/PromptDebugger.vue` | **新** Prompt 调试器 |
+| `web/src/router/index.js` | 新增 6 个路由 |
+| `web/src/constants/navigation.js` | 新增 6 个菜单项 |
 
-**总估算：≈ 5000 行，15-18 天。**
+**总估算：≈ 6500 行，18-22 天。**
 
 ---
 
-## 与 old spec 的关键差异
-
-| 维度 | 旧 spec | 新 spec |
-|------|---------|---------|
-| AI 模型管理 | 硬编码在代码中 | **全局配置中心**，每环节可自主替换 |
-| 审图 | 无 | **三层审查节点** + 审图报告 |
-| 视频模型 | 3 个固定选项 | **动态注册**，通过配置新增/禁用 |
-| 质量关卡 | 用户目视检查 | **AI 自动审核**，不通过阻止入库/合成 |
-
 ## 验证计划
 
-1. 打开 `/ai-config` → 修改 script_llm 为 GPT-4o → 测试连接 → 生成剧本使用新模型
-2. 新增自定义 video_models 条目 → 前端下拉框自动出现 → 选择后正常渲染
-3. 上传角色多角度图 → 自动触发审图 → 审图报告显示一致性评分
-4. 审图拒绝(<70分) → 阻止使用该角色生成视频
-5. 生成分镜帧 → 审图节点② → 不通过帧自动重新生成
+1. `/ai-config` 修改 script_llm → 测试连接 → 剧本使用新模型
+2. 新增 video_models 条目 → 前端下拉框自动出现
+3. 上传角色多角度图 → OSS 自动上传 → 审图自动触发
+4. `pilot_first: true` → 生成 1 集 → 审核 → 确认后批量生成
+5. 流水线运行中 kill 服务器 → 重启 → `resume` 从中断处继续
+6. 30 集生成完成 → 跨集审图报告输出 → 成本报表核对
+7. A/B 对比：同一集 2 个版本 → 审图评分对比 → 选择更好的

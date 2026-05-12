@@ -69,6 +69,8 @@ FLUX 生成本地图 → OSS SDK 上传 → 获得公网 URL → 写入 DB → S
 
 > **降级方案：** OSS 未配置时，角色图仍可手动上传到图床后粘贴 URL。
 
+**本地开发方案：** `oss.provider: "minio"` 使用本地 MinIO 容器（S3 兼容），`localhost:9000` 通过 ngrok 暴露公网 URL 供 Seedance 访问。或使用 `oss.provider: "local"` 仅生成图片到本地目录，跳过 Seedance 参考图注入（该模式下审图节点①仍正常工作）。
+
 ---
 
 ## 第 ① 层：资产工坊（Asset Workshop）
@@ -91,8 +93,18 @@ characters (
   audit_score,
   audit_issues_json,
   -- 元数据
-  series_id,              -- 所属系列 (FK)
   created_at, updated_at
+)
+
+-- 多对多中间表：一个角色可出现在多个系列，一个系列有多个角色
+series_characters (
+  series_id, character_id,
+  PRIMARY KEY (series_id, character_id)
+)
+
+series_scenes (
+  series_id, scene_id,
+  PRIMARY KEY (series_id, scene_id)
 )
 ```
 
@@ -118,14 +130,15 @@ scenes (
   时机: 上传或自动生成角色/场景参考图后
   模型: ai_models.audit_models.multi_image_compare (默认 Gemini 2.5 Pro)
   输入: 多张静态参考图
-  审核: 人脸匹配度 / 服装一致性 / 关键特征
-  输出: 一致性评分 (0-100) + 逐项差异 + 通过(≥85)/警告(70-84)/拒绝(<70)
-  行动: 拒绝 → 阻止使用，自动重试或提示人工
+  审核: 人脸匹配度 / 服装一致性 / 关键特征 / 内容合规(暴力/色情/政治敏感)
+  输出: 一致性评分 (0-100) + 合规评分 + 逐项差异 + 通过(≥85)/警告(70-84)/拒绝(<70)
+  行动: 合规不通过 → 直接拒绝(不可重试)并标记原因；一致性不通过 → 自动重试(最多3次)
 
 节点② — 生成审查 (Post-generation)
   时机: Seedance/Kling 生成分镜帧后
   ⚠️ 生成的是视频，不是图片。处理方式:
-    1. FFmpeg 提取首帧+中间帧+尾帧 3 张静态图
+    1. FFmpeg 提取首帧+中间帧+尾帧 3 张静态图:
+      `ffmpeg -i frame.mp4 -vf "select=eq(n\,0)+eq(n\,n/2)+eq(n\,n-1)" -vsync vfr keyframe_%d.jpg`
     2. 3 张静态图分别与角色参考图组对比
     3. 评分取 3 张图的平均分
   模型: ai_models.audit_models.single_image_detail (默认 GPT-4o)
@@ -466,6 +479,14 @@ pilot_first: true
 
 所有环节的模型通过 `/ai-config` 页面 + `Pixelle-Video/config.yaml` 的 `ai_models` 段管理：
 
+**页面功能：**
+- 模型选择器（每行显示当前模型+provider logo+「测试连接」按钮）
+- **服务健康检查面板：** 顶部一行状态指示灯，显示每个外部服务的连通性（绿色/红色+最后检查时间）
+  - Seedance API / Kling API / RunningHub / FLUX-ComfyUI / Gemini / GPT-4o / OSS
+- 预设模板一键切换（"行业最高标准"/"预算优先"/"开源自部署"）
+- API Key 管理（加密存储，可单独测试每个 Key）
+- **连接测试结果汇总** — 所有测试的最近一次结果和时间
+
 ```yaml
 ai_models:
   script_llm:        # 剧本生成
@@ -489,6 +510,23 @@ ai_models:
 
 ---
 
+## 实施前置步骤
+
+```bash
+# 1. 隔断 Pixelle-Video 与上游仓库的关联（防止 git pull 覆盖本地修改）
+cd D:/devWorkspace/Pixelle-Video
+git remote remove origin  # ✅ 已完成
+git branch -m main master  # 可选：对齐命名
+
+# 2. 确认隔离成功
+git remote -v  # 应无输出
+
+# 3. 备份当前 Pixelle-Video 代码
+cp -r D:/devWorkspace/Pixelle-Video D:/devWorkspace/Pixelle-Video.backup-$(date +%Y%m%d)
+```
+
+---
+
 ## 文件改动清单
 
 ### Pixelle-Video
@@ -500,6 +538,7 @@ ai_models:
 | `pixelle_video/services/asset_generator.py` | **新** 角色/场景图生成 + OSS 上传 |
 | `pixelle_video/services/kling_render.py` | **新** Kling 3.0 渲染 |
 | `pixelle_video/services/seedance_render.py` | **新** Seedance 渲染 (with_audio 参数) |
+| `pixelle_video/services/wan_render.py` | **新** Wan 2.7 开源模型渲染 |
 | `pixelle_video/pipelines/auto_pipeline.py` | **新** 全自动编排器 + 断点续传 |
 | `pixelle_video/pipelines/director.py` | **新** 导演流水线 |
 | `pixelle_video/services/post_production.py` | **新** 转场/片头尾/字幕/BGM |
@@ -541,6 +580,18 @@ ai_models:
 **总估算：≈ 6500 行，18-22 天。**
 
 ---
+
+## 测试策略
+
+| 测试层级 | 覆盖范围 | 工具 | 说明 |
+|----------|----------|------|------|
+| 单元测试 | 每个 service/router 函数 | pytest + mock | Mock 所有外部 API（Seedance/Kling/FLUX/Gemini/GPT-4o），验证业务逻辑 |
+| 集成测试 | 流水线单集试点生成 | pytest + httpx + real APIs | `pilot_first=true` 模式只生成 1 集，验证全链路 |
+| E2E | 可选，手动触发 | Playwright | 前端页面完整交互流程，不依赖外部 API（mock 模式） |
+| LLM eval | 剧本质量/钩子质量/审图准确度 | eval harness | 对 LLM 输出做 A/B 对比评分，积累 prompt 优化数据 |
+| 性能测试 | 并发渲染吞吐量 | locust | 模拟 30 集 × 10 帧的并发压测（使用 mock API） |
+
+**Mock 策略：** 每个外部 API 提供 `MockXxxClient`，通过环境变量 `MOCK_EXTERNAL_APIS=true` 切换，返回预定义的 fixture 数据。
 
 ## 验证计划
 

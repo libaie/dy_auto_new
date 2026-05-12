@@ -40,8 +40,14 @@ Pixelle-Video 已通过透明代理整合到 dy_auto（spec 2026-05-12），Seed
 
 ### 1.1 分镜模型选择器
 
-**前端：** VoiceVisualPanel 的「画面/视频生成引擎」下拉框中增加一项：
-- `seedance_2.0` → 「Seedance 2.0 (字节跳动) — 原生 1080P 声画同步」
+**前端：** VoiceVisualPanel 的「画面/视频生成引擎」下拉框增加以下选项：
+
+| 选项值 | 显示名称 | 适用场景 |
+|--------|----------|----------|
+| (现有) | FLUX / Wan2.1 / SDXL... | 静态模板、本地 ComfyUI |
+| `seedance_2.0` | **Seedance 2.0** — 最佳人脸+多角色一致性 | 多角色对话、需要参考图锚定 |
+| `kling_3.0` | Kling 3.0 — 4K 电影感 | 高潮/结尾镜头、需要 AI 导演 |
+| `wan_2.7` | Wan 2.7 — 开源自部署 | 预算敏感、无内容限制 |
 
 **后端（Pixelle-Video）：** `frame_processor._step_generate_media()` 增加分支：
 
@@ -65,24 +71,29 @@ Seedance 调用的异步轮询逻辑复用 `dy_auto/server/app/routers/seedance.
 **配置：** `Pixelle-Video/config.yaml` 新增：
 ```yaml
 seedance_api_key: ""
+kling_access_key: ""
+kling_secret_key: ""
 ```
 
 ### 1.2 角色档案
 
-**存储：** `Pixelle-Video/config.yaml` 新增 `characters` 段：
-```yaml
-characters:
-  小明:
-    avatar: "characters/xiaoming.jpg"
-    voice: "zh-CN-YunjianNeural"
-    description: "25岁年轻男性，短发，戴黑框眼镜"
-  小红:
-    avatar: "characters/xiaohong.jpg"
-    voice: "zh-CN-XiaoxiaoNeural"
-    description: "22岁女性，长发，红色连衣裙"
+**存储：** dy_auto DB 新增 `characters` 表（避免与 Pixelle-Video config.yaml 分裂）：
+```sql
+characters (
+  id, name, avatar_path, avatar_url,  -- avatar_url 用于 Seedance 公网参考图
+  voice_id, description, created_at
+)
 ```
 
-**角色图片：** 存放在 `Pixelle-Video/characters/` 目录，通过 dy_auto 的 `/api/pixelle-proxy/api/files/` 或独立的上传端点管理。
+生成时，角色信息通过 API 参数注入到 Pixelle-Video 请求中，而非通过 config.yaml 静态配置。
+
+**角色图片：** 存放在 dy_auto `server/app/data/characters/` 目录，通过 `/api/characters/avatar/{filename}` 端点对外暴露。
+
+> **Seedance 公网 URL 约束：** 火山方舟 Seedance API 的 `image_urls` 参数需要**公网可访问的 HTTP URL**。本地部署时 dy_auto 无公网 IP，参考图无法直接传给 Seedance。
+> 
+> **解决方案：**
+> - **MVP 阶段**：允许用户手动填入公网图片 URL（如上传到图床后粘贴链接），同时支持本地上传（供 FLUX/Wan2.1 本地使用）
+> - **后续优化**：集成 OSS/CDN 自动上传，或使用 Seedance 第三方 API（Atlas Cloud 等）看是否支持 base64 图片
 
 **dy_auto 管理 UI：** 新增「角色管理」页面：
 - 角色列表（名称+头像卡片）
@@ -108,7 +119,7 @@ series_videos (
 - 创建系列：主题 + 选择参与角色 → 自动生成系列名称
 - 系列详情：视频列表 + 每个视频独立配置（标题、脚本、角色分配、模型选择）
 - 系列级属性：批量选择所有视频的默认模型
-- 批量生成：一键提交系列内所有视频
+- 批量生成：一键提交系列内所有视频，含并发控制（最大 3 并发）、失败自动重试（最多 2 次）、预估成本展示（基于 Seedance 定价 × 预计时长）
 
 ### 1.4 多角色 TTS
 
@@ -150,9 +161,9 @@ if media_workflow == "seedance_2.0" and frame.character_ids:
 | **Pixelle-Video** | `pixelle_video/services/frame_processor.py` | `_step_generate_media` 增加 Seedance 分支 (~60行) |
 | | `pixelle_video/models/storyboard.py` | `StoryboardFrame` 加 `voice_id`/`reference_urls` (~10行) |
 | | `pixelle_video/pipelines/standard.py` | `plan_visuals` 注入角色参考图 (~30行) |
-| | `pixelle_video/config.py` | `config_manager` 解析 `seedance_api_key` + `characters` (~40行) |
-| | `config.yaml` | 模板新增 `seedance_api_key` + `characters` 段 |
-| **dy_auto 后端** | `server/app/db_models.py` | 新表 `Series` + `SeriesVideo` (~50行) |
+| | `pixelle_video/config.py` | `config_manager` 解析 `seedance_api_key` + `kling_access_key` + `kling_secret_key` (~40行) |
+| | `config.yaml` | 模板新增 `seedance_api_key` + `kling_*` + `characters` 段 |
+| **dy_auto 后端** | `server/app/db_models.py` | 新表 `Character` + `Series` + `SeriesVideo` (~80行) |
 | | `server/app/routers/series.py` | 系列 CRUD API (~150行) |
 | | `server/app/routers/characters.py` | 角色 CRUD API + 头像上传 (~100行) |
 | | `server/app/routers/seedance.py` | 已有，无需改动 |

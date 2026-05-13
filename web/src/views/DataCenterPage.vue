@@ -80,6 +80,7 @@ async function fetchData() {
       resp = await listComments(params)
     } else if (activeTab.value === 'users') {
       if (filterKeyword.value) params.keyword = filterKeyword.value
+      if (filterAccountId.value) params.account_id = filterAccountId.value
       resp = await listUsers(params)
     } else {
       if (filterAccountId.value) params.account_id = filterAccountId.value
@@ -98,6 +99,54 @@ async function fetchData() {
 
 function handlePageChange(p) { page.value = p; fetchData() }
 function handleSearch() { page.value = 1; fetchData() }
+
+const exporting = ref(false)
+async function doExport(all) {
+  exporting.value = true
+  try {
+    const params = {}
+    if (filterTaskId.value) params.task_id = filterTaskId.value
+    if (searchQuery.value) params.search = searchQuery.value
+
+    if (activeTab.value === 'comments') {
+      if (filterKeyword.value) params.keyword = filterKeyword.value
+      if (filterAccountId.value) params.account_id = filterAccountId.value
+    } else if (activeTab.value === 'users') {
+      if (filterKeyword.value) params.keyword = filterKeyword.value
+      if (filterAccountId.value) params.account_id = filterAccountId.value
+    } else if (activeTab.value === 'conversations') {
+      if (filterAccountId.value) params.account_id = filterAccountId.value
+      if (filterStage.value) params.stage = filterStage.value
+    }
+
+    if (!all) {
+      params.skip = (page.value - 1) * pageSize
+      params.limit = pageSize
+    }
+
+    const token = localStorage.getItem('token') || ''
+    const resp = await fetch(`/api/data/export/${activeTab.value}?${new URLSearchParams(params)}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}))
+      throw new Error(err.detail || '导出失败')
+    }
+    const blob = await resp.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    const suffix = all ? 'all' : `page${page.value}`
+    a.href = url
+    a.download = `${activeTab.value}_${suffix}_${new Date().toISOString().slice(0, 10)}.xlsx`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    toast.success(all ? '全部导出完成' : '本页导出完成')
+  } catch (e) {
+    toast.error('导出失败: ' + (e.message || '未知错误'))
+  } finally { exporting.value = false }
+}
 
 const stageBadgeClass = (s) => ({
   qualifying: 'bg-blue-500/20 text-blue-300',
@@ -145,7 +194,7 @@ onMounted(async () => {
     <div class="flex items-center gap-3 mb-4 flex-wrap">
       <input v-model="searchQuery" @keyup.enter="handleSearch" placeholder="搜索..." class="w-40 rounded-lg border px-3 py-1.5 text-sm" style="border-color: var(--border-default); background: var(--bg-surface); color: var(--text-primary);" />
 
-      <input v-if="activeTab === 'comments'" v-model="filterKeyword" @keyup.enter="handleSearch" placeholder="关键词" class="w-28 rounded-lg border px-3 py-1.5 text-sm" style="border-color: var(--border-default); background: var(--bg-surface); color: var(--text-primary);" />
+      <input v-if="activeTab === 'comments' || activeTab === 'users'" v-model="filterKeyword" @keyup.enter="handleSearch" placeholder="行业/关键词" class="w-32 rounded-lg border px-3 py-1.5 text-sm" style="border-color: var(--border-default); background: var(--bg-surface); color: var(--text-primary);" />
 
       <select v-model="filterAccountId" @change="handleSearch" class="rounded-lg border px-3 py-1.5 text-sm" style="border-color: var(--border-default); background: var(--bg-surface); color: var(--text-primary);">
         <option value="">全部账号</option>
@@ -164,6 +213,21 @@ onMounted(async () => {
         任务: {{ filterTaskId.slice(0, 8) }}...
         <button @click="filterTaskId = ''; router.replace({ query: { tab: activeTab } }); fetchData()" class="hover:text-sky-100">&times;</button>
       </span>
+
+      <div class="ml-auto flex gap-1.5">
+        <button @click="doExport(false)" :disabled="exporting"
+          class="px-3 py-1.5 text-sm rounded-lg border transition cursor-pointer"
+          :class="exporting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-sky-500/10 hover:border-sky-500/30'"
+          style="border-color: var(--border-default); color: var(--text-secondary);">
+          {{ exporting ? '...' : '导出本页' }}
+        </button>
+        <button @click="doExport(true)" :disabled="exporting"
+          class="px-3 py-1.5 text-sm rounded-lg border transition cursor-pointer"
+          :class="exporting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-sky-500/10 hover:border-sky-500/30'"
+          style="border-color: var(--border-default); color: var(--accent-400);">
+          {{ exporting ? '...' : '导出全部' }}
+        </button>
+      </div>
     </div>
 
     <!-- Comments Tab -->
@@ -180,8 +244,9 @@ onMounted(async () => {
               <th class="px-4 py-3 font-medium">关键词</th>
               <th class="px-4 py-3 font-medium w-16">点赞</th>
               <th class="px-4 py-3 font-medium">IP属地</th>
-              <th class="px-4 py-3 font-medium">作者</th>
-              <th class="px-4 py-3 font-medium w-36">时间</th>
+              <th class="px-4 py-3 font-medium w-12">作者</th>
+              <th class="px-4 py-3 font-medium w-28">评论时间</th>
+              <th class="px-4 py-3 font-medium w-28">采集时间</th>
             </tr>
           </thead>
           <tbody class="divide-y" style="border-color: var(--border-subtle);">
@@ -192,7 +257,8 @@ onMounted(async () => {
               <td class="px-4 py-3 text-slate-500">{{ item.keyword || '-' }}</td>
               <td class="px-4 py-3 text-slate-400 font-mono text-xs">{{ item.like_count || '0' }}</td>
               <td class="px-4 py-3 text-slate-500 text-xs">{{ item.location || '-' }}</td>
-              <td class="px-4 py-3"><span v-if="item.is_author" class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">作者</span></td>
+              <td class="px-4 py-3"><span v-if="item.is_author" class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">作者</span><span v-else class="text-slate-600">-</span></td>
+              <td class="px-4 py-3 text-slate-500 text-xs">{{ item.time_str ? formatDate(item.time_str) : '-' }}</td>
               <td class="px-4 py-3 text-slate-500 text-xs">{{ formatDate(item.created_at) }}</td>
             </tr>
           </tbody>

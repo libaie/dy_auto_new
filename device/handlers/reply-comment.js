@@ -427,6 +427,9 @@ ReplyCommentHandler.execute = function (params) {
               if (userData) {
                 var lastDetail = stats.details[stats.details.length - 1];
                 if (lastDetail) lastDetail.user = userData;
+                userData._keyword = keyword;
+                userData._taskId = taskId;
+                try { apiClient.saveUserProfile(userData); } catch (e) {}
               }
               if (Date.now() - profileStart < PROFILE_TIMEOUT && canFollow && this._followUser()) {
                 stats.follow_count++;
@@ -719,11 +722,12 @@ ReplyCommentHandler._parseCommentItem = function (item) {
     var timeEl = this._findChildBySelector(item, "comment_time");
     var timeStr = timeEl ? this._extractChildValue(timeEl, "comment_time", "") : "";
 
-    // 检测是否为作者自己的评论（有 "作者" 标签）
+    // 检测是否为作者自己的评论 — 优先用选择器，兜底硬编码
     var isAuthor = false;
     try {
-      var authorTag = item.findOne(text("作者"));
-      if (authorTag) isAuthor = true;
+      var authorEl = this._findChildBySelector(item, "comment_is_author");
+      if (!authorEl) authorEl = item.findOne(text("作者"));
+      if (authorEl) isAuthor = true;
     } catch (e) { /* ignore */ }
 
     return {
@@ -1153,6 +1157,28 @@ ReplyCommentHandler._collectProfileData = function () {
         if (data[fields[actionName]]) hasData = true;
       }
     } catch (e) {}
+  }
+  // Strip "· " / "・ " prefix from user IP location
+  if (data.ip_location) data.ip_location = data.ip_location.replace(/^[·•・\s]+/, "");
+
+  // Clean numeric fields: extract digits, handle Chinese units (万/千), strip accessibility noise
+  var numericFields = { likes_count: 1, follow_count: 1, fans_count: 1, works_count: 1 };
+  for (var key in numericFields) {
+    if (data[key]) {
+      var raw = String(data[key]);
+      var m = raw.match(/([\d.]+)\s*[万wW万]/);
+      if (m) {
+        data[key] = String(Math.round(parseFloat(m[1]) * 10000));
+      } else {
+        m = raw.match(/([\d.]+)\s*[千kK千]/);
+        if (m) {
+          data[key] = String(Math.round(parseFloat(m[1]) * 1000));
+        } else {
+          var digits = raw.replace(/[^\d]/g, "");
+          data[key] = digits || "";
+        }
+      }
+    }
   }
 
   if (hasData) {

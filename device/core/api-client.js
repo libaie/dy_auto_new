@@ -397,6 +397,27 @@ var apiClient = {
       nickname: nickname, text: text, ai_reply: aiReply, task_id: taskId || null,
     });
   },
+
+  saveUserProfile: function (data) {
+    return this.post("/api/device/user-profile", {
+      nickname: data.nickname,
+      douyin_id: data.douyin_id || "",
+      fans_count: data.fans_count || "",
+      likes_count: data.likes_count || "",
+      follow_count: data.follow_count || "",
+      works_count: data.works_count || "",
+      gender: data.gender || "",
+      age: data.age || "",
+      ip_location: data.ip_location || "",
+      is_private: data.is_private || "",
+      keyword: data._keyword || "",
+      task_id: data._taskId || "",
+    });
+  },
+
+  uploadUserAvatar: function (douyinId, imageBase64) {
+    return this.post("/api/device/user-avatar", { douyin_id: douyinId, image_base64: imageBase64 });
+  },
 };
 
 module.exports = apiClient;

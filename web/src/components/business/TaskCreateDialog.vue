@@ -366,17 +366,15 @@ watch(() => props.open, (val) => {
                   <!-- 视频数（reply_comment / search_comment / collect 共用） -->
                   <div v-if="['reply_comment', 'search_comment', 'collect'].includes(form.type)">
                     <label class="block text-sm font-medium text-slate-300">处理视频数 <TipIcon text="每个关键词要处理的视频数量" /></label>
-                    <input v-model.number="form.video_count" type="number" min="1" max="30" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200" />
+                    <input v-model.number="form.video_count" type="number" min="1" max="50" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200" />
                   </div>
                 </template>
 
-                <!-- Reply comment specific -->
-                <template v-if="form.type === 'reply_comment'">
-                  <div>
-                    <label class="block text-sm font-medium text-slate-300">评论最大天数 <TipIcon text="只回复在此天数内发布的评论，超过的将被忽略" /></label>
-                    <input v-model.number="form.max_age_days" type="number" min="1" max="30" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200" />
-                  </div>
-                </template>
+                <!-- 评论最大天数（reply_comment / collect 共用） -->
+                <div v-if="['reply_comment', 'collect'].includes(form.type)">
+                  <label class="block text-sm font-medium text-slate-300">评论最大天数 <TipIcon text="只处理在此天数内发布的评论，超过的将被忽略" /></label>
+                  <input v-model.number="form.max_age_days" type="number" min="1" max="90" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200" />
+                </div>
 
                 <!-- Content template + text -->
                 <template v-if="['search_comment', 'search_dm', 'reply_comment', 'collect'].includes(form.type)">

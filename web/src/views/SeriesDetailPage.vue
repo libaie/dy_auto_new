@@ -13,10 +13,17 @@
             <span>{{ series.mode === 'fully_automatic' ? '全自动' : '逐步确认' }}</span>
           </div>
         </div>
-        <button @click="startPipelineRun" :disabled="pipelineStarting"
-                class="bg-sky-500 hover:bg-sky-400 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm transition cursor-pointer">
-          {{ pipelineStarting ? '启动中...' : '▶ 启动流水线' }}
-        </button>
+        <div class="flex gap-2">
+          <button v-if="!series.character_count && !series.scene_count && series.logline" @click="autoGenerate"
+                  :disabled="autoGenerating" class="bg-purple-500 hover:bg-purple-400 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm transition cursor-pointer"
+                  title="根据故事概要，AI 自动生成角色和场景">
+            {{ autoGenerating ? 'AI 生成中...' : 'AI 一键生成角色&场景' }}
+          </button>
+          <button @click="startPipelineRun" :disabled="pipelineStarting"
+                  class="bg-sky-500 hover:bg-sky-400 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm transition cursor-pointer">
+            {{ pipelineStarting ? '启动中...' : '▶ 启动流水线' }}
+          </button>
+        </div>
       </div>
 
       <div class="rounded-xl border border-gray-700/50 overflow-hidden" style="background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(12px);">
@@ -45,17 +52,69 @@
         </div>
       </div>
     </template>
+
+    <!-- AI 自动生成进度对话框 -->
+    <div v-if="autoGenerating || autoGenResult" class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50" @click.self="autoGenResult = null; load()">
+      <div class="rounded-xl p-6 w-full max-w-lg shadow-2xl border border-gray-700/50 max-h-[85vh] overflow-y-auto" style="background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(20px);">
+        <h2 class="text-lg font-semibold text-slate-100 mb-4">AI 自动生成</h2>
+        <template v-if="autoGenerating">
+          <div class="text-center py-8">
+            <div class="animate-spin w-8 h-8 border-2 border-purple-400 border-t-transparent rounded-full mx-auto mb-3"></div>
+            <p class="text-sm text-slate-400">{{ autoGenStep }}</p>
+          </div>
+        </template>
+        <template v-else-if="autoGenResult">
+          <p class="text-xs text-slate-500 mb-4">AI 已根据故事概要生成以下资产：</p>
+          <div v-if="autoGenResult.characters?.length" class="mb-4">
+            <h3 class="text-sm font-medium text-slate-200 mb-2">角色 ({{ autoGenResult.characters.length }})</h3>
+            <div class="space-y-1">
+              <div v-for="(c, i) in autoGenResult.characters" :key="'c'+i" class="text-xs text-slate-400 flex gap-2">
+                <span class="text-slate-100">{{ c.name }}</span>
+                <span class="text-slate-500">· {{ c.role_type }} · {{ c.gender === 'male' ? '男' : '女' }}</span>
+              </div>
+            </div>
+          </div>
+          <div v-if="autoGenResult.scenes?.length" class="mb-4">
+            <h3 class="text-sm font-medium text-slate-200 mb-2">场景 ({{ autoGenResult.scenes.length }})</h3>
+            <div class="space-y-1">
+              <div v-for="(sc, i) in autoGenResult.scenes" :key="'s'+i" class="text-xs text-slate-400 flex gap-2">
+                <span class="text-slate-100">{{ sc.name }}</span>
+                <span class="text-slate-500">· {{ sc.scene_type }} · {{ sc.lighting }}</span>
+              </div>
+            </div>
+          </div>
+          <div class="flex justify-end mt-4">
+            <button @click="autoGenResult = null; load()" class="px-4 py-2 bg-sky-500 hover:bg-sky-400 text-white rounded-lg transition cursor-pointer text-sm">完成</button>
+          </div>
+        </template>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { getSeries } from '../api/series.js'
+import { getSeries, autoGenerateAssets } from '../api/series.js'
 import { startPipeline, listRuns } from '../api/pipeline.js'
 const route = useRoute(); const series = ref(null); const episodes = ref([]); const runs = ref([]); const loading = ref(true); const pipelineStarting = ref(false); const error = ref('')
+const autoGenerating = ref(false); const autoGenStep = ref(''); const autoGenResult = ref(null)
 async function load() { loading.value = true; error.value = ''; try { const { data } = await getSeries(route.params.id); if (data.ok) { series.value = data.series; episodes.value = data.episodes || [] } else throw new Error('Series not found'); const r = await listRuns(route.params.id); runs.value = r.data.ok ? r.data.runs : [] } catch (e) { error.value = e.message || '加载失败' } finally { loading.value = false } }
 async function startPipelineRun() { pipelineStarting.value = true; try { await startPipeline(route.params.id, null, series.value.mode) } catch (e) { error.value = e.message || '启动失败' } finally { pipelineStarting.value = false }; await load() }
+async function autoGenerate() {
+  autoGenerating.value = true; autoGenResult.value = null; error.value = ''
+  try {
+    autoGenStep.value = 'AI 正在分析故事，生成角色档案...'
+    const { data } = await autoGenerateAssets(route.params.id)
+    if (data.ok) {
+      autoGenResult.value = data
+      autoGenStep.value = ''
+    } else throw new Error('生成失败')
+  } catch (e) {
+    error.value = e.response?.data?.detail || e.message || 'AI 生成失败'
+    autoGenerating.value = false
+  } finally { autoGenerating.value = false }
+}
 function epStatusClass(s) { return { pending: 'bg-gray-800 text-slate-400', rendering: 'bg-yellow-900/40 text-yellow-400', done: 'bg-emerald-900/40 text-emerald-400', failed: 'bg-red-900/40 text-red-400' }[s] || 'bg-gray-800 text-slate-400' }
 function runStatusClass(s) { return { running: 'bg-sky-900/40 text-sky-400', completed: 'bg-emerald-900/40 text-emerald-400', failed: 'bg-red-900/40 text-red-400', pending: 'bg-gray-800 text-slate-400' }[s] || 'bg-gray-800 text-slate-400' }
 onMounted(load)

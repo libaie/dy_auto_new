@@ -890,6 +890,7 @@ async def collect_report(
             db.add(CollectedUser(
                 task_id=request.task_id,
                 device_id=device_id,
+                keyword=request.keyword,
                 nickname=request.user.nickname,
                 douyin_id=request.user.douyin_id,
                 likes_count=request.user.likes_count,
@@ -1049,4 +1050,128 @@ def save_comment_ai_reply(
         db.commit()
         return {"updated": True}
     return {"updated": False}
+
+
+class UserProfileRequest(BaseModel):
+    nickname: str
+    douyin_id: str = ""
+    fans_count: str = ""
+    likes_count: str = ""
+    follow_count: str = ""
+    works_count: str = ""
+    gender: str = ""
+    age: str = ""
+    ip_location: str = ""
+    is_private: str = ""
+    keyword: str = ""
+    task_id: str = ""
+
+
+@router.post("/user-profile")
+def save_user_profile(
+    request: UserProfileRequest,
+    db: Session = Depends(get_db),
+    authed_device_id: str = Depends(verify_device_secret),
+):
+    """保存采集到的用户主页数据，按 douyin_id 去重插入。"""
+    from app.db_models import CollectedUser
+    from sqlalchemy.exc import IntegrityError
+
+    douyin_id = request.douyin_id.strip()
+    if not douyin_id:
+        return {"saved": False, "reason": "empty douyin_id"}
+
+    existing = db.query(CollectedUser).filter(CollectedUser.douyin_id == douyin_id).first()
+    if existing:
+        # Update fields if they changed
+        changed = False
+        for field in ("nickname", "fans_count", "likes_count", "follow_count",
+                       "works_count", "gender", "age", "ip_location", "is_private",
+                       "keyword"):
+            val = getattr(request, field, "") or ""
+            if getattr(existing, field, None) != val:
+                setattr(existing, field, val)
+                changed = True
+        if changed:
+            db.commit()
+        return {"saved": True, "updated": changed, "user_id": existing.id}
+
+    try:
+        user = CollectedUser(
+            nickname=request.nickname,
+            douyin_id=douyin_id,
+            keyword=request.keyword or "",
+            task_id=request.task_id or None,
+            fans_count=request.fans_count or "",
+            likes_count=request.likes_count or "",
+            follow_count=request.follow_count or "",
+            works_count=request.works_count or "",
+            gender=request.gender or "",
+            age=request.age or "",
+            ip_location=request.ip_location or "",
+            is_private=request.is_private or "",
+            device_id=authed_device_id,
+        )
+        db.add(user)
+        db.commit()
+        return {"saved": True, "updated": False, "user_id": user.id}
+    except IntegrityError:
+        db.rollback()
+        return {"saved": False, "reason": "duplicate douyin_id"}
+
+
+class UserAvatarRequest(BaseModel):
+    douyin_id: str
+    image_base64: str  # base64-encoded JPEG/PNG
+
+
+@router.post("/user-avatar")
+def upload_user_avatar(
+    request: UserAvatarRequest,
+    db: Session = Depends(get_db),
+    _: str = Depends(verify_device_secret),
+):
+    """上传用户头像裁剪图，保存到本地并关联 CollectedUser."""
+    import base64
+    import os
+    from app.db_models import CollectedUser
+
+    douyin_id = request.douyin_id.strip()
+    if not douyin_id:
+        return {"saved": False, "reason": "empty douyin_id"}
+
+    user = db.query(CollectedUser).filter(CollectedUser.douyin_id == douyin_id).first()
+    if not user:
+        return {"saved": False, "reason": "user not found"}
+
+    try:
+        img_data = base64.b64decode(request.image_base64)
+    except Exception:
+        return {"saved": False, "reason": "invalid base64"}
+
+    if len(img_data) > 512 * 1024:
+        return {"saved": False, "reason": "image too large (>512KB)"}
+
+    avatar_dir = os.path.join(os.path.dirname(__file__), "..", "..", "data", "avatars")
+    os.makedirs(avatar_dir, exist_ok=True)
+    filename = f"{douyin_id}.jpg"
+    filepath = os.path.join(avatar_dir, filename)
+    with open(filepath, "wb") as f:
+        f.write(img_data)
+
+    user.avatar_url = f"/api/device/avatar/{douyin_id}"
+    db.commit()
+    return {"saved": True, "filename": filename, "size": len(img_data)}
+
+
+@router.get("/avatar/{douyin_id}")
+def get_user_avatar(douyin_id: str):
+    """获取用户头像图片."""
+    import os
+    from fastapi.responses import FileResponse
+    avatar_dir = os.path.join(os.path.dirname(__file__), "..", "..", "data", "avatars")
+    filepath = os.path.join(avatar_dir, f"{douyin_id}.jpg")
+    if not os.path.exists(filepath):
+        raise HTTPException(status_code=404, detail="Avatar not found")
+    return FileResponse(filepath, media_type="image/jpeg")
 

@@ -86,7 +86,7 @@ var aiAnalyzer = {
     }
 
     var prompt = this._buildAnalysisPrompt(searchKeyword, nickname, commentText);
-    var content = this._callAI(prompt, 2048, 0.3);
+    var content = this._callAI(prompt, 1024, 0.3);
     if (!content) {
       logger.warn(TAG, "AI analysis failed");
       return null;
@@ -95,7 +95,7 @@ var aiAnalyzer = {
     var result = this._parseAnalysisResponse(content);
     if (!result) {
       logger.warn(TAG, "AI 解析失败，重试一次");
-      content = this._callAI(prompt, 2048, 0.3);
+      content = this._callAI(prompt, 256, 0.3);
       if (content) {
         result = this._parseAnalysisResponse(content);
       }

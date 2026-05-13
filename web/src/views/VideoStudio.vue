@@ -14,6 +14,9 @@ import {
   listMediaWorkflows, listTTSWorkflows, listBGMs, getVideoFileUrl,
 } from '../api/pixelle-client.js'
 import { getPixelleConfig, updatePixelleConfig } from '../api/pixelle.js'
+import { listCharacters } from '../api/characters.js'
+import { listScenes } from '../api/scenes.js'
+import PipelineLayerConfig from '../components/video-studio/PipelineLayerConfig.vue'
 import { useToastStore } from '../stores/toast.js'
 
 const toast = useToastStore()
@@ -29,6 +32,46 @@ const pipelines = [
   { key: 'seedance', label: 'Seedance 2.0', icon: 'M13 10V3L4 14h7v7l9-11h-7z', desc: '字节跳动 Seedance 2.0 原生视频生成 (1080P 声画同步)' },
 ]
 const activePipeline = ref('quick_create')
+
+// ==================== Layer Model Config ====================
+
+const layerModels = ref({
+  scriptLLM: 'qwen-max',
+  imageModel: 'flux',
+  videoModel: 'auto',
+  ttsModel: 'edge-tts',
+  auditModel: 'auto',
+})
+
+// ==================== Character & Scene Selection ====================
+
+const characterList = ref([])
+const sceneList = ref([])
+const selectedCharacterIds = ref([])
+const selectedSceneIds = ref([])
+
+async function loadAssets() {
+  try {
+    const [cRes, sRes] = await Promise.all([
+      listCharacters().catch(() => ({ data: { ok: false, characters: [] } })),
+      listScenes().catch(() => ({ data: { ok: false, scenes: [] } })),
+    ])
+    characterList.value = cRes.data.ok ? cRes.data.characters : []
+    sceneList.value = sRes.data.ok ? sRes.data.scenes : []
+  } catch {}
+}
+
+function toggleCharacter(id) {
+  const idx = selectedCharacterIds.value.indexOf(id)
+  if (idx >= 0) selectedCharacterIds.value.splice(idx, 1)
+  else selectedCharacterIds.value.push(id)
+}
+
+function toggleScene(id) {
+  const idx = selectedSceneIds.value.indexOf(id)
+  if (idx >= 0) selectedSceneIds.value.splice(idx, 1)
+  else selectedSceneIds.value.push(id)
+}
 
 // ==================== System Config ====================
 
@@ -225,6 +268,18 @@ async function handleGenerate() {
     }
     if (cf.bgmMode !== 'none') payload.bgm_volume = cf.bgmVolume
 
+    // Character & scene references
+    if (selectedCharacterIds.value.length) payload.character_ids = selectedCharacterIds.value
+    if (selectedSceneIds.value.length) payload.scene_ids = selectedSceneIds.value
+
+    // Per-layer model overrides
+    const lm = layerModels.value
+    if (lm.scriptLLM && lm.scriptLLM !== 'qwen-max') payload.script_llm = lm.scriptLLM
+    if (lm.imageModel && lm.imageModel !== 'auto') payload.image_model = lm.imageModel
+    if (lm.videoModel && lm.videoModel !== 'auto') payload.video_model = lm.videoModel
+    if (lm.ttsModel && lm.ttsModel !== 'edge-tts') payload.tts_model = lm.ttsModel
+    if (lm.auditModel && lm.auditModel !== 'auto') payload.audit_model = lm.auditModel
+
     const sc = systemConfig.value
     if (sc.templateFontSize || sc.templateTextColor || sc.templateBgColor) {
       payload.template_params = {}
@@ -312,7 +367,25 @@ function handleClearResult() {
 
 // ==================== Lifecycle ====================
 
-onMounted(() => { loadSystemConfig(); fetchResources() })
+// Two-way sync: layerModels ↔ voiceVisualForm
+watch(() => layerModels.value.ttsModel, (val) => {
+  if (voiceVisualForm.value.ttsEngine !== val) {
+    voiceVisualForm.value = { ...voiceVisualForm.value, ttsEngine: val }
+  }
+})
+watch(() => voiceVisualForm.value.ttsEngine, (val) => {
+  if (layerModels.value.ttsModel !== val) {
+    layerModels.value = { ...layerModels.value, ttsModel: val }
+  }
+})
+watch(() => layerModels.value.imageModel, (val) => {
+  const wf = val === 'flux' ? 'runninghub/image_flux.json' : val === 'sdxl' ? 'comfyui/sdxl.json' : ''
+  if (voiceVisualForm.value.mediaWorkflow !== wf) {
+    voiceVisualForm.value = { ...voiceVisualForm.value, mediaWorkflow: wf }
+  }
+})
+
+onMounted(() => { loadSystemConfig(); fetchResources(); loadAssets() })
 onUnmounted(() => { clearPoll() })
 </script>
 
@@ -340,10 +413,38 @@ onUnmounted(() => { clearPoll() })
     />
 
     <!-- Standard pipeline (quick_create) -->
-    <div v-if="activePipeline === 'quick_create'" class="grid grid-cols-1 lg:grid-cols-3 gap-4" style="min-height: calc(100vh - 330px);">
-      <ContentPanel v-model="contentForm" :bgm-list="bgmList" @bgm-upload="handleBgmUpload"/>
-      <VoiceVisualPanel v-model="voiceVisualForm" :templates="templates" :media-workflows="mediaWorkflows" :tts-workflows="ttsWorkflows" :resources-loading="resourcesLoading" @ref-audio-upload="handleRefAudioUpload"/>
-      <GeneratePanel :generating="generating" :progress="progress" :result="result" :history="history" :video-url="videoUrl" :config-valid="!!(systemConfig.llmApiKey || systemConfig.runninghubApiKey)" @generate="handleGenerate" @clear-result="handleClearResult"/>
+    <div v-if="activePipeline === 'quick_create'" class="space-y-4" style="min-height: calc(100vh - 330px);">
+      <!-- Per-layer model config -->
+      <PipelineLayerConfig v-model="layerModels" />
+      <!-- Character & scene selection chips -->
+      <div v-if="characterList.length || sceneList.length" class="flex gap-4 flex-wrap">
+        <div v-if="characterList.length" class="flex-1 min-w-0">
+          <label class="block text-xs text-slate-400 mb-1.5">选择角色 (可多选)</label>
+          <div class="flex flex-wrap gap-1.5">
+            <button v-for="c in characterList" :key="c.id" @click="toggleCharacter(c.id)"
+              class="px-2.5 py-1 rounded-lg text-xs transition-all cursor-pointer"
+              :class="selectedCharacterIds.includes(c.id) ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30' : 'bg-white/5 text-slate-400 border border-white/10 hover:border-white/20'">
+              {{ c.name }}
+            </button>
+          </div>
+        </div>
+        <div v-if="sceneList.length" class="flex-1 min-w-0">
+          <label class="block text-xs text-slate-400 mb-1.5">选择场景 (可多选)</label>
+          <div class="flex flex-wrap gap-1.5">
+            <button v-for="s in sceneList" :key="s.id" @click="toggleScene(s.id)"
+              class="px-2.5 py-1 rounded-lg text-xs transition-all cursor-pointer"
+              :class="selectedSceneIds.includes(s.id) ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-white/5 text-slate-400 border border-white/10 hover:border-white/20'">
+              {{ s.name }}
+            </button>
+          </div>
+        </div>
+      </div>
+      <!-- Three-column layout -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <ContentPanel v-model="contentForm" :bgm-list="bgmList" @bgm-upload="handleBgmUpload"/>
+        <VoiceVisualPanel v-model="voiceVisualForm" :templates="templates" :media-workflows="mediaWorkflows" :tts-workflows="ttsWorkflows" :resources-loading="resourcesLoading" @ref-audio-upload="handleRefAudioUpload"/>
+        <GeneratePanel :generating="generating" :progress="progress" :result="result" :history="history" :video-url="videoUrl" :config-valid="!!(systemConfig.llmApiKey || systemConfig.runninghubApiKey)" @generate="handleGenerate" @clear-result="handleClearResult"/>
+      </div>
     </div>
 
     <!-- Custom Media -->

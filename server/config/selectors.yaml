@@ -250,6 +250,16 @@ selectors:
   - priority: 1
     type: text
     value: ''
+- action_name: comment_is_author
+  category: collect
+  platform_version: default
+  strategies:
+  - priority: 1
+    type: text
+    value: 作者
+  - priority: 2
+    type: textContains
+    value: 作者
 - action_name: user_nickname
   category: collect
   platform_version: default

@@ -113,19 +113,40 @@ var selectorLoader = global.__selectorLoader || {
     }
 
     function _priority(platformVer) {
+      // exact match: 3, specific version (e.g. "38.6.0"): 2, default/empty: 1
       if (platformVer === douyinVersion) return 3;
-      if (platformVer === "default" || !platformVer) return 2;
-      return 1;
+      if (!platformVer || platformVer === "default") return 1;
+      return 2;
+    }
+
+    // Semantic version distance (lower = closer)
+    function _versionDist(v1, v2) {
+      if (!v1 || !v2 || v1 === "default" || v2 === "default") return 9999;
+      var p1 = String(v1).split("."), p2 = String(v2).split(".");
+      var maxLen = Math.max(p1.length, p2.length);
+      var dist = 0;
+      for (var i = 0; i < maxLen; i++) {
+        dist = dist * 1000 + Math.abs((+p1[i] || 0) - (+p2[i] || 0));
+      }
+      return dist;
     }
 
     for (var i = 0; i < selectors.length; i++) {
       var s = selectors[i];
       var existing = this._cache[s.action_name];
-      if (!existing || _priority(s.platform_version) > _priority(existing.platform_version)) {
+      var p = _priority(s.platform_version);
+      if (!existing || p > _priority(existing.platform_version)) {
         this._cache[s.action_name] = s;
+      } else if (existing && p === _priority(existing.platform_version)) {
+        // Same priority → pick closest version to device
+        var sVer = s.platform_version || "";
+        var exVer = existing.platform_version || "";
+        if (_versionDist(sVer, douyinVersion) < _versionDist(exVer, douyinVersion)) {
+          this._cache[s.action_name] = s;
+        }
       }
     }
-    logger.debug(TAG, "已应用选择器配置，_cache " + Object.keys(this._cache).length + " 个选择器 (抖音 " + douyinVersion + ")");
+    logger.info(TAG, "已应用选择器配置，_cache " + Object.keys(this._cache).length + " 个选择器 (抖音 " + douyinVersion + ")");
   },
 
   /**

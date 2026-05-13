@@ -341,6 +341,7 @@ class CollectedUser(Base):
     device_id = Column(String(36), ForeignKey("devices.id"), nullable=True)
     nickname = Column(String(100), nullable=False)
     douyin_id = Column(String(100), nullable=False, unique=True, index=True)  # 抖音数字ID，去重键
+    keyword = Column(String(200), nullable=True, index=True)  # 采集关键词/行业
     likes_count = Column(String(20), nullable=True)     # 获赞数
     follow_count = Column(String(20), nullable=True)    # 关注数
     fans_count = Column(String(20), nullable=True)      # 粉丝数
@@ -349,6 +350,7 @@ class CollectedUser(Base):
     age = Column(String(10), nullable=True)             # 年龄
     ip_location = Column(String(100), nullable=True)    # IP属地
     is_private = Column(String(10), nullable=True)      # 是否私密账号
+    avatar_url = Column(Text, nullable=True)             # 头像本地路径
     created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
 
 

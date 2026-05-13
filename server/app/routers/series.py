@@ -1,4 +1,6 @@
 """系列 + 剧集管理 API."""
+import json
+import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from typing import Optional
@@ -6,7 +8,9 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import verify_admin_token
 from app.db_models import Series, Episode, Character, Scene, PipelineRun, series_characters, series_scenes
+from app.services.ai_generator import ai_generator
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/series", tags=["series"])
 
 
@@ -24,6 +28,150 @@ class EpisodeUpdate(BaseModel):
     title: Optional[str] = None
     script_json: Optional[dict] = None
     storyboard_json: Optional[dict] = None
+
+
+# === AI 自动生成角色 + 场景 ===
+
+@router.post("/{series_id}/auto-generate")
+async def auto_generate_series_assets(series_id: str, db: Session = Depends(get_db),
+                                      _: str = Depends(verify_admin_token)):
+    """根据系列 logline 自动生成角色和场景，自动创建并关联到系列。"""
+    s = db.query(Series).filter(Series.id == series_id).first()
+    if not s:
+        raise HTTPException(404, "Series not found")
+    if not s.logline:
+        raise HTTPException(400, "请先填写系列的故事概要 (logline)")
+
+    text = s.logline
+    genre = s.genre
+
+    # 1. 生成角色
+    char_prompt = f"""故事概要：{text}
+类型：{genre}
+需要生成的角色数量：4
+
+为每个角色生成以下字段的 JSON：
+- name: 角色姓名
+- role_type: protagonist(主角) / antagonist(反派) / supporting(配角) / cameo(客串)
+- gender: male / female
+- age_range: 年龄段，如 "25-30"
+- personality: 性格描述（2-3句）
+- appearance_desc: 详细外貌描述（50-100字，用于 AI 图像生成）
+- outfit_desc: 典型着装描述（30-50字，用于 AI 图像生成）
+
+严格输出 JSON 数组，格式：{{"characters": [...]}}"""
+    try:
+        raw_chars = await ai_generator.generate_custom(
+            db, _CHAR_SYSTEM, char_prompt, max_tokens=4096, temperature=0.8
+        )
+        char_data = _parse_json_with_key(raw_chars, "characters")
+    except Exception as e:
+        logger.warning("Auto-generate characters failed: %s", e)
+        raise HTTPException(500, f"角色生成失败: {e}")
+
+    # 2. 生成场景
+    scene_prompt = f"""故事概要：{text}
+类型：{genre}
+需要生成的场景数量：5
+
+为每个场景生成以下字段的 JSON：
+- name: 场景/地点名称
+- scene_type: indoor(室内) / outdoor(室外) / transition(转场) / special(特殊)
+- location_desc: 详细地点描述（50-100字，用于 AI 图像生成）
+- lighting: day(白天) / dusk(黄昏) / night(夜晚) / warm_indoor(室内暖光) / cold_fluorescent(冷荧光)
+- mood: warm(温馨) / tense(紧张) / romantic(浪漫) / mysterious(悬疑) / sad(悲伤) / joyful(欢快)
+
+严格输出 JSON 数组，格式：{{"scenes": [...]}}"""
+    try:
+        raw_scenes = await ai_generator.generate_custom(
+            db, _SCENE_SYSTEM, scene_prompt, max_tokens=4096, temperature=0.8
+        )
+        scene_data = _parse_json_with_key(raw_scenes, "scenes")
+    except Exception as e:
+        logger.warning("Auto-generate scenes failed: %s", e)
+        raise HTTPException(500, f"场景生成失败: {e}")
+
+    # 3. 持久化角色
+    created_chars = []
+    for c in char_data["characters"]:
+        ch = Character(
+            name=c.get("name", "?"),
+            role_type=c.get("role_type", "supporting"),
+            gender=c.get("gender", "male"),
+            age_range=c.get("age_range", ""),
+            personality=c.get("personality", ""),
+            appearance_desc=c.get("appearance_desc", ""),
+            outfit_desc=c.get("outfit_desc", ""),
+        )
+        db.add(ch)
+        created_chars.append(ch)
+
+    # 4. 持久化场景
+    created_scenes = []
+    for sc in scene_data["scenes"]:
+        scene = Scene(
+            name=sc.get("name", "?"),
+            scene_type=sc.get("scene_type", "indoor"),
+            location_desc=sc.get("location_desc", ""),
+            lighting=sc.get("lighting", ""),
+            mood=sc.get("mood", ""),
+        )
+        db.add(scene)
+        created_scenes.append(scene)
+
+    db.flush()
+
+    # 5. 关联到系列
+    for ch in created_chars:
+        s.characters.append(ch)
+    for sc in created_scenes:
+        s.scenes.append(sc)
+
+    db.commit()
+
+    return {
+        "ok": True,
+        "characters": [_series_char_dict(c) for c in created_chars],
+        "scenes": [_series_scene_dict(sc) for sc in created_scenes],
+    }
+
+
+_CHAR_SYSTEM = """你是一位资深的编剧和角色设计师。根据故事概要生成详细的角色档案。
+输出必须是合法的 JSON，不要包含 markdown 代码块标记。每个角色包含所有要求字段。
+appearance_desc 要足够详细（50-100字），用于 AI 图像生成。角色之间要有区分度。"""
+
+_SCENE_SYSTEM = """你是一位资深的电影导演和场景设计师。根据故事概要生成详细的场景描述。
+输出必须是合法的 JSON，不要包含 markdown 代码块标记。每个场景包含所有要求字段。
+location_desc 要足够详细（50-100字），用于 AI 图像生成。场景之间要有区分度。"""
+
+
+def _parse_json_with_key(raw: str, key: str) -> dict:
+    import re
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        pass
+    m = re.search(r'```(?:json)?\s*([\s\S]+?)\s*```', raw, re.DOTALL)
+    if m:
+        try:
+            return json.loads(m.group(1))
+        except json.JSONDecodeError:
+            pass
+    m = re.search(r'\{[^{}]*"' + key + r'"\s*:\s*\[[\s\S]*?\][^{}]*\}', raw, re.DOTALL)
+    if m:
+        try:
+            return json.loads(m.group(0))
+        except json.JSONDecodeError:
+            pass
+    raise ValueError(f"无法解析 LLM 返回的 JSON (key={key}): {raw[:300]}")
+
+
+def _series_char_dict(c: Character) -> dict:
+    return {col.name: getattr(c, col.name) for col in Character.__table__.columns}
+
+
+def _series_scene_dict(s: Scene) -> dict:
+    return {col.name: getattr(s, col.name) for col in Scene.__table__.columns}
 
 
 def _series_dict(s: Series) -> dict:

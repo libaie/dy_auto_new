@@ -696,10 +696,46 @@ Plan B 完成后，Plan C（前端）基于此 API 构建 UI。
 | Review | Trigger | Why | Runs | Status | Findings |
 |--------|---------|-----|------|--------|----------|
 | Eng Review | `/plan-eng-review` | Architecture & tests | 1 | CLEAR | 5 issues resolved |
-| CEO Review | — | — | 0 | — | — |
-| Design Review | — | — | 0 | — | — |
+| CEO Review | `/autoplan` | Multi-angle review (2026-05-13) | 1 | ISSUES_OPEN | 3 unresolved, 1 critical gap |
+| Design Review | `/autoplan` | Multi-angle review (2026-05-13) | 1 | ISSUES_OPEN | 4 unresolved (state coverage, accessibility, empty states) |
+| Eng Review (2nd) | `/autoplan` | Post-implementation architecture audit | 1 | ISSUES_OPEN | 7 findings, 2 critical gaps |
 | Codex Review | — | — | 0 | — | — |
 
-**VERDICT:** ENG CLEARED — Plan B locked. Pipeline proxy + encryption + full test coverage added.
+### /autoplan Review Findings (2026-05-13)
 
-**VERDICT:** NO REVIEWS YET — run `/autoplan` or `/plan-eng-review` after Plan C is written.
+**P0 — Critical:**
+- [pipeline.py:39] `asyncio.create_task` orphaned on restart — task state lost, no recovery from `current_layer`
+
+**P1 — High:**
+- [pipeline_proxy.py:17] No retry/fallback when Pixelle-Video unreachable — whole pipeline fails
+- Audit engine not implemented — no quality gate between render and post-production
+- [pipeline_proxy.py:62] `/postproduction/execute` is placeholder — FFmpeg logic missing
+
+**P2 — Medium:**
+- [VideoStudio.vue:314] Fixed 120x5s poll timeout insufficient for Seedance (needs 180)
+- [series.py:148] `_parse_json_with_key` regex fails on nested JSON in array elements
+- No exponential backoff in pollTask
+
+**Design Issues:**
+- State coverage: 5/10 — empty/error/partial-success states missing across 6 pipeline tabs
+- Accessibility: 3/10 — no keyboard nav, no aria-labels
+- First-use experience: 3/10 — no guided tour, silent load failures
+
+**VERDICT:** AUTOPLAN COMPLETE — 3 phases executed (CEO/Design/Eng). 16 decisions (12 auto, 3 taste, 1 user challenge → APPROVED AS-IS). P0 pipeline recovery + P1 audit engine prioritized for next sprint.
+
+### Decision Audit Trail
+
+| # | Phase | Decision | Classification | Principle | Rationale |
+|---|-------|----------|---------------|-----------|-----------|
+| 1 | CEO | SELECTIVE EXPANSION mode | mechanical | P1 completeness | Plan B/C have partial implementation, expand to cover gaps in blast radius |
+| 2 | CEO | Approve error handling for pipeline_proxy | mechanical | P2 boil lakes | 2 files, <50 lines, in blast radius |
+| 3 | CEO | Defer Audit Service full impl | mechanical | P3 pragmatic | New service+router, needs Gemini/GPT-4V API setup |
+| 4 | CEO | Defer PipelineMonitor standalone page | mechanical | P3 pragmatic | Plan C Task 5, ~350 lines, outside current blast radius |
+| 5 | Design | Auto-fix empty states across pipeline tabs | mechanical | P1 completeness | All 6 tabs need empty-state guidance |
+| 6 | Design | Accessibility deferred to backlog | taste | P3 pragmatic | Keyboard nav+aria-labels: high effort, low immediate user impact |
+| 7 | Design | Keep dark glassmorphism theme | mechanical | P5 explicit | Consistent across all components, no change needed |
+| 8 | Eng | Reuse existing layers_json for recovery | taste | P5 explicit | DB field already designed, simpler than Celery |
+| 9 | Eng | Fix pipeline.py asyncio.create_task | mechanical | P1 completeness | P0 — state loss on restart unacceptable |
+|10 | Eng | Add httpx retry to pipeline_proxy | mechanical | P2 boil lakes | 3 retries with exponential backoff, ~20 lines |
+|11 | Eng | Fix pollTask timeout per-model | mechanical | P1 completeness | Seedance needs 15min (180 polls), Kling 10min (120) |
+|12 | Eng | SeriesDetail inline progress bar | taste | P5 explicit | <100 lines vs 350 for standalone monitor |

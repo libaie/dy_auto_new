@@ -81,11 +81,12 @@ def seed_reference_data(db: Session):
     """启动时 seed 默认字典数据。幂等：已存在则跳过。"""
     for category, entries in DEFAULT_DATA.items():
         for i, (val, label) in enumerate(entries):
-            try:
+            exists = db.query(ReferenceData).filter(
+                ReferenceData.category == category,
+                ReferenceData.value == val
+            ).first()
+            if not exists:
                 db.add(ReferenceData(category=category, value=val, label=label, sort_order=i))
-                db.flush()
-            except IntegrityError:
-                db.rollback()
     db.commit()
 
 

@@ -60,22 +60,39 @@ import { ref, reactive, onMounted } from 'vue'
 import { getModels, updateModels } from '../api/aiConfig.js'
 
 const models = reactive({})
+const _originals = {}  // track original values to avoid sending masked keys back
 const loading = ref(true)
 const saving = ref(false)
 const saved = ref(false)
+const error = ref('')
 
 onMounted(async () => {
-  const { data } = await getModels()
-  if (data.ok) Object.assign(models, data.models)
-  loading.value = false
+  try {
+    const { data } = await getModels()
+    if (data.ok) {
+      Object.assign(models, data.models)
+      Object.assign(_originals, data.models)
+    }
+  } catch (e) { error.value = e.message || '加载失败' }
+  finally { loading.value = false }
 })
 
 async function save() {
   saving.value = true
   saved.value = false
-  await updateModels({ ...models })
-  saving.value = false
-  saved.value = true
-  setTimeout(() => saved.value = false, 3000)
+  error.value = ''
+  // Only send fields that changed from their loaded value
+  const changed = {}
+  for (const [k, v] of Object.entries(models)) {
+    if (v !== _originals[k]) changed[k] = v
+  }
+  try {
+    await updateModels(changed)
+    // Update originals to reflect saved state
+    Object.assign(_originals, changed)
+    saved.value = true
+    setTimeout(() => saved.value = false, 3000)
+  } catch (e) { error.value = e.message || '保存失败' }
+  finally { saving.value = false }
 }
 </script>

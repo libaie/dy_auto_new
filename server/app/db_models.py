@@ -489,7 +489,7 @@ class Episode(Base):
     __tablename__ = "episodes"
 
     id = Column(String(36), primary_key=True, default=_uuid)
-    series_id = Column(String(36), ForeignKey("series.id"), nullable=False)
+    series_id = Column(String(36), ForeignKey("series.id", ondelete="CASCADE"), nullable=False)
     episode_number = Column(Integer, nullable=False)
     title = Column(String(200), nullable=True)
     script_json = Column(JSON, nullable=True, default=dict)
@@ -501,15 +501,18 @@ class Episode(Base):
     created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
 
     series = relationship("Series", back_populates="episodes")
-    __table_args__ = (UniqueConstraint("series_id", "episode_number"),)
+    __table_args__ = (
+        UniqueConstraint("series_id", "episode_number"),
+        Index("idx_episodes_series_id", "series_id"),
+    )
 
 
 class PipelineRun(Base):
     __tablename__ = "pipeline_runs"
 
     id = Column(String(36), primary_key=True, default=_uuid)
-    series_id = Column(String(36), ForeignKey("series.id"), nullable=False)
-    episode_id = Column(String(36), ForeignKey("episodes.id"), nullable=True)
+    series_id = Column(String(36), ForeignKey("series.id", ondelete="CASCADE"), nullable=False)
+    episode_id = Column(String(36), ForeignKey("episodes.id", ondelete="SET NULL"), nullable=True)
     mode = Column(String(20), nullable=False, default="step_by_step")
     layers_json = Column(JSON, nullable=True, default=dict)
     current_layer = Column(Integer, nullable=False, default=0)
@@ -519,6 +522,8 @@ class PipelineRun(Base):
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
+
+    __table_args__ = (Index("idx_pipeline_runs_series_id", "series_id"),)
 
 
 class AuditReport(Base):

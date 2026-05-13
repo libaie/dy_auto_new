@@ -6,6 +6,7 @@
     </div>
 
     <div v-if="loading" class="text-gray-500 text-center py-12">加载中...</div>
+    <div v-else-if="error" class="text-red-500 text-center py-12">{{ error }}</div>
     <div v-else-if="characters.length === 0" class="text-gray-400 text-center py-12">暂无角色</div>
     <div v-else class="grid grid-cols-4 gap-4">
       <div v-for="c in characters" :key="c.id" class="bg-white rounded-xl border p-4 text-center hover:shadow-md transition">
@@ -54,18 +55,19 @@ import { listCharacters, createCharacter } from '../api/characters.js'
 const characters = ref([])
 const loading = ref(true)
 const showCreate = ref(false)
+const error = ref('')
 const form = reactive({ name: '', role_type: 'protagonist', gender: 'male', appearance_desc: '', outfit_desc: '', personality: '' })
 
 async function load() {
-  const { data } = await listCharacters()
-  characters.value = data.ok ? data.characters : []
-  loading.value = false
+  loading.value = true; error.value = ''
+  try { const { data } = await listCharacters(); characters.value = data.ok ? data.characters : [] }
+  catch (e) { error.value = e.message || '加载失败' }
+  finally { loading.value = false }
 }
 
 async function doCreate() {
-  await createCharacter({ ...form })
-  showCreate.value = false
-  await load()
+  try { await createCharacter({ ...form }); showCreate.value = false; await load() }
+  catch (e) { error.value = e.message || '创建失败' }
 }
 
 function roleClass(r) {

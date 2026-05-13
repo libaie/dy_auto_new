@@ -1,15 +1,17 @@
 """流水线编排 API — 启动/状态查询/断点续传."""
 import asyncio
+import logging
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
+
+logger = logging.getLogger(__name__)
 from sqlalchemy.orm import Session
-from app.database import get_db
+from app.database import get_db, SessionLocal
 from app.deps import verify_admin_token
 from app.db_models import PipelineRun, Series
 
 router = APIRouter(prefix="/api/pipeline", tags=["pipeline"])
 PROXY_URL = "http://127.0.0.1:8000/api/pipeline-proxy"
-LAYER_COUNT = 6  # 0=assets, 1=story, 2=director, 3=render, 4=post, 5=done
 
 
 async def _proxy_post(path: str, body: dict) -> dict:
@@ -31,27 +33,35 @@ async def pipeline_start(series_id: str, episode_id: str = None,
         mode=mode, status="running",
     )
     db.add(run); db.commit(); db.refresh(run)
+    run_id = run.id
 
-    # Fire-and-forget: 异步执行所有层
-    asyncio.ensure_future(_run_all_layers(db, run))
+    # Fire-and-forget with OWN session (not request-scoped as it closes after response)
+    task = asyncio.create_task(_run_all_layers(run_id))
+    task.add_done_callback(
+        lambda t: logger.error(f"Pipeline task failed: {t.exception()}") if t.exception() else None
+    )
 
-    return {"ok": True, "run_id": run.id}
+    return {"ok": True, "run_id": run_id}
 
 
-async def _run_all_layers(db: Session, run: PipelineRun):
-    """顺序执行所有流水线层."""
-    common = {"series_id": run.series_id, "episode_id": run.episode_id or ""}
-    layer_endpoints = [
-        "/assets/generate", "/story/generate", "/director/generate",
-        "/render/execute", "/postproduction/execute",
-    ]
+async def _run_all_layers(run_id: str):
+    """顺序执行所有流水线层 (使用自有 DB session)."""
+    db = SessionLocal()
     try:
+        run = db.query(PipelineRun).filter(PipelineRun.id == run_id).first()
+        if not run:
+            return
+        common = {"series_id": run.series_id, "episode_id": run.episode_id or ""}
+        layer_endpoints = [
+            "/assets/generate", "/story/generate", "/director/generate",
+            "/render/execute", "/postproduction/execute",
+        ]
         for i, ep in enumerate(layer_endpoints):
             run.current_layer = i
             db.commit()
-            await _proxy_post(ep, common)
+            result = await _proxy_post(ep, common)
             layers = run.layers_json or {}
-            layers[str(i)] = {"status": "completed"}
+            layers[str(i)] = {"status": "completed", "result": result}
             run.layers_json = layers
             db.commit()
         run.status = "completed"
@@ -60,6 +70,7 @@ async def _run_all_layers(db: Session, run: PipelineRun):
         run.error_log = str(e)
     finally:
         db.commit()
+        db.close()
 
 
 @router.post("/resume/{run_id}")
@@ -70,7 +81,10 @@ async def pipeline_resume(run_id: str, db: Session = Depends(get_db),
     if not run or run.status not in ("pending", "running", "paused"):
         raise HTTPException(400, "PipelineRun not resumable")
     run.status = "running"; db.commit()
-    asyncio.ensure_future(_run_all_layers(db, run))
+    task = asyncio.create_task(_run_all_layers(run_id))
+    task.add_done_callback(
+        lambda t: logger.error(f"Pipeline resume failed: {t.exception()}") if t.exception() else None
+    )
     return {"ok": True, "run_id": run.id}
 
 

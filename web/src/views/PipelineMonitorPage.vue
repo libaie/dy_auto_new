@@ -3,6 +3,7 @@
     <button @click="$router.back()" class="text-blue-600 hover:underline mb-4">&larr; 返回</button>
 
     <div v-if="loading" class="text-gray-500 text-center py-12">加载中...</div>
+    <div v-else-if="error" class="text-red-500 text-center py-12">{{ error }}</div>
     <template v-else-if="run">
       <div class="flex justify-between items-start mb-6">
         <div>
@@ -80,10 +81,19 @@ const elapsed = computed(() => {
   return `${m}m ${s}s`
 })
 
+const error = ref('')
+
 async function load() {
-  const { data } = await getRun(route.params.runId.split('/')[0] || route.params.runId, route.params.runId)
-  if (data.ok) run.value = data.run
-  loading.value = false
+  try {
+    const { data } = await getRun('_', route.params.runId)
+    if (data.ok) run.value = data.run
+    else throw new Error('Run not found')
+  } catch (e) {
+    error.value = e.message || '加载失败'
+    if (timer) clearInterval(timer)  // stop polling on error
+  } finally {
+    loading.value = false
+  }
 }
 
 function runStatusClass(s) {

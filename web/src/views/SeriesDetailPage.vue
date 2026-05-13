@@ -3,6 +3,7 @@
     <button @click="$router.push('/series')" class="text-blue-600 hover:underline mb-4">&larr; 返回系列列表</button>
 
     <div v-if="loading" class="text-gray-500 text-center py-12">加载中...</div>
+    <div v-else-if="error" class="text-red-500 text-center py-12">{{ error }}</div>
     <template v-else-if="series">
       <div class="flex justify-between items-start mb-6">
         <div>
@@ -66,23 +67,25 @@ const episodes = ref([])
 const runs = ref([])
 const loading = ref(true)
 const pipelineStarting = ref(false)
+const error = ref('')
 
 async function load() {
-  loading.value = true
-  const { data } = await getSeries(route.params.id)
-  if (data.ok) {
-    series.value = data.series
-    episodes.value = data.episodes || []
-  }
-  const r = await listRuns(route.params.id)
-  runs.value = r.data.ok ? r.data.runs : []
-  loading.value = false
+  loading.value = true; error.value = ''
+  try {
+    const { data } = await getSeries(route.params.id)
+    if (data.ok) { series.value = data.series; episodes.value = data.episodes || [] }
+    else throw new Error('Series not found')
+    const r = await listRuns(route.params.id)
+    runs.value = r.data.ok ? r.data.runs : []
+  } catch (e) { error.value = e.message || '加载失败' }
+  finally { loading.value = false }
 }
 
 async function startPipelineRun() {
   pipelineStarting.value = true
-  await startPipeline(route.params.id, null, series.value.mode)
-  pipelineStarting.value = false
+  try { await startPipeline(route.params.id, null, series.value.mode) }
+  catch (e) { error.value = e.message || '启动失败' }
+  finally { pipelineStarting.value = false }
   await load()
 }
 

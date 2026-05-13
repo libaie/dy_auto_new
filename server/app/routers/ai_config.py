@@ -19,18 +19,14 @@ AI_CONFIG_KEYS = [
 
 @router.get("/models")
 def list_models(db: Session = Depends(get_db)):
-    """读取所有 AI 配置. 敏感字段脱敏显示."""
+    """读取所有 AI 配置. 敏感字段只返回占位符，不暴露任何真实值."""
     rows = db.query(SystemSetting).filter(SystemSetting.key.in_(AI_CONFIG_KEYS)).all()
     result = {}
     for r in rows:
-        val = r.value
         if is_sensitive_key(r.key):
-            try:
-                val = decrypt(val) if val else ""
-                val = val[:4] + "****" + val[-4:] if len(val) > 8 else "****"
-            except Exception:
-                val = "****"
-        result[r.key] = val
+            result[r.key] = "****" if r.value else ""
+        else:
+            result[r.key] = r.value or ""
     return {"ok": True, "models": result}
 
 

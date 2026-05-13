@@ -5,7 +5,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import verify_admin_token
-from app.db_models import Series, Episode, Character, Scene
+from app.db_models import Series, Episode, Character, Scene, PipelineRun, series_characters, series_scenes
 
 router = APIRouter(prefix="/api/series", tags=["series"])
 
@@ -69,7 +69,15 @@ def get_series(series_id: str, db: Session = Depends(get_db)):
 @router.delete("/{series_id}")
 def delete_series(series_id: str, db: Session = Depends(get_db),
                   _: str = Depends(verify_admin_token)):
-    db.query(Series).filter(Series.id == series_id).delete()
+    s = db.query(Series).filter(Series.id == series_id).first()
+    if not s:
+        raise HTTPException(404, "Series not found")
+    # Clean M2M rows first, then episodes, then series
+    db.execute(series_characters.delete().where(series_characters.c.series_id == series_id))
+    db.execute(series_scenes.delete().where(series_scenes.c.series_id == series_id))
+    db.query(Episode).filter(Episode.series_id == series_id).delete()
+    db.query(PipelineRun).filter(PipelineRun.series_id == series_id).delete()
+    db.delete(s)
     db.commit()
     return {"ok": True}
 

@@ -48,6 +48,7 @@
 
     <!-- 系列列表 -->
     <div v-if="loading" class="text-gray-500 text-center py-12">加载中...</div>
+    <div v-else-if="error" class="text-red-500 text-center py-12">{{ error }}</div>
     <div v-else-if="seriesList.length === 0" class="text-gray-400 text-center py-12">暂无系列，点击「新建系列」开始</div>
     <div v-else class="grid gap-4">
       <div v-for="s in seriesList" :key="s.id"
@@ -82,6 +83,7 @@ const seriesList = ref([])
 const loading = ref(true)
 const showCreate = ref(false)
 const creating = ref(false)
+const error = ref('')
 
 const form = reactive({
   title: '', logline: '', genre: 'drama', total_episodes: 30, target_duration: 90,
@@ -89,18 +91,22 @@ const form = reactive({
 })
 
 async function loadSeries() {
-  loading.value = true
-  const { data } = await listSeries()
-  seriesList.value = data.ok ? data.series : []
-  loading.value = false
+  loading.value = true; error.value = ''
+  try {
+    const { data } = await listSeries()
+    seriesList.value = data.ok ? data.series : []
+  } catch (e) { error.value = e.message || '加载失败' }
+  finally { loading.value = false }
 }
 
 async function doCreate() {
   creating.value = true
-  await createSeries({ ...form })
-  showCreate.value = false
-  await loadSeries()
-  creating.value = false
+  try {
+    await createSeries({ ...form })
+    showCreate.value = false
+    await loadSeries()
+  } catch (e) { error.value = e.message || '创建失败' }
+  finally { creating.value = false }
 }
 
 function statusClass(s) {

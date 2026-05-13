@@ -1,4 +1,4 @@
-"""AES-256-GCM field-level encryption for sensitive settings."""
+"""Fernet (AES-128-CBC + HMAC-SHA256) field-level encryption for sensitive settings."""
 import os
 import hashlib
 import base64

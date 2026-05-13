@@ -1,13 +1,19 @@
 <script setup>
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
 import AppTopNav from '../components/layout/AppTopNav.vue'
 import AppSidebar from '../components/layout/AppSidebar.vue'
+import { getCategoryByRoute } from '../constants/navigation.js'
+
+const route = useRoute()
+const activeCategory = computed(() => getCategoryByRoute(route))
 </script>
 
 <template>
   <div class="h-screen flex flex-col overflow-hidden" style="background: var(--bg-void);">
-    <AppTopNav />
+    <AppTopNav :activeCategory="activeCategory" />
     <div class="flex flex-1 overflow-hidden">
-      <AppSidebar />
+      <AppSidebar :activeCategory="activeCategory" />
       <main class="flex-1 overflow-auto">
         <div class="p-6 animate-in">
           <RouterView />

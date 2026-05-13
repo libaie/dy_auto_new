@@ -4,6 +4,10 @@ import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../../stores/auth.js'
 import { getRealtimeStats } from '../../api/stats.js'
 
+const props = defineProps({
+  activeCategory: { type: String, required: true },
+})
+
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
@@ -29,11 +33,12 @@ onUnmounted(() => { clearInterval(clockTimer); clearInterval(statsTimer) })
 
 function handleLogout() { auth.logout(); router.push('/login') }
 
-const navQuick = [
-  { path: '/', label: '仪表盘' },
-  { path: '/tasks', label: '任务' },
-  { path: '/accounts', label: '账号' },
-  { path: '/devices', label: '设备' },
+const categories = [
+  { key: 'ops', label: '运营' },
+  { key: 'tasks', label: '任务' },
+  { key: 'data', label: '数据' },
+  { key: 'ai-video', label: 'AI 视频' },
+  { key: 'system', label: '系统' },
 ]
 </script>
 
@@ -54,11 +59,11 @@ const navQuick = [
       </router-link>
 
       <div class="hidden lg:flex items-center gap-1 tab-bar">
-        <router-link
-          v-for="item in navQuick" :key="item.path" :to="item.path"
+        <span
+          v-for="cat in categories" :key="cat.key"
           class="no-underline"
-          :class="route.path === item.path ? 'active' : ''"
-        >{{ item.label }}</router-link>
+          :class="props.activeCategory === cat.key ? 'active' : ''"
+        >{{ cat.label }}</span>
       </div>
     </div>
 

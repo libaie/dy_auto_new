@@ -1,10 +1,19 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { NAV_ITEMS } from '../../constants/navigation.js'
+import { NAV_CATEGORIES } from '../../constants/navigation.js'
+
+const props = defineProps({
+  activeCategory: { type: String, required: true },
+})
 
 const route = useRoute()
 const expanded = ref(false)
+
+const visibleItems = computed(() => {
+  const cat = NAV_CATEGORIES.find(c => c.key === props.activeCategory)
+  return cat ? cat.items : []
+})
 </script>
 
 <template>
@@ -16,14 +25,24 @@ const expanded = ref(false)
     @mouseleave="expanded = false"
   >
     <div class="flex-1 py-3 space-y-0.5 overflow-y-auto overflow-x-hidden">
+      <!-- Category label -->
+      <div
+        class="px-4 pt-1 pb-2 text-[10px] uppercase tracking-widest font-semibold whitespace-nowrap transition-all duration-200"
+        :class="expanded ? 'opacity-100' : 'opacity-0'"
+        style="color: var(--accent-400);"
+      >
+        {{ NAV_CATEGORIES.find(c => c.key === props.activeCategory)?.label || '' }}
+      </div>
+
       <router-link
-        v-for="item in NAV_ITEMS"
+        v-for="item in visibleItems"
         :key="item.path"
         :to="item.path"
         class="flex items-center h-10 mx-2 rounded-lg transition-all duration-200 group relative no-underline"
         :class="route.path === item.path
           ? 'text-sky-300'
           : 'text-slate-300 hover:text-slate-100'"
+        :aria-label="item.name"
       >
         <!-- Active indicator bar -->
         <div

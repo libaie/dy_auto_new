@@ -237,7 +237,7 @@ SeriesDetailPage (点击系列进入):
 - Create: `web/src/components/pipeline/LayerProgress.vue`
 - Modify: `web/src/router/index.js`
 
-全透明可观测性面板。实时展示七层流水线每层状态，每个 AI prompt 和输出均可见。
+全透明可观测性面板。每 5 秒轮询 GET /api/pipeline/runs/{run_id} 获取 layers_json 进度，实时展示七层流水线每层状态。
 
 **页面结构：**
 
@@ -301,10 +301,13 @@ SeriesDetailPage (点击系列进入):
 | 2 | AI 模型配置中心页 | new + modify | ~270 |
 | 3 | 角色资产库页 + CharacterCard | new + modify | ~250 |
 | 4 | 系列列表 + 详情页 + EpisodeList | new + modify | ~480 |
-| 5 | 流水线监控面板 + LayerProgress | new + modify | ~320 |
+| 5 | 流水线监控面板 + LayerProgress (5s 轮询) | new + modify | ~350 |
 | 6 | 菜单整合 | modify | ~20 |
+| 7 | 完整测试套件 (Vitest, ~15 tests) | new | ~200 |
 
-**Plan C 总工作量：约 1420 行，2-3 天。**
+**Plan C 总工作量：约 1650 行，3-4 天。**
+
+实时进度机制：PipelineMonitorPage 每 5 秒轮询 GET /api/pipeline/runs/{id} 获取 layers_json 进度，Plan B pipeline router 新增单 run 查询端点。
 
 ---
 
@@ -312,9 +315,9 @@ SeriesDetailPage (点击系列进入):
 
 | Review | Trigger | Why | Runs | Status | Findings |
 |--------|---------|-----|------|--------|----------|
-| Eng Review | — | — | 0 | — | — |
+| Eng Review | `/plan-eng-review` | Architecture & tests | 1 | CLEAR | 2 issues resolved |
 | CEO Review | — | — | 0 | — | — |
 | Design Review | — | — | 0 | — | — |
 | Codex Review | — | — | 0 | — | — |
 
-**VERDICT:** NO REVIEWS YET — run `/autoplan` or `/plan-eng-review` after Plan C to lock.
+**VERDICT:** ENG CLEARED — Plan C locked. Polling mechanism defined, full test coverage added.

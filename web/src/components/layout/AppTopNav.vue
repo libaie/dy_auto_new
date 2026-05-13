@@ -34,12 +34,18 @@ onUnmounted(() => { clearInterval(clockTimer); clearInterval(statsTimer) })
 function handleLogout() { auth.logout(); router.push('/login') }
 
 const categories = [
-  { key: 'ops', label: '运营' },
-  { key: 'tasks', label: '任务' },
-  { key: 'data', label: '数据' },
-  { key: 'ai-video', label: 'AI 视频' },
-  { key: 'system', label: '系统' },
+  { key: 'ops', label: '运营', to: '/' },
+  { key: 'tasks', label: '任务', to: '/tasks' },
+  { key: 'data', label: '数据', to: '/data' },
+  { key: 'ai-video', label: 'AI 视频', to: '/video-studio' },
+  { key: 'system', label: '系统', to: '/settings' },
 ]
+
+function handleCategoryClick(cat) {
+  if (props.activeCategory !== cat.key) {
+    router.push(cat.to)
+  }
+}
 </script>
 
 <template>
@@ -59,11 +65,12 @@ const categories = [
       </router-link>
 
       <div class="hidden lg:flex items-center gap-1 tab-bar">
-        <span
+        <button
           v-for="cat in categories" :key="cat.key"
           class="no-underline"
           :class="props.activeCategory === cat.key ? 'active' : ''"
-        >{{ cat.label }}</span>
+          @click="handleCategoryClick(cat)"
+        >{{ cat.label }}</button>
       </div>
     </div>
 

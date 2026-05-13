@@ -539,3 +539,16 @@ class AuditReport(Base):
     issues_json = Column(JSON, nullable=True, default=list)
     raw_response = Column(Text, nullable=True)
     created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
+
+
+class ReferenceData(Base):
+    """系统字典 — 管理所有下拉选项 (系列类型/角色类型/场景属性)."""
+    __tablename__ = "reference_data"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    category = Column(String(50), nullable=False, index=True)  # series_genre / character_role / scene_type / scene_lighting / scene_mood
+    value = Column(String(100), nullable=False)
+    label = Column(String(100), nullable=False)               # 显示名 (支持中文)
+    sort_order = Column(Integer, nullable=False, default=0)
+    enabled = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())

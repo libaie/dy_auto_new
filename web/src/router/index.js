@@ -102,6 +102,11 @@ const routes = [
         component: () => import('../views/ScenesPage.vue'),
       },
       {
+        path: 'dict-manage',
+        name: 'DictManage',
+        component: () => import('../views/DictManagePage.vue'),
+      },
+      {
         path: 'director/:seriesId/:episodeId',
         name: 'Director',
         component: () => import('../views/DirectorPage.vue'),

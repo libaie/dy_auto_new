@@ -1,10 +1,11 @@
 """SQLAlchemy ORM models — database persistence layer."""
 import uuid
 from datetime import datetime, timezone
+from app.config import bj_now
 
 from sqlalchemy import (
-    Column, String, Integer, DateTime, Text, Boolean,
-    JSON, ForeignKey, UniqueConstraint, Index,
+    Column, String, Integer, Float, DateTime, Text, Boolean,
+    JSON, ForeignKey, UniqueConstraint, Index, Table,
 )
 from sqlalchemy.orm import DeclarativeBase, relationship
 
@@ -27,10 +28,10 @@ class Account(Base):
     status = Column(String(20), nullable=False, default="active")  # active, risk_controlled, banned
     cookie = Column(Text, nullable=True)  # encrypted cookie, nullable for MVP
     daily_limits = Column(JSON, nullable=False, default=lambda: {
-        "likes": 50, "comments": 20, "follows": 20, "dms": 10, "replies": 15,
+        "likes": 50, "comments": 20, "follows": 20, "dms": 10, "replies": 15, "nurture_likes": 200,
     })
-    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
+    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
 
     tasks = relationship("Task", back_populates="account")
 
@@ -56,8 +57,8 @@ class Device(Base):
     hardware = Column(String(50), nullable=True)
     display = Column(String(100), nullable=True)
     last_seen_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
+    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
 
     tasks = relationship("Task", back_populates="device")
 
@@ -81,8 +82,8 @@ class DevicePairRequest(Base):
     display = Column(String(100), nullable=True)
     status = Column(String(20), nullable=False, default="pending")  # pending, approved, rejected
     device_secret = Column(String(64), nullable=True)     # generated on approval
-    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
+    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
 
 
 class Task(Base):
@@ -99,7 +100,7 @@ class Task(Base):
     scheduled_at = Column(DateTime, nullable=True)
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
     chain_instance_id = Column(String(36), ForeignKey("chain_instances.id"), nullable=True)
     step_order = Column(Integer, nullable=True)
 
@@ -124,8 +125,8 @@ class UISelector(Base):
     clean_mode = Column(String(20), nullable=True)     # raw | regex | ai
     clean_pattern = Column(Text, nullable=True)         # regex pattern
     clean_prompt = Column(Text, nullable=True)          # AI clean prompt
-    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
+    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
 
 
 class DailyStats(Base):
@@ -142,8 +143,8 @@ class DailyStats(Base):
     follows = Column(Integer, nullable=False, default=0)
     dms = Column(Integer, nullable=False, default=0)
     replies = Column(Integer, nullable=False, default=0)
-    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
+    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
 
     account = relationship("Account")
 
@@ -157,8 +158,8 @@ class ContentTemplate(Base):
     body = Column(Text, nullable=False)
     variables = Column(JSON, nullable=False, default=list)  # ["keyword", "username", "video_title"]
     is_active = Column(Boolean, nullable=False, default=True)
-    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
+    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
 
 
 class SensitiveWord(Base):
@@ -166,7 +167,7 @@ class SensitiveWord(Base):
 
     id = Column(String(36), primary_key=True, default=_uuid)
     word = Column(String(100), nullable=False, unique=True)
-    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
 
 
 class AccountGroup(Base):
@@ -175,8 +176,8 @@ class AccountGroup(Base):
     id = Column(String(36), primary_key=True, default=_uuid)
     name = Column(String(100), nullable=False, unique=True)
     description = Column(String(500), nullable=True, default="")
-    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
+    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
 
     members = relationship("AccountGroupMember", back_populates="group", cascade="all, delete-orphan")
 
@@ -190,7 +191,7 @@ class AccountGroupMember(Base):
     id = Column(String(36), primary_key=True, default=_uuid)
     group_id = Column(String(36), ForeignKey("account_groups.id", ondelete="CASCADE"), nullable=False)
     account_id = Column(String(36), ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False)
-    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
 
     group = relationship("AccountGroup", back_populates="members")
     account = relationship("Account")
@@ -203,8 +204,8 @@ class ChainTemplate(Base):
     name = Column(String(100), nullable=False)
     description = Column(String(500), nullable=True, default="")
     steps = Column(JSON, nullable=False)  # [{step_order, type, label, params}, ...]
-    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
+    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
 
     instances = relationship("ChainInstance", back_populates="template")
 
@@ -219,7 +220,7 @@ class ChainInstance(Base):
     current_step = Column(Integer, nullable=False, default=1)
     total_steps = Column(Integer, nullable=False)
     status = Column(String(20), nullable=False, default="pending")  # pending, running, completed, failed, cancelled
-    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
 
@@ -237,7 +238,7 @@ class RepliedComment(Base):
     author = Column(String(200), nullable=False)
     text = Column(Text, nullable=False)
     replied_by_device = Column(String(36), nullable=True)
-    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
 
 
 class SystemSetting(Base):
@@ -245,7 +246,7 @@ class SystemSetting(Base):
 
     key = Column(String(100), primary_key=True)
     value = Column(Text, nullable=False, default="")
-    updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
 
 
 class Channel(Base):
@@ -262,7 +263,7 @@ class Channel(Base):
     delay_range = Column(JSON, nullable=False, default=lambda: [3000, 8000])
     max_keywords = Column(Integer, nullable=False, default=500)
     current_account_index = Column(Integer, nullable=False, default=0)
-    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
     completed_at = Column(DateTime, nullable=True)
     deleted_at = Column(DateTime, nullable=True)
 
@@ -286,7 +287,7 @@ class ChannelItem(Base):
     assigned_at = Column(DateTime, nullable=True)  # for stale recovery
     task_id = Column(String(36), ForeignKey("tasks.id"), nullable=True)
     queue_position = Column(Integer, nullable=False, default=0)
-    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
     completed_at = Column(DateTime, nullable=True)
 
     channel = relationship("Channel", back_populates="items")
@@ -306,8 +307,8 @@ class PromptTemplate(Base):
     content = Column(JSON, nullable=False)  # 完整提示词结构: { identity, semanticGuide, analysis, ... }
     version = Column(Integer, nullable=False, default=1)
     enabled = Column(Boolean, nullable=False, default=True)
-    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
+    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
 
 
 class CollectedComment(Base):
@@ -326,7 +327,9 @@ class CollectedComment(Base):
     dislike_count = Column(String(20), nullable=True)    # 踩数
     location = Column(String(100), nullable=True)        # IP属地
     is_author = Column(Boolean, nullable=False, default=False)
-    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    ai_reply = Column(Text, nullable=True)              # AI 生成的回复内容
+    ai_replied_at = Column(DateTime, nullable=True)     # AI 回复时间
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
 
 
 class CollectedUser(Base):
@@ -346,4 +349,187 @@ class CollectedUser(Base):
     age = Column(String(10), nullable=True)             # 年龄
     ip_location = Column(String(100), nullable=True)    # IP属地
     is_private = Column(String(10), nullable=True)      # 是否私密账号
-    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
+
+
+class Conversation(Base):
+    """AI 发送的私信会话 — 按 (account_id, recipient_douyin_id) 全局去重"""
+    __tablename__ = "conversations"
+    __table_args__ = (
+        UniqueConstraint("account_id", "recipient_douyin_id", name="uq_conversation_account_recipient"),
+        Index("ix_conversations_task_id", "task_id"),
+        Index("ix_conversations_account_id", "account_id"),
+        Index("ix_conversations_stage", "current_stage"),
+        Index("ix_conversations_status", "status"),
+    )
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    task_id = Column(String(36), ForeignKey("tasks.id"), nullable=True)
+    account_id = Column(String(36), ForeignKey("accounts.id"), nullable=False)
+    device_id = Column(String(36), ForeignKey("devices.id"), nullable=True)
+    keyword = Column(String(200), nullable=True)
+
+    recipient_nickname = Column(String(100), nullable=False)
+    recipient_douyin_id = Column(String(100), nullable=False)
+
+    current_stage = Column(String(20), nullable=False, default="qualifying")
+    intent = Column(String(30), nullable=True)
+    last_dm_content = Column(Text, nullable=True)
+    last_dm_at = Column(DateTime, nullable=True)
+
+    claimed_at = Column(DateTime, nullable=True)
+    status = Column(String(20), nullable=False, default="active")
+
+    total_dm_count = Column(Integer, nullable=False, default=0)
+    reply_received_at = Column(DateTime, nullable=True)
+
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
+    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
+
+    account = relationship("Account")
+    device = relationship("Device")
+    task = relationship("Task")
+
+
+class GeneratedVideo(Base):
+    """AI 生成的短视频"""
+    __tablename__ = "generated_videos"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    task_id = Column(String(36), ForeignKey("tasks.id"), nullable=True)
+    keyword = Column(String(200), nullable=False)
+    title = Column(String(500), nullable=True)
+    video_path = Column(String(500), nullable=True)
+    duration = Column(Float, nullable=True)
+    status = Column(String(20), nullable=False, default="pending")
+    pixelle_task_id = Column(String(100), nullable=True)
+    error = Column(Text, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
+
+    task = relationship("Task")
+
+
+# ==== 多模型系列生成系统 ====
+
+class Character(Base):
+    __tablename__ = "characters"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    name = Column(String(100), nullable=False)
+    role_type = Column(String(20), nullable=False, default="protagonist")
+    gender = Column(String(10), nullable=False, default="male")
+    age_range = Column(String(20), nullable=True)
+    personality = Column(Text, nullable=True)
+    appearance_desc = Column(Text, nullable=True)
+    outfit_desc = Column(Text, nullable=True)
+    avatar_front_url = Column(Text, nullable=True)
+    avatar_side_url = Column(Text, nullable=True)
+    avatar_threequarter_url = Column(Text, nullable=True)
+    avatar_fullbody_url = Column(Text, nullable=True)
+    default_voice_id = Column(String(100), nullable=True)
+    meta_json = Column(JSON, nullable=True, default=dict)
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
+    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
+
+
+class Scene(Base):
+    __tablename__ = "scenes"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    name = Column(String(100), nullable=False)
+    scene_type = Column(String(20), nullable=False, default="indoor")
+    location_desc = Column(Text, nullable=True)
+    lighting = Column(String(50), nullable=True)
+    mood = Column(String(50), nullable=True)
+    reference_wideshot_url = Column(Text, nullable=True)
+    reference_midshot_url = Column(Text, nullable=True)
+    reference_aerial_url = Column(Text, nullable=True)
+    meta_json = Column(JSON, nullable=True, default=dict)
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
+    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
+
+
+class Series(Base):
+    __tablename__ = "series"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    title = Column(String(200), nullable=False)
+    logline = Column(Text, nullable=True)
+    genre = Column(String(50), nullable=False, default="drama")
+    total_episodes = Column(Integer, nullable=False, default=30)
+    target_duration = Column(Integer, nullable=False, default=90)
+    mode = Column(String(20), nullable=False, default="step_by_step")
+    pilot_first = Column(Boolean, nullable=False, default=True)
+    story_bible_json = Column(JSON, nullable=True, default=dict)
+    status = Column(String(20), nullable=False, default="draft")
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
+    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
+
+    characters = relationship("Character", secondary="series_characters", back_populates="series_list")
+    scenes = relationship("Scene", secondary="series_scenes", back_populates="series_list")
+
+
+# M2M: back_populates stubs on Character/Scene (lazy only)
+Character.series_list = relationship("Series", secondary="series_characters", back_populates="characters")
+Scene.series_list = relationship("Series", secondary="series_scenes", back_populates="scenes")
+
+series_characters = Table("series_characters", Base.metadata,
+    Column("series_id", String(36), ForeignKey("series.id"), primary_key=True),
+    Column("character_id", String(36), ForeignKey("characters.id"), primary_key=True),
+)
+
+series_scenes = Table("series_scenes", Base.metadata,
+    Column("series_id", String(36), ForeignKey("series.id"), primary_key=True),
+    Column("scene_id", String(36), ForeignKey("scenes.id"), primary_key=True),
+)
+
+
+class Episode(Base):
+    __tablename__ = "episodes"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    series_id = Column(String(36), ForeignKey("series.id"), nullable=False)
+    episode_number = Column(Integer, nullable=False)
+    title = Column(String(200), nullable=True)
+    script_json = Column(JSON, nullable=True, default=dict)
+    storyboard_json = Column(JSON, nullable=True, default=dict)
+    video_url = Column(Text, nullable=True)
+    duration_seconds = Column(Integer, nullable=True)
+    status = Column(String(20), nullable=False, default="pending")
+    cost_so_far = Column(Float, nullable=True, default=0.0)
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
+
+    series = relationship("Series", back_populates="episodes")
+    __table_args__ = (UniqueConstraint("series_id", "episode_number"),)
+
+
+class PipelineRun(Base):
+    __tablename__ = "pipeline_runs"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    series_id = Column(String(36), ForeignKey("series.id"), nullable=False)
+    episode_id = Column(String(36), ForeignKey("episodes.id"), nullable=True)
+    mode = Column(String(20), nullable=False, default="step_by_step")
+    layers_json = Column(JSON, nullable=True, default=dict)
+    current_layer = Column(Integer, nullable=False, default=0)
+    status = Column(String(20), nullable=False, default="pending")
+    error_log = Column(Text, nullable=True)
+    actual_cost_so_far = Column(Float, nullable=True, default=0.0)
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
+
+
+class AuditReport(Base):
+    __tablename__ = "audit_reports"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    target_type = Column(String(20), nullable=False)
+    target_id = Column(String(36), nullable=False)
+    image_url = Column(Text, nullable=False)
+    auditor_model = Column(String(50), nullable=False)
+    score = Column(Float, nullable=False, default=0.0)
+    pass_fail = Column(Boolean, nullable=False, default=False)
+    issues_json = Column(JSON, nullable=True, default=list)
+    raw_response = Column(Text, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())

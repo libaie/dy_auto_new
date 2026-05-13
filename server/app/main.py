@@ -14,7 +14,7 @@ from contextlib import asynccontextmanager
 
 from app.database import get_db, init_db, SessionLocal
 from app.seed import seed_all
-from app.routers import device, tasks, accounts, devices, auth, selectors, stats, content, account_groups, chains, settings, channels, prompt_templates
+from app.routers import device, tasks, accounts, devices, auth, selectors, stats, content, account_groups, chains, settings, channels, prompt_templates, data, videos, pixelle, seedance, ai_config, characters, scenes, series
 from app.services.ai_generator import ai_generator
 
 
@@ -28,7 +28,7 @@ async def _offline_checker():
         await asyncio.sleep(30)
         db = SessionLocal()
         try:
-            now = datetime.now(timezone.utc).replace(tzinfo=None)
+            now = bj_now()
 
             # 1. Devices online in DB but with no active WS connection → offline immediately
             online_devices = db.query(Device).filter(Device.status == "online").all()
@@ -97,7 +97,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -115,6 +115,16 @@ app.include_router(chains.router)
 app.include_router(settings.router)
 app.include_router(channels.router)
 app.include_router(prompt_templates.router)
+app.include_router(data.router)
+app.include_router(videos.router)
+app.include_router(pixelle.router)
+app.include_router(pixelle.proxy_router)
+app.include_router(seedance.api_router)
+app.include_router(seedance.proxy_router)
+app.include_router(ai_config.router)
+app.include_router(characters.router)
+app.include_router(scenes.router)
+app.include_router(series.router)
 
 
 @app.get("/health")

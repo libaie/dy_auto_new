@@ -12,6 +12,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
+from app.config import bj_now
 from app.database import get_db, init_db, SessionLocal
 from app.seed import seed_all
 from app.routers import device, tasks, accounts, devices, auth, selectors, stats, content, account_groups, chains, settings, channels, prompt_templates, data, videos, pixelle, seedance, ai_config, characters, scenes, series, pipeline_proxy, pipeline, audit, director, reference_data
@@ -79,9 +80,15 @@ async def _offline_checker():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup: init DB and seed. Shutdown: stop checker."""
-    # Skip production init if a test DB override is already in place
     if get_db not in app.dependency_overrides:
         seed_all()
+        # Seed reference data at startup (idempotent)
+        db = SessionLocal()
+        try:
+            from app.routers.reference_data import seed_reference_data
+            seed_reference_data(db)
+        finally:
+            db.close()
     task = asyncio.create_task(_offline_checker())
     yield
     task.cancel()

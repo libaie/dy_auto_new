@@ -47,6 +47,7 @@ async def pipeline_start(series_id: str, episode_id: str = None,
 async def _run_all_layers(run_id: str):
     """顺序执行所有流水线层 (使用自有 DB session)."""
     db = SessionLocal()
+    run = None
     try:
         run = db.query(PipelineRun).filter(PipelineRun.id == run_id).first()
         if not run:
@@ -66,8 +67,11 @@ async def _run_all_layers(run_id: str):
             db.commit()
         run.status = "completed"
     except Exception as e:
-        run.status = "failed"
-        run.error_log = str(e)
+        if run is not None:
+            run.status = "failed"
+            run.error_log = str(e)
+        else:
+            logger.error(f"Pipeline _run_all_layers failed before run loaded: {e}")
     finally:
         db.commit()
         db.close()

@@ -546,9 +546,11 @@ class ReferenceData(Base):
     __tablename__ = "reference_data"
 
     id = Column(String(36), primary_key=True, default=_uuid)
-    category = Column(String(50), nullable=False, index=True)  # series_genre / character_role / scene_type / scene_lighting / scene_mood
+    category = Column(String(50), nullable=False, index=True)
     value = Column(String(100), nullable=False)
-    label = Column(String(100), nullable=False)               # 显示名 (支持中文)
+    label = Column(String(100), nullable=False)
     sort_order = Column(Integer, nullable=False, default=0)
     enabled = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
+
+    __table_args__ = (UniqueConstraint("category", "value"),)

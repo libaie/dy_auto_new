@@ -11,6 +11,7 @@
     </div>
 
     <div v-if="loading" class="text-slate-400 text-center py-12">加载中...</div>
+    <div v-else-if="error" class="text-red-400 text-center py-12">{{ error }}</div>
     <div v-else-if="scenes.length === 0" class="text-slate-500 text-center py-12">
       暂无场景<br><span class="text-xs text-slate-600 mt-1">提示：创建场景后可在系列详情中关联到具体剧集</span>
     </div>
@@ -77,15 +78,15 @@ import { ref, reactive, onMounted } from 'vue'
 import { listScenes, createScene } from '../api/scenes.js'
 import { listItems } from '../api/referenceData.js'
 
-const scenes = ref([]); const loading = ref(true); const showCreate = ref(false)
+const scenes = ref([]); const loading = ref(true); const showCreate = ref(false); const error = ref('')
 const typeOptions = ref([]); const lightingOptions = ref([]); const moodOptions = ref([])
 const form = reactive({ name: '', scene_type: 'indoor', location_desc: '', lighting: '', mood: '' })
 
 async function loadOpts() {
   try { const [t, l, m] = await Promise.all([listItems('scene_type'), listItems('scene_lighting'), listItems('scene_mood')]); if (t.data.ok) { typeOptions.value = t.data.items; form.scene_type = t.data.items[0]?.value || 'indoor' }; if (l.data.ok) lightingOptions.value = l.data.items; if (m.data.ok) moodOptions.value = m.data.items } catch (e) {}
 }
-async function load() { const { data } = await listScenes(); scenes.value = data.ok ? data.scenes : []; loading.value = false }
-async function doCreate() { await createScene({ ...form }); showCreate.value = false; await load() }
+async function load() { try { const { data } = await listScenes(); scenes.value = data.ok ? data.scenes : [] } catch (e) { error.value = e.message || '加载失败' } finally { loading.value = false } }
+async function doCreate() { try { await createScene({ ...form }); showCreate.value = false; await load() } catch (e) { error.value = e.message || '创建失败' } }
 function sceneTypeLabel(v) { const x = typeOptions.value.find(o => o.value === v); return x ? x.label : v }
 function lightingLabel(v) { const x = lightingOptions.value.find(o => o.value === v); return x ? x.label : v }
 function moodLabel(v) { const x = moodOptions.value.find(o => o.value === v); return x ? x.label : v }

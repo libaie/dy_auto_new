@@ -97,6 +97,16 @@ const routes = [
         component: () => import('../views/CharactersPage.vue'),
       },
       {
+        path: 'scenes',
+        name: 'Scenes',
+        component: () => import('../views/ScenesPage.vue'),
+      },
+      {
+        path: 'director/:seriesId/:episodeId',
+        name: 'Director',
+        component: () => import('../views/DirectorPage.vue'),
+      },
+      {
         path: 'series',
         name: 'SeriesList',
         component: () => import('../views/SeriesListPage.vue'),

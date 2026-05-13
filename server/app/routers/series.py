@@ -157,12 +157,26 @@ def _parse_json_with_key(raw: str, key: str) -> dict:
             return json.loads(m.group(1))
         except json.JSONDecodeError:
             pass
-    m = re.search(r'\{[^{}]*"' + key + r'"\s*:\s*\[[\s\S]*?\][^{}]*\}', raw, re.DOTALL)
-    if m:
-        try:
-            return json.loads(m.group(0))
-        except json.JSONDecodeError:
-            pass
+    # Brace-counting extraction: find {"key":[...]} with proper nesting
+    key_pos = raw.find('"' + key + '"')
+    if key_pos >= 0:
+        # Find the opening brace before the key
+        brace_start = raw.rfind('{', 0, key_pos)
+        if brace_start >= 0:
+            depth = 0
+            i = brace_start
+            while i < len(raw):
+                if raw[i] == '{':
+                    depth += 1
+                elif raw[i] == '}':
+                    depth -= 1
+                    if depth == 0:
+                        try:
+                            return json.loads(raw[brace_start:i + 1])
+                        except json.JSONDecodeError:
+                            pass
+                        break
+                i += 1
     raise ValueError(f"无法解析 LLM 返回的 JSON (key={key}): {raw[:300]}")
 
 

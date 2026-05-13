@@ -295,7 +295,7 @@ async function handleGenerate() {
 
     progress.value.message = 'AI 正在生成脚本...'
     progress.value.percent = 5
-    await pollTask(taskId)
+    await pollTask(taskId, payload.video_model)
 
   } catch (e) {
     const errMsg = e.response?.data?.detail || e.message || '视频生成失败'
@@ -308,12 +308,13 @@ async function handleGenerate() {
   }
 }
 
-function pollTask(taskId) {
+function pollTask(taskId, videoModel = 'auto') {
+  const maxAttempts = videoModel === 'seedance' ? 180 : videoModel === 'kling' ? 120 : 120
   return new Promise((resolve, reject) => {
     let attempts = 0
     pollTimer = setInterval(async () => {
       attempts++
-      if (attempts > 120) { reject(new Error('视频生成超时')); return }
+      if (attempts > maxAttempts) { reject(new Error(`视频生成超时 (${(maxAttempts * 5 / 60).toFixed(0)}min)`)); return }
       try {
         const resp = await getTask(taskId)
         const data = resp.data

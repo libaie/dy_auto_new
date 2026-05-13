@@ -45,7 +45,7 @@ async def pipeline_start(series_id: str, episode_id: str = None,
 
 
 async def _run_all_layers(run_id: str):
-    """顺序执行所有流水线层 (使用自有 DB session)."""
+    """顺序执行所有流水线层 (使用自有 DB session)，支持从 checkpoint 恢复."""
     db = SessionLocal()
     run = None
     try:
@@ -57,11 +57,16 @@ async def _run_all_layers(run_id: str):
             "/assets/generate", "/story/generate", "/director/generate",
             "/render/execute", "/postproduction/execute",
         ]
-        for i, ep in enumerate(layer_endpoints):
+        start_layer = run.current_layer
+        for i in range(start_layer, len(layer_endpoints)):
+            ep = layer_endpoints[i]
+            # Skip layers already marked completed in layers_json
+            layers = run.layers_json or {}
+            if layers.get(str(i), {}).get("status") == "completed":
+                continue
             run.current_layer = i
             db.commit()
             result = await _proxy_post(ep, common)
-            layers = run.layers_json or {}
             layers[str(i)] = {"status": "completed", "result": result}
             run.layers_json = layers
             db.commit()

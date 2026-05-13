@@ -1,27 +1,62 @@
 """Pipeline Proxy Wrapper — 翻译层：将流水线操作映射到 Pixelle-Video 实际 API."""
+import asyncio
+import logging
 import httpx
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from app.deps import verify_admin_token
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/pipeline-proxy", tags=["pipeline-proxy"])
 PIXELLE_BASE = "http://127.0.0.1:8500/api"
 
 TIMEOUT = httpx.Timeout(600, connect=10)
+MAX_RETRIES = 3
+RETRY_BACKOFF = 2.0  # seconds, exponential: 2, 4, 8
 
 
 async def _pixelle_post(path: str, json: dict) -> dict:
-    async with httpx.AsyncClient(base_url=PIXELLE_BASE, timeout=TIMEOUT) as c:
-        r = await c.post(path, json=json)
-        r.raise_for_status()
-        return r.json()
+    last_err = None
+    for attempt in range(MAX_RETRIES):
+        try:
+            async with httpx.AsyncClient(base_url=PIXELLE_BASE, timeout=TIMEOUT) as c:
+                r = await c.post(path, json=json)
+                r.raise_for_status()
+                return r.json()
+        except httpx.HTTPStatusError as e:
+            last_err = e
+            if e.response.status_code < 500:
+                raise  # 4xx — don't retry client errors
+        except (httpx.ConnectError, httpx.TimeoutException, httpx.RemoteProtocolError) as e:
+            last_err = e
+        if attempt < MAX_RETRIES - 1:
+            delay = RETRY_BACKOFF * (2 ** attempt)
+            logger.warning("Pixelle POST %s attempt %d/%d failed, retrying in %.0fs: %s",
+                           path, attempt + 1, MAX_RETRIES, delay, last_err)
+            await asyncio.sleep(delay)
+    raise last_err
 
 
 async def _pixelle_get(path: str) -> dict:
-    async with httpx.AsyncClient(base_url=PIXELLE_BASE, timeout=TIMEOUT) as c:
-        r = await c.get(path)
-        r.raise_for_status()
-        return r.json()
+    last_err = None
+    for attempt in range(MAX_RETRIES):
+        try:
+            async with httpx.AsyncClient(base_url=PIXELLE_BASE, timeout=TIMEOUT) as c:
+                r = await c.get(path)
+                r.raise_for_status()
+                return r.json()
+        except httpx.HTTPStatusError as e:
+            last_err = e
+            if e.response.status_code < 500:
+                raise
+        except (httpx.ConnectError, httpx.TimeoutException, httpx.RemoteProtocolError) as e:
+            last_err = e
+        if attempt < MAX_RETRIES - 1:
+            delay = RETRY_BACKOFF * (2 ** attempt)
+            logger.warning("Pixelle GET %s attempt %d/%d failed, retrying in %.0fs: %s",
+                           path, attempt + 1, MAX_RETRIES, delay, last_err)
+            await asyncio.sleep(delay)
+    raise last_err
 
 
 class PipelineCommonInput(BaseModel):

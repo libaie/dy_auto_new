@@ -61,6 +61,14 @@ class ContentService:
             return None
         return _db_template_to_response(tpl)
 
+    def get_template_body(self, db: Session, template_id: str) -> Optional[str]:
+        """Get just the body text of a template. Used for sync resolution."""
+        tpl = db.query(DBTemplate).filter(
+            DBTemplate.id == template_id,
+            DBTemplate.is_active == True,
+        ).first()
+        return tpl.body if tpl else None
+
     def list_templates(
         self, db: Session, category: Optional[str] = None,
         skip: int = 0, limit: int = 50,
@@ -182,22 +190,40 @@ class ContentService:
 
     async def generate_keyword_matrix(self, keyword: str, count: int = 10, db=None) -> list[str]:
         """Generate expanded keyword matrix from a seed keyword using AI."""
-        prompt = f"""基于关键词「{keyword}」，生成 {count} 个相关的抖音搜索关键词。
-要求：
-1. 包含同义词、长尾词、热门话题标签
-2. 适合抖音搜索场景
-3. 每个关键词 2-8 个字
-4. 只返回 JSON 数组格式，不要其他内容
-示例：["关键词1", "关键词2", "关键词3"]"""
+        prompt = f"基于关键词「{keyword}」，生成 {count} 个相关的抖音搜索关键词。要求：包含同义词、长尾词、热门话题标签，每个关键词 2-8 个字。只返回 JSON 数组格式。"
 
         from app.services.ai_generator import ai_generator
-        response = await ai_generator.generate(db, prompt, {})
+        system_prompt = (
+            "你是一个抖音搜索引擎优化专家。用户提供一个种子关键词，"
+            "你返回一个 JSON 字符串数组，包含相关的长尾关键词和同义词。"
+            "只返回 JSON 数组，不要加引号、不要解释、不要 markdown 代码块。"
+        )
+        try:
+            response = await ai_generator.generate_custom(
+                db, system_prompt, prompt,
+                max_tokens=1024, temperature=0.8,
+                thinking_enabled=False,
+            )
+        except Exception:
+            return [keyword]
+
         try:
             keywords = json.loads(response)
             if isinstance(keywords, list):
                 return [str(k) for k in keywords][:count]
         except (json.JSONDecodeError, TypeError):
             pass
+
+        # AI 没有返回纯 JSON，尝试提取 [...] 部分
+        match = re.search(r"\[.*?\]", response, re.DOTALL)
+        if match:
+            try:
+                keywords = json.loads(match.group())
+                if isinstance(keywords, list):
+                    return [str(k) for k in keywords][:count]
+            except (json.JSONDecodeError, TypeError):
+                pass
+
         return [keyword]
 
     # --- Regex Generation ---

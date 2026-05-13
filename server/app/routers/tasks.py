@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.deps import verify_admin_token
+from app.config import bj_now
 from app.models import TaskType, TaskStatus
 from app.services.task_service import task_service
 from app.services.content_service import content_service
@@ -27,8 +28,25 @@ class TaskCreateRequest(BaseModel):
 class TaskBatchCreateRequest(BaseModel):
     type: TaskType
     group_ids: list[str] = []
+    account_ids: list[str] = []
     device_id: Optional[str] = None
     params: dict = {}
+
+
+async def _maybe_resolve_content_template(params: dict, task_type: str, db=None) -> dict:
+    """If params has content_template_id, resolve it into params.content."""
+    template_id = params.get("content_template_id")
+    if not template_id:
+        return params
+    try:
+        keyword = params.get("keyword") or (params.get("keywords", [None])[0]) or ""
+        context = {"keyword": keyword, "task_type": task_type}
+        generated = await content_service.generate_from_template(db, template_id, context)
+        params["content"] = generated
+        logger.info("Resolved content_template_id=%s for task_type=%s", template_id, task_type)
+    except Exception as e:
+        logger.warning("Failed to resolve content_template_id=%s: %s", template_id, e)
+    return params
 
 
 async def _maybe_expand_keywords(params: dict, task_type: str, db=None) -> dict:
@@ -59,6 +77,25 @@ def _resolve_task_type(type_val) -> TaskType:
     return TaskType(type_val)
 
 
+def _validate_and_normalize_params(task_type: str, params: dict) -> dict:
+    """Validate and normalize task params using models.TASK_PARAMS_VALIDATORS."""
+    from app.models import TASK_PARAMS_VALIDATORS
+    from pydantic import BaseModel as PydanticBase
+
+    validator = TASK_PARAMS_VALIDATORS.get(task_type)
+    if validator is None:
+        return params  # unknown type, passthrough
+
+    if callable(validator) and not isinstance(validator, type):
+        # Function-style validator (e.g. _validate_nurture_params)
+        return validator(params)
+    elif isinstance(validator, type) and issubclass(validator, PydanticBase):
+        # Pydantic model validator
+        validated = validator(**params)
+        return validated.model_dump(exclude_none=True)
+    return params
+
+
 @router.post("")
 async def create_task(
     request: TaskCreateRequest,
@@ -67,7 +104,13 @@ async def create_task(
 ):
     if not request.account_id:
         raise HTTPException(status_code=400, detail="account_id is required for single create")
-    params = await _maybe_expand_keywords(request.params, request.type.value, db=db)
+    try:
+        params = _validate_and_normalize_params(request.type.value, request.params)
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Invalid params for {request.type.value}: {str(e)}")
+    params = await _maybe_resolve_content_template(params, request.type.value, db=db)
+    params = await _maybe_expand_keywords(params, request.type.value, db=db)
+
     try:
         task = task_service.create_task(
             db=db,
@@ -81,6 +124,11 @@ async def create_task(
 
     from app.ws_manager import pair_ws_manager
     await pair_ws_manager.broadcast_to_devices({"event": "new_task_available"})
+    await pair_ws_manager.broadcast_to_admins({
+        "event": "task_updated",
+        "task_id": task.id,
+        "status": "pending",
+    })
     return task
 
 
@@ -90,38 +138,47 @@ async def batch_create_tasks(
     db: Session = Depends(get_db),
     _: str = Depends(verify_admin_token),
 ):
-    if not request.group_ids:
-        raise HTTPException(status_code=400, detail="group_ids required for batch create")
+    if not request.group_ids and not request.account_ids:
+        raise HTTPException(status_code=400, detail="需要提供 group_ids 或 account_ids")
     ttype = request.type.value
 
-    from app.db_models import Account, Channel
-    from app.models import TaskType as TT
-    import uuid
+    try:
+        params = _validate_and_normalize_params(ttype, request.params)
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Invalid params for {ttype}: {str(e)}")
 
-    params = await _maybe_expand_keywords(request.params, ttype, db=db)
+    from app.db_models import Account, AccountGroupMember, Channel, ChannelItem as DBChannelItem
+    from app.models import TaskType as TT
+
+    params = await _maybe_resolve_content_template(params, ttype, db=db)
+    params = await _maybe_expand_keywords(params, ttype, db=db)
     raw_keywords = params.get("keywords", []) or ([params.get("keyword")] if params.get("keyword") else [])
     keywords = [k.strip() for k in raw_keywords if k and k.strip()]
 
     if not keywords and not request.params.get("keyword"):
         raise HTTPException(status_code=400, detail="关键词不能为空")
 
-    created_tasks = []
-    total_accounts = 0
-    for gid in request.group_ids:
-        channel = db.query(Channel).filter(Channel.id == gid).first()
-        if not channel:
-            channel = Channel(id=gid, group_id=gid, status="active", task_type=ttype)
-            db.add(channel)
-            db.flush()
-        else:
-            # Reuse existing channel: always reset deleted_at and update task_type / params
-            channel.deleted_at = None
-            channel.task_type = ttype
-            if channel.status != "active":
-                channel.status = "active"
-            db.flush()
+    # 关键词数量上限
+    MAX_KEYWORDS = 500
+    if len(keywords) > MAX_KEYWORDS:
+        raise HTTPException(status_code=400, detail=f"关键词最多 {MAX_KEYWORDS} 个，当前 {len(keywords)} 个")
 
-        from app.db_models import AccountGroupMember
+    # 校验 group_ids 存在性（避免 FK 约束异常）
+    if request.group_ids:
+        from app.db_models import AccountGroup
+        existing_groups = db.query(AccountGroup.id).filter(
+            AccountGroup.id.in_(request.group_ids)
+        ).all()
+        existing_ids = {g[0] for g in existing_groups}
+        missing = [gid for gid in request.group_ids if gid not in existing_ids]
+        if missing:
+            raise HTTPException(status_code=400, detail=f"分组不存在: {', '.join(missing[:3])}")
+
+    # Resolve accounts: from group_ids + from account_ids
+    all_accounts = []
+    seen_account_ids = set()
+
+    for gid in request.group_ids:
         member_account_ids = db.query(AccountGroupMember.account_id).filter(
             AccountGroupMember.group_id == gid
         ).scalar_subquery()
@@ -129,40 +186,94 @@ async def batch_create_tasks(
             Account.id.in_(member_account_ids),
             Account.status == "active",
         ).all()
-        total_accounts += len(accounts)
-        if not accounts:
-            logger.warning("分组 %s 没有活跃账号，跳过", gid)
-        if keywords:
-            # Store common params (prompt_template_id, sort_by, etc.) as template
-            # so claim_channel_item can merge them with each item's keyword
-            channel.params_template = {k: v for k, v in params.items() if k not in ("keyword", "keywords", "keyword_matrix")}
-            db.flush()
-            from app.db_models import ChannelItem
-            for kw in keywords:
-                for acc in accounts:
-                    ci = ChannelItem(
-                        channel_id=channel.id,
-                        keyword=kw.strip(),
-                        account_id=acc.id,
-                        status="pending",
-                        queue_position=len(created_tasks),
-                    )
-                    db.add(ci)
-                    created_tasks.append({"keyword": kw.strip(), "account_id": acc.id})
-        else:
-            for acc in accounts:
-                task = task_service.create_task(
-                    db=db,
-                    task_type=TT(ttype),
-                    account_id=acc.id,
-                    params=params,
-                    device_id=request.device_id or None,
-                )
-                created_tasks.append({"id": task.id, "account_id": acc.id})
+        for acc in accounts:
+            if acc.id not in seen_account_ids:
+                seen_account_ids.add(acc.id)
+                all_accounts.append(acc)
 
-    if total_accounts == 0:
-        db.rollback()
-        raise HTTPException(status_code=400, detail="所选分组没有活跃账号，请先添加活跃账号到分组")
+    for aid in request.account_ids:
+        if aid in seen_account_ids:
+            continue
+        acc = db.query(Account).filter(
+            Account.id == aid, Account.status == "active"
+        ).first()
+        if acc:
+            seen_account_ids.add(acc.id)
+            all_accounts.append(acc)
+
+    if not all_accounts:
+        raise HTTPException(status_code=400, detail="所选分组/账号没有活跃账号，请先添加活跃账号")
+
+    created_tasks = []
+    if keywords:
+        # 确定通道归属的分组：优先用 group_ids[0]，否则查账号所属分组
+        channel_group_id = request.group_ids[0] if request.group_ids else None
+        if not channel_group_id:
+            # 从 account_ids 中查所属分组
+            member_group = db.query(AccountGroupMember.group_id).filter(
+                AccountGroupMember.account_id.in_(request.account_ids)
+            ).first()
+            if member_group:
+                channel_group_id = member_group[0]
+            else:
+                # 账号不在任何分组中，自动创建分组
+                from app.db_models import AccountGroup
+                from datetime import datetime as dt
+                display = all_accounts[0].nickname or all_accounts[0].douyin_id or all_accounts[0].id[:8]
+                # name 字段 String(100)，截断 display 确保不超长
+                ts = dt.now().strftime('%m%d%H%M%S')
+                max_display = 100 - len(f"自动分组--{ts}") - 1  # 预留截断空间
+                if len(display) > max_display:
+                    display = display[:max_display]
+                ag = AccountGroup(
+                    name=f"自动分组-{display}-{ts}",
+                    description="系统自动创建（单账号批量任务）",
+                )
+                db.add(ag)
+                db.flush()
+                channel_group_id = ag.id
+                # 将账号加入新分组
+                for acc in all_accounts:
+                    db.add(AccountGroupMember(group_id=ag.id, account_id=acc.id))
+                db.flush()
+
+        # 总是新建通道（UUID 自动生成），不复用旧通道
+        template_params = {k: v for k, v in params.items() if k not in ("keyword", "keywords", "keyword_matrix")}
+        ch = Channel(
+            group_id=channel_group_id,
+            task_type=ttype,
+            status="active",
+            account_mode="round_robin",
+            params_template=template_params,
+        )
+        db.add(ch)
+        db.flush()
+
+        qpos = 0
+        for kw in keywords:
+            for acc in all_accounts:
+                ci = DBChannelItem(
+                    channel_id=ch.id,
+                    keyword=kw.strip(),
+                    account_id=acc.id,
+                    status="pending",
+                    queue_position=qpos,
+                )
+                qpos += 1
+                db.add(ci)
+                created_tasks.append({"keyword": kw.strip(), "account_id": acc.id})
+        logger.info("通道 %s 已创建: %d 关键词 × %d 账号 = %d 项",
+                     ch.id, len(keywords), len(all_accounts), len(created_tasks))
+    else:
+        for acc in all_accounts:
+            task = task_service.create_task(
+                db=db,
+                task_type=TT(ttype),
+                account_id=acc.id,
+                params=params,
+                device_id=request.device_id or None,
+            )
+            created_tasks.append({"id": task.id, "account_id": acc.id})
 
     db.commit()
 
@@ -178,6 +289,8 @@ async def batch_create_tasks(
                 await pair_ws_manager.broadcast_to_devices({"event": "new_task_available"})
         else:
             await pair_ws_manager.broadcast_to_devices({"event": "new_task_available"})
+        # 通知前端更新任务列表
+        await pair_ws_manager.broadcast_to_admins({"event": "tasks_changed"})
 
     return {"created": len(created_tasks), "mode": "channel" if keywords else "direct"}
 
@@ -206,12 +319,14 @@ class BatchDeleteRequest(BaseModel):
 
 
 @router.post("/batch-delete")
-def batch_delete_tasks(
+async def batch_delete_tasks(
     body: BatchDeleteRequest,
     db: Session = Depends(get_db),
     _: str = Depends(verify_admin_token),
 ):
     count = task_service.delete_tasks_batch(db, body.task_ids)
+    from app.ws_manager import pair_ws_manager
+    await pair_ws_manager.broadcast_to_admins({"event": "tasks_changed"})
     return {"deleted": count}
 
 
@@ -240,21 +355,34 @@ async def cancel_task(
             raise HTTPException(status_code=404, detail="Task not found")
         raise HTTPException(status_code=400, detail=str(e))
 
+    from app.ws_manager import pair_ws_manager
+
     if task.device_id:
-        from app.ws_manager import pair_ws_manager
         await pair_ws_manager.send_to_device(task.device_id, {
             "event": "cancel_task",
             "task_id": task.id,
         })
 
+    # Broadcast so other devices know a channel item is now available
+    await pair_ws_manager.broadcast_to_devices({"event": "new_task_available"})
+    # 通知前端任务列表更新
+    await pair_ws_manager.broadcast_to_admins({
+        "event": "task_updated",
+        "task_id": task.id,
+        "status": "cancelled",
+    })
+
     return task
 
 
 @router.delete("/{task_id}")
-def delete_task(task_id: str, db=Depends(get_db), _=Depends(verify_admin_token)):
+async def delete_task(task_id: str, db=Depends(get_db), _=Depends(verify_admin_token)):
     try:
         task_service.delete_task(db=db, task_id=task_id)
     except ValueError as e:
         if "not found" in str(e): raise HTTPException(status_code=404, detail="Task not found")
         raise HTTPException(status_code=400, detail=str(e))
+    # 通知前端
+    from app.ws_manager import pair_ws_manager
+    await pair_ws_manager.broadcast_to_admins({"event": "tasks_changed"})
     return {"deleted": True, "task_id": task_id}

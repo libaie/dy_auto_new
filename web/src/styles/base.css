@@ -1,0 +1,143 @@
+/* ============================================
+   Helix Command — Base
+   OLED background + cinematic effects
+   ============================================ */
+
+body {
+  font-family: var(--font-sans);
+  background: var(--bg-void);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.01em;
+}
+
+/* === Cinematic Background === */
+.cinematic-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background: var(--bg-void);
+}
+
+/* Gradient orbs */
+.cinematic-bg::before {
+  content: '';
+  position: absolute;
+  width: 1200px;
+  height: 1200px;
+  background: radial-gradient(ellipse at center, rgba(14, 165, 233, 0.04), transparent 65%);
+  top: -400px;
+  left: -200px;
+  animation: orb-float 24s ease-in-out infinite;
+}
+
+.cinematic-bg::after {
+  content: '';
+  position: absolute;
+  width: 900px;
+  height: 900px;
+  background: radial-gradient(ellipse at center, rgba(245, 158, 11, 0.03), transparent 65%);
+  bottom: -300px;
+  right: -200px;
+  animation: orb-float 30s ease-in-out infinite reverse;
+}
+
+@keyframes orb-float {
+  0%, 100% { transform: translate(0, 0) scale(1) rotate(0deg); }
+  25% { transform: translate(80px, -60px) scale(1.1) rotate(2deg); }
+  50% { transform: translate(40px, 40px) scale(0.95) rotate(-1deg); }
+  75% { transform: translate(-50px, -30px) scale(1.05) rotate(1deg); }
+}
+
+/* Subtle dot grid */
+.dot-grid {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  opacity: 0.025;
+  background-image: radial-gradient(circle, rgba(56, 189, 248, 0.8) 1px, transparent 1px);
+  background-size: 32px 32px;
+  mask-image: radial-gradient(ellipse at 50% 30%, black 40%, transparent 75%);
+}
+
+/* Scan line overlay (very subtle) */
+.scan-lines {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0.015;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(255, 255, 255, 0.5) 2px,
+    rgba(255, 255, 255, 0.5) 3px
+  );
+}
+
+/* === Scrollbar === */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(56, 189, 248, 0.12); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(56, 189, 248, 0.3); }
+
+/* === Selection === */
+::selection { background: rgba(14, 165, 233, 0.3); color: #fff; }
+
+/* === Focus === */
+*:focus-visible {
+  outline: 2px solid var(--accent-500);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* === Animations === */
+@keyframes count-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 4px rgba(14, 165, 233, 0.3); }
+  50% { box-shadow: 0 0 16px rgba(14, 165, 233, 0.6); }
+}
+@keyframes border-glow {
+  0%, 100% { border-color: var(--border-default); }
+  50% { border-color: var(--border-accent); }
+}
+
+.animate-in { animation: fade-in 0.4s var(--ease-out), slide-up 0.5s var(--ease-out); }
+.animate-count { animation: count-up 0.6s var(--ease-out); }
+
+/* === Pulse dots === */
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.5); }
+  70% { box-shadow: 0 0 0 8px rgba(52, 211, 153, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
+}
+.pulse-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--status-online);
+  animation: pulse-ring 2s ease-out infinite;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

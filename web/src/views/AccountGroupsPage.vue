@@ -22,6 +22,7 @@ import {
 import { listAccounts } from '../api/accounts.js'
 import { formatDate } from '../utils/format.js'
 import { useToastStore } from '../stores/toast.js'
+import { useWebSocket } from '../composables/useWebSocket.js'
 
 // --- Data state ---
 const groups = ref([])
@@ -60,6 +61,18 @@ const selectedAccountIds = ref([])
 // --- Page-level error ---
 const pageError = ref(null)
 const toast = useToastStore()
+
+// --- WebSocket ---
+function wsUrl() {
+  const token = localStorage.getItem('token') || ''
+  const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
+  return `${protocol}//${location.host}/api/devices/ws/pair-events?token=${encodeURIComponent(token)}`
+}
+useWebSocket(wsUrl, {
+  onMessage(msg) {
+    if (msg.event === 'account_groups_changed') fetchGroups()
+  },
+})
 
 // --- Table columns ---
 const columns = [

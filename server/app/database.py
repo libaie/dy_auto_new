@@ -28,6 +28,7 @@ def _set_sqlite_pragma(dbapi_conn, connection_record):
     cursor = dbapi_conn.cursor()
     cursor.execute("PRAGMA journal_mode=WAL")
     cursor.execute("PRAGMA busy_timeout=5000")
+    cursor.execute("PRAGMA foreign_keys = ON")
     cursor.close()
 
 
@@ -118,10 +119,28 @@ def _seed_selector_descriptions():
 
 
 def init_db():
-    """Create all tables. Called once at startup."""
+    """Create all tables. Called once at startup.
+
+    Runs alembic migrations first, then create_all as safety net for any tables
+    not yet captured by migrations. Both are idempotent.
+    """
     # Ensure data directory exists for SQLite
     if DATABASE_URL.startswith("sqlite"):
         Path(DATABASE_URL.replace("sqlite:///", "")).parent.mkdir(parents=True, exist_ok=True)
+
+    # Try alembic migrations first
+    try:
+        from alembic.config import Config
+        from alembic import command
+        alembic_ini = SERVER_DIR / "alembic.ini"
+        if alembic_ini.exists():
+            alembic_cfg = Config(str(alembic_ini))
+            command.upgrade(alembic_cfg, "head")
+            logger.info("Alembic migrations applied")
+    except Exception as e:
+        logger.warning("Alembic migration skipped: %s", e)
+
+    # Safety net: create_all for any tables not in migrations
     Base.metadata.create_all(bind=engine)
     _migrate_add_columns()
     _seed_selector_descriptions()

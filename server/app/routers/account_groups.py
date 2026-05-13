@@ -7,6 +7,7 @@ from app.database import get_db
 from app.db_models import AccountGroup, AccountGroupMember, Account
 from app.deps import verify_admin_token
 from app.models import AccountGroupCreate, AccountGroupUpdate, AccountGroupMemberRequest
+from app.ws_manager import pair_ws_manager
 
 router = APIRouter(prefix="/api/account-groups", tags=["account-groups"])
 
@@ -23,7 +24,7 @@ def _group_to_dict(group: AccountGroup, member_count: int = 0) -> dict:
 
 
 @router.post("")
-def create_group(
+async def create_group(
     request: AccountGroupCreate,
     db: Session = Depends(get_db),
     _: str = Depends(verify_admin_token),
@@ -35,6 +36,7 @@ def create_group(
     db.add(group)
     db.commit()
     db.refresh(group)
+    await pair_ws_manager.broadcast_to_admins({"event": "account_groups_changed"})
     return _group_to_dict(group, 0)
 
 
@@ -83,7 +85,7 @@ def get_group(
 
 
 @router.put("/{group_id}")
-def update_group(
+async def update_group(
     group_id: str,
     request: AccountGroupUpdate,
     db: Session = Depends(get_db),
@@ -102,11 +104,12 @@ def update_group(
     db.commit()
     db.refresh(group)
     member_count = db.query(AccountGroupMember).filter(AccountGroupMember.group_id == group_id).count()
+    await pair_ws_manager.broadcast_to_admins({"event": "account_groups_changed"})
     return _group_to_dict(group, member_count)
 
 
 @router.delete("/{group_id}")
-def delete_group(
+async def delete_group(
     group_id: str,
     db: Session = Depends(get_db),
     _: str = Depends(verify_admin_token),
@@ -116,6 +119,7 @@ def delete_group(
         raise HTTPException(status_code=404, detail="分组不存在")
     db.delete(group)
     db.commit()
+    await pair_ws_manager.broadcast_to_admins({"event": "account_groups_changed"})
     return {"deleted": True, "id": group_id}
 
 
@@ -152,7 +156,7 @@ def list_members(
 
 
 @router.post("/{group_id}/members")
-def add_members(
+async def add_members(
     group_id: str,
     request: AccountGroupMemberRequest,
     db: Session = Depends(get_db),
@@ -178,11 +182,12 @@ def add_members(
             db.add(AccountGroupMember(group_id=group_id, account_id=account_id))
             added.append(account_id)
     db.commit()
+    await pair_ws_manager.broadcast_to_admins({"event": "account_groups_changed"})
     return {"added": added, "count": len(added)}
 
 
 @router.delete("/{group_id}/members")
-def remove_members(
+async def remove_members(
     group_id: str,
     request: AccountGroupMemberRequest,
     db: Session = Depends(get_db),
@@ -200,4 +205,5 @@ def remove_members(
         .delete(synchronize_session=False)
     )
     db.commit()
+    await pair_ws_manager.broadcast_to_admins({"event": "account_groups_changed"})
     return {"removed": count}

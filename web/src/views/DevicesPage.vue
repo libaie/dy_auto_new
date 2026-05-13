@@ -318,6 +318,8 @@ function connectPairWS() {
             dev.status = data.status
           }
         }
+      } else if (data.event === 'devices_changed') {
+        fetchDevices()
       }
     } catch (e) {
       console.error('WS message parse error:', e)

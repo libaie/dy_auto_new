@@ -193,13 +193,13 @@ var apiClient = {
   /**
    * 带重试的 HTTP POST
    */
-  post: function (path, body) {
+  post: function (path, body, timeout) {
     if (!config.serverUrl) {
       logger.error(TAG, "serverUrl 未设置，无法请求: " + path);
       return null;
     }
     var url = config.serverUrl + path;
-    return this._requestWithRetry("POST", url, { body: body, label: "POST " + path });
+    return this._requestWithRetry("POST", url, { body: body, label: "POST " + path, timeout: timeout });
   },
 
   /**
@@ -353,6 +353,13 @@ var apiClient = {
     });
   },
 
+  releaseCommentReply: function (author, text) {
+    return this.post("/api/device/comment-claim-release", {
+      author: author,
+      text: text,
+    });
+  },
+
   reportRiskControl: function (accountId, riskType, detail) {
     return this.post("/api/device/risk-report", {
       account_id: accountId,
@@ -369,6 +376,26 @@ var apiClient = {
 
   getOfflineQueueSize: function () {
     return offlineQueue.length;
+  },
+
+  // --- DM conversation ---
+
+  claimDMRecipient: function (data) {
+    return this.post("/api/device/dm-claim-recipient", data);
+  },
+
+  reportDMSend: function (data) {
+    return this.post("/api/device/dm-send-report", data);
+  },
+
+  releaseDMRecipient: function (data) {
+    return this.post("/api/device/dm-release-recipient", data);
+  },
+
+  saveCommentAIReply: function (nickname, text, aiReply, taskId) {
+    return this.post("/api/device/comment-ai-reply", {
+      nickname: nickname, text: text, ai_reply: aiReply, task_id: taskId || null,
+    });
   },
 };
 

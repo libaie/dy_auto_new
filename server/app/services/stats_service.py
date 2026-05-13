@@ -1,5 +1,6 @@
 """Daily stats tracking service — operation counts per account per day."""
 from datetime import datetime, timezone
+from app.config import bj_now
 from typing import Optional
 
 from sqlalchemy.orm import Session
@@ -21,7 +22,7 @@ _TASK_TYPE_TO_COLUMN = {
 
 class StatsService:
     def _today(self) -> str:
-        return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        return bj_now().strftime("%Y-%m-%d")
 
     def _get_or_create(self, db: Session, account_id: str, date: str) -> DailyStats:
         """Get or create daily stats row for an account+date."""
@@ -68,6 +69,12 @@ class StatsService:
 
         limits = account.daily_limits or {}
         counts = self.get_today_counts(db, account_id)
+
+        # nurture 使用独立配额键 nurture_likes，与 search_like 分离
+        if task_type == "nurture":
+            limit = limits.get("nurture_likes", limits.get("likes", 999))
+            used = counts.get("likes", 0)
+            return used < limit
 
         column = _TASK_TYPE_TO_COLUMN.get(task_type)
         if not column:

@@ -76,17 +76,17 @@
               v-model.number="formParams.count"
               type="number"
               min="1"
-              max="20"
+              max="50"
               class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
             />
           </div>
-          <div v-if="form.task_type === 'reply_comment'">
+          <div v-if="['reply_comment', 'search_comment', 'collect'].includes(form.task_type)">
             <label class="block text-sm font-medium text-slate-300 mb-1">处理视频数</label>
             <input
               v-model.number="formParams.video_count"
               type="number"
               min="1"
-              max="10"
+              max="30"
               class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
             />
           </div>
@@ -177,8 +177,8 @@ const seedKeyword = ref('')
 const keywordGenerating = ref(false)
 const paramsText = ref('{}')
 const formParams = ref({
-  count: 5,
-  video_count: 3,
+  count: 10,
+  video_count: 5,
   max_age_days: 5,
   sort_by: '',
   content: '',
@@ -256,8 +256,10 @@ async function submit() {
     count: params.count !== undefined ? params.count : fp.count,
     content: params.content !== undefined ? params.content : (fp.content || undefined),
   }
-  if (form.value.task_type === 'reply_comment') {
+  if (['reply_comment', 'search_comment', 'collect'].includes(form.value.task_type)) {
     merged.video_count = params.video_count !== undefined ? params.video_count : fp.video_count
+  }
+  if (form.value.task_type === 'reply_comment') {
     merged.max_age_days = params.max_age_days !== undefined ? params.max_age_days : fp.max_age_days
     if (fp.sort_by) merged.sort_by = params.sort_by || fp.sort_by
   }

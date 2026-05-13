@@ -154,9 +154,8 @@ var deviceWs = {
     }
 
     var self = this;
-    var wsUrl = config.serverUrl.replace("http://", "ws://") +
-      "/api/device/ws/status?device_id=" + encodeURIComponent(config.deviceId) +
-      "&secret=" + encodeURIComponent(config.deviceSecret);
+    // Secret NOT in URL — sent as first auth message after connect
+    var wsUrl = config.serverUrl.replace("http://", "ws://") + "/api/device/ws/status";
 
     logger.info(TAG, "连接: " + wsUrl);
 
@@ -178,10 +177,21 @@ var deviceWs = {
 
       var listener = new JavaAdapter(WebSocketListener, {
         onOpen: function (ws, response) {
-          logger.info(TAG, "已连接");
+          logger.info(TAG, "已连接，发送认证消息");
           self._ws = ws;
           self._connected = true;
           self._reconnectDelay = 3000;
+
+          // Send auth as first message (not in URL)
+          var authMsg = JSON.stringify({
+            type: "auth",
+            device_id: config.deviceId,
+            secret: config.deviceSecret,
+          });
+          try { ws.send(authMsg); } catch (e) {
+            logger.error(TAG, "发送认证消息失败: " + e.message);
+          }
+
           // 启动应用层心跳（每 30 秒发一次 ping）
           self._startPing();
           // 通知连接成功（用于重连后重新 poll）

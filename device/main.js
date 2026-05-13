@@ -206,6 +206,7 @@ function startMainLoop(serverUrl, secret) {
   function processTaskQueue() {
     if (_taskBusy || _taskQueue.length === 0) return;
     _taskBusy = true;
+    _idleTicks = 0;
     var task = _taskQueue.shift();
 
     threads.start(function () {
@@ -234,6 +235,11 @@ function startMainLoop(serverUrl, secret) {
       } finally {
         _taskBusy = false;
         processTaskQueue();
+
+        // 队列空 → poll 检查是否有下一个通道任务（但不关抖音，由空闲定时器统一处理）
+        if (_taskQueue.length === 0 && !_taskBusy) {
+          catchUpPoll();
+        }
       }
     });
   }
@@ -415,11 +421,20 @@ function startMainLoop(serverUrl, secret) {
     }
   }
 
-  // 空闲时定时 poll — 即使 WS 通知丢失也能发现待执行任务
+  // 空闲时定时 poll — 即使 WS 通知丢失也能发现待执行任务。找不到任务就关抖音
   var IDLE_POLL_INTERVAL = 30000;
+  var _idleTicks = 0;
   setInterval(function () {
     if (!_taskBusy && _taskQueue.length === 0) {
       catchUpPoll();
+      if (!_taskBusy && _taskQueue.length === 0) {
+        _idleTicks++;
+        if (_idleTicks >= 1) {
+          logger.info(TAG, "空闲超过一轮，关闭抖音");
+          try { require("./core/ui-operator").closeApp(); } catch (e) {}
+          _idleTicks = 0;
+        }
+      }
     }
   }, IDLE_POLL_INTERVAL);
 

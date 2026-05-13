@@ -75,28 +75,46 @@ PIXELLE_VIDEO_TIMEOUT = 600  # 10 分钟超时
 
 ```python
 # server/app/services/video_service.py
+import httpx
+from pathlib import Path
 
 class VideoGenerationService:
-    def generate_script(self, keyword: str, n_scenes: int = 5) -> dict:
-        """调用 AI 根据关键词生成分镜脚本。
-        返回: { title, scenes: [{image_prompt, narration}] }
+    def __init__(self):
+        self._client = None
+
+    async def _get_client(self) -> httpx.AsyncClient:
+        if self._client is None:
+            self._client = httpx.AsyncClient(
+                base_url=config.PIXELLE_VIDEO_URL,
+                timeout=httpx.Timeout(30, connect=10),
+            )
+        return self._client
+
+    async def generate_script(self, keyword: str, n_scenes: int = 5) -> dict:
+        """调用 AI 根据关键词生成分镜脚本（使用项目已有 content_service AI）。"""
+        ...
+
+    async def submit_video_task(self, script: dict, template: str, voice: str, bgm: str) -> str:
+        """POST /api/video/generate/async → 返回 pixelle_task_id。
+        重试: 3次，指数退避。异常: httpx.ConnectError / HTTPStatusError → 日志 + raise。
         """
-        pass
+        ...
 
-    def submit_video_task(self, script: dict, template: str, voice: str, bgm: str) -> str:
-        """POST /api/video/generate/async → 返回 pixelle_task_id"""
-        pass
-
-    def poll_task(self, pixelle_task_id: str, timeout: int) -> dict | None:
-        """轮询 GET /api/tasks/{pixelle_task_id} → 返回 {status, video_path, duration} 或 None(超时)"""
-        pass
-
-    def generate_video(self, keyword: str, n_scenes: int = 5) -> dict:
-        """同步封装：脚本生成 → 提交 → 轮询 → 返回结果。
-        阻塞最长时间 = PIXELLE_VIDEO_TIMEOUT 秒。
-        返回: { success, video_path, title, duration, error? }
+    async def poll_task(self, pixelle_task_id: str, timeout: int) -> dict | None:
+        """轮询 GET /api/tasks/{pixelle_task_id} → 每 10s 一次，直到 completed/failed 或超时。
+        返回: {status, video_path, duration} 或 None(超时)。
+        video_path 需清洗：仅保留文件名，拼接项目视频目录，拒绝含 ../ 的路径。
         """
-        pass
+        ...
+
+    def _sanitize_path(self, raw_path: str) -> Path:
+        """只取文件名，拒绝路径遍历。视频统一存 server/data/videos/ 下。"""
+        name = Path(raw_path).name
+        return Path("server/data/videos") / name
+
+    async def generate_video(self, keyword: str, n_scenes: int = 5) -> dict:
+        """完整流水线（async）。返回: {success, video_path, title, duration, error?}"""
+        ...
 ```
 
 ### 2.3 新增 `generate_video` 任务类型
@@ -113,15 +131,24 @@ class VideoGenerationService:
 }
 ```
 
-**执行流程（服务端）：**
+**执行流程（服务端后台任务，不经过设备）：**
+
+> generate_video 是纯服务端任务，不走设备 poll/claim 流程。创建时立即标记 RUNNING，启动 FastAPI BackgroundTasks 异步执行，完成后更新状态。
 
 ```
-task_executor 收到 generate_video 任务
-  → video_service.generate_script(keyword)     # AI 生成脚本
-  → video_service.submit_video_task(script)      # 提交 Pixelle-Video
-  → video_service.poll_task(task_id, timeout)    # 轮询直到完成或超时
-  → 结果写入 task.result = { video_path, title, duration }
-  → report_result("completed")
+POST /api/tasks (type=generate_video) 创建任务
+  → task_service.create_task(status="running", device_id=None)
+  → BackgroundTasks: _execute_video_task(task_id, params)
+      → video_service.generate_script(keyword)        # AI 生成脚本
+      → video_service.submit_video_task(script)        # 提交 Pixelle-Video (httpx async)
+      → while timeout:
+          video_service.poll_task(task_id)             # 轮询 GET /api/tasks/{id}
+      → 完成: GeneratedVideo 入库, task.result 写入
+      → task_service.report_result("completed")
+      → 失败: retry_count++, 超过3次标记 failed
+  → WS broadcast task_updated
+
+get_pending_task() 排除 generate_video 类型，防止设备误领取。
 ```
 
 ### 2.4 新增 API
@@ -164,7 +191,7 @@ class GeneratedVideo(Base):
 | `server/app/routers/videos.py` | **新建** | 视频管理 API |
 | `server/app/main.py` | 修改 | 注册 videos router |
 | `server/app/models.py` | 修改 | 新增 TaskType.generate_video + Pydantic 模型 |
-| `server/app/services/task_service.py` | 修改 | 新增 generate_video 配额检查（不消耗互动配额） |
+| `server/app/services/task_service.py` | 修改 | `get_pending_task` 排除 generate_video（防止设备误领取）；`report_result` 对 generate_video 跳过 stats 递增 |
 
 ### 不上线的
 

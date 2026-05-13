@@ -72,6 +72,21 @@ const routes = [
         component: () => import('../views/PromptTemplatesPage.vue'),
       },
       {
+        path: 'data',
+        name: 'DataCenter',
+        component: () => import('../views/DataCenterPage.vue'),
+      },
+      {
+        path: 'video-studio',
+        name: 'VideoStudio',
+        component: () => import('../views/VideoStudio.vue'),
+      },
+      {
+        path: 'videos',
+        name: 'Videos',
+        component: () => import('../views/VideosPage.vue'),
+      },
+      {
         path: 'settings',
         name: 'Settings',
         component: () => import('../views/SettingsPage.vue'),

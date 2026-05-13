@@ -210,12 +210,11 @@ var antiDetect = {
     this.randomDelay(actionName);
 
     // 概率跳过（低谷时段偶尔跳过操作，更像真人）
-    if (Math.random() < 0.05 * timeMultiplier) {
+    if (Math.random() < 0.01 * timeMultiplier) {
       logger.info(TAG, "跳过操作（节奏波动）");
       return false;
     }
 
-    this.maybePause();
     var result = actionFn();
     this.postActionDelay();
     return result;

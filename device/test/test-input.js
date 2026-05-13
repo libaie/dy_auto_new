@@ -55,7 +55,7 @@ try {
     sleep(200);
     eb.setSelection(0, eb.text().length);
     sleep(100);
-    shell("input keyevent 67", false);  // KEYCODE_DEL
+    shell("input keyevent 67", false);  // KeyCode_DEL
     sleep(200);
     // 输入文字
     shell("input text meishi", false);  // 拼音输入

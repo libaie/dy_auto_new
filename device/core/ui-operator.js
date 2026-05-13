@@ -27,6 +27,8 @@ var uiOperator = {
       var pkg = currentPackage();
       if (pkg === TARGET_PKG) {
         logger.info(TAG, "抖音打开成功");
+        // 通过 deep link 回到首页，避免上次关闭时的页面残留
+        try { app.openUrl("snssdk1128://feed"); sleep(2000); } catch (e) {}
         return true;
       }
       logger.warn(TAG, "等待抖音启动 (" + (i + 1) + "/3), 当前包名: " + pkg);
@@ -103,37 +105,52 @@ var uiOperator = {
         var element = this._findByStrategy(s);
         if (element && this._isOnScreen(element)) {
           // press 模式：找到元素后用真实触摸按压代替点击
-          if (s.click_mode === "press" && !element.isCoordinate && !element.isImage && !element.isPackage) {
-            var pb = element.bounds();
-            if (pb) {
-              var pcx = pb.centerX();
-              var pcy = pb.centerY();
-              if (s.x_percent != null) pcx += Math.round((pb.right - pb.left) * s.x_percent / 100);
-              if (s.y_percent != null) pcy += Math.round((pb.bottom - pb.top) * s.y_percent / 100);
-              logger.debug(TAG, "通过 " + s.type + " +press 找到: '" + actionName + "'");
-              return { isPress: true, x: pcx, y: pcy, duration: s.press_duration || 150 };
+          if (s.click_mode === "press") {
+            if (element.isImage || element.isCoordinate) {
+              if (s.x_percent != null) element.x += s.x_percent;
+              if (s.y_percent != null) element.y += s.y_percent;
+              return { isPress: true, x: element.x, y: element.y, duration: s.press_duration || 150 };
+            }
+            if (!element.isPackage) {
+              var pb = element.bounds();
+              if (pb) {
+                var pcx = pb.centerX();
+                var pcy = pb.centerY();
+                if (s.x_percent != null) pcx += Math.round((pb.right - pb.left) * s.x_percent / 100);
+                if (s.y_percent != null) pcy += Math.round((pb.bottom - pb.top) * s.y_percent / 100);
+                logger.debug(TAG, "通过 " + s.type + " +press 找到: '" + actionName + "'");
+                return { isPress: true, x: pcx, y: pcy, duration: s.press_duration || 150 };
+              }
             }
           }
 
-          // 偏移处理：UiObject 不能挂 JS 属性，直接算坐标返回
-          if ((s.x_percent != null || s.y_percent != null) && !element.isCoordinate && !element.isImage && !element.isPackage) {
-            var b = element.bounds();
-            if (b) {
-              var cx = b.centerX();
-              var cy = b.centerY();
-              var elW = b.right - b.left;
-              var elH = b.bottom - b.top;
-              if (s.x_percent != null) cx += Math.round(elW * s.x_percent / 100);
-              if (s.y_percent != null) cy += Math.round(elH * s.y_percent / 100);
+          // 偏移处理：image 用像素偏移，coordinate 已在 _findByStrategy 处理跳过，控件按比例
+          if (s.x_percent != null || s.y_percent != null) {
+            if (element.isImage) {
+              if (s.x_percent != null) element.x += s.x_percent;
+              if (s.y_percent != null) element.y += s.y_percent;
               logger.debug(TAG, "通过 " + s.type + " +偏移 找到: '" + actionName + "'");
-              return { isCoordinate: true, x: cx, y: cy };
+              return element;
+            }
+            if (!element.isCoordinate && !element.isPackage) {
+              var b = element.bounds();
+              if (b) {
+                var cx = b.centerX();
+                var cy = b.centerY();
+                var elW = b.right - b.left;
+                var elH = b.bottom - b.top;
+                if (s.x_percent != null) cx += Math.round(elW * s.x_percent / 100);
+                if (s.y_percent != null) cy += Math.round(elH * s.y_percent / 100);
+                logger.debug(TAG, "通过 " + s.type + " +偏移 找到: '" + actionName + "'");
+                return { isCoordinate: true, x: cx, y: cy };
+              }
             }
           }
           logger.debug(TAG, "通过 " + s.type + " 找到元素: '" + actionName + "'");
           return element;
         }
       }
-      sleep(500);
+      sleep(700);
     }
 
     logger.warn(TAG, "未找到元素: " + actionName);
@@ -247,6 +264,23 @@ var uiOperator = {
     }
 
     var all, j;
+    // Non-text types: match_mode is meaningless, handle directly
+    switch (strategy.type) {
+      case "package":
+        if (currentPackage() === strategy.value) {
+          return { isPackage: true, packageName: strategy.value };
+        }
+        return null;
+      case "coordinate":
+        var x = Math.round(strategy.x_percent * device.width);
+        var y = Math.round(strategy.y_percent * device.height);
+        return { isCoordinate: true, x: x, y: y };
+      case "image":
+        return this._findByImage(strategy.template, strategy.threshold || 0.8);
+      case "chain":
+        return this._findByChain(strategy.steps || []);
+    }
+    // Text-based types: use match_mode
     var matchMode = strategy.match_mode || "exact";
     if (matchMode === "contains") {
       switch (strategy.type) {
@@ -262,21 +296,7 @@ var uiOperator = {
         case "id": all = id(strategy.value).find(); break;
         case "desc": all = desc(strategy.value).find(); break;
         case "className": all = className(strategy.value).find(); break;
-        case "package":
-          if (currentPackage() === strategy.value) {
-            return { isPackage: true, packageName: strategy.value };
-          }
-          return null;
-        case "coordinate":
-          var x = Math.round(strategy.x_percent * device.width);
-          var y = Math.round(strategy.y_percent * device.height);
-          return { isCoordinate: true, x: x, y: y };
-        case "image":
-          return this._findByImage(strategy.template, strategy.threshold || 0.8);
-        case "chain":
-          return this._findByChain(strategy.steps || []);
-        default:
-          return null;
+        default: return null;
       }
     }
     if (all && all.length > 0) {
@@ -293,14 +313,86 @@ var uiOperator = {
    * @returns {Array} UiObject 数组
    */
   _findManyByStrategy: function (strategy) {
+    // Multi-condition mode
+    if (strategy.conditions && strategy.conditions.length > 0) {
+      return this._findManyByConditions(strategy);
+    }
+
+    // Non-text types: match_mode is meaningless, handle directly
+    if (strategy.type === "chain") {
+      return this._findByChainAll(strategy.steps || []);
+    }
+
+    // Text-based types: use match_mode
+    var matchMode = strategy.match_mode || "exact";
+    if (matchMode === "contains") {
+      switch (strategy.type) {
+        case "text": return textContains(strategy.value).find();
+        case "id": return idContains(strategy.value).find();
+        case "desc": return descContains(strategy.value).find();
+        case "className": return classNameContains(strategy.value).find();
+        default: return [];
+      }
+    }
     switch (strategy.type) {
       case "text": return text(strategy.value).find();
       case "id": return id(strategy.value).find();
       case "desc": return desc(strategy.value).find();
       case "className": return className(strategy.value).find();
-      case "chain": return this._findByChainAll(strategy.steps || []);
       default: return [];
     }
+  },
+
+  /**
+   * 多条件组合查找多个控件（AND/OR）
+   */
+  _findManyByConditions: function (strategy) {
+    var conditions = strategy.conditions;
+    var logic = strategy.logic || "and";
+
+    if (logic === "or") {
+      var results = [];
+      var seen = {};
+      for (var j = 0; j < conditions.length; j++) {
+        var candidates = this._findByCondition(conditions[j]);
+        if (!candidates) continue;
+        for (var k = 0; k < candidates.length; k++) {
+          var el = candidates[k];
+          var key = this._elKey(el);
+          if (!seen[key]) {
+            seen[key] = true;
+            results.push(el);
+          }
+        }
+      }
+      return results;
+    }
+
+    // AND: find all elements that match ALL conditions
+    var candidates = this._findByCondition(conditions[0]);
+    if (!candidates || candidates.length === 0) return [];
+
+    var results = [];
+    for (var m = 0; m < candidates.length; m++) {
+      var el = candidates[m];
+      var allMatch = true;
+      for (var n = 1; n < conditions.length; n++) {
+        if (!this._elementMatchesCondition(el, conditions[n])) {
+          allMatch = false;
+          break;
+        }
+      }
+      if (allMatch) results.push(el);
+    }
+    return results;
+  },
+
+  /** 生成元素去重 key（bounds 中心 + className） */
+  _elKey: function (el) {
+    try {
+      var b = el.bounds();
+      return (el.className() || "") + "@" + (b ? (b.centerX() + "," + b.centerY()) : "?");
+    } catch (e) { return String(Math.random()); }
   },
 
   _findByChainAll: function (steps) {
@@ -345,7 +437,8 @@ var uiOperator = {
           // 只保留屏幕内的元素
           var visible = all.filter(function (el) { return self._isOnScreen(el); });
           if (visible.length > 0) {
-            logger.debug(TAG, "通过 " + s.type + " 找到 " + visible.length + "/" + all.length + " 个可见元素: '" + actionName + "'");
+            var label = s.conditions ? "conditions(" + (s.logic || "and") + ")" : (s.type || "unknown");
+            logger.debug(TAG, "通过 " + label + " 找到 " + visible.length + "/" + all.length + " 个可见元素: '" + actionName + "'");
             return visible;
           }
         }
@@ -412,10 +505,10 @@ var uiOperator = {
       var step = steps[i];
       if (!sel) {
         sel = this._makeSelector(step);
-        if (!sel) return null;
+        if (!sel) { logger.debug(TAG, "链式 Phase1: _makeSelector 返回 null, step=" + JSON.stringify(step)); return null; }
       } else {
         sel = this._chainSelector(sel, step);
-        if (!sel) return null;
+        if (!sel) { logger.debug(TAG, "链式 Phase1: _chainSelector 返回 null"); return null; }
       }
     }
 
@@ -435,6 +528,7 @@ var uiOperator = {
     var el = null;
     if (sel) {
       var candidates = sel.find();
+      logger.debug(TAG, "链式 Phase2: 候选=" + (candidates ? candidates.length : 0) + " 个");
       if (candidates && candidates.length > 0) {
         for (var k = 0; k < candidates.length; k++) {
           if (this._isOnScreen(candidates[k])) { el = candidates[k]; break; }
@@ -444,15 +538,15 @@ var uiOperator = {
       // First step is a nav step with no prior filter: start from root
       try { el = className("android.widget.FrameLayout").findOne(1000); } catch (e) {}
     }
-    if (!el) return null;
+    if (!el) { logger.debug(TAG, "链式 Phase2: 未找到可见元素 (sel=" + (sel ? "ok" : "null") + ")"); return null; }
 
     // Phase 3: walk the tree
     for (var m = navStartIdx; m < steps.length; m++) {
       var navStep = steps[m];
       var navAction = navStep.nav || "filter";
       if (navAction === "parent") {
-        try { el = el.parent(); } catch (e) { return null; }
-        if (!el) return null;
+        try { el = el.parent(); } catch (e) { logger.debug(TAG, "链式 Phase3: parent() 异常"); return null; }
+        if (!el) { logger.debug(TAG, "链式 Phase3: parent() 返回 null"); return null; }
       } else if (navAction === "child") {
         var childSel = this._makeSelector(navStep);
         if (!childSel) return null;
@@ -497,15 +591,18 @@ var uiOperator = {
       }
     }
 
-    return this._isOnScreen(el) ? el : null;
+    var result = this._isOnScreen(el) ? el : null;
+    logger.debug(TAG, "链式 完成: _isOnScreen=" + (result ? "true" : "false"));
+    return result;
   },
 
   _makeSelector: function (step) {
+    var contains = step.match_mode === "contains";
     switch (step.type) {
-      case "text":      return text(step.value);
-      case "id":        return id(step.value);
-      case "desc":      return desc(step.value);
-      case "className": return className(step.value);
+      case "text":      return contains ? textContains(step.value) : text(step.value);
+      case "id":        return contains ? idContains(step.value) : id(step.value);
+      case "desc":      return contains ? descContains(step.value) : desc(step.value);
+      case "className": return contains ? classNameContains(step.value) : className(step.value);
       case "textContains":      return textContains(step.value);
       case "descContains":      return descContains(step.value);
       case "idContains":        return idContains(step.value);
@@ -515,11 +612,12 @@ var uiOperator = {
   },
 
   _chainSelector: function (sel, step) {
+    var contains = step.match_mode === "contains";
     switch (step.type) {
-      case "text":      return sel.text(step.value);
-      case "id":        return sel.id(step.value);
-      case "desc":      return sel.desc(step.value);
-      case "className": return sel.className(step.value);
+      case "text":      return contains ? sel.textContains(step.value) : sel.text(step.value);
+      case "id":        return contains ? sel.idContains(step.value) : sel.id(step.value);
+      case "desc":      return contains ? sel.descContains(step.value) : sel.desc(step.value);
+      case "className": return contains ? sel.classNameContains(step.value) : sel.className(step.value);
       case "textContains":      return sel.textContains(step.value);
       case "descContains":      return sel.descContains(step.value);
       case "idContains":        return sel.idContains(step.value);
@@ -532,14 +630,17 @@ var uiOperator = {
     var actual;
     try {
       switch (step.type) {
-        case "text": actual = el.text(); break;
-        case "desc": actual = el.desc(); break;
-        case "id": actual = el.id(); break;
-        case "className": actual = el.className(); break;
+        case "text": case "textContains": actual = el.text(); break;
+        case "desc": case "descContains": actual = el.desc(); break;
+        case "id": case "idContains": actual = el.id(); break;
+        case "className": case "classNameContains": actual = el.className(); break;
         default: return false;
       }
     } catch (e) { return false; }
-    return actual && actual.indexOf(step.value) !== -1;
+    if (!actual) return false;
+    var matchMode = step.match_mode || "exact";
+    if (matchMode === "contains") return actual.indexOf(step.value) !== -1;
+    return actual === step.value;
   },
 
   /**
@@ -634,8 +735,7 @@ var uiOperator = {
     try {
       setClip(text);
       sleep(200);
-      try { shell("input keyevent 279", true); } catch (e3) { /* ignore */ }
-      try { keyCode(279); } catch (e4) { /* ignore */ }
+      try { shell("input keyevent 279", false); } catch (e3) { /* ignore */ }
       sleep(200);
       logger.debug(TAG, "剪贴板粘贴: '" + text.substring(0, 20) + "'");
       return true;
@@ -652,8 +752,7 @@ var uiOperator = {
    */
   submitViaKeyboard: function (submitActionName) {
     // 尝试键盘回车
-    try { shell("input keyevent 66", true); sleep(300); return true; } catch (e1) { /* ignore */ }
-    try { keyCode(66); sleep(300); return true; } catch (e2) { /* ignore */ }
+    try { shell("input keyevent 66", false); sleep(300); return true; } catch (e1) { /* ignore */ }
 
     // 回退: 点击提交按钮
     if (submitActionName) {
@@ -676,11 +775,12 @@ var uiOperator = {
    * @returns {boolean}
    */
   swipeUp: function () {
-    var startX = device.width / 2 + Math.floor(Math.random() * 50 - 25);
-    var startY = device.height * 0.7;
-    var endX = device.width / 2 + Math.floor(Math.random() * 50 - 25);
-    var endY = device.height * 0.3;
-    return swipe(startX, startY, endX, endY, Math.floor(Math.random() * 200 + 300));
+    var startX = device.width * (0.35 + Math.random() * 0.2);         // 35%-55% 屏宽
+    var startY = device.height * (0.6 + Math.random() * 0.1);         // 60%-70% 屏高
+    var endX = startX + Math.floor(Math.random() * 30 + 20);           // 微微右上 +20~50px
+    var endY = device.height * (0.35 + Math.random() * 0.1);          // 35%-45% 屏高
+    var duration = Math.floor(Math.random() * 200 + 300);              // 300-500ms
+    gestures([0, duration, [startX, startY], [endX, endY]]);
   },
 
   /**

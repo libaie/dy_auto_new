@@ -57,9 +57,9 @@ var aiAnalyzer = {
     try {
       var result = apiClient.post("/api/device/ai-proxy", {
         prompt: prompt,
-        max_tokens: maxTokens || 512,
+        max_tokens: maxTokens || 4096,
         temperature: temperature != null ? temperature : 0.7,
-      });
+      }, 120000);  // AI 生成最长等 2 分钟
 
       if (!result || !result.content) {
         logger.error(TAG, "AI 代理返回空内容");
@@ -86,13 +86,21 @@ var aiAnalyzer = {
     }
 
     var prompt = this._buildAnalysisPrompt(searchKeyword, nickname, commentText);
-    var content = this._callAI(prompt, 512, 0.3);
+    var content = this._callAI(prompt, 2048, 0.3);
     if (!content) {
       logger.warn(TAG, "AI analysis failed");
       return null;
     }
 
-    return this._parseAnalysisResponse(content);
+    var result = this._parseAnalysisResponse(content);
+    if (!result) {
+      logger.warn(TAG, "AI 解析失败，重试一次");
+      content = this._callAI(prompt, 2048, 0.3);
+      if (content) {
+        result = this._parseAnalysisResponse(content);
+      }
+    }
+    return result;
   },
 
   /**
@@ -351,6 +359,7 @@ var aiAnalyzer = {
       "- is_bot / is_competitor\n\n" +
       "## 评分规则\n" + scoring + "\n\n" +
       "## 回复生成规则\n" + replyRules + "\n" +
+      "- **回复正文不要加「回复 @昵称」前缀，系统会自动显示**\n" +
       "- 输出示例：✅ \"" + an.replyExample.good + "\" | ❌ \"" + an.replyExample.bad + "\"\n\n" +
       "根据 tier 选择语气：\n" + tierText + "\n\n" +
       "## 输入\n" +
@@ -362,7 +371,7 @@ var aiAnalyzer = {
       "  \"score\": 75,\n" +
       "  \"tier\": \"high\",\n" +
       "  \"dimensions\": {\n" +
-      "    \"intent\": \"consult_intent\",\n" +
+      "    \"intent\": \"health_consult\",\n" +
       "    \"sentiment\": \"neutral\",\n" +
       "    \"focus\": \"quality\",\n" +
       "    \"profile\": { \"role\": \"unknown\", \"spending\": \"mid\" },\n" +
@@ -371,6 +380,7 @@ var aiAnalyzer = {
       "  \"reply\": \"" + an.replyExample.good + "\"\n" +
       "}\n\n" +
       "tier 规则：score >= 70 为 \"high\"，40-69 为 \"medium\"，< 40 为 \"low\"\n" +
+      "intent 必须是以下之一（根据 tier 语气说明选择最匹配的）：\"" + Object.keys(an.tiers).join("\" / \"") + "\"\n" +
       "请直接输出 JSON，不要其他文本。";
   },
 };

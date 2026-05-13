@@ -24,6 +24,8 @@ import {
   generateCleanPrompt,
 } from '../api/selectors.js'
 import { useToastStore } from '../stores/toast.js'
+import { useSavedPrompt } from '../composables/useSavedPrompt.js'
+import { useWebSocket } from '../composables/useWebSocket.js'
 
 // 动作名称中文说明
 const actionDescriptions = {
@@ -195,8 +197,8 @@ const defaultForm = {
 // --- AI generation state ---
 const generatingRegex = ref(false)
 const generatingPrompt = ref(false)
-const regexAiPrompt = ref('')
-const cleanAiPrompt = ref('')
+const regexAiPrompt = useSavedPrompt('selector_regex', '')
+const cleanAiPrompt = useSavedPrompt('selector_clean', '')
 
 async function generateRegexAI() {
   if (!regexAiPrompt.value.trim()) {
@@ -236,16 +238,30 @@ const form = reactive({ ...defaultForm })
 const editMode = ref('form') // 'form' | 'json'
 const strategyList = ref([])
 
+// Normalize legacy condition types: classNameContains → type:className + match_mode:contains
+// (Chain steps use their own type system — classNameContains is valid there, do NOT touch)
+function _normalizeLegacyTypes(strategies) {
+  const MAP = { classNameContains: 'className', idContains: 'id', textContains: 'text', descContains: 'desc' }
+  for (const s of strategies) {
+    if (s.conditions) {
+      for (const c of s.conditions) {
+        if (MAP[c.type]) { c.match_mode = 'contains'; c.type = MAP[c.type] }
+      }
+    }
+  }
+  return strategies
+}
+
 function syncStrategiesToList() {
   try {
-    strategyList.value = JSON.parse(form.strategies || '[]')
+    strategyList.value = _normalizeLegacyTypes(JSON.parse(form.strategies || '[]'))
   } catch {
     strategyList.value = []
   }
 }
 
 function syncListToStrategies() {
-  form.strategies = JSON.stringify(strategyList.value, null, 2)
+  form.strategies = JSON.stringify(_normalizeLegacyTypes(strategyList.value), null, 2)
 }
 
 function addStrategy() {
@@ -284,6 +300,18 @@ const deleting = ref(false)
 // --- Page-level error ---
 const pageError = ref(null)
 const toast = useToastStore()
+
+// --- WebSocket ---
+function wsUrl() {
+  const token = localStorage.getItem('token') || ''
+  const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
+  return `${protocol}//${location.host}/api/devices/ws/pair-events?token=${encodeURIComponent(token)}`
+}
+useWebSocket(wsUrl, {
+  onMessage(msg) {
+    if (msg.event === 'selectors_changed') fetchSelectors()
+  },
+})
 
 // --- Fetch selectors ---
 async function fetchSelectors() {
@@ -946,6 +974,7 @@ onMounted(fetchSelectors)
                         :index="i"
                         :total-count="strategyList.length"
                         :action-name="form.action_name"
+                        :purpose="form.purpose"
                         @update="updateStrategy(i, $event)"
                         @delete="deleteStrategy(i)"
                         @move-up="moveStrategy(i, -1)"

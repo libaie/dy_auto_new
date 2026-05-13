@@ -19,6 +19,7 @@ import {
 import { formatDate } from '../utils/format.js'
 import { useToastStore } from '../stores/toast.js'
 import TipIcon from '../components/TipIcon.vue'
+import { useWebSocket } from '../composables/useWebSocket.js'
 
 // --- Data state ---
 const accounts = ref([])
@@ -53,6 +54,18 @@ const deleting = ref(false)
 const pageError = ref(null)
 
 const toast = useToastStore()
+
+// --- WebSocket ---
+function wsUrl() {
+  const token = localStorage.getItem('token') || ''
+  const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
+  return `${protocol}//${location.host}/api/devices/ws/pair-events?token=${encodeURIComponent(token)}`
+}
+useWebSocket(wsUrl, {
+  onMessage(msg) {
+    if (msg.event === 'accounts_changed') fetchAccounts()
+  },
+})
 
 // --- Status options for the dropdown ---
 const statusOptions = [

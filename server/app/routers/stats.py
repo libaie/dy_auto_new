@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, Query, HTTPException
 from typing import Optional
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
+from app.config import bj_now
 
 from app.database import get_db
 from app.deps import verify_admin_token
@@ -64,7 +65,7 @@ def daily_stats(
 ):
     """Daily operation stats for all accounts."""
     if not date:
-        date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        date = bj_now().strftime("%Y-%m-%d")
 
     rows = db.query(DailyStats).filter(DailyStats.date == date).all()
     if not rows:
@@ -72,14 +73,16 @@ def daily_stats(
 
     # Batch-load accounts to avoid N+1 query
     account_ids = [row.account_id for row in rows]
-    accounts_map = {
-        a.id: a.nickname
-        for a in db.query(Account).filter(Account.id.in_(account_ids)).all()
-    }
+    accounts_map = {}
+    for a in db.query(Account).filter(Account.id.in_(account_ids)).all():
+        accounts_map[a.id] = {"nickname": a.nickname, "daily_limits": a.daily_limits or {}}
+
+    default_limits = {"likes": 50, "comments": 20, "follows": 20, "dms": 10, "replies": 15}
 
     accounts = [{
         "account_id": row.account_id,
-        "nickname": accounts_map.get(row.account_id, "unknown"),
+        "nickname": accounts_map.get(row.account_id, {}).get("nickname", "unknown"),
+        "daily_limits": accounts_map.get(row.account_id, {}).get("daily_limits") or default_limits,
         "likes": row.likes,
         "comments": row.comments,
         "follows": row.follows,

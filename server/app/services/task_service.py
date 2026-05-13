@@ -1,9 +1,10 @@
 """Task scheduling service — backed by SQLAlchemy database."""
 from datetime import datetime, timezone
+from app.config import bj_now
 from typing import Optional
 
 from sqlalchemy.orm import Session
-from sqlalchemy import update, or_, and_, null, String
+from sqlalchemy import update, or_, and_, null, String, select
 
 from app.db_models import Task as DBTask, Device as DBDevice
 from app.models import TaskType, TaskStatus, Task as PydanticTask
@@ -102,12 +103,23 @@ class TaskService:
             )
 
         # 3. Recover stuck RUNNING tasks (device crashed while executing)
+        # Only reclaim tasks from devices that haven't sent a heartbeat recently.
         from datetime import timedelta
-        stale_threshold = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=3)
+        import os
+        stale_minutes = int(os.getenv("TASK_STALE_MINUTES", "10"))
+        stale_threshold = bj_now() - timedelta(minutes=stale_minutes)
+
+        # Find devices that were recently seen (still online)
+        online_device_ids = select(DBDevice.id).where(
+            DBDevice.last_seen_at.isnot(None),
+            DBDevice.last_seen_at >= stale_threshold,
+        )
+
         stale_running = db.query(DBTask).filter(
             DBTask.status == TaskStatus.RUNNING.value,
             DBTask.started_at.isnot(None),
             DBTask.started_at < stale_threshold,
+            ~DBTask.device_id.in_(online_device_ids),  # skip tasks on online devices
         ).all()
         for stale in stale_running:
             stale.status = TaskStatus.PENDING.value
@@ -124,7 +136,7 @@ class TaskService:
             db.flush()
 
         # 4. Find candidate tasks with routing and scheduled_at applied
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        now = bj_now()
         candidates = db.query(DBTask).filter(
             DBTask.status == TaskStatus.PENDING.value,
             route_filter,
@@ -141,14 +153,9 @@ class TaskService:
         ).distinct().scalar_subquery()
 
         for db_task in candidates:
-            # Check main task quota AND follow/DM quotas for reply_comment
+            # Check task quota (reply_comment 不阻塞 follow/DM，handler 内部优雅降级)
             if not stats_service.check_quota(db, db_task.account_id, db_task.type):
                 continue
-            if db_task.type == "reply_comment":
-                if not stats_service.check_quota(db, db_task.account_id, "follow"):
-                    continue
-                if not stats_service.check_quota(db, db_task.account_id, "search_dm"):
-                    continue
             # Atomic claim: only succeeds if no other task for this account is RUNNING
             result = db.execute(
                 update(DBTask)
@@ -157,7 +164,7 @@ class TaskService:
                     DBTask.status == TaskStatus.PENDING.value,
                     ~DBTask.account_id.in_(busy_account_ids),
                 )
-                .values(status=TaskStatus.RUNNING.value, device_id=device_id, started_at=datetime.now(timezone.utc))
+                .values(status=TaskStatus.RUNNING.value, device_id=device_id, started_at=bj_now())
             )
             db.commit()
 
@@ -193,24 +200,22 @@ class TaskService:
         if status == TaskStatus.COMPLETED:
             db_task.status = TaskStatus.COMPLETED.value
             db_task.result = result
-            db_task.completed_at = datetime.now(timezone.utc)
-            # Record operation counts (分别统计回复/关注/私信，风控关键)
+            db_task.completed_at = bj_now()
             r = result or {}
-            success_count = r.get("success_count", 1)
+            success_count = r.get("success_count", 0)
             stats_service.increment(db, db_task.account_id, db_task.type, count=success_count)
-            # 额外统计关注和私信（reply_comment 任务包含多种操作）
             follow_count = r.get("follow_count", 0)
             if follow_count > 0:
                 stats_service.increment(db, db_task.account_id, "follow", count=follow_count)
             dm_count = r.get("dm_count", 0)
             if dm_count > 0:
-                stats_service.increment(db, db_task.account_id, "search_dm", count=dm_count)
+                    stats_service.increment(db, db_task.account_id, "search_dm", count=dm_count)
         elif status == TaskStatus.FAILED:
             db_task.retry_count += 1
             if db_task.retry_count >= MAX_RETRIES:
                 db_task.status = TaskStatus.FAILED.value
                 db_task.result = result
-                db_task.completed_at = datetime.now(timezone.utc)
+                db_task.completed_at = bj_now()
             else:
                 db_task.status = TaskStatus.PENDING.value  # re-queue for retry
                 db_task.device_id = None
@@ -219,7 +224,7 @@ class TaskService:
                 # the same keyword while the task retries via the direct queue.
                 # Refresh assigned_at to extend the stale recovery window.
                 if channel_item:
-                    channel_item.assigned_at = datetime.now(timezone.utc)
+                    channel_item.assigned_at = bj_now()
 
         # Advance chain if this task is part of one
         if db_task.chain_instance_id and db_task.status in ("completed", "failed"):
@@ -279,7 +284,7 @@ class TaskService:
         if task.status in (TaskStatus.COMPLETED.value, TaskStatus.CANCELLED.value):
             raise ValueError(f"Cannot cancel task in status: {task.status}")
         task.status = TaskStatus.CANCELLED.value
-        task.completed_at = datetime.now(timezone.utc)
+        task.completed_at = bj_now()
 
         # Reset associated channel item so it can be re-dispatched
         from app.db_models import ChannelItem
@@ -342,11 +347,22 @@ class TaskService:
         return result
 
     def check_cancelled_running(self, db: Session, device_id: str) -> Optional[PydanticTask]:
-        """Check if device has a running task that was cancelled."""
+        """Check if device has a running task that was recently cancelled.
+
+        Only returns tasks cancelled within the last 5 minutes — older ones are
+        treated as acknowledged to prevent the same stale cancellation from
+        being returned on every poll.
+        """
+        from datetime import timedelta
+        cutoff = bj_now() - timedelta(minutes=5)
         task = (
             db.query(DBTask)
-            .filter(DBTask.device_id == device_id, DBTask.status == TaskStatus.CANCELLED.value)
-            .order_by(DBTask.created_at.desc())
+            .filter(
+                DBTask.device_id == device_id,
+                DBTask.status == TaskStatus.CANCELLED.value,
+                DBTask.completed_at >= cutoff,
+            )
+            .order_by(DBTask.completed_at.desc())
             .first()
         )
         return _db_task_to_pydantic(task) if task else None

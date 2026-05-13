@@ -3,11 +3,13 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import Optional
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
+from app.config import bj_now
 
 from app.database import get_db
 from app.db_models import ChainTemplate, ChainInstance, Task as DBTask, Account, Device, AccountGroupMember
 from app.deps import verify_admin_token
 from app.models import ChainTemplateCreate, ChainTemplateUpdate, ChainInstanceCreateRequest
+from app.ws_manager import pair_ws_manager
 
 router = APIRouter(prefix="/api/chains", tags=["chains"])
 
@@ -44,7 +46,7 @@ def _instance_to_dict(inst: ChainInstance, template_name: str = "", account_nick
 # --- Chain Template CRUD ---
 
 @router.post("/templates")
-def create_template(
+async def create_template(
     request: ChainTemplateCreate,
     db: Session = Depends(get_db),
     _: str = Depends(verify_admin_token),
@@ -58,6 +60,7 @@ def create_template(
     db.add(tpl)
     db.commit()
     db.refresh(tpl)
+    await pair_ws_manager.broadcast_to_admins({"event": "chains_changed"})
     return _template_to_dict(tpl)
 
 
@@ -87,7 +90,7 @@ def get_template(
 
 
 @router.put("/templates/{template_id}")
-def update_template(
+async def update_template(
     template_id: str,
     request: ChainTemplateUpdate,
     db: Session = Depends(get_db),
@@ -117,11 +120,12 @@ def update_template(
         tpl.steps = [s.model_dump() for s in request.steps]
     db.commit()
     db.refresh(tpl)
+    await pair_ws_manager.broadcast_to_admins({"event": "chains_changed"})
     return _template_to_dict(tpl)
 
 
 @router.delete("/templates/{template_id}")
-def delete_template(
+async def delete_template(
     template_id: str,
     db: Session = Depends(get_db),
     _: str = Depends(verify_admin_token),
@@ -137,6 +141,7 @@ def delete_template(
         raise HTTPException(status_code=400, detail=f"该模板有 {active} 个活跃实例，无法删除")
     db.delete(tpl)
     db.commit()
+    await pair_ws_manager.broadcast_to_admins({"event": "chains_changed"})
     return {"deleted": True, "id": template_id}
 
 
@@ -163,6 +168,7 @@ async def create_instances(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
+    await pair_ws_manager.broadcast_to_admins({"event": "chains_changed"})
     return {
         "created_count": len(results["created"]),
         "skipped_busy_count": len(results["skipped_busy"]),
@@ -270,19 +276,19 @@ async def cancel_instance(
     )
     for task in active_tasks:
         task.status = "cancelled"
-        task.completed_at = datetime.now(timezone.utc)
+        task.completed_at = bj_now()
 
         if task.device_id:
-            from app.ws_manager import pair_ws_manager
             await pair_ws_manager.send_to_device(task.device_id, {
                 "event": "cancel_task",
                 "task_id": task.id,
             })
 
     inst.status = "cancelled"
-    inst.completed_at = datetime.now(timezone.utc)
+    inst.completed_at = bj_now()
     db.commit()
 
+    await pair_ws_manager.broadcast_to_admins({"event": "chains_changed"})
     return {"status": "cancelled", "id": instance_id}
 
 
@@ -325,4 +331,5 @@ async def retry_instance(
 
     chain_service._safe_push_step_task(db, inst)
 
+    await pair_ws_manager.broadcast_to_admins({"event": "chains_changed"})
     return {"status": "retrying", "id": instance_id, "step": failed_task.step_order}

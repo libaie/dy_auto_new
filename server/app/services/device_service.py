@@ -1,6 +1,7 @@
 """Device registration, heartbeat, and status management."""
 from datetime import datetime, timezone, timedelta
 from sqlalchemy.orm import Session
+from app.config import bj_now
 
 from app.db_models import Device
 
@@ -17,7 +18,7 @@ class DeviceService:
     ) -> dict:
         """Register or update a device. Returns device info dict."""
         device = db.query(Device).filter(Device.id == device_id).first()
-        now = datetime.now(timezone.utc)
+        now = bj_now()
 
         if device:
             device.name = name
@@ -63,7 +64,7 @@ class DeviceService:
         if not device:
             return False
         was_offline = device.status != "online"
-        device.last_seen_at = datetime.now(timezone.utc)
+        device.last_seen_at = bj_now()
         device.status = "online"
         if ip:
             device.ip = ip
@@ -87,7 +88,7 @@ class DeviceService:
 
     def set_offline_devices(self, db: Session, timeout_seconds: int = 300) -> int:
         """Mark devices as offline if no heartbeat for timeout_seconds. Returns count."""
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        now = bj_now()
         cutoff_dt = now - timedelta(seconds=timeout_seconds)
         count = (
             db.query(Device)

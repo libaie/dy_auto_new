@@ -6,6 +6,7 @@ const props = defineProps({
   index: { type: Number, required: true },
   totalCount: { type: Number, required: true },
   actionName: { type: String, default: '' },
+  purpose: { type: String, default: 'locate' },
 })
 
 const emit = defineEmits(['update', 'delete', 'move-up', 'move-down'])
@@ -34,6 +35,8 @@ const isMultiCondition = computed(() =>
   !!(props.strategy.conditions && props.strategy.conditions.length > 0)
 )
 
+const isLocate = computed(() => props.purpose !== 'extract')
+
 const typeConfig = computed(() =>
   STRATEGY_TYPES.find(t => t.value === props.strategy.type) || STRATEGY_TYPES[0]
 )
@@ -49,8 +52,8 @@ function updateField(key, value) {
 function onTypeChange(newType) {
   const base = { type: newType }
   if (newType === 'coordinate') {
-    base.x_percent = props.strategy.x_percent || 50
-    base.y_percent = props.strategy.y_percent || 50
+    base.x_percent = props.strategy.x_percent || 0.5
+    base.y_percent = props.strategy.y_percent || 0.5
   } else if (newType === 'chain') {
     base.steps = props.strategy.steps || [{ type: 'text', value: '' }]
   } else if (newType === 'image') {
@@ -235,8 +238,8 @@ async function onImageFileSelect(e) {
         </select>
       </div>
 
-            <!-- click_mode dropdown -->
-      <div v-if="canHaveMatchMode || ['text','id','desc','className','package','image'].includes(strategy.type)" class="mt-2">
+            <!-- click_mode dropdown (hidden for extract purpose) -->
+      <div v-if="isLocate && (canHaveMatchMode || ['text','id','desc','className','package','image'].includes(strategy.type) || isMultiCondition)" class="mt-2">
         <label class="text-xs text-slate-400 mb-1 block">点击方式</label>
         <select
           :value="strategy.click_mode || 'click'"
@@ -426,29 +429,31 @@ async function onImageFileSelect(e) {
         </div>
       </div>
 
-      <!-- coordinate: x + y inputs -->
+      <!-- coordinate: x + y inputs (0-1 比例) -->
       <div v-else-if="typeConfig.fields === 'xy'" class="flex gap-3">
         <div class="flex-1">
-          <label class="text-xs text-slate-400 mb-1 block">X 百分比 (0-100)</label>
+          <label class="text-xs text-slate-400 mb-1 block">X 比例 (0-1)</label>
           <input
             type="number"
             min="0"
-            max="100"
+            max="1"
+            step="0.01"
             :value="strategy.x_percent"
             @input="updateField('x_percent', Number($event.target.value))"
-            placeholder="50"
+            placeholder="0.5"
             class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:border-purple-500/50 focus:outline-none"
           />
         </div>
         <div class="flex-1">
-          <label class="text-xs text-slate-400 mb-1 block">Y 百分比 (0-100)</label>
+          <label class="text-xs text-slate-400 mb-1 block">Y 比例 (0-1)</label>
           <input
             type="number"
             min="0"
-            max="100"
+            max="1"
+            step="0.01"
             :value="strategy.y_percent"
             @input="updateField('y_percent', Number($event.target.value))"
-            placeholder="50"
+            placeholder="0.5"
             class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:border-purple-500/50 focus:outline-none"
           />
         </div>

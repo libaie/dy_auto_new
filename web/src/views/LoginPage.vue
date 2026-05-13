@@ -30,48 +30,47 @@ async function handleLogin() {
 </script>
 
 <template>
-  <div class="min-h-screen flex items-center justify-center login-aurora">
-    <div class="w-full max-w-sm glass-card p-8 gradient-border">
-      <h1 class="text-2xl font-bold text-center gradient-text mb-2">抖音助手</h1>
-      <p class="text-center text-slate-400 text-sm mb-8">管理后台登录</p>
+  <div class="min-h-screen flex items-center justify-center relative login-aurora">
+    <div class="cinematic-bg"></div>
+    <div class="dot-grid"></div>
 
-      <form @submit.prevent="handleLogin" class="space-y-5">
-        <div>
-          <label class="block text-sm font-medium text-slate-300 mb-1.5" for="username">用户名</label>
-          <input
-            id="username"
-            v-model="username"
-            type="text"
-            required
-            class="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg text-slate-200 placeholder-slate-500"
-            placeholder="请输入用户名"
-          />
+    <div class="relative z-10 w-full max-w-sm">
+      <!-- Brand -->
+      <div class="text-center mb-8">
+        <div class="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg" style="background: linear-gradient(135deg, var(--accent-600), var(--accent-500)); box-shadow: 0 0 40px var(--accent-glow);">
+          <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
         </div>
+        <h1 class="text-2xl font-black tracking-tight gradient-text">抖音助手</h1>
+        <p class="text-slate-500 text-sm mt-1 font-mono tracking-wide">COMMAND CENTER</p>
+      </div>
 
-        <div>
-          <label class="block text-sm font-medium text-slate-300 mb-1.5" for="password">密码</label>
-          <input
-            id="password"
-            v-model="password"
-            type="password"
-            required
-            class="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg text-slate-200 placeholder-slate-500"
-            placeholder="请输入密码"
-          />
-        </div>
+      <!-- Card -->
+      <div class="card-glass p-8 card-gradient">
+        <form @submit.prevent="handleLogin" class="space-y-5">
+          <div>
+            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5" for="username">用户名</label>
+            <input id="username" v-model="username" type="text" required class="w-full px-3 py-2.5 rounded-lg text-sm" placeholder="请输入用户名" />
+          </div>
 
-        <div v-if="error" class="text-red-400 text-sm bg-red-500/10 border border-red-500/20 p-2.5 rounded-lg">
-          {{ error }}
-        </div>
+          <div>
+            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5" for="password">密码</label>
+            <input id="password" v-model="password" type="password" required class="w-full px-3 py-2.5 rounded-lg text-sm" placeholder="请输入密码" />
+          </div>
 
-        <button
-          type="submit"
-          :disabled="loading"
-          class="btn-aurora w-full py-2.5 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <span class="relative z-10">{{ loading ? '登录中...' : '登录' }}</span>
-        </button>
-      </form>
+          <div v-if="error" class="text-red-400 text-xs bg-red-500/8 border border-red-500/15 p-2.5 rounded-lg flex items-center gap-2">
+            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+            {{ error }}
+          </div>
+
+          <button type="submit" :disabled="loading" class="btn-primary w-full py-2.5 text-sm justify-center">
+            {{ loading ? '验证中...' : '进入指挥中心' }}
+          </button>
+        </form>
+      </div>
+
+      <p class="text-center text-[11px] text-slate-600 mt-6 font-mono tracking-wider">DOUYIN AUTOMATION · HELIX COMMAND</p>
     </div>
   </div>
 </template>

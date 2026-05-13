@@ -1,6 +1,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { getSettings, updateSettings } from '../api/settings.js'
+import { testConnection } from '../api/pixelle.js'
 import { useToastStore } from '../stores/toast.js'
 import LoadingSpinner from '../components/LoadingSpinner.vue'
 
@@ -13,7 +14,12 @@ const form = reactive({
   ai_base_url: 'https://api.deepseek.com',
   ai_model: 'deepseek-chat',
   ai_thinking: 'max',
+  pixelle_video_url: 'http://localhost:8500',
+  pixelle_video_timeout: 600,
 })
+
+const pixelleConnTest = ref(null)
+const pixelleTesting = ref(false)
 
 async function fetchSettings() {
   loading.value = true
@@ -24,6 +30,8 @@ async function fetchSettings() {
     form.ai_base_url = data.ai_base_url || 'https://api.deepseek.com'
     form.ai_model = data.ai_model || 'deepseek-chat'
     form.ai_thinking = data.ai_thinking || 'max'
+    form.pixelle_video_url = data.pixelle_video_url || 'http://localhost:8500'
+    form.pixelle_video_timeout = parseInt(data.pixelle_video_timeout) || 600
   } catch {
     toast.error('加载设置失败')
   } finally {
@@ -39,12 +47,27 @@ async function handleSave() {
       ai_base_url: form.ai_base_url,
       ai_model: form.ai_model,
       ai_thinking: form.ai_thinking,
+      pixelle_video_url: form.pixelle_video_url,
+      pixelle_video_timeout: String(form.pixelle_video_timeout),
     })
     toast.success('设置已保存')
   } catch {
     toast.error('保存失败')
   } finally {
     saving.value = false
+  }
+}
+
+async function handleTestConnection() {
+  pixelleTesting.value = true
+  pixelleConnTest.value = null
+  try {
+    const resp = await testConnection()
+    pixelleConnTest.value = resp.data
+  } catch {
+    pixelleConnTest.value = { ok: false, error: '请求失败' }
+  } finally {
+    pixelleTesting.value = false
   }
 }
 
@@ -123,6 +146,70 @@ onMounted(fetchSettings)
             <p class="mt-1 text-xs text-slate-500">控制 AI 思考深度，等级越高回复质量越好但耗时更长</p>
           </div>
         </div>
+      </div>
+
+      <!-- Pixelle-Video Configuration -->
+      <div class="glass-card p-6 mb-6">
+        <div class="flex items-center gap-3 mb-6">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <div>
+            <h2 class="text-lg font-semibold text-white">Pixelle-Video 配置</h2>
+            <p class="text-sm text-slate-400">AI 视频生成服务（LLM 脚本 → ComfyUI 配图 → TTS 配音 → FFmpeg 合成）</p>
+          </div>
+        </div>
+
+        <div class="space-y-5">
+          <!-- Connection -->
+          <div>
+            <label class="block text-sm font-medium text-slate-300 mb-2">Pixelle-Video 服务地址</label>
+            <div class="flex gap-2">
+              <input
+                v-model="form.pixelle_video_url"
+                type="text"
+                placeholder="http://localhost:8501"
+                class="flex-1 px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/30 transition-all"
+              />
+              <button
+                @click="handleTestConnection"
+                :disabled="pixelleTesting"
+                class="px-4 py-3 rounded-xl bg-purple-500/20 text-purple-300 text-sm hover:bg-purple-500/30 disabled:opacity-50 transition-colors whitespace-nowrap"
+              >
+                {{ pixelleTesting ? '测试中...' : '测试连接' }}
+              </button>
+            </div>
+            <div v-if="pixelleConnTest" class="mt-2 text-sm flex items-center gap-2">
+              <template v-if="pixelleConnTest.ok">
+                <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+                <span class="text-emerald-400">连接成功 (v{{ pixelleConnTest.version }})</span>
+              </template>
+              <template v-else>
+                <svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                <span class="text-red-400">连接失败: {{ pixelleConnTest.error }}</span>
+              </template>
+            </div>
+            <p class="mt-1 text-xs text-slate-500">Pixelle-Video 的 FastAPI 服务地址（默认端口 8501）</p>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-slate-300 mb-2">超时时间 (秒)</label>
+            <input
+              v-model.number="form.pixelle_video_timeout"
+              type="number"
+              min="60"
+              max="3600"
+              class="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/30 transition-all"
+            />
+            <p class="mt-1 text-xs text-slate-500">代理请求 Pixelle-Video 的最大等待时间</p>
+          </div>
+        </div>
 
         <div class="mt-6 flex justify-end">
           <button
@@ -147,6 +234,7 @@ onMounted(fetchSettings)
             <ul class="list-disc list-inside space-y-1 text-slate-500">
               <li>养号过程中的内容语义分析（判断是否与大健康相关）</li>
               <li>评论 / 私信内容 AI 生成</li>
+              <li>Pixelle-Video 视频生成（LLM 脚本 → ComfyUI 配图 → TTS 配音 → 合成）</li>
             </ul>
             <p class="mt-3">配置保存后，设备端下次轮询任务时自动生效。</p>
           </div>

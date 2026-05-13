@@ -115,7 +115,8 @@ class SearchCommentParams(BaseModel):
     keywords: Optional[list[str]] = Field(None, description="批量关键词（通道模式）")
     content: Optional[str] = Field(None, max_length=200, description="评论内容")
     content_template_id: Optional[str] = Field(None, description="内容模板ID")
-    count: int = Field(default=5, ge=1, le=20, description="处理数量")
+    count: int = Field(default=5, ge=1, le=50, description="每视频处理数量")
+    video_count: int = Field(default=5, ge=1, le=30, description="处理视频数")
     sort_by: Optional[str] = Field(None, pattern="^(latest|most_liked)$")
 
 
@@ -131,7 +132,7 @@ class SearchDMParams(BaseModel):
     keywords: Optional[list[str]] = Field(None, description="批量关键词（通道模式）")
     content: Optional[str] = Field(None, max_length=500, description="私信内容")
     content_template_id: Optional[str] = Field(None, description="内容模板ID")
-    count: int = Field(default=5, ge=1, le=10, description="私信数量")
+    count: int = Field(default=5, ge=1, le=50, description="私信数量")
     sort_by: Optional[str] = Field(None, pattern="^(latest|most_liked)$")
 
 
@@ -140,8 +141,8 @@ class ReplyCommentParams(BaseModel):
     keywords: Optional[list[str]] = Field(None, description="批量关键词（通道模式）")
     content: Optional[str] = Field(None, max_length=500, description="私信内容")
     content_template_id: Optional[str] = Field(None, description="内容模板ID")
-    count: int = Field(default=5, ge=1, le=10, description="每个视频处理评论数")
-    video_count: int = Field(default=3, ge=1, le=10, description="处理视频数")
+    count: int = Field(default=5, ge=1, le=50, description="每个视频处理评论数")
+    video_count: int = Field(default=3, ge=1, le=30, description="处理视频数")
     sort_by: Optional[str] = Field(None, pattern="^(latest|most_liked)$")
     max_age_days: int = Field(default=5, ge=1, le=30, description="评论最大天数")
     max_follows: int = Field(default=20, ge=1, le=50, description="每日关注上限")
@@ -165,6 +166,7 @@ TASK_PARAMS_VALIDATORS = {
     "search_like": SearchLikeParams,
     "search_dm": SearchDMParams,
     "reply_comment": ReplyCommentParams,
+    "collect": SearchCommentParams,  # collect 复用和 search_comment 相同的参数
 }
 
 
@@ -553,4 +555,33 @@ class CollectReportRequest(BaseModel):
     keyword: str
     comment: CollectCommentData
     user: CollectUserData | None = None
+
+
+# --- DM / Conversation models ---
+
+class DMClaimRecipientRequest(BaseModel):
+    account_id: str
+    recipient_douyin_id: str
+    recipient_nickname: str
+
+
+class DMClaimRecipientResponse(BaseModel):
+    claimed: bool
+    conversation_id: str | None = None
+
+
+class DMSendReportRequest(BaseModel):
+    conversation_id: str
+    stage: str = "qualifying"
+    intent: str | None = None
+    keyword: str | None = None
+    content: str
+
+
+class DMReleaseRecipientRequest(BaseModel):
+    conversation_id: str
+
+
+class DMReleaseRecipientResponse(BaseModel):
+    released: bool
 

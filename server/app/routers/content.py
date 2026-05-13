@@ -1,8 +1,5 @@
 """Content management API — templates, sensitive words, AI generation."""
-import logging
 from fastapi import APIRouter, HTTPException, Query, Depends
-
-logger = logging.getLogger(__name__)
 from typing import Optional
 from sqlalchemy.orm import Session
 
@@ -16,6 +13,7 @@ from app.models import (
 from app.database import get_db
 from app.deps import verify_admin_token
 from app.services.content_service import content_service
+from app.ws_manager import pair_ws_manager
 
 router = APIRouter(prefix="/api/content", tags=["content"])
 
@@ -23,15 +21,17 @@ router = APIRouter(prefix="/api/content", tags=["content"])
 # --- Template CRUD ---
 
 @router.post("/templates", response_model=ContentTemplateResponse)
-def create_template(
+async def create_template(
     request: ContentTemplateCreate,
     db: Session = Depends(get_db),
     _: str = Depends(verify_admin_token),
 ):
-    return content_service.create_template(
+    result = content_service.create_template(
         db, name=request.name, category=request.category,
         body=request.body, variables=request.variables,
     )
+    await pair_ws_manager.broadcast_to_admins({"event": "content_changed"})
+    return result
 
 
 @router.get("/templates")
@@ -60,7 +60,7 @@ def get_template(
 
 
 @router.put("/templates/{template_id}", response_model=ContentTemplateResponse)
-def update_template(
+async def update_template(
     template_id: str,
     request: ContentTemplateUpdate,
     db: Session = Depends(get_db),
@@ -70,30 +70,34 @@ def update_template(
     tpl = content_service.update_template(db, template_id, **updates)
     if not tpl:
         raise HTTPException(status_code=404, detail="Template not found")
+    await pair_ws_manager.broadcast_to_admins({"event": "content_changed"})
     return tpl
 
 
 @router.delete("/templates/{template_id}")
-def delete_template(
+async def delete_template(
     template_id: str,
     db: Session = Depends(get_db),
     _: str = Depends(verify_admin_token),
 ):
     if not content_service.delete_template(db, template_id):
         raise HTTPException(status_code=404, detail="Template not found")
+    await pair_ws_manager.broadcast_to_admins({"event": "content_changed"})
     return {"ok": True}
 
 
 # --- Sensitive Word CRUD ---
 
 @router.post("/sensitive-words", response_model=SensitiveWordResponse)
-def add_sensitive_word(
+async def add_sensitive_word(
     request: SensitiveWordCreate,
     db: Session = Depends(get_db),
     _: str = Depends(verify_admin_token),
 ):
     try:
-        return content_service.add_sensitive_word(db, request.word)
+        result = content_service.add_sensitive_word(db, request.word)
+        await pair_ws_manager.broadcast_to_admins({"event": "content_changed"})
+        return result
     except ValueError:
         raise HTTPException(status_code=409, detail="Word already exists")
 
@@ -110,13 +114,14 @@ def list_sensitive_words(
 
 
 @router.delete("/sensitive-words/{word_id}")
-def delete_sensitive_word(
+async def delete_sensitive_word(
     word_id: str,
     db: Session = Depends(get_db),
     _: str = Depends(verify_admin_token),
 ):
     if not content_service.delete_sensitive_word(db, word_id):
         raise HTTPException(status_code=404, detail="Word not found")
+    await pair_ws_manager.broadcast_to_admins({"event": "content_changed"})
     return {"ok": True}
 
 
@@ -160,7 +165,7 @@ async def generate_keywords(
 
 # --- AI Regex & Clean Prompt Generation ---
 
-@router.post(/generate-regex)
+@router.post("/generate-regex")
 async def generate_regex(
     request: GenerateRegexRequest,
     db: Session = Depends(get_db),
@@ -175,7 +180,7 @@ async def generate_regex(
     return {"regex": regex}
 
 
-@router.post(/generate-clean-prompt)
+@router.post("/generate-clean-prompt")
 async def generate_clean_prompt(
     request: GenerateCleanPromptRequest,
     db: Session = Depends(get_db),

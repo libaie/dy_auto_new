@@ -98,9 +98,12 @@ NurtureHandler._executeV2 = function (params) {
   }
 
   // Build stats
-  var stats = {};
+  var stats = { success_count: 0 };
   progress.forEach(function (p) {
     stats[p.type] = { target: p.target, done: p.done };
+    if (p.type === "like" || p.type === "comment" || p.type === "follow") {
+      stats.success_count += p.done;
+    }
   });
 
   logger.info(TAG, "养号 V2 完成: " + JSON.stringify(stats));
@@ -512,6 +515,7 @@ NurtureHandler._legacyExecute = function (params) {
     stats.videos_watched++;
   }
 
+  stats.success_count = stats.likes + stats.follows;
   logger.info(TAG, "养号完成. 统计: " + JSON.stringify(stats));
   return { success: true, result: stats };
 };

@@ -12,7 +12,8 @@ var TAG = "采集";
 
 var SearchCollectHandler = Object.create(SearchBaseHandler);
 
-SearchCollectHandler._interactWithVideo = function (content, stats) {
+SearchCollectHandler._interactWithVideo = function (content, stats, params) {
+  params = params || {};
   var taskId = (stats._taskId || "");
   var keyword = (stats._keyword || "");
 
@@ -20,7 +21,7 @@ SearchCollectHandler._interactWithVideo = function (content, stats) {
 
   var collected = 0;
   var visitedUsers = {};
-  var maxComments = 50;
+  var maxComments = params.count || 50;
   var maxScroll = 20;
 
   for (var scroll = 0; scroll < maxScroll; scroll++) {
@@ -59,19 +60,34 @@ SearchCollectHandler._interactWithVideo = function (content, stats) {
 };
 
 SearchCollectHandler._openComments = function () {
-  var commentBtn = uiOperator.findElement("video_comment_btn", 2000);
+  var _isCommentPanelOpen = function () {
+    if (uiOperator.findElement("comment_input", 1000)) return true;
+    if (uiOperator.findElement("comment_list", 1000)) return true;
+    if (uiOperator.findElement("is_comment_view", 500)) return true;
+    return false;
+  };
+
+  // 尝试 1：选择器找评论入口按钮（desc/text → coordinate DB兜底 → AND条件）
+  var commentBtn = uiOperator.findElement("video_comment_btn", 3000);
   if (commentBtn) {
     uiOperator.clickElement(commentBtn);
-    sleep(1500);
-    return true;
+    sleep(2000);
+    if (_isCommentPanelOpen()) return true;
   }
-  // 兜底：评论按钮通常在屏幕右侧，坐标点击
-  logger.info(TAG, "策略未找到评论入口，坐标兜底");
-  click(device.width * 0.92, device.height * 0.55);
-  sleep(1500);
-  // 验证是否打开了评论面板
-  if (uiOperator.findElement("is_comment_view", 2000)) return true;
-  if (uiOperator.findElement("comment_list", 2000)) return true;
+
+  // 尝试 2：点屏幕唤醒 UI，用多坐标候选集重试（不重复走 DB 策略）
+  logger.info(TAG, "未找到评论入口，唤醒 UI 后多坐标尝试");
+  click(device.width * 0.5, device.height * 0.5);
+  sleep(2000);
+  var candidates = [
+    [0.87, 0.58], [0.90, 0.55], [0.85, 0.62], [0.92, 0.50]
+  ];
+  for (var ci = 0; ci < candidates.length; ci++) {
+    click(device.width * candidates[ci][0], device.height * candidates[ci][1]);
+    sleep(2000);
+    if (_isCommentPanelOpen()) return true;
+  }
+
   logger.warn(TAG, "评论入口打开失败");
   return false;
 };
@@ -90,8 +106,13 @@ SearchCollectHandler._aiQualify = function (comment) {
 };
 
 SearchCollectHandler._collectCommentData = function (item, comment) {
+  // 将原始 UI 时间文本转换为标准 ISO 时间
+  var timeStr = comment.time || "";
+  var parsed = ReplyCommentHandler._parseTime(timeStr);
+  var isoTime = parsed ? parsed.toISOString() : timeStr;
+
   var data = {
-    nickname: comment.nickname, content: comment.text, time_str: comment.time,
+    nickname: comment.nickname, content: comment.text, time_str: isoTime,
     reply_count: "", like_count: "", dislike_count: "", location: "", is_author: comment.isAuthor || false
   };
   var extraFields = {
@@ -150,10 +171,10 @@ SearchCollectHandler._reportCollection = function (taskId, keyword, commentData,
 
 SearchCollectHandler.execute = function (params) {
   var keyword = params.keyword;
-  var count = params.count || 5;
+  var videoCount = params.video_count || params.count || 5;
   aiAnalyzer.useTemplate(params.prompt_template_id);
   if (!keyword) return { success: false, error: "缺少关键词" };
-  logger.info(TAG, "采集: '" + keyword + "', 视频=" + count);
+  logger.info(TAG, "采集: '" + keyword + "', 视频=" + videoCount + ", 每视频评论=" + (params.count || 50));
 
   var taskId = params.task_id || "";
   if (!this.ensureAppActive()) return { success: false, error: "打开抖音失败" };
@@ -174,8 +195,8 @@ SearchCollectHandler.execute = function (params) {
   }
 
   var stats = { success_count: 0, fail_count: 0, details: [], _taskId: taskId, _keyword: keyword };
-  for (var i = 0; i < count; i++) {
-    logger.info(TAG, "第 " + (i + 1) + "/" + count + " 个视频");
+  for (var i = 0; i < videoCount; i++) {
+    logger.info(TAG, "第 " + (i + 1) + "/" + videoCount + " 个视频");
     if (i === 0) {
       if (!this._clickSearchResult(0)) break;
       sleep(2000);
@@ -184,11 +205,10 @@ SearchCollectHandler.execute = function (params) {
       uiOperator.swipeUp();
       sleep(2500);
     }
-    if (!this._interactWithVideo("", stats)) stats.fail_count++;
+    if (!this._interactWithVideo("", stats, params)) stats.fail_count++;
     antiDetect.maybePause();
   }
   logger.info(TAG, "采集完成: " + JSON.stringify(stats));
-  uiOperator.closeApp();
   return { success: true, result: stats };
 };
 

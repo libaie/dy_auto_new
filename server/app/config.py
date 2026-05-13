@@ -28,7 +28,7 @@ JWT_EXPIRE_HOURS = int(os.getenv("JWT_EXPIRE_HOURS", "24"))
 
 
 def _check_default_credentials():
-    """Check if default credentials are being used and warn."""
+    """Check if default credentials are being used and warn/error."""
     defaults_used = []
     if DEVICE_SECRET == "change-me-to-a-random-string":
         defaults_used.append("DEVICE_SECRET")
@@ -44,6 +44,10 @@ def _check_default_credentials():
         f"WARNING: Using default credentials for: {', '.join(defaults_used)}. "
         f"Set these environment variables before deploying to production."
     )
+
+    if not DEBUG:
+        print(f"FATAL: {msg}", file=sys.stderr)
+        sys.exit(1)
 
     print(f"WARNING: {msg}", file=sys.stderr)
 
@@ -197,3 +201,44 @@ def get_ai_config_with_key(db=None):
     if not cfg["api_key"]:
         return None
     return cfg
+
+
+from datetime import datetime, timezone, timedelta
+
+_BJ_TZ = timezone(timedelta(hours=8))
+
+
+def bj_now() -> datetime:
+    """返回北京时间（UTC+8）的 naive datetime，用于数据库存储。"""
+    return datetime.now(_BJ_TZ).replace(tzinfo=None)
+
+
+# --- Pixelle-Video 集成 ---
+PIXELLE_VIDEO_URL = os.getenv("PIXELLE_VIDEO_URL", "http://localhost:8500")
+PIXELLE_VIDEO_TIMEOUT = 600       # 代理请求超时（秒）
+PIXELLE_CONFIG_PATH = os.getenv("PIXELLE_CONFIG_PATH", str(SERVER_DIR.parent.parent.parent / "Pixelle-Video" / "config.yaml"))
+
+# --- Seedance 2.0 (火山方舟 Ark API) ---
+SEEDANCE_API_KEY = os.getenv("SEEDANCE_API_KEY", "")
+
+
+def _resolve_pixelle_config(db=None):
+    """从 DB 读取 Pixelle-Video 配置，fallback 到环境变量/默认值。"""
+    url = PIXELLE_VIDEO_URL
+    timeout = PIXELLE_VIDEO_TIMEOUT
+
+    if db:
+        try:
+            from app.db_models import SystemSetting
+            import logging
+            _log = logging.getLogger(__name__)
+            settings = {s.key: s.value for s in db.query(SystemSetting).all()}
+            url = settings.get("pixelle_video_url") or url
+            try:
+                timeout = int(settings.get("pixelle_video_timeout", timeout))
+            except (TypeError, ValueError):
+                _log.warning("Invalid pixelle timeout in DB, using default")
+        except Exception:
+            _log.warning("Failed to resolve pixelle config from DB, using defaults", exc_info=True)
+
+    return {"url": url, "timeout": timeout}

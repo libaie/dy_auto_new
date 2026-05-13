@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat /tmp/pixelle-video-analysis/pixelle_video/llm_presets.py)",
+      "Read(//tmp/pixelle-video-analysis/pixelle_video/**)",
+      "Bash(cat /tmp/pixelle-video-analysis/pixelle_video/tts_voices.py)",
+      "Bash(cat /tmp/pixelle-video-analysis/pixelle_video/utils/workflow_util.py)",
+      "Read(//tmp/pixelle-video-analysis/pixelle_video/utils/**)",
+      "Bash(cat /tmp/pixelle-video-analysis/pixelle_video/utils/template_util.py)",
+      "Bash(cat /tmp/pixelle-video-analysis/pixelle_video/config/schema.py)",
+      "Read(//tmp/pixelle-video-analysis/pixelle_video/config/**)"
+    ]
+  }
+}

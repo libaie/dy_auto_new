@@ -1,5 +1,4 @@
 """Prompt template management CRUD API — admin only."""
-import asyncio
 import json
 import logging
 from datetime import datetime, timezone
@@ -56,7 +55,7 @@ TEMPLATE_SCHEMA_DESC = """提示词模板 JSON 结构：
     "sentiments": ["sentiment_type: 描述"],
     "scoringRules": ["评分规则"],
     "replyRules": ["回复生成规则"],
-    "replyExample": { "good": "好的回复示例", "bad": "不好的回复示例" },
+    "replyExample": { "good": "好的回复示例（纯回复正文，不含原文引用）", "bad": "不好的回复示例（纯回复正文，不含原文引用）" },
     "tiers": { "tier_name": "对应语气描述" }
   },
   "videoComment": {
@@ -91,11 +90,17 @@ TEMPLATE_GEN_SYSTEM = """你是一个 AI 提示词模板生成专家。根据用
 6. scoringRules 要有明确分值
 7. replyRules 要有具体指导，不要只说"自然一点"
 8. 直接输出 JSON，不要 markdown 代码块包裹，不要解释
+9. **replyExample.good 和 replyExample.bad 只写回复正文，绝对不要包含「评论'xxx' → 回复：'yyy'」这种元格式**
 
 ## 场景说明
 - 场景1 (videoComment): 视频评论 = 在视频下留言吸引其他观众注意，相当于广告位
 - 场景2 (analysis): 评论回复 = 分析已有评论并生成回复，吸引评论者注意
-- 场景3 (dmOpener + dmStages): 私信转化 = 多阶段私信漏斗"""
+- 场景3 (dmOpener + dmStages): 私信转化 = 多阶段私信漏斗
+
+## replyExample 正确 vs 错误示例
+❌ 错误: { "good": "评论'价格多少' → 回复：'私信您了解详情哦'", "bad": "评论'太贵了' → 回复：'一分钱一分货'" }
+✅ 正确: { "good": "私信您了解详情哦～不同方案价格不同，看看哪个适合您", "bad": "亲可以看看哦" }
+replyExample 中的文本就是最终输出的回复内容，不需要标注原文是什么、回复是什么。"""
 
 
 @router.post("/generate")
@@ -124,10 +129,17 @@ async def generate_template(
             if content.endswith("```"):
                 content = content[: content.rfind("```")].strip()
         template = json.loads(content)
+        # 校验 AI 生成的 replyExample 格式
+        try:
+            prompt_template_service._validate_reply_example(template)
+        except ValueError as ve:
+            raise HTTPException(status_code=422, detail=f"AI 生成的 replyExample 格式不正确: {str(ve)}")
         return {"content": template}
     except json.JSONDecodeError as e:
         logger.warning("AI generated invalid JSON: %s", str(e)[:200])
         raise HTTPException(status_code=500, detail=f"AI 生成的 JSON 格式无效: {str(e)[:200]}")
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("Template generation failed: %s", e)
         raise HTTPException(status_code=500, detail=f"生成失败: {str(e)}")
@@ -170,6 +182,12 @@ async def generate_template_stream(
                 if raw.endswith("```"):
                     raw = raw[: raw.rfind("```")].strip()
             template = json.loads(raw)
+            # 校验 AI 生成的 replyExample 格式
+            try:
+                prompt_template_service._validate_reply_example(template)
+            except ValueError as ve:
+                yield f"data: {json.dumps({'type': 'warning', 'message': f'replyExample 格式不正确: {str(ve)}。请重新生成。', 'content': template})}\n\n"
+                return
             yield f"data: {json.dumps({'type': 'done', 'content': template})}\n\n"
         except json.JSONDecodeError as e:
             logger.warning("AI generated invalid JSON: %s", str(e)[:200])
@@ -230,10 +248,6 @@ async def create_template(
     from app.ws_manager import pair_ws_manager
     await pair_ws_manager.broadcast_to_devices({
         "event": "prompt_templates_updated",
-        "version": version,
-    })
-    await pair_ws_manager.broadcast_to_admins({
-        "event": "prompt_templates_changed",
         "version": version,
     })
     await pair_ws_manager.broadcast_to_admins({

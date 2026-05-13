@@ -18,6 +18,7 @@ import { listDevices } from '../api/devices.js'
 import { listGroups } from '../api/accountGroups.js'
 import { formatDate } from '../utils/format.js'
 import { useToastStore } from '../stores/toast.js'
+import { useWebSocket } from '../composables/useWebSocket.js'
 
 const statusMap = {
   pending: '待执行',
@@ -66,6 +67,18 @@ const cancelling = ref(false)
 const pageError = ref(null)
 
 const toast = useToastStore()
+
+// --- WebSocket ---
+function wsUrl() {
+  const token = localStorage.getItem('token') || ''
+  const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
+  return `${protocol}//${location.host}/api/devices/ws/pair-events?token=${encodeURIComponent(token)}`
+}
+useWebSocket(wsUrl, {
+  onMessage(msg) {
+    if (msg.event === 'chains_changed') fetchInstances()
+  },
+})
 
 // --- Table columns ---
 const columns = [

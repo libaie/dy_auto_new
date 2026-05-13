@@ -1,8 +1,9 @@
 """Channel service -- create, claim, complete, stale recovery, risk control."""
 from datetime import datetime, timezone
+from app.config import bj_now
 from typing import Optional
 
-from sqlalchemy import update, and_, exists
+from sqlalchemy import update, and_, exists, select
 from sqlalchemy.orm import Session
 
 from app.db_models import (
@@ -129,7 +130,7 @@ class ChannelService:
         from app.services.stats_service import stats_service
         from app.models import TaskType, TaskStatus
 
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        now = bj_now()
 
         # Stale recovery: reset items assigned > 3 min ago (matches task_service stale threshold)
         from datetime import timedelta
@@ -163,10 +164,20 @@ class ChannelService:
         bound_account_id = device.bound_account_id if device else None
 
         # Get pending items from active channels
-        candidates = db.query(ChannelItem).filter(
+        query = db.query(ChannelItem).filter(
             ChannelItem.channel_id.in_(channel_ids),
             ChannelItem.status == "pending",
-        ).order_by(ChannelItem.queue_position.asc()).limit(10).all()
+        )
+        if bound_account_id:
+            query = query.filter(ChannelItem.account_id == bound_account_id)
+        else:
+            # Unbound device: exclude accounts bound to other devices
+            bound_ids_subq = select(DBDevice.bound_account_id).where(
+                DBDevice.bound_account_id.isnot(None)
+            )
+            query = query.filter(~ChannelItem.account_id.in_(bound_ids_subq))
+
+        candidates = query.order_by(ChannelItem.queue_position.asc()).limit(50).all()
 
         for item in candidates:
             ch = channel_map[item.channel_id]
@@ -174,10 +185,6 @@ class ChannelService:
             # Filter: account must be active
             account = db.query(Account).filter(Account.id == item.account_id).first()
             if not account or account.status != "active":
-                continue
-
-            # Filter: routing (bound device can only claim its account's items)
-            if bound_account_id and item.account_id != bound_account_id:
                 continue
 
             # Filter: per-account concurrency (check both ChannelItem and Task tables)
@@ -196,25 +203,22 @@ class ChannelService:
             if running_task:
                 continue
 
-            # Filter: cooldown
+            # Filter: cooldown（同一设备刚完成的不受限，反检测已控制节奏）
             last_completed = db.query(ChannelItem).filter(
                 ChannelItem.account_id == item.account_id,
                 ChannelItem.status == "completed",
                 ChannelItem.completed_at.isnot(None),
             ).order_by(ChannelItem.completed_at.desc()).first()
             if last_completed and ch.cooldown_seconds > 0:
-                elapsed = (now - last_completed.completed_at.replace(tzinfo=None)).total_seconds()
-                if elapsed < ch.cooldown_seconds:
-                    continue
+                same_device = last_completed.assigned_device_id == device_id
+                if not same_device:
+                    elapsed = (now - last_completed.completed_at.replace(tzinfo=None)).total_seconds()
+                    if elapsed < ch.cooldown_seconds:
+                        continue
 
-            # Filter: daily quota (reply_comment 还需额外检查关注和私信配额)
+            # Filter: daily quota（reply_comment 只在 reply 配额耗尽时阻塞，follow/DM 由 handler 优雅降级）
             if not stats_service.check_quota(db, item.account_id, ch.task_type):
                 continue
-            if ch.task_type == "reply_comment":
-                if not stats_service.check_quota(db, item.account_id, "follow"):
-                    continue
-                if not stats_service.check_quota(db, item.account_id, "search_dm"):
-                    continue
 
             # Optimistic lock: claim the item
             result = db.execute(
@@ -233,6 +237,18 @@ class ChannelService:
             # Task is created as RUNNING to prevent get_pending_task from stealing it
             params = dict(ch.params_template or {})
             params["keyword"] = item.keyword
+            # Resolve content_template_id with the item's keyword (sync, no AI)
+            template_id = params.pop("content_template_id", None)
+            if template_id:
+                try:
+                    from app.services.content_service import content_service as cs
+                    tpl_body = cs.get_template_body(db, template_id)
+                    if tpl_body:
+                        params["content"] = cs.substitute_variables(
+                            tpl_body, {"keyword": item.keyword}
+                        )
+                except Exception:
+                    pass
             # 注入账号剩余配额（reply_comment 设备端需要关注和私信上限）
             if ch.task_type == "reply_comment":
                 remaining = stats_service.get_remaining_quotas(db, item.account_id)
@@ -271,7 +287,7 @@ class ChannelService:
         channel_id = item.channel_id
 
         item.status = status
-        item.completed_at = datetime.now(timezone.utc)
+        item.completed_at = bj_now()
         db.flush()
 
         channel_completed = False
@@ -290,7 +306,7 @@ class ChannelService:
                         )
                     ),
                 )
-                .values(status="completed", completed_at=datetime.now(timezone.utc))
+                .values(status="completed", completed_at=bj_now())
             )
             db.flush()
             db.expire_all()
@@ -308,7 +324,7 @@ class ChannelService:
                 ChannelItem.account_id == account_id,
                 ChannelItem.status == "pending",
             )
-            .values(status="skipped", completed_at=datetime.now(timezone.utc))
+            .values(status="skipped", completed_at=bj_now())
         )
         db.flush()
         db.expire_all()
@@ -335,7 +351,7 @@ class ChannelService:
                     ChannelItem.channel_id == channel_id,
                     ChannelItem.status == "pending",
                 )
-                .values(status="skipped", completed_at=datetime.now(timezone.utc))
+                .values(status="skipped", completed_at=bj_now())
             )
         db.commit()
 
@@ -344,14 +360,14 @@ class ChannelService:
         ch = self.get_channel(db, channel_id)
         if not ch:
             raise ValueError(f"通道 {channel_id} 不存在")
-        ch.deleted_at = datetime.now(timezone.utc)
+        ch.deleted_at = bj_now()
         db.execute(
             update(ChannelItem)
             .where(
                 ChannelItem.channel_id == channel_id,
                 ChannelItem.status == "pending",
             )
-            .values(status="skipped", completed_at=datetime.now(timezone.utc))
+            .values(status="skipped", completed_at=bj_now())
         )
         db.commit()
 

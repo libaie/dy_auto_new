@@ -3,7 +3,8 @@ import ToastNotification from './components/ToastNotification.vue'
 </script>
 
 <template>
-  <div class="aurora-bg"></div>
+  <div class="cinematic-bg"></div>
+  <div class="dot-grid"></div>
   <RouterView />
   <ToastNotification />
 </template>

@@ -24,18 +24,18 @@ var SearchBaseHandler = Object.create(BaseHandler);
  */
 SearchBaseHandler.execute = function (params) {
   var keyword = params.keyword;
-  var count = params.count || 5;
+  var videoCount = params.video_count || params.count || 5;
   var content = params.content || "";
   var sortBy = params.sort_by || "";
 
-  
+
   aiAnalyzer.useTemplate(params.prompt_template_id);
 
   if (!keyword) {
     return { success: false, error: "缺少关键词" };
   }
 
-  logger.info(TAG, "搜索: '" + keyword + "', 数量=" + count + ", 排序=" + sortBy);
+  logger.info(TAG, "搜索: '" + keyword + "', 视频=" + videoCount + ", 排序=" + sortBy);
 
   var taskId = params.task_id || "";
   var apiClient = require("../core/api-client");
@@ -69,7 +69,7 @@ SearchBaseHandler.execute = function (params) {
     }
   }
 
-  sleep(3000);
+  sleep(2000);
 
   // 4. 点击"视频" tab
   this._clickVideoTab();
@@ -78,14 +78,14 @@ SearchBaseHandler.execute = function (params) {
   // 5. 排序（如果指定）
   if (sortBy) {
     this._sortResults(sortBy);
-    sleep(2000);
+    sleep(1500);
   }
 
   // 6. 逐个视频处理（第一个点击，后续滑动切换）
   var stats = { success_count: 0, fail_count: 0, details: [] };
 
-  for (var i = 0; i < count; i++) {
-    logger.info(TAG, "处理第 " + (i + 1) + "/" + count + " 个结果");
+  for (var i = 0; i < videoCount; i++) {
+    logger.info(TAG, "处理第 " + (i + 1) + "/" + videoCount + " 个结果");
 
     if (i === 0) {
       // 第一个视频：从搜索结果点击
@@ -112,8 +112,6 @@ SearchBaseHandler.execute = function (params) {
   }
 
   logger.info(TAG, "搜索完成. " + JSON.stringify(stats));
-  // 关闭抖音，等待下一个任务
-  uiOperator.closeApp();
   return { success: true, result: stats };
 };
 
@@ -122,21 +120,34 @@ SearchBaseHandler.execute = function (params) {
  * 先尝试直接点击搜索入口，失败则 back() 后重试
  */
 SearchBaseHandler._openSearch = function () {
-  // 先直接尝试点击搜索入口（当前可能已在首页）
-  var clicked = this.safeClick("search_tab", 1);
+  // 1. 首页可能还在加载，多等几秒，重试 3 次（safeClick 内部 findElement 等 3s × 退避 2s/4s ≈ 最多 17s）
+  var clicked = this.safeClick("search_tab", 3);
   if (clicked) {
-    sleep(1500);
+    sleep(Math.floor(Math.random() * 1000 + 1000));
     return true;
   }
 
-  // 搜索入口找不到，可能在子页面，back() 回退后重试
-  back();
-  sleep(1500);
+  // 2. 搜索入口找不到，可能在子页面，最多 back 3 次（不摧毁页面状态）
+  for (var i = 0; i < 3; i++) {
+    back();
+    sleep(Math.floor(Math.random() * 400 + 1000));
+    clicked = this.safeClick("search_tab", 2);
+    if (clicked) {
+      sleep(Math.floor(Math.random() * 1000 + 1000));
+      return true;
+    }
+  }
 
-  clicked = this.safeClick("search_tab", 3);
-  if (clicked) {
-    sleep(1500);
-    return true;
+  // 3. 冷启动兜底
+  logger.warn(TAG, "back 链恢复失败，尝试冷启动回首页");
+  try { uiOperator.closeApp(); sleep(800); } catch (e) {}
+  if (uiOperator.openApp()) {
+    sleep(4000);  // 冷启动给足够时间
+    clicked = this.safeClick("search_tab", 3);
+    if (clicked) {
+      sleep(Math.floor(Math.random() * 1000 + 1000));
+      return true;
+    }
   }
   return false;
 };
@@ -242,15 +253,6 @@ SearchBaseHandler._clickVideoTab = function () {
  * @param {string} sortBy - "latest" 或 "most_liked"
  */
 SearchBaseHandler._sortResults = function (sortBy) {
-  // 点击排序按钮打开弹出框
-  var sortBtnClicked = this.safeClick("sort_button", 3);
-  if (!sortBtnClicked) {
-    logger.warn(TAG, "排序按钮未找到");
-    return false;
-  }
-  sleep(800);
-
-  // 使用选择器系统点击排序选项（自动尝试 text → image 策略）
   var actionMap = {
     "latest": "sort_latest",
     "most_liked": "sort_most_liked",
@@ -258,18 +260,55 @@ SearchBaseHandler._sortResults = function (sortBy) {
   };
   var actionName = actionMap[sortBy] || actionMap["default"];
 
-  var clicked = this.safeClick(actionName, 3);
-  if (clicked) {
-    logger.info(TAG, "排序方式: " + sortBy);
-    sleep(300);
-    // 轻点排序按钮关闭弹窗（retries=1，避免二次点击重新打开）
+  // 打开排序弹窗
+  if (!this.safeClick("sort_button", 3)) {
+    logger.warn(TAG, "排序按钮未找到");
+    return false;
+  }
+  sleep(1500);
+
+  // 以图找图验证弹窗是否打开，没找到则重试一次
+  var optionEl = uiOperator.findElement(actionName, 3000);
+  if (!optionEl) {
+    logger.info(TAG, "排序弹窗未检测到 " + sortBy + "，关闭弹窗后重试");
+    // 第一次点击关闭可能残留的弹窗，第二次重新打开
     this.safeClick("sort_button", 1);
-    sleep(300);
-    return true;
+    sleep(800);
+    optionEl = uiOperator.findElement(actionName, 3000);
   }
 
-  logger.warn(TAG, "点击排序选项失败: " + sortBy);
-  return false;
+  if (!optionEl) {
+    logger.warn(TAG, "排序选项未找到: " + sortBy);
+    this.safeClick("sort_button", 1);
+    return false;
+  }
+
+  // 点击排序选项
+  uiOperator.clickElement(optionEl);
+  logger.info(TAG, "排序方式: " + sortBy);
+  sleep(500);
+
+  // 关弹窗：抖音选完排序后可能自动关，也可能不关。连点可能反而重新打开。
+  // 策略：先等 800ms 等自动关闭动画完成，再图找图判断，开着才关，关完验证
+  var stillOpen = uiOperator.findElement(actionName, 2000);
+  if (stillOpen) {
+    logger.info(TAG, "排序弹窗未关闭，点击关闭");
+    var closeBtn = uiOperator.findElement("sort_button", 2000);
+    if (closeBtn) {
+      uiOperator.clickElement(closeBtn);
+      sleep(600);
+      // 验证：如果还在，说明刚才那下可能反而打开了，再关一次
+      if (uiOperator.findElement(actionName, 1000)) {
+        logger.info(TAG, "排序弹窗仍在，再次关闭");
+        closeBtn = uiOperator.findElement("sort_button", 1000);
+        if (closeBtn) { uiOperator.clickElement(closeBtn); sleep(500); }
+      }
+    }
+  } else {
+    logger.info(TAG, "排序弹窗已关闭");
+  }
+  sleep(500);
+  return true;
 };
 
 /**
@@ -350,7 +389,7 @@ SearchBaseHandler._clickSearchResult = function (index) {
         if (seenCount === index) {
           if (tryClick(items[i])) {
             logger.info(TAG, "点击视频: 第" + (index+1) + "个(策略)"); sleep(2000);
-            this.safeClick("off_video", 2);
+            this.safeClick("off_video", 1);
             return true;
           }
           return false;
@@ -369,7 +408,7 @@ SearchBaseHandler._clickSearchResult = function (index) {
           if (cnt === index) {
             if (tryClick(children[c])) {
               logger.info(TAG, "点击视频: 第" + (index+1) + "个(兜底)"); sleep(2000);
-              this.safeClick("off_video", 2);
+              this.safeClick("off_video", 1);
               return true;
             }
             return false;

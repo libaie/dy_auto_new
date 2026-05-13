@@ -49,6 +49,7 @@ var taskExecutor = {
     this._currentTaskId = task.id;
     this._cancelled = false;
     task.params.task_id = task.id;  // 注入任务 ID 供 handler 上报进度
+    task.params.account_id = task.account_id;  // 注入账号 ID 供 handler 使用
 
     // 看门狗：任务最大执行时间 30 分钟，同时检查取消标记
     var TASK_TIMEOUT = 30 * 60 * 1000;

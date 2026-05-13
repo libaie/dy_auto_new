@@ -70,7 +70,7 @@ def _device_to_dict(dev: Device) -> dict:
 
 
 @router.post("")
-def create_device(
+async def create_device(
     request: DeviceCreateRequest,
     db: Session = Depends(get_db),
     _: str = Depends(verify_admin_token),
@@ -90,6 +90,7 @@ def create_device(
     db.add(dev)
     db.commit()
     db.refresh(dev)
+    await pair_ws_manager.broadcast_to_admins({"event": "devices_changed"})
     return _device_to_dict(dev)
 
 
@@ -312,12 +313,12 @@ async def update_device(
 
     # Push config/proxy changes to device via WS
     if proxy_changed:
-        from app.ws_manager import pair_ws_manager
         await pair_ws_manager.send_to_device(device_id, {
             "event": "config_updated",
             "proxy": dev.proxy_config,
         })
 
+    await pair_ws_manager.broadcast_to_admins({"event": "devices_changed"})
     return _device_to_dict(dev)
 
 

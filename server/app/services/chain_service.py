@@ -3,6 +3,7 @@ import asyncio
 import logging
 import threading
 from datetime import datetime, timezone
+from app.config import bj_now
 from typing import Optional
 
 from sqlalchemy.orm import Session
@@ -77,7 +78,7 @@ class ChainService:
 
                 self._create_step_task(db, instance, 1, template)
                 instance.status = "running"
-                instance.started_at = datetime.now(timezone.utc)
+                instance.started_at = bj_now()
                 results["created"].append(account_id)
 
             db.commit()
@@ -119,12 +120,12 @@ class ChainService:
             next_step = task.step_order + 1
             if next_step > chain.total_steps:
                 chain.status = "completed"
-                chain.completed_at = datetime.now(timezone.utc)
+                chain.completed_at = bj_now()
             else:
                 chain.current_step = next_step
                 chain.status = "running"
                 if not chain.started_at:
-                    chain.started_at = datetime.now(timezone.utc)
+                    chain.started_at = bj_now()
                 template = db.query(ChainTemplate).filter(ChainTemplate.id == chain.template_id).first()
                 if template:
                     self._create_step_task(db, chain, next_step, template)
@@ -132,7 +133,7 @@ class ChainService:
                     self._safe_push_step_task(db, chain)
         elif status == "failed":
             chain.status = "failed"
-            chain.completed_at = datetime.now(timezone.utc)
+            chain.completed_at = bj_now()
 
         # Do NOT commit here — caller (report_result) handles the commit
 

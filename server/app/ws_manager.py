@@ -71,16 +71,17 @@ class PairWSManager:
     # --- Device status connections (persistent WS for online/offline) ---
 
     async def register_device_status(self, device_id: str, ws: WebSocket):
-        """Register a device's persistent status connection."""
-        await ws.accept()
-        # If device already has a connection, close the old one
+        """Register a device's persistent status connection.
+        Caller must have already accepted the WebSocket before calling this.
+        """
+        # 先替换再关旧连接：旧连接的 finally 块检查时会发现已不是活跃连接，跳过离线标记
         old = self._device_status_connections.get(device_id)
+        self._device_status_connections[device_id] = ws
         if old:
             try:
                 await old.close()
             except Exception:
                 pass
-        self._device_status_connections[device_id] = ws
 
     def unregister_device_status(self, device_id: str):
         """Remove device status connection (device disconnected)."""

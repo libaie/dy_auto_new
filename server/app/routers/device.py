@@ -1,4 +1,5 @@
 """Device-facing API — poll, report, heartbeat, selectors."""
+import logging
 from fastapi import APIRouter, HTTPException, Query, Depends, UploadFile, File as FastAPIFile, WebSocket, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -7,11 +8,20 @@ from sqlalchemy.orm import Session
 import asyncio
 import io
 
-from app.models import TaskProgressReport, TaskResultReport, PollResponse, DeviceRegisterRequest, DeviceRegisterResponse, RiskReport, DeviceGenerateRequest, DeviceGenerateResponse, DeviceAIProxyRequest, DeviceAIProxyResponse, PairRequestCreate, PairStatusResponse
+logger = logging.getLogger(__name__)
+
+from app.models import (
+    TaskProgressReport, TaskResultReport, PollResponse, DeviceRegisterRequest,
+    DeviceRegisterResponse, RiskReport, DeviceGenerateRequest, DeviceGenerateResponse,
+    DeviceAIProxyRequest, DeviceAIProxyResponse, PairRequestCreate, PairStatusResponse,
+    CollectReportRequest, CollectCommentData, CollectUserData,
+    DMClaimRecipientRequest, DMClaimRecipientResponse,
+    DMSendReportRequest, DMReleaseRecipientRequest, DMReleaseRecipientResponse,
+)
 from app.database import get_db
 from app.deps import verify_device_secret, verify_admin_token
 from app.services.task_service import task_service
-from app.config import ANTI_DETECT_CONFIG, ANTI_DETECT_CONFIG_VERSION, DEVICE_CONFIG
+from app.config import ANTI_DETECT_CONFIG, ANTI_DETECT_CONFIG_VERSION, DEVICE_CONFIG, bj_now
 from app.services.selector_service import selector_service
 from app.services.prompt_template_service import prompt_template_service
 from app.ws_manager import pair_ws_manager
@@ -34,7 +44,7 @@ async def _notify_pending_tasks(db: Session, device_id: str):
         logger.info(f"[notify] 设备 {device_id} 不存在，跳过")
         return
 
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = bj_now()
 
     # Build routing filter (same logic as task_service.get_pending_task)
     if device.bound_account_id:
@@ -100,6 +110,8 @@ async def create_pair_request(
         client_ip = raw_request.client.host if raw_request.client else ""
 
     # 1. Already paired — Device exists with a valid secret
+    # SECURITY: Do NOT auto-return secret. If the device lost its local config,
+    # create a new pending request so admin must re-approve.
     device = db.query(Device).filter(Device.id == request.device_id).first()
     if device and device.device_secret:
         # Update IP and device info on reconnect
@@ -113,11 +125,14 @@ async def create_pair_request(
         device.hardware = request.hardware or device.hardware
         device.display = request.display or device.display
         db.commit()
-        # Return full approved payload (secret + config) so device can reconnect immediately
-        class _FakePairReq:
-            device_secret = device.device_secret
-        payload = _build_approved_payload(_FakePairReq())
-        return PairStatusResponse(**payload)
+        # Create a new pending pair request — admin must re-approve
+        # to disclose the secret. Don't auto-return it.
+        logger.warning(
+            "Already-paired device %s re-requested pairing (secret not disclosed). "
+            "Creating pending request for admin re-approval.",
+            request.device_id,
+        )
+        # Fall through to pending/new request logic below
 
     # 2. Pending request already exists — return same token
     pending = db.query(DevicePairRequest).filter(
@@ -306,17 +321,30 @@ async def ws_pair_status(websocket: WebSocket, token: str):
 
 
 @router.websocket("/ws/status")
-async def ws_device_status(websocket: WebSocket, device_id: str = Query(""), secret: str = Query("")):
+async def ws_device_status(websocket: WebSocket):
     """Device maintains a persistent WS connection for status tracking.
     Server detects disconnect immediately → marks device offline → broadcasts to admins.
+
+    Authentication: device sends {"type":"auth","device_id":"...","secret":"..."}
+    as the first message after connect (not in URL).
     """
     from app.db_models import Device
     from app.config import DEVICE_SECRET
 
-    # Authenticate: accept master secret or per-device secret
-    if not secret:
-        await websocket.accept()
-        await websocket.close(code=4001, reason="Missing secret")
+    await websocket.accept()
+
+    # Read auth message (first message after connect)
+    try:
+        auth_msg = await asyncio.wait_for(websocket.receive_json(), timeout=10)
+    except (asyncio.TimeoutError, Exception):
+        await websocket.close(code=4001, reason="Auth timeout or invalid message")
+        return
+
+    device_id = auth_msg.get("device_id", "")
+    secret = auth_msg.get("secret", "")
+
+    if not secret or not device_id:
+        await websocket.close(code=4001, reason="Missing device_id or secret")
         return
 
     db = next(get_db())
@@ -324,15 +352,9 @@ async def ws_device_status(websocket: WebSocket, device_id: str = Query(""), sec
         if secret != DEVICE_SECRET:
             device = db.query(Device).filter(Device.device_secret == secret).first()
             if not device:
-                await websocket.accept()
                 await websocket.close(code=4001, reason="Invalid secret")
                 return
             device_id = device.id
-
-        if not device_id:
-            await websocket.accept()
-            await websocket.close(code=4001, reason="Missing device_id")
-            return
 
         # Register WS connection FIRST — before DB update — so _offline_checker
         # never sees "DB online but no WS" during the race window
@@ -377,27 +399,28 @@ async def ws_device_status(websocket: WebSocket, device_id: str = Query(""), sec
         except (asyncio.TimeoutError, Exception):
             pass
         finally:
-            # Device disconnected → mark offline immediately
-            pair_ws_manager.unregister_device_status(device_id)
-            db2 = next(get_db())
-            try:
-                device_obj = db2.query(Device).filter(Device.id == device_id).first()
-                if device_obj:
-                    device_obj.status = "offline"
-                    db2.commit()
-            finally:
-                db2.close()
-            await pair_ws_manager.broadcast_to_admins({
-                "event": "device_status_changed",
-                "device_id": device_id,
-                "status": "offline",
-            })
+            # 只在本连接仍是活跃连接时才标记离线（避免重连竞态）
+            if pair_ws_manager._device_status_connections.get(device_id) is websocket:
+                pair_ws_manager.unregister_device_status(device_id)
+                db2 = next(get_db())
+                try:
+                    device_obj = db2.query(Device).filter(Device.id == device_id).first()
+                    if device_obj:
+                        device_obj.status = "offline"
+                        db2.commit()
+                finally:
+                    db2.close()
+                await pair_ws_manager.broadcast_to_admins({
+                    "event": "device_status_changed",
+                    "device_id": device_id,
+                    "status": "offline",
+                })
     finally:
         db.close()
 
 
 @router.get("/poll", response_model=PollResponse)
-def poll_tasks(
+async def poll_tasks(
     device_id: str = Query(...),
     db: Session = Depends(get_db),
     authed_device_id: Optional[str] = Depends(verify_device_secret),
@@ -411,6 +434,14 @@ def poll_tasks(
     task = task_service.get_pending_task(db, device_id)
     version = selector_service.get_version(db)
     tmpl_version = prompt_template_service.get_version(db)
+
+    # 设备领到任务 → 通知前端任务列表更新
+    if task:
+        await pair_ws_manager.broadcast_to_admins({
+            "event": "task_updated",
+            "task_id": task.id,
+            "status": task.status.value if hasattr(task.status, 'value') else str(task.status),
+        })
 
     from app.services.device_service import device_service
     device_info = device_service.get_device_status(db, device_id)
@@ -455,13 +486,13 @@ async def report_result(
     db: Session = Depends(get_db),
     authed_device_id: Optional[str] = Depends(verify_device_secret),
 ):
-    # Per-device secret: verify the task belongs to this device
+    # Verify the task belongs to this device (reject if unassigned or mismatched)
     if authed_device_id:
         from app.db_models import Task as DBTask
         db_task = db.query(DBTask).filter(DBTask.id == report.task_id).first()
         if not db_task:
             raise HTTPException(status_code=404, detail="Task not found")
-        if db_task.device_id and db_task.device_id != authed_device_id:
+        if db_task.device_id != authed_device_id:
             raise HTTPException(status_code=403, detail="Task does not belong to this device")
 
     try:
@@ -482,6 +513,10 @@ async def report_result(
         "status": str(report.status.value),
         "result": report.result or {},
     })
+
+    # 通知所有在线设备有新任务可领取（通道内可能有下一批待执行 item）
+    if report.status.value in ("completed", "failed"):
+        await pair_ws_manager.broadcast_to_devices({"event": "new_task_available"})
 
     # Broadcast channel progress via WS (BackgroundTasks runs after response)
     if channel_broadcast_info:
@@ -652,7 +687,7 @@ async def script_upload(
 
 
 @router.post("/risk-report")
-def report_risk(
+async def report_risk(
     report: RiskReport,
     db: Session = Depends(get_db),
     _: None = Depends(verify_device_secret),
@@ -668,6 +703,7 @@ def report_risk(
         from app.services.channel_service import channel_service
         channel_service.on_risk_control(db, report.account_id)
         db.commit()
+        await pair_ws_manager.broadcast_to_admins({"event": "accounts_changed"})
     return {"status": "acknowledged", "account_status": account.status}
 
 
@@ -702,6 +738,26 @@ def claim_comment_reply(
     ))
     db.commit()
     return {"claimed": True, "hash": content_hash}
+
+
+@router.post("/comment-claim-release")
+def release_comment_claim(
+    request: CommentRepliedRequest,
+    db: Session = Depends(get_db),
+    authed_device_id: str = Depends(verify_device_secret),
+):
+    """回复失败时释放占位，避免误标记为已回复"""
+    import hashlib
+    content_hash = hashlib.sha256(
+        (request.author + "|" + request.text).encode("utf-8")
+    ).hexdigest()
+    from app.db_models import RepliedComment
+    db.query(RepliedComment).filter(
+        RepliedComment.content_hash == content_hash,
+        RepliedComment.replied_by_device == authed_device_id,
+    ).delete()
+    db.commit()
+    return {"released": True}
 
 
 @router.post("/generate-content", response_model=DeviceGenerateResponse)
@@ -797,11 +853,9 @@ async def ai_proxy(
 
 # --- 采集数据上报 ---
 
-from app.models import CollectReportRequest, CollectCommentData, CollectUserData
-
 
 @router.post("/collect-report")
-def collect_report(
+async def collect_report(
     request: CollectReportRequest,
     db: Session = Depends(get_db),
     device_id: str = Depends(verify_device_secret),
@@ -809,7 +863,7 @@ def collect_report(
     from app.db_models import CollectedComment, CollectedUser
     from sqlalchemy.exc import IntegrityError
 
-    # 1. 保存评论数据
+    # 1. 保存评论（独立提交，用户去重失败不影响评论落库）
     comment = CollectedComment(
         task_id=request.task_id,
         device_id=device_id,
@@ -824,7 +878,9 @@ def collect_report(
         is_author=request.comment.is_author,
     )
     db.add(comment)
+    db.commit()  # 评论独立提交
 
+    # 2. 保存用户（独立事务，失败不影响已提交的评论）
     user_new = False
     if request.user and request.user.douyin_id:
         existing = db.query(CollectedUser).filter(
@@ -845,13 +901,152 @@ def collect_report(
                 ip_location=request.user.ip_location,
                 is_private=request.user.is_private,
             ))
-            user_new = True
+            try:
+                db.commit()
+                user_new = True
+            except IntegrityError:
+                db.rollback()
+                user_new = False
 
+    # WS 实时推送
+    await pair_ws_manager.broadcast_to_admins({"event": "data_changed", "type": "comment", "id": comment.id})
+    if user_new:
+        await pair_ws_manager.broadcast_to_admins({"event": "data_changed", "type": "user", "id": request.user.douyin_id})
+
+    return {"comment_saved": True, "user_new": user_new}
+
+
+# --- DM conversation endpoints ---
+
+@router.post("/dm-claim-recipient", response_model=DMClaimRecipientResponse)
+def dm_claim_recipient(
+    request: DMClaimRecipientRequest,
+    db: Session = Depends(get_db),
+    authed_device_id: str = Depends(verify_device_secret),
+):
+    """原子占用：insert conversation where not exists (account_id, douyin_id).
+    SQLite WAL 竞态：并发 SELECT 可能同时通过 → IntegrityError → claimed=false."""
+    from app.db_models import Conversation
+    from sqlalchemy.exc import IntegrityError
+    from datetime import datetime, timezone, timedelta
+
+    now = bj_now()
+
+    # 清理孤儿 claim（超 30min 未发送）
+    orphan_threshold = now - timedelta(minutes=30)
+    db.query(Conversation).filter(
+        Conversation.claimed_at.isnot(None),
+        Conversation.claimed_at < orphan_threshold,
+        Conversation.status == "active",
+        Conversation.last_dm_at.is_(None),
+    ).delete()
+    db.flush()
+
+    # 检查已有会话
+    existing = db.query(Conversation).filter(
+        Conversation.account_id == request.account_id,
+        Conversation.recipient_douyin_id == request.recipient_douyin_id,
+    ).first()
+    if existing:
+        return DMClaimRecipientResponse(claimed=False, conversation_id=None)
+
+    conv = Conversation(
+        task_id=None,
+        account_id=request.account_id,
+        device_id=authed_device_id,
+        recipient_nickname=request.recipient_nickname,
+        recipient_douyin_id=request.recipient_douyin_id,
+        claimed_at=now,
+    )
+    db.add(conv)
     try:
         db.commit()
     except IntegrityError:
         db.rollback()
-        user_new = False
+        return DMClaimRecipientResponse(claimed=False, conversation_id=None)
 
-    return {"comment_saved": True, "user_new": user_new}
+    db.refresh(conv)
+    return DMClaimRecipientResponse(claimed=True, conversation_id=conv.id)
+
+
+@router.post("/dm-send-report")
+async def dm_send_report(
+    request: DMSendReportRequest,
+    db: Session = Depends(get_db),
+    authed_device_id: str = Depends(verify_device_secret),
+):
+    """DM 发送成功后上报：更新 stage、content、计数"""
+    from app.db_models import Conversation
+
+    now = bj_now()
+    conv = db.query(Conversation).filter(Conversation.id == request.conversation_id).first()
+    if not conv:
+        raise HTTPException(status_code=404, detail="会话不存在")
+
+    conv.current_stage = request.stage
+    conv.intent = request.intent
+    conv.last_dm_content = request.content
+    conv.last_dm_at = now
+    conv.total_dm_count = (conv.total_dm_count or 0) + 1
+    conv.claimed_at = None  # 清除 claim 标记
+    if request.keyword and not conv.keyword:
+        conv.keyword = request.keyword
+    db.commit()
+
+    await pair_ws_manager.broadcast_to_admins({
+        "event": "data_changed", "type": "conversation", "id": conv.id,
+    })
+    return {"ok": True}
+
+
+@router.post("/dm-release-recipient", response_model=DMReleaseRecipientResponse)
+def dm_release_recipient(
+    request: DMReleaseRecipientRequest,
+    db: Session = Depends(get_db),
+    authed_device_id: str = Depends(verify_device_secret),
+):
+    """DM 发送失败时释放占用。仅允许 claim 设备释放，防止误删其他设备的成功会话。"""
+    from app.db_models import Conversation
+
+    conv = db.query(Conversation).filter(
+        Conversation.id == request.conversation_id,
+        Conversation.device_id == authed_device_id,
+        Conversation.last_dm_at.is_(None),  # 尚未成功发送过
+    ).first()
+    if conv:
+        db.delete(conv)
+        db.commit()
+        return DMReleaseRecipientResponse(released=True)
+    return DMReleaseRecipientResponse(released=False)
+
+
+class CommentAIReplyRequest(BaseModel):
+    nickname: str
+    text: str
+    ai_reply: str
+    task_id: str | None = None
+
+
+@router.post("/comment-ai-reply")
+def save_comment_ai_reply(
+    request: CommentAIReplyRequest,
+    db: Session = Depends(get_db),
+    _: str = Depends(verify_device_secret),
+):
+    """保存 AI 生成的回复到采集的评论记录（按昵称+内容+task_id 匹配，避免跨视频错配）"""
+    from app.db_models import CollectedComment
+    query = db.query(CollectedComment).filter(
+        CollectedComment.nickname == request.nickname,
+        CollectedComment.content == request.text,
+        CollectedComment.ai_reply.is_(None),
+    )
+    if request.task_id:
+        query = query.filter(CollectedComment.task_id == request.task_id)
+    comment = query.order_by(CollectedComment.created_at.desc()).first()
+    if comment:
+        comment.ai_reply = request.ai_reply
+        comment.ai_replied_at = bj_now()
+        db.commit()
+        return {"updated": True}
+    return {"updated": False}
 

@@ -14,9 +14,24 @@ import ConfirmDialog from '../components/ConfirmDialog.vue'
 import LoadingSpinner from '../components/LoadingSpinner.vue'
 import EmptyState from '../components/EmptyState.vue'
 import { useToastStore } from '../stores/toast.js'
+import { useSavedPrompt } from '../composables/useSavedPrompt.js'
+import { useWebSocket } from '../composables/useWebSocket.js'
 import * as api from '../api/promptTemplates.js'
 
 const toast = useToastStore()
+
+// --- WebSocket ---
+function wsUrl() {
+  const token = localStorage.getItem('token') || ''
+  const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
+  return `${protocol}//${location.host}/api/devices/ws/pair-events?token=${encodeURIComponent(token)}`
+}
+useWebSocket(wsUrl, {
+  onMessage(msg) {
+    if (msg.event === 'prompt_templates_changed') fetchTemplates()
+  },
+})
+
 const generatingStatus = ref('')
 const templates = ref([])
 const loading = ref(false)
@@ -24,7 +39,7 @@ const saving = ref(false)
 const generating = ref(false)
 const dialogOpen = ref(false)
 const isEditing = ref(false)
-const aiDesc = ref('')
+const aiDesc = useSavedPrompt('template_generator', '')
 const form = ref({ name: '', industry: 'health', description: '', contentJson: '' })
 const showDeleteDialog = ref(false)
 const deletingName = ref(null)
@@ -69,7 +84,6 @@ async function fetchTemplates() {
 
 function openCreate() {
   isEditing.value = false
-  aiDesc.value = ''
   generatingStatus.value = ''
   form.value = { name: '', industry: 'health', description: '', contentJson: '' }
   dialogOpen.value = true
@@ -144,7 +158,6 @@ async function handleGenerate() {
 
 function openEdit(row) {
   isEditing.value = true
-  aiDesc.value = ''
   generatingStatus.value = ''
   form.value = {
     name: row.name,

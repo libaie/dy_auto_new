@@ -9,6 +9,7 @@ from app.models import (
     ChannelItemUpdate,
 )
 from app.services.channel_service import channel_service
+from app.ws_manager import pair_ws_manager
 from app.db_models import Account, AccountGroup, ChannelItem, Device
 
 router = APIRouter(prefix="/api/channels", tags=["channels"])
@@ -54,7 +55,7 @@ def _item_to_response(item, account_nickname: str = "", device_name: str = "") -
 
 
 @router.post("")
-def create_channel(
+async def create_channel(
     request: ChannelCreate,
     db: Session = Depends(get_db),
     _: str = Depends(verify_admin_token),
@@ -74,6 +75,7 @@ def create_channel(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+    await pair_ws_manager.broadcast_to_admins({"event": "channels_changed"})
     group = db.query(AccountGroup).filter(AccountGroup.id == ch.group_id).first()
     stats = channel_service.get_channel_stats(db, ch.id)
     return _channel_to_response(ch, stats, group.name if group else "")
@@ -129,7 +131,7 @@ def get_channel(
 
 
 @router.patch("/{channel_id}")
-def update_channel(
+async def update_channel(
     channel_id: str,
     request: ChannelUpdate,
     db: Session = Depends(get_db),
@@ -141,11 +143,17 @@ def update_channel(
         channel_service.update_channel_status(db, channel_id, request.status)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+    # 通道恢复后广播 new_task_available，让在线设备立即领取
+    if request.status == "active":
+        await pair_ws_manager.broadcast_to_devices({"event": "new_task_available"})
+
+    await pair_ws_manager.broadcast_to_admins({"event": "channels_changed"})
     return {"status": "updated", "id": channel_id}
 
 
 @router.delete("/{channel_id}")
-def delete_channel(
+async def delete_channel(
     channel_id: str,
     db: Session = Depends(get_db),
     _: str = Depends(verify_admin_token),
@@ -154,11 +162,12 @@ def delete_channel(
         channel_service.soft_delete_channel(db, channel_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    await pair_ws_manager.broadcast_to_admins({"event": "channels_changed"})
     return {"deleted": True, "id": channel_id}
 
 
 @router.post("/{channel_id}/items")
-def append_items(
+async def append_items(
     channel_id: str,
     request: ChannelAppendItems,
     db: Session = Depends(get_db),
@@ -168,11 +177,12 @@ def append_items(
         channel_service.append_items(db, channel_id, request.keywords)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    await pair_ws_manager.broadcast_to_admins({"event": "channels_changed"})
     return {"appended": len(request.keywords), "channel_id": channel_id}
 
 
 @router.patch("/{channel_id}/items/{item_id}")
-def update_item(
+async def update_item(
     channel_id: str,
     item_id: str,
     request: ChannelItemUpdate,
@@ -185,4 +195,5 @@ def update_item(
         channel_service.update_item_status(db, item_id, request.status)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    await pair_ws_manager.broadcast_to_admins({"event": "channels_changed"})
     return {"status": "updated", "item_id": item_id}

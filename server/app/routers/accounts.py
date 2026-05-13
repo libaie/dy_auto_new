@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.db_models import Account
 from app.deps import verify_admin_token
+from app.ws_manager import pair_ws_manager
 
 router = APIRouter(prefix="/api/accounts", tags=["accounts"])
 
@@ -42,7 +43,7 @@ def _account_to_dict(acc: Account) -> dict:
 
 
 @router.post("")
-def create_account(
+async def create_account(
     request: AccountCreateRequest,
     db: Session = Depends(get_db),
     _: str = Depends(verify_admin_token),
@@ -57,6 +58,7 @@ def create_account(
     db.add(acc)
     db.commit()
     db.refresh(acc)
+    await pair_ws_manager.broadcast_to_admins({"event": "accounts_changed"})
     return _account_to_dict(acc)
 
 
@@ -86,7 +88,7 @@ def get_account(
 
 
 @router.put("/{account_id}")
-def update_account(
+async def update_account(
     account_id: str,
     request: AccountUpdateRequest,
     db: Session = Depends(get_db),
@@ -111,11 +113,12 @@ def update_account(
 
     db.commit()
     db.refresh(acc)
+    await pair_ws_manager.broadcast_to_admins({"event": "accounts_changed"})
     return _account_to_dict(acc)
 
 
 @router.delete("/{account_id}")
-def delete_account(
+async def delete_account(
     account_id: str,
     db: Session = Depends(get_db),
     _: str = Depends(verify_admin_token),
@@ -137,4 +140,5 @@ def delete_account(
 
     db.delete(acc)
     db.commit()
+    await pair_ws_manager.broadcast_to_admins({"event": "accounts_changed"})
     return {"deleted": True, "id": account_id}

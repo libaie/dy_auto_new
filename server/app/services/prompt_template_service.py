@@ -58,8 +58,32 @@ class PromptTemplateService:
             return None
         return _to_dict(t)
 
-    @staticmethod
-    def _validate_content(content: dict) -> None:
+    # replyExample 中不允许出现的元格式模式
+    # 这些模式用于检测"评论'xxx' → 回复：'yyy'"类的元格式
+    _REPLY_EXAMPLE_FORBIDDEN = [
+        ("→ 回复", "replyExample 中不应包含「→ 回复」元格式，只需写回复正文，不需要标注原文"),
+        ("→ 私信", "replyExample 中不应包含「→」箭头标注原文，只需写回复正文"),
+        ("评论'", "replyExample 中不应包含「评论'...'」引用原文的写法，只需写回复正文"),
+        ('评论"', 'replyExample 中不应包含「评论"..."」引用原文的写法，只需写回复正文'),
+    ]
+
+    @classmethod
+    def _validate_reply_example(cls, content: dict) -> None:
+        """校验 replyExample 不含元格式（评论xxx→回复：xxx 等）。"""
+        an = content.get("analysis", {})
+        re_example = an.get("replyExample", {})
+        if not re_example:
+            return
+        for key in ("good", "bad"):
+            text = re_example.get(key, "")
+            if not isinstance(text, str) or not text.strip():
+                continue
+            for pattern, tip in cls._REPLY_EXAMPLE_FORBIDDEN:
+                if pattern in text:
+                    raise ValueError(f"replyExample.{key} 格式错误: {tip}。当前值: {text[:80]}")
+
+    @classmethod
+    def _validate_content(cls, content: dict) -> None:
         """Validate required template content fields. Raises ValueError on mismatch."""
         required = ["identity", "disabledWords", "semanticGuide", "analysis", "localFilter"]
         for field in required:
@@ -71,6 +95,7 @@ class PromptTemplateService:
         sg = content.get("semanticGuide", {})
         if not sg.get("highValueSignals") or not sg.get("lowValueSignals") or not sg.get("keyExamples"):
             raise ValueError("semanticGuide must contain highValueSignals, lowValueSignals, keyExamples")
+        cls._validate_reply_example(content)
 
     def create_template(self, db: Session, name: str, industry: str,
                         content: dict, description: str = "") -> dict:

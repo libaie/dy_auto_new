@@ -465,13 +465,14 @@ class Series(Base):
     created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
     updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
 
+    episodes = relationship("Episode", back_populates="series")
     characters = relationship("Character", secondary="series_characters", back_populates="series_list")
     scenes = relationship("Scene", secondary="series_scenes", back_populates="series_list")
 
 
-# M2M: back_populates stubs on Character/Scene (lazy only)
-Character.series_list = relationship("Series", secondary="series_characters", back_populates="characters")
-Scene.series_list = relationship("Series", secondary="series_scenes", back_populates="scenes")
+# M2M: reverse relationships (lazy only, back_populates resolved at mapper configure time)
+Character.series_list = relationship("Series", secondary="series_characters", back_populates="characters", lazy="noload")
+Scene.series_list = relationship("Series", secondary="series_scenes", back_populates="scenes", lazy="noload")
 
 series_characters = Table("series_characters", Base.metadata,
     Column("series_id", String(36), ForeignKey("series.id"), primary_key=True),

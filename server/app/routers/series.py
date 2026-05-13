@@ -49,6 +49,7 @@ def create_series(body: SeriesCreate, db: Session = Depends(get_db),
                   _: str = Depends(verify_admin_token)):
     s = Series(**body.model_dump())
     db.add(s)
+    db.flush()  # 确保 s.id 已生成，满足 Episode FK 约束
     for ep_num in range(1, body.total_episodes + 1):
         db.add(Episode(series_id=s.id, episode_number=ep_num, status="pending"))
     db.commit(); db.refresh(s)

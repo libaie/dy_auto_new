@@ -14,7 +14,7 @@ from contextlib import asynccontextmanager
 
 from app.database import get_db, init_db, SessionLocal
 from app.seed import seed_all
-from app.routers import device, tasks, accounts, devices, auth, selectors, stats, content, account_groups, chains, settings, channels, prompt_templates, data, videos, pixelle, seedance, ai_config, characters, scenes, series, pipeline_proxy, pipeline, audit
+from app.routers import device, tasks, accounts, devices, auth, selectors, stats, content, account_groups, chains, settings, channels, prompt_templates, data, videos, pixelle, seedance, ai_config, characters, scenes, series, pipeline_proxy, pipeline, audit, director
 from app.services.ai_generator import ai_generator
 
 
@@ -128,6 +128,7 @@ app.include_router(series.router)
 app.include_router(pipeline_proxy.router)
 app.include_router(pipeline.router)
 app.include_router(audit.router)
+app.include_router(director.router)
 
 
 @app.get("/health")

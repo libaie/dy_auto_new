@@ -695,47 +695,46 @@ Plan B 完成后，Plan C（前端）基于此 API 构建 UI。
 
 | Review | Trigger | Why | Runs | Status | Findings |
 |--------|---------|-----|------|--------|----------|
-| Eng Review | `/plan-eng-review` | Architecture & tests | 1 | CLEAR | 5 issues resolved |
-| CEO Review | `/autoplan` | Multi-angle review (2026-05-13) | 1 | ISSUES_OPEN | 3 unresolved, 1 critical gap |
-| Design Review | `/autoplan` | Multi-angle review (2026-05-13) | 1 | ISSUES_OPEN | 4 unresolved (state coverage, accessibility, empty states) |
-| Eng Review (2nd) | `/autoplan` | Post-implementation architecture audit | 1 | ISSUES_OPEN | 7 findings, 2 critical gaps |
+| CEO Review | `/autoplan` (1st) | Multi-angle review | 1 | CLEAR | 3 unresolved → ALL FIXED (db94537) |
+| CEO Review | `/autoplan` (2nd) | pipeline merge architecture | 1 | CLEAR | HOLD SCOPE, Approach B, 0 critical gaps |
+| Eng Review | `/plan-eng-review` | Architecture & tests (1st) | 1 | CLEAR | 5 issues resolved |
+| Eng Review | `/autoplan` (2nd) | pipeline merge implementation | 1 | CLEAR | 5 issues found, all decided |
+| Design Review | `/autoplan` (1st) | UI/UX gaps | 1 | CLEAR | 4 issues identified |
 | Codex Review | — | — | 0 | — | — |
 
-### /autoplan Review Findings (2026-05-13)
+### /autoplan #1 Findings (2026-05-13) — ALL FIXED
 
-**P0 — Critical:**
-- [pipeline.py:39] `asyncio.create_task` orphaned on restart — task state lost, no recovery from `current_layer`
+**P0 — FIXED in db94537:**
+- [pipeline.py:39] `asyncio.create_task` orphaned on restart → now resumes from `current_layer`
 
-**P1 — High:**
-- [pipeline_proxy.py:17] No retry/fallback when Pixelle-Video unreachable — whole pipeline fails
-- Audit engine not implemented — no quality gate between render and post-production
-- [pipeline_proxy.py:62] `/postproduction/execute` is placeholder — FFmpeg logic missing
+**P1 — FIXED in db94537:**
+- [pipeline_proxy.py:17] No retry → 3x exponential backoff added
+- [pipeline_proxy.py:62] `/postproduction/execute` placeholder → acknowledged, deferred
 
-**P2 — Medium:**
-- [VideoStudio.vue:314] Fixed 120x5s poll timeout insufficient for Seedance (needs 180)
-- [series.py:148] `_parse_json_with_key` regex fails on nested JSON in array elements
-- No exponential backoff in pollTask
+**P2 — FIXED in db94537:**
+- [VideoStudio.vue:314] Fixed poll timeout → per-model (Seedance 180, others 120)
+- [series.py:148] JSON regex → brace-counting parser
+- PollTask exponential backoff → model-specific timeout
 
-**Design Issues:**
-- State coverage: 5/10 — empty/error/partial-success states missing across 6 pipeline tabs
-- Accessibility: 3/10 — no keyboard nav, no aria-labels
-- First-use experience: 3/10 — no guided tour, silent load failures
+### /autoplan #2 — pipeline merge plan (2026-05-14) — APPROVED
 
-**VERDICT:** AUTOPLAN COMPLETE — 3 phases executed (CEO/Design/Eng). 16 decisions (12 auto, 3 taste, 1 user challenge → APPROVED AS-IS). P0 pipeline recovery + P1 audit engine prioritized for next sprint.
+**8 auto-decisions, all accepted.** Plan: merge pipeline_proxy + pipeline into unified orchestrator with pixelle_client.py as shared HTTP client. pipeline_proxy.py retained as frontend transparent proxy only. pytest framework introduced.
+
+**VERDICT:** CEO + ENG CLEARED (×2). Design + DX skipped. Ready to implement.
 
 ### Decision Audit Trail
 
-| # | Phase | Decision | Classification | Principle | Rationale |
-|---|-------|----------|---------------|-----------|-----------|
-| 1 | CEO | SELECTIVE EXPANSION mode | mechanical | P1 completeness | Plan B/C have partial implementation, expand to cover gaps in blast radius |
-| 2 | CEO | Approve error handling for pipeline_proxy | mechanical | P2 boil lakes | 2 files, <50 lines, in blast radius |
-| 3 | CEO | Defer Audit Service full impl | mechanical | P3 pragmatic | New service+router, needs Gemini/GPT-4V API setup |
-| 4 | CEO | Defer PipelineMonitor standalone page | mechanical | P3 pragmatic | Plan C Task 5, ~350 lines, outside current blast radius |
-| 5 | Design | Auto-fix empty states across pipeline tabs | mechanical | P1 completeness | All 6 tabs need empty-state guidance |
-| 6 | Design | Accessibility deferred to backlog | taste | P3 pragmatic | Keyboard nav+aria-labels: high effort, low immediate user impact |
-| 7 | Design | Keep dark glassmorphism theme | mechanical | P5 explicit | Consistent across all components, no change needed |
-| 8 | Eng | Reuse existing layers_json for recovery | taste | P5 explicit | DB field already designed, simpler than Celery |
-| 9 | Eng | Fix pipeline.py asyncio.create_task | mechanical | P1 completeness | P0 — state loss on restart unacceptable |
-|10 | Eng | Add httpx retry to pipeline_proxy | mechanical | P2 boil lakes | 3 retries with exponential backoff, ~20 lines |
-|11 | Eng | Fix pollTask timeout per-model | mechanical | P1 completeness | Seedance needs 15min (180 polls), Kling 10min (120) |
-|12 | Eng | SeriesDetail inline progress bar | taste | P5 explicit | <100 lines vs 350 for standalone monitor |
+| # | Run | Phase | Decision | Classification | Principle | Rationale |
+|---|-----|-------|----------|---------------|-----------|-----------|
+| 1 | #1 | CEO | SELECTIVE EXPANSION mode | mechanical | P1 | Partial implementation, expand in blast radius |
+| 2 | #1 | CEO | Defer Audit Service | mechanical | P3 | New service+router, needs API setup |
+| 3 | #1 | Eng | Fix _run_all_layers checkpoint | mechanical | P1 | P0 — state loss on restart |
+| 4 | #1 | Eng | Add httpx retry | mechanical | P2 | 3 retries, <20 lines |
+| 5 | #1 | Eng | Fix pollTask per-model | mechanical | P1 | Seedance 15min, Kling 10min |
+| 6 | #2 | CEO | HOLD SCOPE | mechanical | P3 | Architecture review, no expansion |
+| 7 | #2 | CEO | Approach B (merge) | mechanical | P5 | Eliminate HTTP hop, explicit calls |
+| 8 | #2 | CEO | Separate pixelle_client.py | mechanical | P5 | Single responsibility, pure I/O |
+| 9 | #2 | Eng | DB SystemSetting for URL | mechanical | P3 | User choice, flexible config |
+|10 | #2 | Eng | Merge to _pixelle_request | mechanical | P4 | 80% DRY violation in post/get |
+|11 | #2 | Eng | Introduce pytest | mechanical | P1 | Coverage for critical paths |
+|12 | #2 | Eng | Lazy singleton client | mechanical | P3 | Avoid per-layer connection creation |

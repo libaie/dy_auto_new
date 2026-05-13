@@ -1,7 +1,6 @@
 """流水线编排 API — 启动/状态查询/断点续传."""
 import asyncio
 import logging
-import httpx
 from fastapi import APIRouter, Depends, HTTPException
 
 logger = logging.getLogger(__name__)
@@ -9,17 +8,18 @@ from sqlalchemy.orm import Session
 from app.database import get_db, SessionLocal
 from app.deps import verify_admin_token
 from app.db_models import PipelineRun, Series
+from app.services.pixelle_client import _pixelle_request
 
 router = APIRouter(prefix="/api/pipeline", tags=["pipeline"])
-PROXY_URL = "http://127.0.0.1:8000/api/pipeline-proxy"
 
-
-async def _proxy_post(path: str, body: dict) -> dict:
-    async with httpx.AsyncClient(base_url=PROXY_URL,
-                                 timeout=httpx.Timeout(600, connect=10)) as c:
-        r = await c.post(path, json=body)
-        r.raise_for_status()
-        return r.json()
+LAYER_ENDPOINTS = [
+    ("POST", "/api/image/generate",           "assets"),
+    ("POST", "/api/content/narration",         "story_narration"),
+    ("GET",  "/api/content/title",             "story_title"),
+    ("POST", "/api/content/image-prompt",      "director"),
+    ("POST", "/api/video/generate/async",      "render"),
+    ("POST", "/api/postproduction/execute",    "postproduction"),
+]
 
 
 @router.post("/start")
@@ -28,6 +28,14 @@ async def pipeline_start(series_id: str, episode_id: str = None,
                          db: Session = Depends(get_db),
                          _: str = Depends(verify_admin_token)):
     """创建并启动新流水线."""
+    # 幂等性检查 — 同一 series 不允许有运行中的重复 PipelineRun
+    existing = db.query(PipelineRun).filter(
+        PipelineRun.series_id == series_id,
+        PipelineRun.status.in_(["pending", "running"]),
+    ).first()
+    if existing:
+        raise HTTPException(409, f"Series {series_id} 已有运行中的流水线 (run_id={existing.id})")
+
     run = PipelineRun(
         series_id=series_id, episode_id=episode_id,
         mode=mode, status="running",
@@ -35,7 +43,6 @@ async def pipeline_start(series_id: str, episode_id: str = None,
     db.add(run); db.commit(); db.refresh(run)
     run_id = run.id
 
-    # Fire-and-forget with OWN session (not request-scoped as it closes after response)
     task = asyncio.create_task(_run_all_layers(run_id))
     task.add_done_callback(
         lambda t: logger.error(f"Pipeline task failed: {t.exception()}") if t.exception() else None
@@ -53,20 +60,18 @@ async def _run_all_layers(run_id: str):
         if not run:
             return
         common = {"series_id": run.series_id, "episode_id": run.episode_id or ""}
-        layer_endpoints = [
-            "/assets/generate", "/story/generate", "/director/generate",
-            "/render/execute", "/postproduction/execute",
-        ]
         start_layer = run.current_layer
-        for i in range(start_layer, len(layer_endpoints)):
-            ep = layer_endpoints[i]
+        for i in range(start_layer, len(LAYER_ENDPOINTS)):
+            method, path, label = LAYER_ENDPOINTS[i]
             # Skip layers already marked completed in layers_json
             layers = run.layers_json or {}
             if layers.get(str(i), {}).get("status") == "completed":
                 continue
             run.current_layer = i
             db.commit()
-            result = await _proxy_post(ep, common)
+            result = await _pixelle_request(method, path, json=common)
+            logger.info("Pipeline layer %d/%d (%s) — %s %s — OK",
+                         i, len(LAYER_ENDPOINTS), label, method, path)
             layers[str(i)] = {"status": "completed", "result": result}
             run.layers_json = layers
             db.commit()

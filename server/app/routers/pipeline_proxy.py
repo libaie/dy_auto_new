@@ -1,106 +1,27 @@
-"""Pipeline Proxy Wrapper — 翻译层：将流水线操作映射到 Pixelle-Video 实际 API."""
-import asyncio
-import logging
+"""Pixelle-Video 透明代理 — 供前端 pixelle-client.js 透传调用."""
 import httpx
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import JSONResponse
 from app.deps import verify_admin_token
 
-logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/pipeline-proxy", tags=["pipeline-proxy"])
-PIXELLE_BASE = "http://127.0.0.1:8500/api"
-
+router = APIRouter(prefix="/api/pixelle-proxy", tags=["pixelle-proxy"])
+PIXELLE_BASE = "http://127.0.0.1:8500"
 TIMEOUT = httpx.Timeout(600, connect=10)
-MAX_RETRIES = 3
-RETRY_BACKOFF = 2.0  # seconds, exponential: 2, 4, 8
 
 
-async def _pixelle_post(path: str, json: dict) -> dict:
-    last_err = None
-    for attempt in range(MAX_RETRIES):
+@router.api_route("/api/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
+async def pixelle_proxy(request: Request, path: str, _: str = Depends(verify_admin_token)):
+    """透明代理所有前端 pixelle-client.js 请求到 Pixelle-Video."""
+    body = None
+    if request.method in ("POST", "PUT"):
         try:
-            async with httpx.AsyncClient(base_url=PIXELLE_BASE, timeout=TIMEOUT) as c:
-                r = await c.post(path, json=json)
-                r.raise_for_status()
-                return r.json()
-        except httpx.HTTPStatusError as e:
-            last_err = e
-            if e.response.status_code < 500:
-                raise  # 4xx — don't retry client errors
-        except (httpx.ConnectError, httpx.TimeoutException, httpx.RemoteProtocolError) as e:
-            last_err = e
-        if attempt < MAX_RETRIES - 1:
-            delay = RETRY_BACKOFF * (2 ** attempt)
-            logger.warning("Pixelle POST %s attempt %d/%d failed, retrying in %.0fs: %s",
-                           path, attempt + 1, MAX_RETRIES, delay, last_err)
-            await asyncio.sleep(delay)
-    raise last_err
+            body = await request.json()
+        except Exception:
+            body = None
 
-
-async def _pixelle_get(path: str) -> dict:
-    last_err = None
-    for attempt in range(MAX_RETRIES):
+    async with httpx.AsyncClient(base_url=PIXELLE_BASE, timeout=TIMEOUT) as c:
+        r = await c.request(request.method, f"/api/{path}", json=body)
         try:
-            async with httpx.AsyncClient(base_url=PIXELLE_BASE, timeout=TIMEOUT) as c:
-                r = await c.get(path)
-                r.raise_for_status()
-                return r.json()
-        except httpx.HTTPStatusError as e:
-            last_err = e
-            if e.response.status_code < 500:
-                raise
-        except (httpx.ConnectError, httpx.TimeoutException, httpx.RemoteProtocolError) as e:
-            last_err = e
-        if attempt < MAX_RETRIES - 1:
-            delay = RETRY_BACKOFF * (2 ** attempt)
-            logger.warning("Pixelle GET %s attempt %d/%d failed, retrying in %.0fs: %s",
-                           path, attempt + 1, MAX_RETRIES, delay, last_err)
-            await asyncio.sleep(delay)
-    raise last_err
-
-
-class PipelineCommonInput(BaseModel):
-    series_id: str = ""
-    episode_id: str = ""
-
-
-@router.post("/assets/generate")
-async def assets_generate(body: PipelineCommonInput, _: str = Depends(verify_admin_token)):
-    """Layer 0: 资产生成 → Pixelle image API."""
-    result = await _pixelle_post("/image/generate", body.model_dump())
-    return {"ok": True, "result": result}
-
-
-@router.post("/story/generate")
-async def story_generate(body: PipelineCommonInput, _: str = Depends(verify_admin_token)):
-    """Layer 1: 故事工坊 → Pixelle content API (narration + title)."""
-    narration = await _pixelle_post("/content/narration", body.model_dump())
-    title = await _pixelle_post("/content/title", body.model_dump())
-    return {"ok": True, "narration": narration, "title": title}
-
-
-@router.post("/director/generate")
-async def director_generate(body: PipelineCommonInput, _: str = Depends(verify_admin_token)):
-    """Layer 2: 导演工坊 → LLM chain + image-prompt generation."""
-    image_prompt = await _pixelle_post("/content/image-prompt", body.model_dump())
-    return {"ok": True, "image_prompt": image_prompt}
-
-
-@router.post("/render/execute")
-async def render_execute(body: PipelineCommonInput, _: str = Depends(verify_admin_token)):
-    """Layer 3: 渲染引擎 → Pixelle video generate async."""
-    result = await _pixelle_post("/video/generate/async", body.model_dump())
-    return {"ok": True, "task_id": result.get("task_id")}
-
-
-@router.post("/postproduction/execute")
-async def postproduction_execute(body: PipelineCommonInput, _: str = Depends(verify_admin_token)):
-    """Layer 5: 后期包装 → FFmpeg 合成 (本地执行，暂留占位)."""
-    return {"ok": True, "message": "Post-production executed (placeholder)"}
-
-
-@router.get("/tasks/{task_id}")
-async def get_task_status(task_id: str, _: str = Depends(verify_admin_token)):
-    """查询 Pixelle-Video 任务状态."""
-    result = await _pixelle_get(f"/tasks/{task_id}")
-    return {"ok": True, "task": result}
+            return JSONResponse(content=r.json(), status_code=r.status_code)
+        except Exception:
+            return JSONResponse(content={"detail": r.text}, status_code=r.status_code)

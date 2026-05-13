@@ -1,74 +1,70 @@
 <template>
   <div class="p-6">
     <div class="flex justify-between items-center mb-6">
-      <h1 class="text-2xl font-bold text-gray-900">系列管理</h1>
-      <button @click="showCreate = true" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+      <h1 class="text-2xl font-bold text-slate-100">系列管理</h1>
+      <button @click="showCreate = true" class="bg-sky-500 hover:bg-sky-400 text-white px-4 py-2 rounded-lg transition-colors duration-200 cursor-pointer">
         + 新建系列
       </button>
     </div>
 
-    <!-- 新建系列 Dialog -->
-    <div v-if="showCreate" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div class="bg-white rounded-xl p-6 w-full max-w-lg shadow-xl">
-        <h2 class="text-lg font-semibold mb-4">新建系列</h2>
+    <!-- 新建 Dialog -->
+    <div v-if="showCreate" class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50" @click.self="showCreate = false">
+      <div class="rounded-xl p-6 w-full max-w-lg shadow-2xl border border-gray-700/50" style="background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(20px);">
+        <h2 class="text-lg font-semibold text-slate-100 mb-4">新建系列</h2>
         <div class="space-y-3">
-          <input v-model="form.title" placeholder="系列标题" class="w-full border rounded-lg px-3 py-2" />
-          <textarea v-model="form.logline" placeholder="一句话梗概 (logline)" class="w-full border rounded-lg px-3 py-2" rows="2" />
+          <input v-model="form.title" placeholder="系列标题" class="w-full rounded-lg px-3 py-2 bg-gray-800 border border-gray-600 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500/50 transition" />
+          <textarea v-model="form.logline" placeholder="一句话梗概 (logline)" class="w-full rounded-lg px-3 py-2 bg-gray-800 border border-gray-600 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500/50 transition" rows="2" />
           <div class="flex gap-3">
-            <select v-model="form.genre" class="border rounded-lg px-3 py-2 flex-1">
-              <option value="drama">都市爱情</option>
-              <option value="romance">古装言情</option>
-              <option value="fantasy">奇幻悬疑</option>
-              <option value="suspense">悬疑推理</option>
-              <option value="scifi">科幻</option>
+            <select v-model="form.genre" class="rounded-lg px-3 py-2 flex-1 bg-gray-800 border border-gray-600 text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/50 cursor-pointer">
+              <option value="drama">都市爱情</option><option value="romance">古装言情</option>
+              <option value="fantasy">奇幻悬疑</option><option value="suspense">悬疑推理</option><option value="scifi">科幻</option>
             </select>
-            <select v-model="form.total_episodes" class="border rounded-lg px-3 py-2">
+            <select v-model="form.total_episodes" class="rounded-lg px-3 py-2 bg-gray-800 border border-gray-600 text-slate-100 cursor-pointer">
               <option v-for="n in [10,20,30,50]" :key="n" :value="n">{{ n }} 集</option>
             </select>
-            <input v-model.number="form.target_duration" type="number" placeholder="时长(s)" class="border rounded-lg px-3 py-2 w-24" />
+            <input v-model.number="form.target_duration" type="number" placeholder="时长(s)" class="rounded-lg px-3 py-2 w-24 bg-gray-800 border border-gray-600 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500/50" />
           </div>
           <div class="flex gap-3">
-            <select v-model="form.mode" class="border rounded-lg px-3 py-2 flex-1">
+            <select v-model="form.mode" class="rounded-lg px-3 py-2 flex-1 bg-gray-800 border border-gray-600 text-slate-100 cursor-pointer">
               <option value="step_by_step">逐步确认模式</option>
               <option value="fully_automatic">全自动一键生成</option>
             </select>
-            <label class="flex items-center gap-2 text-sm">
-              <input type="checkbox" v-model="form.pilot_first" /> Pilot 试点
+            <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+              <input type="checkbox" v-model="form.pilot_first" class="accent-sky-500" /> Pilot 试点
             </label>
           </div>
         </div>
         <div class="flex justify-end gap-3 mt-6">
-          <button @click="showCreate = false" class="px-4 py-2 border rounded-lg">取消</button>
-          <button @click="doCreate" class="px-4 py-2 bg-blue-600 text-white rounded-lg" :disabled="creating">
+          <button @click="showCreate = false" class="px-4 py-2 rounded-lg border border-gray-600 text-slate-300 hover:bg-gray-700 transition cursor-pointer">取消</button>
+          <button @click="doCreate" class="px-4 py-2 bg-sky-500 hover:bg-sky-400 text-white rounded-lg transition disabled:opacity-50 cursor-pointer" :disabled="creating">
             {{ creating ? '创建中...' : '创建' }}
           </button>
         </div>
       </div>
     </div>
 
-    <!-- 系列列表 -->
-    <div v-if="loading" class="text-gray-500 text-center py-12">加载中...</div>
-    <div v-else-if="error" class="text-red-500 text-center py-12">{{ error }}</div>
-    <div v-else-if="seriesList.length === 0" class="text-gray-400 text-center py-12">暂无系列，点击「新建系列」开始</div>
+    <!-- 内容 -->
+    <div v-if="loading" class="text-slate-400 text-center py-12">加载中...</div>
+    <div v-else-if="error" class="text-red-400 text-center py-12">{{ error }}</div>
+    <div v-else-if="seriesList.length === 0" class="text-slate-500 text-center py-12">暂无系列，点击「新建系列」开始</div>
     <div v-else class="grid gap-4">
       <div v-for="s in seriesList" :key="s.id"
-           class="bg-white rounded-xl border p-5 hover:shadow-md transition cursor-pointer"
+           class="rounded-xl border border-gray-700/50 p-5 hover:shadow-lg hover:shadow-sky-900/10 transition-all duration-200 cursor-pointer"
+           style="background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(12px);"
            @click="$router.push(`/series/${s.id}`)">
         <div class="flex justify-between items-start">
           <div>
-            <h3 class="text-lg font-semibold text-gray-900">{{ s.title }}</h3>
-            <p class="text-sm text-gray-500 mt-1">{{ s.logline || '(无梗概)' }}</p>
-            <div class="flex gap-3 mt-2 text-xs text-gray-400">
-              <span>{{ s.total_episodes }} 集</span>
-              <span>{{ s.target_duration }}s/集</span>
-              <span>{{ s.genre }}</span>
-              <span>{{ s.mode === 'fully_automatic' ? '全自动' : '逐步确认' }}</span>
+            <h3 class="text-lg font-semibold text-slate-100">{{ s.title }}</h3>
+            <p class="text-sm text-slate-400 mt-1">{{ s.logline || '(无梗概)' }}</p>
+            <div class="flex gap-3 mt-2 text-xs text-slate-500">
+              <span>{{ s.total_episodes }} 集</span><span>{{ s.target_duration }}s/集</span>
+              <span>{{ s.genre }}</span><span>{{ s.mode === 'fully_automatic' ? '全自动' : '逐步确认' }}</span>
             </div>
           </div>
           <span :class="statusClass(s.status)" class="px-2 py-1 rounded text-xs font-medium">{{ s.status }}</span>
         </div>
-        <div class="mt-3 bg-gray-100 rounded-full h-2">
-          <div class="bg-blue-500 h-2 rounded-full" :style="{ width: progressPercent(s) + '%' }"></div>
+        <div class="mt-3 rounded-full h-1.5" style="background: rgba(255,255,255,0.06);">
+          <div class="h-1.5 rounded-full transition-all duration-500" :class="progressColor(s.status)" :style="{ width: progressPercent(s) + '%' }"></div>
         </div>
       </div>
     </div>
@@ -79,46 +75,14 @@
 import { ref, reactive, onMounted } from 'vue'
 import { listSeries, createSeries } from '../api/series.js'
 
-const seriesList = ref([])
-const loading = ref(true)
-const showCreate = ref(false)
-const creating = ref(false)
-const error = ref('')
+const seriesList = ref([]), loading = ref(true), showCreate = ref(false), creating = ref(false), error = ref('')
+const form = reactive({ title: '', logline: '', genre: 'drama', total_episodes: 30, target_duration: 90, mode: 'step_by_step', pilot_first: true })
 
-const form = reactive({
-  title: '', logline: '', genre: 'drama', total_episodes: 30, target_duration: 90,
-  mode: 'step_by_step', pilot_first: true,
-})
+async function loadSeries() { loading.value = true; error.value = ''; try { const { data } = await listSeries(); seriesList.value = data.ok ? data.series : [] } catch (e) { error.value = e.message || '加载失败' } finally { loading.value = false } }
+async function doCreate() { creating.value = true; try { await createSeries({ ...form }); showCreate.value = false; await loadSeries() } catch (e) { error.value = e.message || '创建失败' } finally { creating.value = false } }
 
-async function loadSeries() {
-  loading.value = true; error.value = ''
-  try {
-    const { data } = await listSeries()
-    seriesList.value = data.ok ? data.series : []
-  } catch (e) { error.value = e.message || '加载失败' }
-  finally { loading.value = false }
-}
-
-async function doCreate() {
-  creating.value = true
-  try {
-    await createSeries({ ...form })
-    showCreate.value = false
-    await loadSeries()
-  } catch (e) { error.value = e.message || '创建失败' }
-  finally { creating.value = false }
-}
-
-function statusClass(s) {
-  return { draft: 'bg-gray-100 text-gray-600', rendering: 'bg-yellow-100 text-yellow-700',
-           done: 'bg-green-100 text-green-700', failed: 'bg-red-100 text-red-700' }[s] || 'bg-gray-100 text-gray-600'
-}
-
-function progressPercent(s) {
-  if (s.status === 'done') return 100
-  if (s.status === 'draft') return 0
-  return s.status === 'rendering' ? 50 : 10
-}
-
+function statusClass(s) { return { draft: 'bg-gray-800 text-slate-400', rendering: 'bg-yellow-900/40 text-yellow-400', done: 'bg-emerald-900/40 text-emerald-400', failed: 'bg-red-900/40 text-red-400' }[s] || 'bg-gray-800 text-slate-400' }
+function progressColor(s) { return s === 'done' ? 'bg-emerald-500' : s === 'rendering' ? 'bg-sky-500 animate-pulse' : 'bg-slate-600' }
+function progressPercent(s) { if (s === 'done') return 100; if (s === 'draft') return 0; return s === 'rendering' ? 50 : 10 }
 onMounted(loadSeries)
 </script>

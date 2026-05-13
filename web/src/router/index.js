@@ -87,6 +87,31 @@ const routes = [
         component: () => import('../views/VideosPage.vue'),
       },
       {
+        path: 'ai-config',
+        name: 'AIConfig',
+        component: () => import('../views/AIConfigPage.vue'),
+      },
+      {
+        path: 'characters',
+        name: 'Characters',
+        component: () => import('../views/CharactersPage.vue'),
+      },
+      {
+        path: 'series',
+        name: 'SeriesList',
+        component: () => import('../views/SeriesListPage.vue'),
+      },
+      {
+        path: 'series/:id',
+        name: 'SeriesDetail',
+        component: () => import('../views/SeriesDetailPage.vue'),
+      },
+      {
+        path: 'pipeline/:runId',
+        name: 'PipelineMonitor',
+        component: () => import('../views/PipelineMonitorPage.vue'),
+      },
+      {
         path: 'settings',
         name: 'Settings',
         component: () => import('../views/SettingsPage.vue'),

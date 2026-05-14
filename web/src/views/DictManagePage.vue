@@ -105,6 +105,8 @@
                class="list-add-input list-add-input--label" />
         <input v-model="newValue" placeholder="value (可选)"
                class="list-add-input list-add-input--value" @keyup.enter="addItem" />
+        <input v-model="newDesc" placeholder="描述 (可选)"
+               class="list-add-input list-add-input--desc" @keyup.enter="addItem" />
         <button @click="addItem" class="btn btn--primary btn--sm" :disabled="!newLabel.trim()">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
           添加
@@ -127,8 +129,11 @@
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"/></svg>
             </span>
 
-            <!-- Value -->
-            <code class="list-item-value">{{ item.value }}</code>
+            <!-- Value + description -->
+            <div class="list-item-meta">
+              <code class="list-item-value">{{ item.value }}</code>
+              <span v-if="item.description" class="list-item-desc">{{ item.description }}</span>
+            </div>
 
             <!-- Editable label -->
             <input
@@ -172,6 +177,7 @@ const currentCat = ref('')
 const items = ref([])
 const newLabel = ref('')
 const newValue = ref('')
+const newDesc = ref('')
 
 const addingCat = ref(false)
 const newCatKey = ref('')
@@ -250,8 +256,13 @@ async function load() {
 
 async function addItem() {
   if (!newLabel.value.trim()) return
-  await createItem({ category: currentCat.value, value: newValue.value || newLabel.value, label: newLabel.value })
-  newLabel.value = ''; newValue.value = ''
+  await createItem({
+    category: currentCat.value,
+    value: newValue.value || newLabel.value,
+    label: newLabel.value,
+    description: newDesc.value,
+  })
+  newLabel.value = ''; newValue.value = ''; newDesc.value = ''
   await load()
 }
 
@@ -530,6 +541,7 @@ onMounted(async () => { await loadCategories(); await load() })
 .list-add-input:focus { border-color: rgba(14, 165, 233, 0.45); }
 .list-add-input--label { flex: 1; }
 .list-add-input--value { width: 140px; }
+.list-add-input--desc { width: 180px; }
 
 .list-empty {
   display: flex;
@@ -564,19 +576,32 @@ onMounted(async () => { await loadCategories(); await load() })
 }
 .list-item:hover .list-item-grip { opacity: 1; }
 
+.list-item-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 90px;
+  max-width: 110px;
+  flex-shrink: 0;
+}
 .list-item-value {
-  font-size: 12px;
+  font-size: 11px;
   color: #64748b;
   font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
-  min-width: 80px;
-  max-width: 100px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   background: rgba(30, 41, 59, 0.4);
-  padding: 2px 8px;
-  border-radius: 5px;
-  flex-shrink: 0;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+.list-item-desc {
+  font-size: 10px;
+  color: #475569;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 2px;
 }
 .list-item-input {
   flex: 1;

@@ -16,6 +16,12 @@ DEFAULT_CATEGORIES = [
     ("scene_type", "场景类型"),
     ("scene_lighting", "场景光照"),
     ("scene_mood", "场景氛围"),
+    ("dataSourceTypes", "数据来源类型"),
+    ("llm_script_models", "脚本生成模型"),
+    ("image_models", "画面生成模型"),
+    ("video_models", "视频渲染模型"),
+    ("tts_models", "语音合成模型"),
+    ("audit_models", "质量审计模型"),
 ]
 
 DEFAULT_DATA = {
@@ -39,6 +45,41 @@ DEFAULT_DATA = {
     "scene_mood": [
         ("warm", "温馨"), ("tense", "紧张"), ("romantic", "浪漫"),
         ("mysterious", "悬疑"), ("sad", "悲伤"), ("joyful", "欢快"),
+    ],
+    "dataSourceTypes": [
+        ("0", "普通视频"), ("1", "带货视频"),
+    ],
+    "llm_script_models": [
+        ("qwen-max", "Qwen Max", "通义千问 · 阿里云"),
+        ("gpt-4o", "GPT-4o", "OpenAI 旗舰"),
+        ("deepseek-v3", "DeepSeek V3", "高性价比"),
+        ("claude-opus", "Claude Opus", "创意写作"),
+        ("ollama-local", "Ollama 本地", "开源本地部署"),
+    ],
+    "image_models": [
+        ("flux", "FLUX", "RunningHub · 高质量静态图"),
+        ("sdxl", "SDXL", "ComfyUI · 灵活可控"),
+        ("auto", "自动选择", "根据场景自动匹配"),
+    ],
+    "video_models": [
+        ("auto", "自动选择", "根据镜头类型智能切换"),
+        ("seedance", "Seedance 2.0", "字节跳动 · 人脸最优"),
+        ("kling", "Kling 3.0", "快手 · 4K AI导演"),
+        ("wan", "Wan 2.7", "阿里 · 开源 RunningHub"),
+        ("flux", "FLUX 静态图", "仅静态画面，无动态视频"),
+    ],
+    "tts_models": [
+        ("edge-tts", "Edge-TTS", "微软免费 · 40+语言"),
+        ("index-tts", "Index-TTS", "声音克隆 · 上传参考音频"),
+        ("spark-tts", "Spark-TTS", "火山引擎 · 高级合成"),
+        ("custom", "自定义 ComfyUI", "自托管 TTS 工作流"),
+    ],
+    "audit_models": [
+        ("auto", "自动选择", "根据内容类型自动"),
+        ("gemini", "Gemini", "Google 多模态审计"),
+        ("gpt-4o", "GPT-4o", "OpenAI 视觉审计"),
+        ("local", "本地 vLLM", "自托管审计模型"),
+        ("none", "跳过审计", "不进行质量检查"),
     ],
 }
 
@@ -128,13 +169,17 @@ def list_items(category: str, db: Session = Depends(get_db)):
     items = db.query(ReferenceData).filter(
         ReferenceData.category == category, ReferenceData.enabled == True
     ).order_by(ReferenceData.sort_order).all()
-    return {"ok": True, "items": [{"value": it.value, "label": it.label} for it in items]}
+    return {"ok": True, "items": [
+        {"value": it.value, "label": it.label, "description": it.description or ""}
+        for it in items
+    ]}
 
 
 class RefDataCreate(BaseModel):
     category: str
     value: str
     label: str
+    description: str = ""
     sort_order: int = 0
 
 
@@ -179,6 +224,7 @@ def list_all_items(category: str, db: Session = Depends(get_db),
     ).order_by(ReferenceData.sort_order).all()
     return {"ok": True, "items": [
         {"id": it.id, "value": it.value, "label": it.label,
+         "description": it.description or "",
          "sort_order": it.sort_order, "enabled": it.enabled}
         for it in items
     ]}
@@ -194,11 +240,15 @@ def seed_reference_data(db: Session):
             db.add(ReferenceCategory(key=key, label=label, sort_order=i))
     db.commit()
     for category, entries in DEFAULT_DATA.items():
-        for i, (val, label) in enumerate(entries):
+        for i, entry in enumerate(entries):
+            val = entry[0]
+            label = entry[1]
+            desc = entry[2] if len(entry) > 2 else ""
             exists = db.query(ReferenceData).filter(
                 ReferenceData.category == category,
                 ReferenceData.value == val
             ).first()
             if not exists:
-                db.add(ReferenceData(category=category, value=val, label=label, sort_order=i))
+                db.add(ReferenceData(category=category, value=val, label=label,
+                                     description=desc, sort_order=i))
     db.commit()

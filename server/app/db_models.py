@@ -327,6 +327,7 @@ class CollectedComment(Base):
     dislike_count = Column(String(20), nullable=True)    # 踩数
     location = Column(String(100), nullable=True)        # IP属地
     is_author = Column(Boolean, nullable=False, default=False)
+    data_source_type = Column(Integer, nullable=False, default=0)  # 0=普通视频, 1=带货视频
     ai_reply = Column(Text, nullable=True)              # AI 生成的回复内容
     ai_replied_at = Column(DateTime, nullable=True)     # AI 回复时间
     created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
@@ -350,6 +351,7 @@ class CollectedUser(Base):
     age = Column(String(10), nullable=True)             # 年龄
     ip_location = Column(String(100), nullable=True)    # IP属地
     is_private = Column(String(10), nullable=True)      # 是否私密账号
+    data_source_type = Column(Integer, nullable=False, default=0)  # 0=普通视频, 1=带货视频
     avatar_url = Column(Text, nullable=True)             # 头像本地路径
     created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
 
@@ -544,13 +546,14 @@ class AuditReport(Base):
 
 
 class ReferenceData(Base):
-    """系统字典 — 管理所有下拉选项 (系列类型/角色类型/场景属性)."""
+    """系统字典 — 管理所有下拉选项 (系列类型/角色类型/场景属性/模型配置)."""
     __tablename__ = "reference_data"
 
     id = Column(String(36), primary_key=True, default=_uuid)
     category = Column(String(50), nullable=False, index=True)
     value = Column(String(100), nullable=False)
     label = Column(String(100), nullable=False)
+    description = Column(String(200), nullable=True)
     sort_order = Column(Integer, nullable=False, default=0)
     enabled = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime, nullable=False, default=lambda: bj_now())

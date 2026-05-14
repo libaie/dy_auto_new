@@ -171,3 +171,34 @@ seed 在 startup 调用，幂等（按 `(model_type, provider, model_name)` 唯�
 | `web/src/components/video-studio/PipelineLayerConfig.vue` | 改为调用 `/api/ai-models/options` |
 | `web/src/views/DictManagePage.vue` | 移除模型相关分类的种子数据（已废弃） |
 | `server/app/routers/reference_data.py` | 移除 DEFAULT_DATA 中的模型分类 |
+
+---
+
+## GSTACK REVIEW REPORT — /plan-ceo-review 2026-05-14
+
+### Completion Summary
+
+| Section | Result |
+|---------|--------|
+| Mode | SELECTIVE EXPANSION |
+| Premises | 6/6 ACCEPTED |
+| Architecture | CLEAN — single table + JSON config, no new dependencies |
+| Error/Rescue | CLEAN — IntegrityError on duplicate, encrypted storage, 404 on missing |
+| Security | CLEAN — api_key encrypted at rest, admin-only endpoints |
+| Data Flow | CLEAN — standard CRUD, api_key masked in list |
+| Code Quality | CLEAN — follows existing patterns (crypto.py, reference_data CRUD) |
+| Tests | ACCEPTED — 5-8 CRUD tests included in scope |
+| Performance | CLEAN — single table, indexed queries |
+| Observability | CLEAN — standard FastAPI logging |
+| Deployment | CLEAN — Base.metadata.create_all for new table |
+| Long-Term | CLEAN — reversible (drop table + git revert) |
+| Design (Sec 11) | CLEAN — left-right split panel, dynamic form fields per model type |
+
+### Accepted Expansions
+- Model test connection button ("测试连接")
+
+### Deferred
+- Provider preset templates → TODOS.md
+
+### Verdict
+CEO + Design CLEAR — ready to implement

@@ -349,16 +349,16 @@ onMounted(async () => { await loadCategories(); await load() })
   background: rgba(15, 23, 42, 0.8);
   border: 1px solid rgba(71, 85, 105, 0.3);
   border-radius: 6px;
-  padding: 3px 8px;
+  padding: 5px 10px;
   font-size: 13px;
   color: #e2e8f0;
   outline: none;
-  width: 100px;
+  min-width: 130px;
   transition: border-color 150ms;
 }
 .cat-add-input::placeholder { color: #64748b; }
 .cat-add-input:focus { border-color: rgba(14, 165, 233, 0.5); }
-.cat-add-input--key { width: 80px; }
+.cat-add-input--key { min-width: 110px; }
 .cat-add-btn {
   padding: 2px 6px;
   border-radius: 5px;

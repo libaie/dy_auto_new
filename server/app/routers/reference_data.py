@@ -177,11 +177,6 @@ def list_all_items(category: str, db: Session = Depends(get_db),
     items = db.query(ReferenceData).filter(
         ReferenceData.category == category
     ).order_by(ReferenceData.sort_order).all()
-    if not items:
-        seed_reference_data(db)
-        items = db.query(ReferenceData).filter(
-            ReferenceData.category == category
-        ).order_by(ReferenceData.sort_order).all()
     return {"ok": True, "items": [
         {"id": it.id, "value": it.value, "label": it.label,
          "sort_order": it.sort_order, "enabled": it.enabled}

@@ -1,6 +1,7 @@
 """系统字典 API — 管理所有下拉选项 + 分类."""
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from app.database import get_db
@@ -46,10 +47,21 @@ DEFAULT_DATA = {
 
 @router.get("/reference-categories")
 def list_categories(db: Session = Depends(get_db)):
-    """获取所有字典分类 (公开只读)."""
+    """获取所有字典分类 (公开只读), 含每类已启用选项数."""
     cats = db.query(ReferenceCategory).order_by(ReferenceCategory.sort_order).all()
+    # Per-category enabled item count
+    counts = {}
+    if cats:
+        rows = (
+            db.query(ReferenceData.category, func.count(ReferenceData.id))
+            .filter(ReferenceData.enabled == True)
+            .group_by(ReferenceData.category)
+            .all()
+        )
+        counts = {row[0]: row[1] for row in rows}
     return {"ok": True, "categories": [
-        {"id": c.id, "key": c.key, "label": c.label, "sort_order": c.sort_order}
+        {"id": c.id, "key": c.key, "label": c.label,
+         "sort_order": c.sort_order, "item_count": counts.get(c.key, 0)}
         for c in cats
     ]}
 
@@ -130,7 +142,12 @@ class RefDataCreate(BaseModel):
 def create_item(body: RefDataCreate, db: Session = Depends(get_db),
                 _: str = Depends(verify_admin_token)):
     item = ReferenceData(**body.model_dump())
-    db.add(item); db.commit(); db.refresh(item)
+    db.add(item)
+    try:
+        db.commit(); db.refresh(item)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, f"选项 '{body.value}' 在分类 '{body.category}' 中已存在")
     return {"ok": True, "item": {"value": item.value, "label": item.label}}
 
 

@@ -9,7 +9,7 @@
               class="px-3 py-1.5 rounded-lg text-sm transition cursor-pointer relative group"
               :class="currentCat === cat.key ? 'bg-sky-600 text-white' : 'bg-gray-800 text-slate-300 hover:bg-gray-700'">
         {{ cat.label }}
-        <span class="ml-1 text-xs opacity-60">({{ catCount(cat.key) }})</span>
+        <span class="ml-1 text-xs opacity-60">({{ cat.item_count ?? 0 }})</span>
         <span class="hidden group-hover:inline-flex ml-2 gap-1">
           <button @click.stop="startEditCat(cat)" class="text-yellow-400 hover:text-yellow-300 text-xs" title="编辑">✎</button>
           <button @click.stop="removeCategory(cat)" class="text-red-400 hover:text-red-300 text-xs" title="删除">✕</button>
@@ -80,10 +80,6 @@ const newCatLabel = ref('')
 const editingCat = ref(null)
 const editCatKey = ref('')
 const editCatLabel = ref('')
-
-function catCount(key) {
-  return items.value.filter(i => i.enabled).length
-}
 
 async function loadCategories() {
   const { data } = await listCategories()

@@ -93,6 +93,8 @@ async def lifespan(app: FastAPI):
     yield
     task.cancel()
     await ai_generator.aclose()
+    from app.services import pixelle_client
+    await pixelle_client.close_client()
 
 
 app = FastAPI(

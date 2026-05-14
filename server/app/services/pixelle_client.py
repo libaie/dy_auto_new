@@ -40,6 +40,14 @@ def _get_client() -> httpx.AsyncClient:
     return _client
 
 
+async def close_client():
+    """Close the module-level httpx client. Call during app shutdown."""
+    global _client
+    if _client and not _client.is_closed:
+        await _client.aclose()
+        _client = None
+
+
 async def _pixelle_request(method: str, path: str, db: Session | None = None, **kwargs) -> dict:
     """统一的 Pixelle-Video HTTP 请求入口，带指数退避重试."""
     url = f"{_get_base_url(db)}{path}"

@@ -82,17 +82,18 @@ describe('getCategoryByRoute', () => {
     expect(getCategoryByRoute({ path: '/settings' })).toBe('system')
   })
 
-  it('matches dynamic route /series/:id via matched[0].path', () => {
+  it('matches dynamic route /series/:id via deepest matched entry', () => {
+    // Vue Router matched[] is parent→child ordered: parent '/' at [0], child at [1]
     expect(getCategoryByRoute({
       path: '/series/abc123',
-      matched: [{ path: '/series/:id' }],
+      matched: [{ path: '/' }, { path: '/series/:id' }],
     })).toBe('ai-video')
   })
 
-  it('matches dynamic route /director/:x/:y via matched[0].path', () => {
+  it('matches dynamic route /director/:x/:y via deepest matched entry', () => {
     expect(getCategoryByRoute({
       path: '/director/s1/e1',
-      matched: [{ path: '/director/:seriesId/:episodeId' }],
+      matched: [{ path: '/' }, { path: '/director/:seriesId/:episodeId' }],
     })).toBe('ai-video')
   })
 

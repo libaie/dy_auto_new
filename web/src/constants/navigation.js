@@ -84,8 +84,9 @@ export function getCategoryByRoute(route) {
     return ROUTE_CATEGORY_MAP[route.path]
   }
   // 2. route definition pattern match (dynamic routes like /series/:id)
-  if (route.matched?.[0]?.path) {
-    const pattern = route.matched[0].path
+  // Vue Router matched[] is parent→child ordered; use deepest (last) match
+  if (route.matched?.length) {
+    const pattern = route.matched[route.matched.length - 1].path
     if (ROUTE_CATEGORY_MAP[pattern] != null) {
       return ROUTE_CATEGORY_MAP[pattern]
     }

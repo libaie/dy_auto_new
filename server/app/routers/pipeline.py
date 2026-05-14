@@ -78,8 +78,11 @@ async def _run_all_layers(run_id: str):
         run.status = "completed"
     except Exception as e:
         if run is not None:
+            import traceback
+            tb = traceback.format_exc()
+            logger.error("Pipeline %s failed: %s\n%s", run_id, e, tb)
             run.status = "failed"
-            run.error_log = str(e)
+            run.error_log = f"{e}\n{tb}"
         else:
             logger.error(f"Pipeline _run_all_layers failed before run loaded: {e}")
     finally:

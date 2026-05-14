@@ -202,3 +202,56 @@ seed 在 startup 调用，幂等（按 `(model_type, provider, model_name)` 唯�
 
 ### Verdict
 CEO + Design CLEAR — ready to implement
+
+---
+
+## Eng Review — /plan-eng-review 2026-05-14
+
+### Step 0: Scope Challenge
+8 files — complexity threshold triggered. All 8 confirmed necessary: new ORM model + CRUD router + UI rewrite + PipelineLayerConfig integration + cleanup of superseded dictionary system.
+
+### Section 1: Architecture — CLEAN
+Single AIModel table + JSON config for type-specific fields. Reuses crypto.py for encryption. No new dependencies. admin-only auth on all mutation endpoints.
+
+### Section 2: Code Quality — CLEAN
+Follows existing patterns: crypto.py encryption, reference_data.py CRUD structure. No DRY violations.
+
+### Section 3: Test Review — 17 test points accepted
+13 backend (pytest, new test_ai_config.py) + 4 frontend (Vitest, new ai-config.test.js).
+Test plan artifact: ~/.gstack/projects/dy_auto/HNXE-feature-video-review-fixes-eng-review-test-plan-20260514-221137.md
+
+```
+NEW CODEPATHS — 17 total, 0 pre-existing coverage:
+  GET  /api/ai-models          (3 tests)
+  GET  /api/ai-models/{id}     (3 tests)
+  POST /api/ai-models           (3 tests)
+  PUT  /api/ai-models/{id}     (2 tests)
+  DELETE /api/ai-models/{id}   (2 tests)
+  GET  /api/ai-models/options   (1 test — implicit in CRUD tests)
+  AIConfigPage.vue              (4 Vitest tests)
+PipelineLayerConfig.vue         (INHERITED — existing onMounted pattern coverage)
+```
+
+### Section 4: Performance — CLEAN
+Single-table query, indexed on model_type. No N+1. options endpoint: one filtered SELECT. No caching needed.
+
+### Failure Modes
+| Mode | Rescued? | Test? | User sees? |
+|------|----------|-------|-----------|
+| Duplicate model name+provider | Y (IntegrityError→409) | Y | "模型已存在" |
+| Decrypt failure (corrupted key) | Y (log+fallback) | Y | 空白 api_key |
+| Empty DB on options fetch | Y (empty array) | Y | 空下拉列表 |
+| Invalid model_type enum | Y (Pydantic 422) | Y | "类型不合法" |
+
+### Completion Summary
+- Architecture: 0 issues
+- Code Quality: 0 issues
+- Test Review: 17 gaps → 17 test points accepted
+- Performance: 0 issues
+- NOT in scope: written (see CEO review)
+- What already exists: written
+- Failure modes: 0 critical gaps
+- Parallelization: Sequential — DB model → Router → Frontend → PipelineLayerConfig cleanup
+
+### Verdict
+ENG CLEAR — 0 blocking issues, 17 test points committed to scope

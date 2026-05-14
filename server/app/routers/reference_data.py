@@ -1,13 +1,21 @@
-"""系统字典 API — 管理所有下拉选项."""
+"""系统字典 API — 管理所有下拉选项 + 分类."""
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from app.database import get_db
 from app.deps import verify_admin_token
-from app.db_models import ReferenceData
+from app.db_models import ReferenceData, ReferenceCategory
 
-router = APIRouter(prefix="/api/reference-data", tags=["reference-data"])
+router = APIRouter(prefix="/api", tags=["reference-data"])
+
+DEFAULT_CATEGORIES = [
+    ("series_genre", "系列类型"),
+    ("character_role", "角色类型"),
+    ("scene_type", "场景类型"),
+    ("scene_lighting", "场景光照"),
+    ("scene_mood", "场景氛围"),
+]
 
 DEFAULT_DATA = {
     "series_genre": [
@@ -34,7 +42,75 @@ DEFAULT_DATA = {
 }
 
 
-@router.get("/{category}")
+# ==== Category CRUD ====
+
+@router.get("/reference-categories")
+def list_categories(db: Session = Depends(get_db)):
+    """获取所有字典分类 (公开只读)."""
+    cats = db.query(ReferenceCategory).order_by(ReferenceCategory.sort_order).all()
+    return {"ok": True, "categories": [
+        {"id": c.id, "key": c.key, "label": c.label, "sort_order": c.sort_order}
+        for c in cats
+    ]}
+
+
+class CategoryCreate(BaseModel):
+    key: str
+    label: str
+    sort_order: int = 0
+
+
+@router.post("/reference-categories")
+def create_category(body: CategoryCreate, db: Session = Depends(get_db),
+                    _: str = Depends(verify_admin_token)):
+    cat = ReferenceCategory(key=body.key, label=body.label, sort_order=body.sort_order)
+    db.add(cat)
+    try:
+        db.commit(); db.refresh(cat)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, f"分类 key '{body.key}' 已存在")
+    return {"ok": True, "category": {"id": cat.id, "key": cat.key, "label": cat.label}}
+
+
+@router.put("/reference-categories/{cat_id}")
+def update_category(cat_id: str, body: dict, db: Session = Depends(get_db),
+                    _: str = Depends(verify_admin_token)):
+    cat = db.query(ReferenceCategory).filter(ReferenceCategory.id == cat_id).first()
+    if not cat:
+        raise HTTPException(404, "分类不存在")
+    if "label" in body:
+        cat.label = body["label"]
+    if "sort_order" in body:
+        cat.sort_order = body["sort_order"]
+    if "key" in body and body["key"] != cat.key:
+        old_key = cat.key
+        cat.key = body["key"]
+        db.query(ReferenceData).filter(ReferenceData.category == old_key).update(
+            {"category": body["key"]}, synchronize_session=False)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, f"分类 key '{body.get('key')}' 已存在")
+    return {"ok": True}
+
+
+@router.delete("/reference-categories/{cat_id}")
+def delete_category(cat_id: str, db: Session = Depends(get_db),
+                    _: str = Depends(verify_admin_token)):
+    cat = db.query(ReferenceCategory).filter(ReferenceCategory.id == cat_id).first()
+    if not cat:
+        raise HTTPException(404, "分类不存在")
+    db.query(ReferenceData).filter(ReferenceData.category == cat.key).delete()
+    db.delete(cat)
+    db.commit()
+    return {"ok": True}
+
+
+# ==== Item CRUD ====
+
+@router.get("/reference-data/{category}")
 def list_items(category: str, db: Session = Depends(get_db)):
     """获取某分类下的所有启用选项 (公开只读)."""
     items = db.query(ReferenceData).filter(
@@ -50,7 +126,7 @@ class RefDataCreate(BaseModel):
     sort_order: int = 0
 
 
-@router.post("")
+@router.post("/reference-data")
 def create_item(body: RefDataCreate, db: Session = Depends(get_db),
                 _: str = Depends(verify_admin_token)):
     item = ReferenceData(**body.model_dump())
@@ -58,7 +134,7 @@ def create_item(body: RefDataCreate, db: Session = Depends(get_db),
     return {"ok": True, "item": {"value": item.value, "label": item.label}}
 
 
-@router.put("/{item_id}")
+@router.put("/reference-data/{item_id}")
 def update_item(item_id: str, body: dict, db: Session = Depends(get_db),
                 _: str = Depends(verify_admin_token)):
     item = db.query(ReferenceData).filter(ReferenceData.id == item_id).first()
@@ -69,7 +145,7 @@ def update_item(item_id: str, body: dict, db: Session = Depends(get_db),
     return {"ok": True}
 
 
-@router.delete("/{item_id}")
+@router.delete("/reference-data/{item_id}")
 def delete_item(item_id: str, db: Session = Depends(get_db),
                 _: str = Depends(verify_admin_token)):
     db.query(ReferenceData).filter(ReferenceData.id == item_id).delete()
@@ -77,27 +153,14 @@ def delete_item(item_id: str, db: Session = Depends(get_db),
     return {"ok": True}
 
 
-def seed_reference_data(db: Session):
-    """启动时 seed 默认字典数据。幂等：已存在则跳过。"""
-    for category, entries in DEFAULT_DATA.items():
-        for i, (val, label) in enumerate(entries):
-            exists = db.query(ReferenceData).filter(
-                ReferenceData.category == category,
-                ReferenceData.value == val
-            ).first()
-            if not exists:
-                db.add(ReferenceData(category=category, value=val, label=label, sort_order=i))
-    db.commit()
-
-
-@router.get("/admin/{category}")
+@router.get("/reference-data/admin/{category}")
 def list_all_items(category: str, db: Session = Depends(get_db),
                    _: str = Depends(verify_admin_token)):
     """管理端：列出某分类所有项 (含 id, enabled)."""
     items = db.query(ReferenceData).filter(
         ReferenceData.category == category
     ).order_by(ReferenceData.sort_order).all()
-    if not items and category in DEFAULT_DATA:
+    if not items:
         seed_reference_data(db)
         items = db.query(ReferenceData).filter(
             ReferenceData.category == category
@@ -107,3 +170,23 @@ def list_all_items(category: str, db: Session = Depends(get_db),
          "sort_order": it.sort_order, "enabled": it.enabled}
         for it in items
     ]}
+
+
+# ==== Seed ====
+
+def seed_reference_data(db: Session):
+    """启动时 seed 默认分类 + 字典数据。幂等：已存在则跳过。"""
+    for i, (key, label) in enumerate(DEFAULT_CATEGORIES):
+        exists = db.query(ReferenceCategory).filter(ReferenceCategory.key == key).first()
+        if not exists:
+            db.add(ReferenceCategory(key=key, label=label, sort_order=i))
+    db.commit()
+    for category, entries in DEFAULT_DATA.items():
+        for i, (val, label) in enumerate(entries):
+            exists = db.query(ReferenceData).filter(
+                ReferenceData.category == category,
+                ReferenceData.value == val
+            ).first()
+            if not exists:
+                db.add(ReferenceData(category=category, value=val, label=label, sort_order=i))
+    db.commit()

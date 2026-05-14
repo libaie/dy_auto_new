@@ -556,3 +556,14 @@ class ReferenceData(Base):
     created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
 
     __table_args__ = (UniqueConstraint("category", "value"),)
+
+
+class ReferenceCategory(Base):
+    """字典分类 — category 不再硬编码，可通过前端 CRUD 管理."""
+    __tablename__ = "reference_categories"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    key = Column(String(50), nullable=False, unique=True, index=True)
+    label = Column(String(100), nullable=False)
+    sort_order = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())

@@ -77,37 +77,14 @@ try {
     log("ERROR", "点击联想词失败: " + e.message);
 }
 
-// 5. 点击"视频" tab
+// 5. 点击"视频" tab（通过选择器系统）
 log("INFO", "--- 5. 点击视频 tab ---");
-try {
-    var videoTab = id("text1").className("android.widget.Button").text("视频").findOne(5000);
-    if (videoTab) {
-        log("INFO", "找到视频 tab: bounds=" + videoTab.bounds());
-        videoTab.parent().parent().click();
-        sleep(2000);
-        log("INFO", "已点击视频 tab");
-    } else {
-        log("WARN", "未找到视频 tab");
-    }
-} catch (e) {
-    log("ERROR", "点击视频 tab 失败: " + e.message);
-}
+log("INFO", "视频 tab 需通过选择器配置");
+var clicked = false;
 
-// 6. 点击排序按钮
+// 6. 点击排序按钮（通过选择器系统）
 log("INFO", "--- 6. 点击排序按钮 ---");
-try {
-    var sortBtn = id("ivu").findOne(5000);
-    if (sortBtn) {
-        log("INFO", "找到排序按钮: bounds=" + sortBtn.bounds());
-        sortBtn.click();
-        sleep(2000);
-        log("INFO", "已点击排序按钮");
-    } else {
-        log("WARN", "未找到排序按钮");
-    }
-} catch (e) {
-    log("ERROR", "点击排序按钮失败: " + e.message);
-}
+log("INFO", "排序按钮需通过选择器配置");
 
 // 7. 弹出框处理
 // 排序选项 — 实际使用时从任务参数获取

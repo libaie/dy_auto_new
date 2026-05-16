@@ -4,6 +4,7 @@ var uiOperator = require("../core/ui-operator");
 var antiDetect = require("../core/anti-detect");
 var logger = require("../utils/logger");
 var aiAnalyzer = require("../core/ai-analyzer");
+var flowContext = require("../core/flow-context");
 
 var TAG = "搜索";
 
@@ -95,8 +96,12 @@ SearchBaseHandler.execute = function (params) {
       }
       sleep(2000);
     } else {
-      // 后续视频：滑动切换
+      // 后续视频：暂停 → 滑动切换
       back(); sleep(500);
+      if (uiOperator.findElement("is_video_view", 1000)) {
+        press(device.width / 2, device.height / 2, 80);
+        sleep(300);
+      }
       uiOperator.swipeUp();
       sleep(2500);
     }
@@ -124,6 +129,7 @@ SearchBaseHandler._openSearch = function () {
   var clicked = this.safeClick("search_tab", 3);
   if (clicked) {
     sleep(Math.floor(Math.random() * 1000 + 1000));
+    flowContext.enter("search");
     return true;
   }
 
@@ -134,6 +140,7 @@ SearchBaseHandler._openSearch = function () {
     clicked = this.safeClick("search_tab", 2);
     if (clicked) {
       sleep(Math.floor(Math.random() * 1000 + 1000));
+      flowContext.enter("search");
       return true;
     }
   }
@@ -142,10 +149,11 @@ SearchBaseHandler._openSearch = function () {
   logger.warn(TAG, "back 链恢复失败，尝试冷启动回首页");
   try { uiOperator.closeApp(); sleep(800); } catch (e) {}
   if (uiOperator.openApp()) {
-    sleep(4000);  // 冷启动给足够时间
+    sleep(4000);
     clicked = this.safeClick("search_tab", 3);
     if (clicked) {
       sleep(Math.floor(Math.random() * 1000 + 1000));
+      flowContext.enter("search");
       return true;
     }
   }
@@ -157,7 +165,21 @@ SearchBaseHandler._openSearch = function () {
  * 使用 setText 直接设置（测试验证可用）
  */
 SearchBaseHandler._inputKeyword = function (keyword) {
-  var editBox = className("EditText").findOne(2000);
+  // 确认在搜索页
+  if (!uiOperator.isOnPage("search")) {
+    logger.warn(TAG, "搜索输入框未找到：不在搜索页");
+    return false;
+  }
+  // 在屏幕顶部区域限定查找可聚焦的搜索输入框
+  var allEdits = className("EditText").find();
+  var editBox = null;
+  for (var ei = 0; ei < allEdits.length; ei++) {
+    try {
+      if (!allEdits[ei].focusable()) continue;
+      var b = allEdits[ei].bounds();
+      if (b && b.top < device.height * 0.3) { editBox = allEdits[ei]; break; }
+    } catch (e) {}
+  }
   if (!editBox) {
     logger.warn(TAG, "搜索输入框未找到");
     return false;
@@ -171,35 +193,16 @@ SearchBaseHandler._inputKeyword = function (keyword) {
 };
 
 /**
- * 点击联想词
- * 通过 search_suggestion_list 选择器策略查找联想词列表，点击第一个
+ * 点击联想词 — RecyclerView 内遍历匹配关键词
  */
 SearchBaseHandler._clickSuggestion = function (keyword) {
-  var uiOperator = require("../core/ui-operator");
-
-  // 路径1: 选择器策略查找
-  var items = uiOperator.findElements("search_suggestion_list", 3000);
-  if (items.length > 0) {
-    for (var i = 0; i < items.length; i++) {
-      var t = items[i].findOne(text(keyword));
-      if (t) {
-        logger.info(TAG, "点击联想词(策略): '" + t.text() + "'");
-        var gp = t.parent().parent();
-        var b = gp.bounds();
-        if (b) { press(b.centerX(), b.centerY(), 150); sleep(500); return true; }
-      }
-    }
-  }
-
-  // 路径2: 硬编码兜底 — RecyclerView + 遍历匹配 + 爷爷节点
-  logger.info(TAG, "策略未找到联想词，尝试硬编码兜底");
+  // RecyclerView 遍历匹配联想词
   var rv = id("recycler_view").findOne(2000);
   if (!rv) {
     var allRVs = className("androidx.recyclerview.widget.RecyclerView").find();
     if (allRVs.length === 0) allRVs = className("android.support.v7.widget.RecyclerView").find();
     for (var ri = 0; ri < allRVs.length; ri++) {
       var rvb = allRVs[ri].bounds();
-      // 联想词列表通常在搜索框下方，取较小的那个
       if (rvb && rvb.height() < device.height * 0.5 && rvb.top < device.height * 0.4) {
         rv = allRVs[ri]; break;
       }
@@ -210,7 +213,7 @@ SearchBaseHandler._clickSuggestion = function (keyword) {
     for (var c = 0; c < children.length; c++) {
       var ct = children[c].findOne(text(keyword));
       if (ct) {
-        logger.info(TAG, "点击联想词(兜底): '" + ct.text() + "'");
+        logger.info(TAG, "点击联想词: '" + ct.text() + "'");
         var gpp = ct.parent().parent();
         var bb = gpp.bounds();
         if (bb) { press(bb.centerX(), bb.centerY(), 150); sleep(500); return true; }
@@ -227,23 +230,12 @@ SearchBaseHandler._clickSuggestion = function (keyword) {
  * 优先使用选择器系统，回退到硬编码
  */
 SearchBaseHandler._clickVideoTab = function () {
-  // 尝试使用选择器系统
   var clicked = this.safeClick("search_video_tab", 2);
   if (clicked) {
     logger.info(TAG, "点击视频标签");
     return true;
   }
-  // 回退：硬编码
-  try {
-    var vt = id("text1").className("android.widget.Button").text("视频").findOne(5000);
-    if (vt) {
-      vt.parent().parent().click();
-      logger.info(TAG, "点击视频标签(硬编码)");
-      return true;
-    }
-  } catch (e) {
-    logger.warn(TAG, "视频标签点击失败: " + e.message);
-  }
+  logger.warn(TAG, "视频标签点击失败");
   return false;
 };
 
@@ -363,7 +355,7 @@ SearchBaseHandler._clickSearchResult = function (index) {
   function tryClick(el) {
     if (el.clickable()) return el.click();
     var b = el.bounds();
-    if (b) return click(b.centerX(), b.centerY());
+    if (b) return press(b.centerX(), b.centerY(), 80);
     return false;
   }
 

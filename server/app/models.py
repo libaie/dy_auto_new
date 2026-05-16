@@ -69,6 +69,7 @@ class SelectorConfig(BaseModel):
     platform_version: str = "default"
     strategies: list[SelectorStrategy]
     version: int = 1
+    purpose: str = "locate"  # locate | extract | page_detect
 
 
 class TaskCreateRequest(BaseModel):
@@ -111,14 +112,15 @@ class NurtureParams(BaseModel):
 
 
 class SearchCommentParams(BaseModel):
-    keyword: str = Field(..., min_length=1, max_length=50, description="搜索关键词")
+    keyword: str = Field("", min_length=0, max_length=200, description="搜索关键词（分享链接模式时可为空）")
     keywords: Optional[list[str]] = Field(None, description="批量关键词（通道模式）")
+    share_links: Optional[list[str]] = Field(None, description="分享链接列表，每个链接对应一个视频")
     content: Optional[str] = Field(None, max_length=200, description="评论内容")
     content_template_id: Optional[str] = Field(None, description="内容模板ID")
-    count: int = Field(default=5, ge=1, le=200, description="每视频处理数量")
-    video_count: int = Field(default=5, ge=1, le=50, description="处理视频数")
+    count: int = Field(default=5, ge=-1, description="每视频处理数量, -1=全量")
+    video_count: int = Field(default=5, ge=-1, description="处理视频数, -1=全量")
     sort_by: Optional[str] = Field(None, pattern="^(latest|most_liked)$")
-    max_age_days: int = Field(default=30, ge=1, le=90, description="评论最大天数")
+    max_age_days: int = Field(default=30, ge=-1, description="评论最大天数, -1=不限")
 
 
 class SearchLikeParams(BaseModel):
@@ -142,10 +144,10 @@ class ReplyCommentParams(BaseModel):
     keywords: Optional[list[str]] = Field(None, description="批量关键词（通道模式）")
     content: Optional[str] = Field(None, max_length=500, description="私信内容")
     content_template_id: Optional[str] = Field(None, description="内容模板ID")
-    count: int = Field(default=5, ge=1, le=50, description="每个视频处理评论数")
-    video_count: int = Field(default=3, ge=1, le=50, description="处理视频数")
+    count: int = Field(default=5, ge=-1, description="每个视频处理评论数, -1=全量")
+    video_count: int = Field(default=3, ge=-1, description="处理视频数, -1=全量")
     sort_by: Optional[str] = Field(None, pattern="^(latest|most_liked)$")
-    max_age_days: int = Field(default=5, ge=1, le=30, description="评论最大天数")
+    max_age_days: int = Field(default=5, ge=-1, description="评论最大天数, -1=不限")
     max_follows: int = Field(default=20, ge=1, le=50, description="每日关注上限")
     max_dms: int = Field(default=10, ge=1, le=30, description="每日私信上限")
 
@@ -235,6 +237,15 @@ class LoginRequest(BaseModel):
 class LoginResponse(BaseModel):
     token: str
     expires_in: int  # seconds
+    role: str = "admin"
+    user_id: str = ""
+
+
+class RegisterRequest(BaseModel):
+    username: str = Field(..., min_length=2, max_length=50)
+    password: str = Field(..., min_length=6, max_length=100)
+    role: Optional[str] = "operator"
+    nickname: Optional[str] = None
 
 
 class AdminUser(BaseModel):
@@ -536,6 +547,9 @@ class CollectCommentData(BaseModel):
     dislike_count: str = ""
     location: str = ""
     is_author: bool = False
+    intended_province: str | None = None
+    intended_city: str | None = None
+    intended_attraction: str | None = None
 
 
 class CollectUserData(BaseModel):
@@ -556,6 +570,7 @@ class CollectReportRequest(BaseModel):
     keyword: str
     comment: CollectCommentData
     user: CollectUserData | None = None
+    data_source_type: int = 0  # 0=普通视频, 1=带货视频
 
 
 # --- DM / Conversation models ---

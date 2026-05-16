@@ -99,7 +99,7 @@ if (searchBtn) {
 } else {
     log("WARN", "未找到搜索按钮，尝试点击搜索图标");
     // 尝试通过 id 找
-    var searchIcon = id("et7").findOnce() || desc("搜索").findOnce();
+    var searchIcon = desc("搜索").findOnce();
     if (searchIcon) {
         searchIcon.click();
         sleep(2000);
@@ -139,16 +139,8 @@ if (editBox) {
     }
     sleep(3000);
 
-    // 点击视频 tab
-    try {
-        var videoTab = id("text1").className("android.widget.Button").text("视频").findOne(5000);
-        if (videoTab) {
-            videoTab.parent().parent().click();
-            sleep(2000);
-        }
-    } catch (e) {
-        log("WARN", "视频 tab 点击失败: " + e.message);
-    }
+    // 点击视频 tab（通过选择器系统）
+    log("INFO", "视频 tab 需通过选择器配置");
 
     capturePage("page_search_result");
 } else {

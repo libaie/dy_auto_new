@@ -30,19 +30,19 @@ SearchCommentHandler._interactWithVideo = function (content, stats) {
     logger.info(TAG, "AI 生成评论: '" + content.substring(0, 30) + "'");
   }
 
-  // 0. 确认进入视频详情页 — 检测评论按钮，不存在则尝试点击屏幕中心进入
-  var uiOperator = require("../core/ui-operator");
-  var commentBtn = uiOperator.findElement("video_comment_btn", 2000);
-  if (!commentBtn) {
-    logger.info(TAG, "未检测到视频详情页，尝试点击进入");
-    var x = Math.round(device.width * 0.5);
-    var y = Math.round(device.height * 0.5);
-    click(x, y);
+  // 0. 确认进入视频详情页
+  if (!uiOperator.isOnPage("video")) {
+    logger.info(TAG, "未检测到视频详情页，尝试点击屏幕中心进入");
+    press(Math.round(device.width * 0.5), Math.round(device.height * 0.5), 80);
     sleep(2000);
-    commentBtn = uiOperator.findElement("video_comment_btn", 3000);
   }
+  if (!uiOperator.isOnPage("video")) {
+    logger.warn(TAG, "未进入视频详情页");
+    return false;
+  }
+  var commentBtn = uiOperator.findElement("video_comment_btn", 3000);
   if (!commentBtn) {
-    logger.warn(TAG, "评论入口按钮未找到，可能未进入视频详情页");
+    logger.warn(TAG, "评论入口按钮未找到");
     return false;
   }
 

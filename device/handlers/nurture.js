@@ -341,9 +341,8 @@ NurtureHandler._ensureOnFeed = function () {
   var maxRetries = 5;
   for (var attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      // 检测是否在推荐页 — 使用选择器系统的 like_button（自动匹配最新 ID）
-      var likeBtn = uiOperator.findElement("like_button", 1000);
-      if (likeBtn) return; // 已在推荐页
+      // 检测是否在推荐页
+      if (uiOperator.isOnPage("feed")) return;
 
       // 检测是否在有底部 tab 的主页面（首页/朋友/消息/我的）
       var homeTab = text("首页").findOne(2000);

@@ -78,13 +78,8 @@ if (rv) {
 }
 sleep(3000);
 
-// 点击视频 tab
-log("INFO", "点击视频 tab...");
-try {
-    var vt = id("text1").className("android.widget.Button").text("视频").findOne(5000);
-    if (vt) vt.parent().parent().click();
-    sleep(2000);
-} catch (e) { log("WARN", "视频 tab: " + e.message); }
+// 点击视频 tab（通过选择器系统）
+log("INFO", "视频 tab 需通过选择器配置");
 
 // 点击排序按钮
 log("INFO", "点击排序按钮...");

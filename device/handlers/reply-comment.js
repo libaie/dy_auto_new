@@ -2,120 +2,13 @@
 var SearchBaseHandler = require("./search-base");
 var aiAnalyzer = require("../core/ai-analyzer");
 var uiOperator = require("../core/ui-operator");
-var selectorLoader = require("../core/selector-loader");
 var antiDetect = require("../core/anti-detect");
 var apiClient = require("../core/api-client");
 var logger = require("../utils/logger");
+var commentUtils = require("./comment-utils");
 
 var TAG = "评论回复";
-
-// 页面指纹表 — 每个页面至少一个指纹命中即确认
-// 指纹选择原则：只放该页面独有的、稳定存在的元素
-// 顺序很重要：先检查具体页面，最后检查宽泛的 home
-// home 的 search_tab 在视频页/搜索页也可能可见，必须放最后
-var PAGE_DETECTORS = {
-  comment:  ["is_comment_view"],                                         // 评论面板（最具体）
-  dm:       ["dm_input", "dm_send"],                                     // 私信页
-  profile:  ["user_nickname"],                                           // 个人主页
-  video:    ["is_video_view"],                                           // 视频详情页
-  search:   ["search_video_list", "search_video_tab"],                   // 搜索结果页
-  home:     ["search_tab"],                                              // 抖音首页（最后兜底）
-};
-
-/**
- * 检测当前处于哪个已知页面，返回页面名，未知返回 null
- */
-function detectCurrentPage() {
-  for (var pageName in PAGE_DETECTORS) {
-    var fingerprints = PAGE_DETECTORS[pageName];
-    for (var i = 0; i < fingerprints.length; i++) {
-      if (uiOperator.findElement(fingerprints[i], 800)) {
-        return pageName;
-      }
-    }
-  }
-  return null;
-}
-
-/**
- * 从当前未知页面逐层 back 回到已知页面
- * 每 back 一次检测指纹，直到命中目标页或耗尽
- * @param {string} targetPage - 目标页面名
- * @param {number} maxBacks - 最大 back 次数
- * @returns {boolean} 是否到达目标页面
- */
-function recoverToPage(targetPage, maxBacks) {
-  maxBacks = maxBacks || 5;
-  for (var i = 0; i < maxBacks; i++) {
-    var current = detectCurrentPage();
-    if (current === targetPage) {
-      if (i > 0) logger.info(TAG, "已恢复到 " + targetPage + " (back " + i + " 次)");
-      return true;
-    }
-    if (current && current !== targetPage) {
-      // 在别的已知页面但不是目标，继续 back
-      logger.debug(TAG, "当前在 " + current + "，继续 back 前往 " + targetPage);
-    }
-    back();
-    sleep(800);
-  }
-  // 耗尽 back，检查是否至少到了目标
-  return detectCurrentPage() === targetPage;
-}
-
-/**
- * 确保当前在指定页面，不在则自动恢复
- * @param {string} page - 页面名
- * @param {Function} recoverFn - 首选恢复函数，返回 true 表示恢复成功
- * @param {number} maxRetries - 最大重试次数
- * @returns {boolean} 是否已在目标页面
- */
-function ensurePage(page, recoverFn, maxRetries) {
-  maxRetries = maxRetries || 3;
-  var detectors = PAGE_DETECTORS[page] || [];
-
-  for (var attempt = 0; attempt < maxRetries; attempt++) {
-    // 检测是否已在目标页
-    for (var d = 0; d < detectors.length; d++) {
-      if (uiOperator.findElement(detectors[d], 1000)) {
-        if (attempt > 0) logger.info(TAG, "页面恢复: " + page + " (尝试 " + attempt + ")");
-        return true;
-      }
-    }
-
-    // 不在目标页 — 先判断当前实际在哪
-    var actualPage = detectCurrentPage();
-    if (actualPage) {
-      logger.info(TAG, "当前在 " + actualPage + "，需要 " + page + "，尝试恢复 (" + (attempt + 1) + "/" + maxRetries + ")");
-    } else {
-      logger.warn(TAG, "未知页面，需要 " + page + "，尝试 back 链恢复 (" + (attempt + 1) + "/" + maxRetries + ")");
-    }
-
-    // 已知页面 + 有自定义恢复 → 用自定义恢复
-    if (actualPage && recoverFn && attempt < maxRetries - 1) {
-      recoverFn();
-      continue;
-    }
-
-    // 没有自定义恢复函数 → 只验证，不做破坏性 back 链（back 链会摧毁页面状态）
-    if (!recoverFn) {
-      return false;
-    }
-
-    // 有自定义恢复但不可用 → 尝试 back 链兜底
-    if (recoverToPage(page, 3)) {
-      return true;
-    }
-  }
-
-  // 有自定义恢复但次数耗尽 → back 链最后一搏
-  if (recoverFn && recoverToPage(page, 5)) {
-    return true;
-  }
-
-  logger.warn(TAG, "无法恢复到 " + page + " 页面");
-  return false;
-}
+var flowContext = require("../core/flow-context");
 
 /**
  * 评论回复 + 关注 + 私信 Handler
@@ -145,16 +38,18 @@ var ReplyCommentHandler = Object.create(SearchBaseHandler);
 ReplyCommentHandler.execute = function (params) {
   var keyword = params.keyword;
   var content = params.content || "";
-  var count = params.count || 5;
-  var videoCount = params.video_count || 3;
+  var count = (params.count === -1) ? Infinity : (params.count || 5);
+  var videoCount = (params.video_count === -1) ? Infinity : (params.video_count || 3);
   var sortBy = params.sort_by || "latest";
-  var maxAgeDays = params.max_age_days || 5;
+  var maxAgeDays = (params.max_age_days === -1) ? Infinity : (params.max_age_days || 5);
   // 每日上限（从服务端下发或设备配置获取）
   var maxFollows = params.max_follows || 20;
   var maxDMs = params.max_dms || 10;
 
   // 加载服务端提示词模板
   aiAnalyzer.useTemplate(params.prompt_template_id);
+
+  var dest = aiAnalyzer.resolveDestination(keyword);
 
   if (!keyword) {
     return { success: false, error: "缺少关键词" };
@@ -219,7 +114,7 @@ ReplyCommentHandler.execute = function (params) {
     if (commentCount === 0) {
       logger.info(TAG, "该视频无评论，跳过");
       stats.videos_processed++;
-      if (v < videoCount - 1) { uiOperator.swipeUp(); sleep(2500); }
+      if (v < videoCount - 1) { if (uiOperator.findElement("is_video_view", 1000)) { press(device.width / 2, device.height / 2, 80); sleep(300); } uiOperator.swipeUp(); sleep(2500); }
       continue;
     }
 
@@ -231,8 +126,9 @@ ReplyCommentHandler.execute = function (params) {
       this.safeClick("video_comment_btn", 2);
       sleep(2000);
       // 验证是否真正打开
-      if (ensurePage("comment", null, 1)) {
+      if (uiOperator.isOnPage("comment")) {
         commentsOpened = true;
+        flowContext.enter("comment");
         break;
       }
       logger.info(TAG, "评论区未打开，重试 (" + (retry + 1) + "/2)");
@@ -303,12 +199,7 @@ ReplyCommentHandler.execute = function (params) {
         }
 
         // 本地预过滤：纯表情/无意义评论先拦掉，避免无价值的 claim 和 AI 调用
-        var stripped = comment.text
-          .replace(/\[[^\]]+\]/g, "")
-          .replace(/[\s~!@#$%^&*()_+\-={}|:;<>?,./'""'""、。！，《》]+/g, "")
-          .replace(/[^一-龥a-zA-Z0-9]/g, "")
-          .trim();
-        if (!stripped || stripped.length <= 2) {
+        if (!commentUtils.localPreFilter(comment.text)) {
           logger.info(TAG, "跳过无意义评论（纯表情/短文本）: " + comment.text.substring(0, 20));
           stats.skipped++; totalRead++;
           _reportProgress("视频 " + (v + 1) + "/" + videoCount,
@@ -387,7 +278,7 @@ ReplyCommentHandler.execute = function (params) {
         if (this._replyToComment(analysis.reply, comment.nickname)) {
           stats.success_count++;
           // 保存 AI 回复到采集记录，供前端展示
-          try { apiClient.saveCommentAIReply(comment.nickname, comment.text, analysis.reply, params.task_id); } catch (e) {}
+          try { apiClient.saveCommentAIReply(comment.nickname, comment.text, analysis.reply, params.task_id, dest ? dest.province : null, dest ? dest.city : null, dest ? dest.attraction : null); } catch (e) {}
         } else {
           stats.fail_count++;
           // 回复失败 → 释放 global claim，避免误标记为"已回复"
@@ -429,6 +320,11 @@ ReplyCommentHandler.execute = function (params) {
                 if (lastDetail) lastDetail.user = userData;
                 userData._keyword = keyword;
                 userData._taskId = taskId;
+                if (dest) {
+                  userData._intended_province = dest.province || "";
+                  userData._intended_city = dest.city || "";
+                  userData._intended_attraction = dest.attraction || "";
+                }
                 try { apiClient.saveUserProfile(userData); } catch (e) {}
               }
               if (Date.now() - profileStart < PROFILE_TIMEOUT && canFollow && this._followUser()) {
@@ -445,6 +341,7 @@ ReplyCommentHandler.execute = function (params) {
                   var aiDM = aiAnalyzer.generateDM({
                     searchKeyword: keyword, nickname: comment.nickname,
                     commentText: comment.text, tier: dmIntent,
+                    intendedCity: (dest && (dest.city || dest.attraction || dest.province)) || "",
                   });
                   if (aiDM) dmContent = aiDM;
                 } catch (e) { /* ignore */ }
@@ -515,11 +412,14 @@ ReplyCommentHandler.execute = function (params) {
             // 确保回到评论区
             this._returnToComments();
             // 二次确认，不在评论区就重试
-            if (!ensurePage("comment", function () {
+            var onComment = uiOperator.isOnPage("comment");
+            if (!onComment) {
               back(); sleep(800);
               this._openComments();
               sleep(1500);
-            }.bind(this), 2)) {
+              onComment = uiOperator.isOnPage("comment");
+            }
+            if (!onComment) {
               logger.warn(TAG, "返回评论区失败，跳过后续评论");
               processed = count;  // 终止 while 循环
               break;
@@ -571,7 +471,11 @@ ReplyCommentHandler.execute = function (params) {
       if (uiOperator.findElement("is_comment_view", 300)) {
         back(); sleep(600);
       }
-      // 3. 上滑切下一个视频
+      // 3. 暂停视频 → 上滑切下一个
+      if (uiOperator.findElement("is_video_view", 1000)) {
+        press(device.width / 2, device.height / 2, 80);
+        sleep(300);
+      }
       uiOperator.swipeUp();
       sleep(2500);
     }
@@ -607,32 +511,7 @@ ReplyCommentHandler._searchAndSort = function (keyword, sortBy) {
  * 打开评论区 — 点击视频评论入口按钮
  */
 ReplyCommentHandler._openComments = function () {
-  // 检测评论区是否真正打开（comment_list 可见才算）执行进度
-  var items = uiOperator.findElements("comment_list", 500);
-  if (items && items.length > 0) {
-    logger.info(TAG, "评论区已打开 (" + items.length + " 条可见)");
-    return true;
-  }
-
-  // 点视频评论按钮
-  this.safeClick("video_comment_btn", 3);
-  sleep(2000);
-
-  // 验证：评论列表是否加载
-  items = uiOperator.findElements("comment_list", 3000);
-  if (items && items.length > 0) {
-    logger.info(TAG, "评论区已打开 (" + items.length + " 条)");
-    return true;
-  }
-
-  // 重试：备用方式
-  this.safeClick("comment_input", 2);
-  sleep(2000);
-  items = uiOperator.findElements("comment_list", 3000);
-  if (items && items.length > 0) return true;
-
-  logger.warn(TAG, "评论区未能打开");
-  return false;
+  return commentUtils.openComments();
 };
 
 /**
@@ -690,59 +569,9 @@ ReplyCommentHandler._readComments = function (maxCount) {
  * @returns {Object|null} { nickname, text, time, element }
  */
 ReplyCommentHandler._parseCommentItem = function (item) {
-  try {
-    var uiOperator = require("../core/ui-operator");
-
-    // 使用选择器系统提取昵称
-    var nicknameEl = this._findChildBySelector(item, "comment_author");
-    var nickname = nicknameEl ? this._extractChildValue(nicknameEl, "comment_author", "unknown") : null;
-    if (!nickname) {
-      nicknameEl = item.findOne(clickable(true).className("android.widget.TextView"));
-      nickname = nicknameEl ? this._extractChildValue(nicknameEl, "comment_author", "unknown") : "unknown";
-    }
-
-    // 使用选择器系统提取评论文本
-    var textEl = this._findChildBySelector(item, "comment_text");
-    var text = textEl ? this._extractChildValue(textEl, "comment_text", "") : "";
-    if (!text) {
-      var textViews = item.find(className("android.widget.TextView"));
-      var maxLen = 0;
-      for (var i = 0; i < textViews.length; i++) {
-        var t = textViews[i].text() || "";
-        if (t.length > maxLen && t !== nickname) {
-          maxLen = t.length;
-          textEl = textViews[i];
-        }
-      }
-      text = textEl ? this._extractChildValue(textEl, "comment_text", "") : "";
-    }
-    if (!text) return null;
-
-    // 使用选择器系统提取时间
-    var timeEl = this._findChildBySelector(item, "comment_time");
-    var timeStr = timeEl ? this._extractChildValue(timeEl, "comment_time", "") : "";
-
-    // 检测是否为作者自己的评论 — 优先用选择器，兜底硬编码
-    var isAuthor = false;
-    try {
-      var authorEl = this._findChildBySelector(item, "comment_is_author");
-      if (!authorEl) authorEl = item.findOne(text("作者"));
-      if (authorEl) isAuthor = true;
-    } catch (e) { /* ignore */ }
-
-    return {
-      nickname: nickname,
-      text: text,
-      time: timeStr,
-      element: item,
-      isAuthor: isAuthor,
-      replyBtn: this._findChildBySelector(item, "comment_reply_button"),
-      commentAuthorAvatarEl: this._findChildBySelector(item, "comment_author_avatar"),  
-    };
-  } catch (e) {
-    logger.warn(TAG, "解析评论项出错: " + e.message);
-    return null;
-  }
+  var result = commentUtils.parseCommentItem(item, this);
+  if (result) result.element = item;  // 保持向后兼容
+  return result;
 };
 
 
@@ -753,28 +582,7 @@ ReplyCommentHandler._parseCommentItem = function (item) {
  * @returns {Array} 筛选后的评论
  */
 ReplyCommentHandler._filterByTime = function (comments, maxAgeDays) {
-  var now = new Date();
-  var cutoff = new Date(now.getTime() - maxAgeDays * 24 * 60 * 60 * 1000);
-
-  var filtered = [];
-  for (var i = 0; i < comments.length; i++) {
-    var comment = comments[i];
-    var commentDate = this._parseTime(comment.time);
-
-    if (!commentDate) {
-      // 无法解析时间，默认保留
-      filtered.push(comment);
-      continue;
-    }
-
-    if (commentDate >= cutoff) {
-      filtered.push(comment);
-    } else {
-      logger.debug(TAG, "过滤过期评论: " + comment.time + " > " + maxAgeDays + "天");
-    }
-  }
-
-  return filtered;
+  return commentUtils.filterByTime(comments, maxAgeDays);
 };
 
 /**
@@ -787,86 +595,7 @@ ReplyCommentHandler._filterByTime = function (comments, maxAgeDays) {
  * @returns {Date|null}
  */
 ReplyCommentHandler._parseTime = function (timeStr) {
-  if (!timeStr) return null;
-
-  var now = new Date();
-
-  // "刚刚"
-  if (timeStr.indexOf("刚刚") !== -1) {
-    return now;
-  }
-
-  // "X秒前"
-  var secMatch = timeStr.match(/(\d+)\s*秒前/);
-  if (secMatch) {
-    return new Date(now.getTime() - parseInt(secMatch[1]) * 1000);
-  }
-
-  // "X分钟前"
-  var minMatch = timeStr.match(/(\d+)\s*分钟前/);
-  if (minMatch) {
-    return new Date(now.getTime() - parseInt(minMatch[1]) * 60 * 1000);
-  }
-
-  // "X小时前"
-  var hourMatch = timeStr.match(/(\d+)\s*小时前/);
-  if (hourMatch) {
-    return new Date(now.getTime() - parseInt(hourMatch[1]) * 60 * 60 * 1000);
-  }
-
-  // "昨天 HH:MM"
-  if (timeStr.indexOf("昨天") !== -1) {
-    var yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-    var hmMatch = timeStr.match(/(\d{1,2}):(\d{2})/);
-    if (hmMatch) {
-      yesterday.setHours(parseInt(hmMatch[1]), parseInt(hmMatch[2]), 0, 0);
-    }
-    return yesterday;
-  }
-
-  // "前天 HH:MM"
-  if (timeStr.indexOf("前天") !== -1) {
-    var dayBefore = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 2);
-    var hm2 = timeStr.match(/(\d{1,2}):(\d{2})/);
-    if (hm2) {
-      dayBefore.setHours(parseInt(hm2[1]), parseInt(hm2[2]), 0, 0);
-    }
-    return dayBefore;
-  }
-
-  // "X天前"
-  var dayMatch = timeStr.match(/(\d+)\s*天前/);
-  if (dayMatch) {
-    return new Date(now.getTime() - parseInt(dayMatch[1]) * 24 * 60 * 60 * 1000);
-  }
-
-  // "X周前"
-  var weekMatch = timeStr.match(/(\d+)\s*周前/);
-  if (weekMatch) {
-    return new Date(now.getTime() - parseInt(weekMatch[1]) * 7 * 24 * 60 * 60 * 1000);
-  }
-
-  // "MM-DD" (当年)
-  var mdMatch = timeStr.match(/^(\d{1,2})-(\d{1,2})$/);
-  if (mdMatch) {
-    return new Date(now.getFullYear(), parseInt(mdMatch[1]) - 1, parseInt(mdMatch[2]));
-  }
-
-  // "MM-DD HH:MM" (当年，带时间)
-  var mdtMatch = timeStr.match(/^(\d{1,2})-(\d{1,2})\s+(\d{1,2}):(\d{2})$/);
-  if (mdtMatch) {
-    return new Date(now.getFullYear(), parseInt(mdtMatch[1]) - 1, parseInt(mdtMatch[2]),
-                    parseInt(mdtMatch[3]), parseInt(mdtMatch[4]), 0);
-  }
-
-  // "YYYY-MM-DD"
-  var ymdMatch = timeStr.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-  if (ymdMatch) {
-    return new Date(parseInt(ymdMatch[1]), parseInt(ymdMatch[2]) - 1, parseInt(ymdMatch[3]));
-  }
-
-  logger.warn(TAG, "无法解析时间: " + timeStr);
-  return null;
+  return commentUtils.parseTime(timeStr);
 };
 
 /**
@@ -1030,7 +759,8 @@ ReplyCommentHandler._enterCommenterProfile = function (commentAuthorAvatarEl, ni
   var avatarClicked = this.safeClick("comment_author_avatar", 2);
   if (avatarClicked) {
     sleep(2000);
-    if (uiOperator.findElement("user_nickname", 3000)) {
+    if (uiOperator.isOnPage("profile")) {
+      flowContext.enter("profile");
       return true;
     }
     logger.warn(TAG, "点击头像后未检测到主页，回退重试");
@@ -1137,56 +867,7 @@ ReplyCommentHandler._followUser = function () {
  * 调用时机：已在个人主页时采集，不 back（调用方负责返回评论区）
  */
 ReplyCommentHandler._collectProfileData = function () {
-  var data = { nickname: "", douyin_id: "", likes_count: "", follow_count: "",
-    fans_count: "", works_count: "", gender: "", age: "", ip_location: "", is_private: "否" };
-
-  var fields = {
-    "user_nickname": "nickname", "user_douyin_id": "douyin_id",
-    "user_likes_count": "likes_count", "user_follow_count": "follow_count",
-    "user_fans_count": "fans_count", "user_works_count": "works_count",
-    "user_gender": "gender", "user_age": "age", "user_ip_location": "ip_location"
-  };
-  var hasData = false;
-  for (var actionName in fields) {
-    try {
-      var el = uiOperator.findElement(actionName, 2000);
-      if (el) {
-        var selector = selectorLoader.get(actionName);
-        data[fields[actionName]] = (selector && selector.purpose === "extract")
-          ? uiOperator.extractValue(el, selector) : (el.text() || "");
-        if (data[fields[actionName]]) hasData = true;
-      }
-    } catch (e) {}
-  }
-  // Strip "· " / "・ " prefix from user IP location
-  if (data.ip_location) data.ip_location = data.ip_location.replace(/^[·•・\s]+/, "");
-
-  // Clean numeric fields: extract digits, handle Chinese units (万/千), strip accessibility noise
-  var numericFields = { likes_count: 1, follow_count: 1, fans_count: 1, works_count: 1 };
-  for (var key in numericFields) {
-    if (data[key]) {
-      var raw = String(data[key]);
-      var m = raw.match(/([\d.]+)\s*[万wW万]/);
-      if (m) {
-        data[key] = String(Math.round(parseFloat(m[1]) * 10000));
-      } else {
-        m = raw.match(/([\d.]+)\s*[千kK千]/);
-        if (m) {
-          data[key] = String(Math.round(parseFloat(m[1]) * 1000));
-        } else {
-          var digits = raw.replace(/[^\d]/g, "");
-          data[key] = digits || "";
-        }
-      }
-    }
-  }
-
-  if (hasData) {
-    logger.info(TAG, "用户数据: " + data.nickname + " | 抖音号=" + data.douyin_id +
-      " | 粉丝=" + data.fans_count + " | 获赞=" + data.likes_count + " | 作品=" + data.works_count);
-    return data;
-  }
-  return null;
+  return commentUtils.collectProfileData({ uploadAvatar: false });
 };
 
 /**
@@ -1201,6 +882,7 @@ ReplyCommentHandler._sendDM = function (content) {
     return false;
   }
   sleep(1500);
+  flowContext.enter("dm");
 
   // 2. 点击 dm_input 触发键盘，输入框自动获得焦点
   if (!this.safeClick("dm_input", 2)) {
@@ -1275,43 +957,40 @@ ReplyCommentHandler._sendDM = function (content) {
   return true;
 };
 
-/**
- * 容错返回评论区（从私信页/个人主页/任意页面回到评论区）
- * 使用选择器动作名检测当前页面，不依赖固定次数 back
- *
- * 页面检测选择器（需在管理后台配置）：
- *   is_comment_view  — 当前在评论面板？
- *   is_user_view     — 当前在个人主页？
- */
 ReplyCommentHandler._returnToComments = function () {
   var maxBacks = 5;
   for (var i = 0; i < maxBacks; i++) {
     // 已在评论面板 → 完成
-    if (uiOperator.findElement("is_comment_view", 500)) {
+    if (uiOperator.isOnPage("comment")) {
       logger.info(TAG, "回到评论区 (back " + i + " 次)");
+      flowContext.enter("comment");
       return;
     }
 
-    // 在个人主页 → 优先级高于视频页（主页作品Tab有视频缩略图，is_video_view 会误匹配）
-    if (uiOperator.findElement("is_user_view", 300) ||
-        uiOperator.findElement("user_nickname", 300)) {
+    // 在个人主页 → back
+    if (uiOperator.isOnPage("profile")) {
       logger.info(TAG, "在个人主页，back 到评论区");
       back(); sleep(800);
-      continue;  // back 后重新检测，可能到视频页或评论面板
+      continue;
     }
 
-    // 在私信页 → back 到个人主页
-    var onDMPage = uiOperator.findElement("dm_input", 300)
-                || uiOperator.findElement("dm_send", 300);
-    if (onDMPage) {
+    // 在私信页 → back
+    if (uiOperator.isOnPage("dm")) {
       logger.info(TAG, "在私信页，back 到个人主页");
       back(); sleep(800);
       continue;
     }
 
-    // 已在视频详情页 → 打开评论区
-    if (uiOperator.findElement("is_video_view", 500) ||
-        uiOperator.findElement("video_comment_btn", 500)) {
+    // 已确认是视频详情页 → 判断上下文
+    if (uiOperator.isOnPage("video")) {
+      if (flowContext.is("profile")) {
+        // 从个人主页误触进来的 → back
+        logger.info(TAG, "检测到误触（profile→video），back");
+        back(); sleep(500);
+        flowContext.enter("profile");
+        continue;
+      }
+      // 搜索流中的视频 → 打开评论区
       logger.info(TAG, "在视频页，打开评论区 (back " + i + " 次)");
       this._openComments();
       return;
@@ -1325,36 +1004,6 @@ ReplyCommentHandler._returnToComments = function () {
 
   logger.warn(TAG, "无法回到评论区，兜底打开");
   this._openComments();
-};
-
-/**
- * 为高质量线索生成个性化私信招呼语
- * @param {string} searchKeyword
- * @param {string} nickname
- * @param {string} commentText
- * @param {Object} analysis - AI 分析结果
- * @returns {string} 私信内容
- */
-ReplyCommentHandler._generateDMGreeting = function (searchKeyword, nickname, commentText, analysis) {
-  // 基于意图生成不同的招呼语
-  var intent = analysis.dimensions ? analysis.dimensions.intent : "other";
-  var greeting = "";
-
-  switch (intent) {
-    case "buy_intent":
-      greeting = "你好，看到你在评论区问" + searchKeyword + "的事，可以聊聊~";
-      break;
-    case "compare_intent":
-      greeting = "你好，看到你在对比" + searchKeyword + "，有些经验可以分享";
-      break;
-    case "consult_intent":
-      greeting = "你好，关于" + searchKeyword + "的问题，可以交流下~";
-      break;
-    default:
-      greeting = "你好，看到你也关注" + searchKeyword + "，认识一下~";
-  }
-
-  return greeting;
 };
 
 module.exports = ReplyCommentHandler;

@@ -13,21 +13,29 @@ var uiOperator = {
     var TARGET_PKG = "com.ss.android.ugc.aweme";
     logger.info(TAG, "正在打开抖音...");
 
-    // 如果已在前台，直接返回
-    if (currentPackage() === TARGET_PKG) {
+    var pkg = currentPackage();
+    if (pkg === TARGET_PKG) {
       logger.info(TAG, "抖音已在前台");
       return true;
     }
 
+    // 键盘覆盖兜底：输入法弹出时 currentPackage() 返回键盘包名, 先关键盘
+    if (pkg && (pkg.indexOf("inputmethod") !== -1 || pkg.indexOf("keyboard") !== -1)) {
+      logger.info(TAG, "输入法覆盖(" + pkg + "), 关闭键盘后重试");
+      try { back(); sleep(800); } catch (e) {}
+      if (currentPackage() === TARGET_PKG) {
+        logger.info(TAG, "关闭键盘后抖音已在前台");
+        return true;
+      }
+    }
+
     app.launchApp("抖音");
 
-    // 最多重试 3 次，每次等待 3 秒
     for (var i = 0; i < 3; i++) {
       sleep(3000);
-      var pkg = currentPackage();
+      pkg = currentPackage();
       if (pkg === TARGET_PKG) {
         logger.info(TAG, "抖音打开成功");
-        // 通过 deep link 回到首页，避免上次关闭时的页面残留
         try { app.openUrl("snssdk1128://feed"); sleep(2000); } catch (e) {}
         return true;
       }
@@ -448,6 +456,46 @@ var uiOperator = {
 
     logger.warn(TAG, "未找到元素列表: " + actionName);
     return [];
+  },
+
+  /**
+   * 页面检测 — AND 逻辑，所有 strategies 必须同时命中才返回 true
+   * 仅对 purpose="page_detect" 的选择器生效
+   * @param {string} actionName
+   * @param {number} timeout - 每个 strategy 的超时 ms，默认 300
+   * @returns {boolean}
+   */
+  isOnPage: function (actionName, timeout) {
+    timeout = timeout || 300;
+    var config = selectorLoader.get(actionName);
+    if (!config || config.purpose !== "page_detect") return false;
+    for (var i = 0; i < config.strategies.length; i++) {
+      if (!this.findElement(config.strategies[i].value, timeout)) {
+        return false;
+      }
+    }
+    return true;
+  },
+
+  /**
+   * 检测当前页面 — 遍历所有 page_detect 选择器，按 priority 返回第一个匹配的 action_name
+   * @returns {string|null} 页面名，无匹配返回 null
+   */
+  detectPage: function () {
+    var all = selectorLoader._cache;
+    var pages = [];
+    for (var key in all) {
+      if (all[key].purpose === "page_detect") {
+        pages.push({ name: key, priority: all[key].priority || 99 });
+      }
+    }
+    pages.sort(function (a, b) { return a.priority - b.priority; });
+    for (var i = 0; i < pages.length; i++) {
+      if (this.isOnPage(pages[i].name, 300)) {
+        return pages[i].name;
+      }
+    }
+    return null;
   },
 
   /**

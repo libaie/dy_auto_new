@@ -114,6 +114,7 @@ const availableVersions = computed(() => {
 const categoryFilter = ref('all')
 const categoryTabs = [
   { key: 'all', label: '全部' },
+  { key: 'page_detect', label: '页面检测' },
   { key: 'search', label: '搜索相关' },
   { key: 'comment', label: '评论相关' },
   { key: 'dm', label: '私信相关' },
@@ -126,6 +127,7 @@ const categoryTabs = [
 
 const categoryOptions = [
   { value: '', label: '未分类' },
+  { value: 'page_detect', label: '页面检测' },
   { value: 'search', label: '搜索相关' },
   { value: 'comment', label: '评论相关' },
   { value: 'dm', label: '私信相关' },
@@ -141,6 +143,7 @@ function getCategoryLabel(cat) {
 }
 
 const categoryColorMap = {
+  page_detect: 'bg-amber-500/15 text-amber-300 border-amber-500/25',
   search: 'bg-blue-500/15 text-blue-300 border-blue-500/25',
   comment: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25',
   dm: 'bg-pink-500/15 text-pink-300 border-pink-500/25',
@@ -600,6 +603,13 @@ onMounted(fetchSelectors)
                 平台 {{ sel.platform_version }}
               </span>
               <span
+                v-if="sel.purpose === 'page_detect'"
+                class="inline-flex items-center rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/25 px-2.5 py-0.5 text-xs font-medium"
+                title="页面检测：多控件 AND 判定"
+              >
+                页面检测
+              </span>
+              <span
                 v-if="sel.category"
                 :class="[
                   'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium',
@@ -797,7 +807,7 @@ onMounted(fetchSelectors)
                     <p class="mt-1 text-xs text-slate-500">选择此选择器所属的操作模块分类，方便筛选和维护</p>
                   </div>
 
-                  <!-- purpose: locate vs extract -->
+                  <!-- purpose: locate / extract / page_detect -->
                   <div>
                     <label class="flex items-center gap-1.5 text-sm font-medium text-slate-300">
                       控件用途
@@ -819,8 +829,16 @@ onMounted(fetchSelectors)
                       >
                         取值（读取控件内容）
                       </button>
+                      <button
+                        type="button"
+                        :class="form.purpose === 'page_detect' ? 'bg-amber-500/20 text-amber-300' : 'text-slate-500 hover:text-slate-300'"
+                        class="flex-1 px-4 py-2 text-sm font-medium transition-colors"
+                        @click="form.purpose = 'page_detect'"
+                      >
+                        页面检测（多控件 AND 判定）
+                      </button>
                     </div>
-                    <p class="mt-1 text-xs text-slate-500">定位：查找控件并点击/输入；取值：查找控件并读取其属性值</p>
+                    <p class="mt-1 text-xs text-slate-500">定位：查找控件并点击/输入；取值：读取控件属性值；页面检测：所有策略必须同时命中才判定页面存在</p>
                   </div>
 
                   <!-- extract fields (shown when purpose=extract) -->

@@ -772,7 +772,8 @@ ReplyCommentHandler._enterCommenterProfile = function (commentAuthorAvatarEl, ni
     if (nameEl) {
       nameEl.parent().click();
       sleep(2000);
-      if (uiOperator.findElement("user_nickname", 3000)) {
+      if (uiOperator.isOnPage("profile")) {
+        flowContext.enter("profile");
         return true;
       }
     }

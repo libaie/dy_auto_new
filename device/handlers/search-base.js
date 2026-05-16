@@ -440,24 +440,14 @@ SearchBaseHandler._goBack = function () {
 SearchBaseHandler._backToSearchResults = function () {
   var maxBacks = 5;
   for (var i = 0; i < maxBacks; i++) {
-    // 已在搜索视频列表页？
-    var items = uiOperator.findElements("search_video_list", 2000);
-    if (items.length > 0) {
-      logger.info(TAG, "已在搜索视频列表页 (back " + i + " 次)");
-      return true;
-    }
-    var videoTab = uiOperator.findElement("search_video_tab", 1000);
-    if (videoTab) {
-      logger.info(TAG, "检测到视频 tab，已在搜索页 (back " + i + " 次)");
+    if (uiOperator.isOnPage("search_result_list") || uiOperator.isOnPage("search")) {
+      logger.info(TAG, "已在搜索列表页 (back " + i + " 次)");
+      flowContext.enter("search");
       return true;
     }
 
-    // 诊断当前页面
-    var where = "未知";
-    if (uiOperator.findElement("is_comment_view", 300)) where = "评论面板";
-    else if (uiOperator.findElement("is_user_view", 300)) where = "个人主页";
-    else if (uiOperator.findElement("is_video_view", 300)) where = "视频详情页";
-    logger.info(TAG, "第 " + (i + 1) + " 次 back，当前位置: " + where);
+    var page = uiOperator.detectPage();
+    logger.info(TAG, "第 " + (i + 1) + " 次 back，当前位置: " + (page || "未知"));
     back();
     sleep(1000);
   }

@@ -4,6 +4,7 @@ var uiOperator = require("../core/ui-operator");
 var antiDetect = require("../core/anti-detect");
 var aiAnalyzer = require("../core/ai-analyzer");
 var logger = require("../utils/logger");
+var flowContext = require("../core/flow-context");
 
 var TAG = "养号";
 
@@ -342,7 +343,7 @@ NurtureHandler._ensureOnFeed = function () {
   for (var attempt = 0; attempt < maxRetries; attempt++) {
     try {
       // 检测是否在推荐页
-      if (uiOperator.isOnPage("feed")) return;
+      if (uiOperator.isOnPage("feed")) { flowContext.enter("feed"); return; }
 
       // 检测是否在有底部 tab 的主页面（首页/朋友/消息/我的）
       var homeTab = text("首页").findOne(2000);

@@ -214,6 +214,9 @@ function startMainLoop(serverUrl, secret) {
         logger.info(TAG, "执行任务: " + task.id + " (" + task.type + ")");
         floatingWindow.setStatus("running");
 
+        var flowContext = require("./core/flow-context");
+        flowContext.reset();
+
         var result = taskExecutor.execute(task);
 
         // 上报结果
@@ -532,7 +535,7 @@ function applyServerConfig(serverConfig) {
 
     // 保持脚本存活（定时器和 WS 在后台运行）
     while (true) {
-      sleep(60000);
+      sleep(30000);
     }
   } catch (e) {
     console.error("启动失败: " + e.message + "\n" + e.stack);

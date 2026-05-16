@@ -33,15 +33,18 @@
 
 每个页面由 N 个控件的**同时存在**来判定（AND 逻辑）：
 
-| page_name | required_elements | 说明 |
-|-----------|-------------------|------|
-| search | ["is_search_view"] | 搜索输入页 |
-| search_result_list | ["search_video_list", "search_video_tab"] | 搜索结果列表 |
-| video | ["is_video_view"] | 视频详情页（控件层面不区分子类型） |
-| comment | ["is_comment_view"] | 评论面板（可叠加） |
-| profile | ["user_nickname"] | 个人主页 |
-| dm | ["dm_input"] | 私信页 |
-| feed | ["like_button"] | 推荐页（兜底） |
+| priority | page_name | required_elements | 说明 |
+|----------|-----------|-------------------|------|
+| 0 | comment | ["is_comment_view"] | 评论面板（最先检测，叠在任何页面之上） |
+| 1 | dm | ["dm_input"] | 私信页 |
+| 2 | profile | ["user_nickname"] | 个人主页 |
+| 3 | search | ["is_search_view"] | 搜索输入页 |
+| 4 | search_result_list | ["search_video_list", "search_video_tab"] | 搜索结果列表 |
+| 5 | video | ["is_video_view"] | 视频详情页（控件层面不区分子类型） |
+| 6 | dialog | ["system_dialog_close"] | 系统弹窗/权限对话框 |
+| 7 | feed | ["like_button"] | 推荐页（最后兜底，like_button 几乎全屏可见） |
+
+**Priority 规则**：叠层页面必须排在底层页面之前。`comment` 优先于 `video`（评论区遮在视频之上，`is_video_view` 在评论区背后仍可见）。`dialog` 优先于 `feed`（弹窗遮住推荐流）。`feed` 最后——`like_button` 在几乎所有视频播放页都可见，只能做兜底。
 
 ### 服务端
 
@@ -198,9 +201,27 @@ if (pageDetector.isOnPage("video")) {
 | 风险 | 对策 |
 |------|------|
 | 页面加载延迟导致 enter 失败 | `enter()` 调用方给 3s 重试窗口，超时标记 `unknown` 触发恢复 |
-| 意外弹窗打断 detect | `detectPage()` 返回 null 时，先 `safeClick` 关闭弹窗再重检测 |
+| 意外弹窗打断 detect | `detectPage()` 返回 `"dialog"` 时，先 `safeClick("dialog_close")` → `detectPage()` 重检测 |
 | 上下文与页面不匹配 | 关键操作前轻量校验：`detectPage()` 结果是否符合 `flowContext._current` |
 | 恢复失败 | back 5 次不在任何已知页 → 回首页冷启动兜底，标记 `idle` |
+
+---
+
+## flow-context 注入点
+
+每个 Handler 文件中，在页面检测确认到达后调用 `flowContext.enter()`：
+
+| 文件 | 行号 | 注入点 | 上下文 |
+|------|------|--------|--------|
+| search-base.js | ~92-96 | `_clickSearchResult(0)` 后，`isOnPage("video")` 确认 | `search_video` |
+| search-base.js | ~127 | `_openSearch()` 后，`isOnPage("search")` 确认 | `search` |
+| search-collect.js | ~321 | `_clickSearchResult(0)` 后确认 | `search_video` |
+| search-collect.js | ~130 | `_openComments()` 后确认 | `comment` |
+| reply-comment.js | ~232-241 | 评论区打开后确认 | `comment` |
+| reply-comment.js | ~413 | `_enterCommenterProfile()` 后，`isOnPage("profile")` 确认 | `profile` |
+| reply-comment.js | ~981-986 | `_sendDM()` 进入私信页后确认 | `dm` |
+| reply-comment.js | ~519-530 | `_returnToComments()` 回到评论面板后确认 | `comment` |
+| nurture.js | ~342-346 | `_ensureOnFeed()` 确认后在推荐页 | `feed` |
 
 ---
 
@@ -209,4 +230,4 @@ if (pageDetector.isOnPage("video")) {
 1. 搜索采集流程：`search → search_result_list → search_video → comment` 链条完整
 2. 评论回复流程：`search → search_video → comment → profile → dm → comment` 链条完整
 3. 个人主页误触检测：`profile → profile_video` 页面检测 + 上下文校验，触发 back
-4. 弹窗中断恢复：弹出系统权限弹窗 → `detectPage()` 返回 null → 关闭弹窗 → 重新检测
+4. 弹窗中断恢复：弹出系统权限弹窗 → `detectPage()` 返回 `"dialog"` → 关闭弹窗 → 重新检测

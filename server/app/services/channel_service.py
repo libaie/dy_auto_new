@@ -44,6 +44,7 @@ class ChannelService:
         account_id: Optional[str] = None,
         cooldown_seconds: int = 300,
         delay_range: list[int] = None,
+        user_id: Optional[str] = None,
     ) -> Channel:
         if len(keywords) > MAX_KEYWORDS:
             raise ValueError(f"关键词最多 {MAX_KEYWORDS} 个，当前 {len(keywords)} 个")
@@ -79,6 +80,7 @@ class ChannelService:
             status="active",
             account_mode=account_mode,
             account_id=account_id,
+            user_id=user_id,
             params_template=params_template,
             cooldown_seconds=cooldown_seconds,
             delay_range=delay_range,
@@ -135,23 +137,63 @@ class ChannelService:
         # Stale recovery: reset items assigned > 3 min ago (matches task_service stale threshold)
         from datetime import timedelta
         stale_threshold = now - timedelta(seconds=180)
-        db.execute(
-            update(ChannelItem)
-            .where(
-                ChannelItem.status == "assigned",
-                ChannelItem.assigned_at.isnot(None),
-                ChannelItem.assigned_at < stale_threshold,
-            )
-            .values(status="pending", assigned_device_id=None, assigned_at=None, task_id=None)
-        )
-        db.flush()
+        stale_items = db.query(ChannelItem).filter(
+            ChannelItem.status == "assigned",
+            ChannelItem.assigned_at.isnot(None),
+            ChannelItem.assigned_at < stale_threshold,
+        ).all()
+        stale_channel_ids = set()
+        for si in stale_items:
+            si.status = "pending"
+            si.assigned_device_id = None
+            si.assigned_at = None
+            si.task_id = None
+            stale_channel_ids.add(si.channel_id)
+        if stale_items:
+            db.flush()
+            for cid in stale_channel_ids:
+                self._reactivate_channel(db, cid)
         db.expire_all()
 
-        # Find active channels with pending items
-        active_channels = db.query(Channel).filter(
+        # Build routing filter based on device's bound_account_id
+        device = db.query(DBDevice).filter(DBDevice.id == device_id).first()
+        bound_account_id = device.bound_account_id if device else None
+        device_user_id = device.user_id if device else None
+
+        # Find active channels with pending items, scoped to device's user
+        channel_query = db.query(Channel).filter(
             Channel.status == "active",
             Channel.deleted_at.is_(None),
-        ).all()
+        )
+        if device_user_id:
+            from sqlalchemy import or_ as ch_or
+            channel_query = channel_query.filter(
+                ch_or(Channel.user_id == device_user_id, Channel.user_id.is_(None))
+            )
+        active_channels = channel_query.all()
+
+        # Self-heal: re-activate completed/cancelled channels that still have pending items
+        stuck_query = db.query(Channel).filter(
+            Channel.status.in_(["completed", "cancelled"]),
+            Channel.deleted_at.is_(None),
+        )
+        if device_user_id:
+            from sqlalchemy import or_ as ch_or2
+            stuck_query = stuck_query.filter(
+                ch_or2(Channel.user_id == device_user_id, Channel.user_id.is_(None))
+            )
+        stuck_channels = stuck_query.all()
+        for sc in stuck_channels:
+            has_pending = db.query(ChannelItem).filter(
+                ChannelItem.channel_id == sc.id,
+                ChannelItem.status.in_(["pending", "assigned"]),
+            ).first()
+            if has_pending:
+                sc.status = "active"
+                sc.completed_at = None
+                active_channels.append(sc)
+        if stuck_channels:
+            db.flush()
 
         if not active_channels:
             return None
@@ -159,9 +201,7 @@ class ChannelService:
         channel_ids = [ch.id for ch in active_channels]
         channel_map = {ch.id: ch for ch in active_channels}
 
-        # Build routing filter based on device's bound_account_id
-        device = db.query(DBDevice).filter(DBDevice.id == device_id).first()
-        bound_account_id = device.bound_account_id if device else None
+        # Build candidate query with account routing
 
         # Get pending items from active channels
         query = db.query(ChannelItem).filter(
@@ -260,6 +300,7 @@ class ChannelService:
                 type=ch.task_type,
                 account_id=item.account_id,
                 device_id=device_id,
+                user_id=ch.user_id,
                 params=params,
                 status=TaskStatus.RUNNING.value,
                 started_at=now,
@@ -329,9 +370,9 @@ class ChannelService:
         db.flush()
         db.expire_all()
 
-    def update_channel_status(self, db: Session, channel_id: str, new_status: str):
+    def update_channel_status(self, db: Session, channel_id: str, new_status: str, user_id: Optional[str] = None):
         """Update channel status with validation."""
-        ch = self.get_channel(db, channel_id)
+        ch = self.get_channel(db, channel_id, user_id=user_id)
         if not ch:
             raise ValueError(f"通道 {channel_id} 不存在")
 
@@ -355,9 +396,9 @@ class ChannelService:
             )
         db.commit()
 
-    def soft_delete_channel(self, db: Session, channel_id: str):
+    def soft_delete_channel(self, db: Session, channel_id: str, user_id: Optional[str] = None):
         """Soft delete a channel."""
-        ch = self.get_channel(db, channel_id)
+        ch = self.get_channel(db, channel_id, user_id=user_id)
         if not ch:
             raise ValueError(f"通道 {channel_id} 不存在")
         ch.deleted_at = bj_now()
@@ -371,9 +412,9 @@ class ChannelService:
         )
         db.commit()
 
-    def append_items(self, db: Session, channel_id: str, keywords: list[str]):
+    def append_items(self, db: Session, channel_id: str, keywords: list[str], user_id: Optional[str] = None):
         """Append new keywords to an active channel."""
-        ch = self.get_channel(db, channel_id)
+        ch = self.get_channel(db, channel_id, user_id=user_id)
         if not ch:
             raise ValueError(f"通道 {channel_id} 不存在")
         if ch.status != "active":
@@ -400,11 +441,23 @@ class ChannelService:
             db.add(item)
         db.commit()
 
-    def update_item_status(self, db: Session, item_id: str, new_status: str):
+    def _reactivate_channel(self, db: Session, channel_id: str):
+        """If channel is completed/cancelled but now has pending items, revert to active."""
+        ch = db.query(Channel).filter(Channel.id == channel_id).first()
+        if ch and ch.status in ("completed", "cancelled"):
+            ch.status = "active"
+            ch.completed_at = None
+            db.flush()
+
+    def update_item_status(self, db: Session, item_id: str, new_status: str, user_id: Optional[str] = None):
         """Update a single channel item status (skip/requeue)."""
         item = db.query(ChannelItem).filter(ChannelItem.id == item_id).first()
         if not item:
             raise ValueError(f"Item {item_id} 不存在")
+        if user_id:
+            ch = db.query(Channel).filter(Channel.id == item.channel_id, Channel.user_id == user_id).first()
+            if not ch:
+                raise ValueError(f"Item {item_id} 不属于当前用户")
 
         valid = {"pending": ["skipped"], "failed": ["pending"]}
         allowed = valid.get(item.status, [])
@@ -416,18 +469,23 @@ class ChannelService:
             item.assigned_device_id = None
             item.task_id = None
             item.completed_at = None
+            self._reactivate_channel(db, item.channel_id)
         db.commit()
 
-    def get_channel(self, db: Session, channel_id: str) -> Optional[Channel]:
-        return db.query(Channel).filter(
+    def get_channel(self, db: Session, channel_id: str, user_id: Optional[str] = None) -> Optional[Channel]:
+        query = db.query(Channel).filter(
             Channel.id == channel_id,
             Channel.deleted_at.is_(None),
-        ).first()
+        )
+        if user_id:
+            query = query.filter(Channel.user_id == user_id)
+        return query.first()
 
-    def list_channels(self, db: Session) -> list[Channel]:
-        return db.query(Channel).filter(
-            Channel.deleted_at.is_(None),
-        ).order_by(Channel.created_at.desc()).all()
+    def list_channels(self, db: Session, user_id: Optional[str] = None) -> list[Channel]:
+        query = db.query(Channel).filter(Channel.deleted_at.is_(None))
+        if user_id:
+            query = query.filter(Channel.user_id == user_id)
+        return query.order_by(Channel.created_at.desc()).all()
 
     def get_channel_stats(self, db: Session, channel_id: str) -> dict:
         items = db.query(ChannelItem).filter(

@@ -100,7 +100,7 @@ def _validate_and_normalize_params(task_type: str, params: dict) -> dict:
 async def create_task(
     request: TaskCreateRequest,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     if not request.account_id:
         raise HTTPException(status_code=400, detail="account_id is required for single create")
@@ -112,12 +112,14 @@ async def create_task(
     params = await _maybe_expand_keywords(params, request.type.value, db=db)
 
     try:
+        user_id, _ = user
         task = task_service.create_task(
             db=db,
             task_type=request.type,
             account_id=request.account_id,
             params=params,
             device_id=request.device_id or None,
+            user_id=user_id,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -136,10 +138,11 @@ async def create_task(
 async def batch_create_tasks(
     request: TaskBatchCreateRequest,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     if not request.group_ids and not request.account_ids:
         raise HTTPException(status_code=400, detail="需要提供 group_ids 或 account_ids")
+    user_id, _ = user
     ttype = request.type.value
 
     try:
@@ -245,6 +248,7 @@ async def batch_create_tasks(
             status="active",
             account_mode="round_robin",
             params_template=template_params,
+            user_id=user_id,
         )
         db.add(ch)
         db.flush()
@@ -272,6 +276,7 @@ async def batch_create_tasks(
                 account_id=acc.id,
                 params=params,
                 device_id=request.device_id or None,
+                user_id=user_id,
             )
             created_tasks.append({"id": task.id, "account_id": acc.id})
 
@@ -305,12 +310,15 @@ def list_tasks(
     skip: int = 0,
     limit: int = 50,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     limit = min(limit, 100)
+    user_id, role = user
     tasks = task_service.list_tasks(db=db, status=status, task_type=type, search=search,
-                                     sort_by=sort_by, sort_order=sort_order, skip=skip, limit=limit)
-    total = task_service.count_tasks(db=db, status=status, task_type=type, search=search)
+                                     sort_by=sort_by, sort_order=sort_order, skip=skip, limit=limit,
+                                     current_user_id=None if role == "admin" else user_id)
+    total = task_service.count_tasks(db=db, status=status, task_type=type, search=search,
+                                     current_user_id=None if role == "admin" else user_id)
     return {"tasks": tasks, "total": total}
 
 
@@ -322,7 +330,7 @@ class BatchDeleteRequest(BaseModel):
 async def batch_delete_tasks(
     body: BatchDeleteRequest,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     count = task_service.delete_tasks_batch(db, body.task_ids)
     from app.ws_manager import pair_ws_manager
@@ -334,7 +342,7 @@ async def batch_delete_tasks(
 def get_task(
     task_id: str,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     task = task_service.get_task(db=db, task_id=task_id)
     if not task:
@@ -346,7 +354,7 @@ def get_task(
 async def cancel_task(
     task_id: str,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     try:
         task = task_service.cancel_task(db=db, task_id=task_id)

@@ -44,11 +44,13 @@ class TaskService:
         params: dict,
         scheduled_at: Optional[datetime] = None,
         device_id: Optional[str] = None,
+        user_id: Optional[str] = None,
     ) -> PydanticTask:
         db_task = DBTask(
             type=task_type.value,
             account_id=account_id,
             device_id=device_id,
+            user_id=user_id,
             params=params,
             status=TaskStatus.PENDING.value,
             scheduled_at=scheduled_at,
@@ -80,9 +82,10 @@ class TaskService:
             db.commit()
             return task_pydantic
 
-        # 1. Look up the polling device's bound account
+        # 1. Look up the polling device's bound account and user
         device = db.query(DBDevice).filter(DBDevice.id == device_id).first()
         bound_account_id = device.bound_account_id if device else None
+        device_user_id = device.user_id if device else None
 
         # 2. Build routing filter
         if bound_account_id:
@@ -128,20 +131,33 @@ class TaskService:
         if stale_running:
             # Reset associated channel items so keywords can be re-dispatched
             from app.db_models import ChannelItem
+            from app.services.channel_service import channel_service as ch_svc
             stale_ids = [t.id for t in stale_running]
-            db.query(ChannelItem).filter(ChannelItem.task_id.in_(stale_ids)).update(
-                {"status": "pending", "assigned_device_id": None, "assigned_at": None, "task_id": None},
-                synchronize_session=False,
-            )
-            db.flush()
+            stale_ch_items = db.query(ChannelItem).filter(ChannelItem.task_id.in_(stale_ids)).all()
+            stale_ch_ids = set()
+            for sci in stale_ch_items:
+                sci.status = "pending"
+                sci.assigned_device_id = None
+                sci.assigned_at = None
+                sci.task_id = None
+                stale_ch_ids.add(sci.channel_id)
+            if stale_ch_items:
+                db.flush()
+                for cid in stale_ch_ids:
+                    ch_svc._reactivate_channel(db, cid)
 
-        # 4. Find candidate tasks with routing and scheduled_at applied
+        # 4. Find candidate tasks with routing, user scope, and scheduled_at applied
         now = bj_now()
-        candidates = db.query(DBTask).filter(
+        candidate_query = db.query(DBTask).filter(
             DBTask.status == TaskStatus.PENDING.value,
             route_filter,
             or_(DBTask.scheduled_at.is_(None), DBTask.scheduled_at <= now),
-        ).order_by(DBTask.created_at.asc()).limit(10).all()
+        )
+        if device_user_id:
+            candidate_query = candidate_query.filter(
+                or_(DBTask.user_id == device_user_id, DBTask.user_id.is_(None))
+            )
+        candidates = candidate_query.order_by(DBTask.created_at.asc()).limit(10).all()
 
         if not candidates:
             return None
@@ -243,7 +259,7 @@ class TaskService:
 
     def list_tasks(self, db: Session, status=None, task_type: str = None, search: str = None,
                    sort_by: str = "created_at", sort_order: str = "desc",
-                   skip: int = 0, limit: int = 50) -> list[PydanticTask]:
+                   skip: int = 0, limit: int = 50, current_user_id: str = None) -> list[PydanticTask]:
         query = db.query(DBTask)
         if status:
             query = query.filter(DBTask.status == (status.value if hasattr(status, 'value') else status))
@@ -256,12 +272,14 @@ class TaskService:
                 DBTask.device_id.like(pattern),
                 DBTask.params.like(pattern),
             ))
+        if current_user_id:
+            query = query.filter(DBTask.user_id == current_user_id)
         col = getattr(DBTask, sort_by, DBTask.created_at)
         order = col.desc() if sort_order == "desc" else col.asc()
         db_tasks = query.order_by(order).offset(skip).limit(limit).all()
         return [_db_task_to_pydantic(t) for t in db_tasks]
 
-    def count_tasks(self, db: Session, status=None, task_type: str = None, search: str = None) -> int:
+    def count_tasks(self, db: Session, status=None, task_type: str = None, search: str = None, current_user_id: str = None) -> int:
         query = db.query(DBTask)
         if status:
             query = query.filter(DBTask.status == (status.value if hasattr(status, 'value') else status))
@@ -274,6 +292,8 @@ class TaskService:
                 DBTask.device_id.like(pattern),
                 DBTask.params.like(pattern),
             ))
+        if current_user_id:
+            query = query.filter(DBTask.user_id == current_user_id)
         return query.count()
 
     def cancel_task(self, db: Session, task_id: str):
@@ -288,12 +308,15 @@ class TaskService:
 
         # Reset associated channel item so it can be re-dispatched
         from app.db_models import ChannelItem
+        from app.services.channel_service import channel_service as ch_svc
         channel_item = db.query(ChannelItem).filter(ChannelItem.task_id == task_id).first()
         if channel_item:
             channel_item.status = "pending"
             channel_item.assigned_device_id = None
             channel_item.assigned_at = None
             channel_item.task_id = None
+            db.flush()
+            ch_svc._reactivate_channel(db, channel_item.channel_id)
 
         db.commit()
         db.refresh(task)
@@ -309,12 +332,15 @@ class TaskService:
 
         # Reset associated ChannelItem so the keyword can be re-dispatched
         from app.db_models import ChannelItem
+        from app.services.channel_service import channel_service as ch_svc
         channel_item = db.query(ChannelItem).filter(ChannelItem.task_id == task_id).first()
         if channel_item:
             channel_item.status = "pending"
             channel_item.assigned_device_id = None
             channel_item.assigned_at = None
             channel_item.task_id = None
+            db.flush()
+            ch_svc._reactivate_channel(db, channel_item.channel_id)
 
         db.delete(task)
         db.commit()
@@ -334,12 +360,19 @@ class TaskService:
         if not deletable_ids:
             return 0
         # Reset channel items only for tasks that will actually be deleted
+        from app.services.channel_service import channel_service as ch_svc
         channel_items = db.query(ChannelItem).filter(ChannelItem.task_id.in_(deletable_ids)).all()
+        ch_ids = set()
         for ci in channel_items:
             ci.status = "pending"
             ci.assigned_device_id = None
             ci.assigned_at = None
             ci.task_id = None
+            ch_ids.add(ci.channel_id)
+        if channel_items:
+            db.flush()
+            for cid in ch_ids:
+                ch_svc._reactivate_channel(db, cid)
         result = db.query(DBTask).filter(
             DBTask.id.in_(deletable_ids),
         ).delete(synchronize_session=False)

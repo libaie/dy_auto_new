@@ -419,13 +419,14 @@ NurtureHandler._commentOnVideo = function (templateId) {
 
   // 预检评论数：零评论视频点评论按钮会直接唤起键盘，跳过
   var commentBtn = uiOperator.findElement("video_comment_btn", 2000);
-  var commentCount = 0;
+  var commentCount = -1;
   if (commentBtn && !commentBtn.isImage && !commentBtn.isCoordinate) {
     try {
       var cmNumMatch = (commentBtn.desc() || "").match(/(\d+)/);
       if (cmNumMatch) commentCount = parseInt(cmNumMatch[1]);
     } catch (e) {}
   }
+  logger.info(TAG, "评论数: " + (commentCount >= 0 ? commentCount : "未知"));
   if (commentCount === 0) {
     logger.info(TAG, "该视频无评论，跳过评论");
     return;

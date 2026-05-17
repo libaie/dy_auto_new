@@ -4,30 +4,32 @@
 
 ### Added
 - 多控件 AND 页面检测：选择器系统新增 `page_detect` 目的类型，所有策略同时匹配才判定页面命中
-- 流程上下文状态机 (flowContext)：运行时追踪业务环节（search→search_video→comment→profile→dm），区分不同路径进入的同一页面
-- SaaS P1 多用户认证与数据隔离：User 表 + bcrypt 登录 + JWT role 鉴权，7 张业务表加 user_id FK，非 admin 自动 scope 过滤
+- 流程上下文状态机 (flowContext)：运行时追踪业务环节，区分不同路径进入的同一页面
+- SaaS P1 多用户认证与数据隔离：User 表 + bcrypt 登录 + JWT role 鉴权，非 admin 自动 scope 过滤
 - 用户管理页面：admin 可注册/启用/禁用/删除用户，含路由守卫
-- 选择器管理前端新增"页面检测"分类标签和琥珀色标记
-- 字典分类不再硬编码：前端完整 CRUD，数据从服务端字典表读取
+- 多分辨率选择器 profile 系统：服务端按设备分辨率返回匹配选择器和模板，跨设备部署不再失效
+- 新设备自动标定流程：设备端截图裁剪上传 → 服务端自动创建对应分辨率的 selector
+- 全局异常日志中间件：捕获未处理 500，记录完整 traceback
+- 通道编辑功能：可中途修改执行设备、账号、分组，含批量编辑和同步到存量子项选项
 
 ### Fixed
-- 修复 flowContext 状态在任务间泄漏（main.js 未 reset）
-- 修复 _enterCommenterProfile 回退路径缺少 flowContext.enter("profile")
-- 修复 AI 臆想硬编码选择器：删除 id("text1")、id("et7")、id("ivu") 等虚构 ID
-- 修复 auth.js 用户列表 API 路径错误 (/users → /auth/users)
-- 修复 verify_ws_admin_token 改为返回 (user_id, role) 元组后 pixelle.py/videos.py 未解包
-- 修复 devices.py count 在 user_id 过滤前计算导致 operator 看到错误总数
-- 修复 list_all_items 每次调用自动种子数据导致 27 倍重复
-- 修复 TopNav 分类标签不可点击跳转
-- 修复 conftest auth override 适配新的 verify_admin_token 元组返回格式
+- 评论处理器零评论视频键盘弹出问题：5 个 handler 统一加评论数预检（含 desc() 纯文本无数字归零）
+- 换视频时残留旧评论面板导致误操作：进入视频前加 is_comment_view 守卫
+- is_comment_end 检测时机错误：从循环开头移到 swipe 后，首个 scroll 批次不跳过
+- _openSearch 返回 true 但未进入搜索页：3 条返回路径全部加 isOnPage 验证
+- 硬编码 accounts.yaml seed 导致删掉的 acc-001 重启后重建 + FK 级联 500 错误
+- flowContext 状态在任务间泄漏 / _enterCommenterProfile 回退路径 / AI 臆想硬编码选择器
+- auth.js 用户列表 API 路径 / verify_ws_admin_token 元组解包 / devices.py count 过滤
+- list_all_items 自动种子导致 27 倍重复 / TopNav 分类标签不可点击 / conftest auth override
 
 ### Changed
-- 导航栏整合：20 个扁平项 → 5 个分类组（运营/采集/AI 视频/数据中心/系统）
-- Pipeline 模型选项：硬编码 JS 数组 → DB 字典表动态读取
-- 搜索处理器重构：页面检测全部改用 isOnPage/detectPage + flowContext
-- 回复评论处理器重构：删除约 120 行本地硬编码页面检测，统一走选择器系统
-- DictManagePage UI 美化：玻璃态 + SVG 图标
-- 搜索输入框限定屏幕上方 30% 区域查找，避免误匹配底部控件
+- 导航栏整合：20 个扁平项 → 5 个分类组
+- 悬浮窗美化：极光渐变球体 + CardView 阴影 + 弹性回弹动画
+- 悬浮窗新增强制停止进程入口 + 等待弹窗支持关闭
+- 搜索处理器重构：页面检测全部走 isOnPage/detectPage + flowContext
+- Pipeline 模型选项：硬编码 → DB 动态读取
+- 搜索输入框限定屏幕上方 30% 区域查找
+- 回复评论处理器删除约 120 行本地硬编码页面检测
 
 ---
 

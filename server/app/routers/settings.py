@@ -6,7 +6,7 @@ from sqlalchemy.exc import OperationalError
 
 from app.database import get_db
 from app.db_models import SystemSetting
-from app.deps import verify_admin_token
+from app.deps import verify_admin_token, require_role
 from app.models import SettingUpdate
 
 logger = logging.getLogger(__name__)
@@ -17,7 +17,7 @@ router = APIRouter(prefix="/api/settings", tags=["settings"])
 @router.get("")
 def get_settings(
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     try:
         rows = db.query(SystemSetting).all()
@@ -31,7 +31,7 @@ def get_settings(
 def update_settings(
     request: SettingUpdate,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(require_role("admin")),
 ):
     for key, value in request.settings.items():
         try:

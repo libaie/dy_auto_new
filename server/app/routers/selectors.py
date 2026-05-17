@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 import time
 
 from app.database import get_db
-from app.deps import verify_admin_token
+from app.deps import verify_admin_token, require_role
 from app.services.selector_service import selector_service
 from app.services.template_service import template_service
 
@@ -48,7 +48,7 @@ def list_selectors(
     include_disabled: bool = Query(False),
     category: Optional[str] = Query(None),
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     selectors = selector_service.list_all_selectors(db, include_disabled=include_disabled, category=category)
     version = selector_service.get_version(db)
@@ -59,7 +59,7 @@ def list_selectors(
 def get_selector(
     action_name: str,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     sel = selector_service.get_selector(db, action_name)
     if not sel:
@@ -71,7 +71,7 @@ def get_selector(
 async def create_selector(
     request: SelectorCreateRequest,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(require_role("admin")),
 ):
     try:
         sel = selector_service.create_selector(
@@ -104,7 +104,7 @@ async def update_selector(
     action_name: str,
     request: SelectorUpdateRequest,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(require_role("admin")),
 ):
     try:
         sel = selector_service.update_selector(
@@ -136,7 +136,7 @@ async def update_selector(
 async def delete_selector(
     action_name: str,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(require_role("admin")),
 ):
     deleted = selector_service.delete_selector(db, action_name)
     if not deleted:
@@ -157,7 +157,7 @@ async def toggle_selector(
     action_name: str,
     request: SelectorToggleRequest,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(require_role("admin")),
 ):
     try:
         sel = selector_service.toggle_selector(db, action_name, request.enabled)
@@ -178,7 +178,7 @@ async def toggle_selector(
 
 @router.get("/templates")
 def list_templates(
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     templates = template_service.list_templates()
     return {"templates": templates, "total": len(templates)}
@@ -188,7 +188,7 @@ def list_templates(
 async def upload_template(
     file: UploadFile = FastAPIFile(...),
     action_name: str = "",
-    _: str = Depends(verify_admin_token),
+    user = Depends(require_role("admin")),
 ):
     import os
     ext = os.path.splitext(file.filename or "")[1].lower()
@@ -208,7 +208,7 @@ async def upload_template(
 @router.delete("/templates/{filename}")
 def delete_template(
     filename: str,
-    _: str = Depends(verify_admin_token),
+    user = Depends(require_role("admin")),
 ):
     deleted = template_service.delete_template(filename)
     if not deleted:

@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.deps import verify_admin_token
+from app.deps import verify_admin_token, require_role
 from app.services.prompt_template_service import prompt_template_service
 
 logger = logging.getLogger(__name__)
@@ -107,7 +107,7 @@ replyExample 中的文本就是最终输出的回复内容，不需要标注原�
 async def generate_template(
     request: TemplateGenerateRequest,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     """AI 根据描述生成提示词模板 JSON"""
     from app.services.ai_generator import ai_generator as gen
@@ -149,7 +149,7 @@ async def generate_template(
 async def generate_template_stream(
     request: TemplateGenerateRequest,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     """AI 根据描述生成提示词模板 JSON（SSE 流式输出，避免超时）"""
     from app.services.ai_generator import ai_generator as gen
@@ -211,7 +211,7 @@ async def generate_template_stream(
 def list_templates(
     include_disabled: bool = Query(False),
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     templates = prompt_template_service.list_all_templates(db, include_disabled=include_disabled)
     version = prompt_template_service.get_version(db)
@@ -222,7 +222,7 @@ def list_templates(
 def get_template(
     name: str,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     tmpl = prompt_template_service.get_template(db, name)
     if not tmpl:
@@ -234,7 +234,7 @@ def get_template(
 async def create_template(
     request: TemplateCreateRequest,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(require_role("admin")),
 ):
     try:
         tmpl = prompt_template_service.create_template(
@@ -262,7 +262,7 @@ async def update_template(
     name: str,
     request: TemplateUpdateRequest,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(require_role("admin")),
 ):
     try:
         tmpl = prompt_template_service.update_template(
@@ -291,7 +291,7 @@ async def update_template(
 async def delete_template(
     name: str,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(require_role("admin")),
 ):
     deleted = prompt_template_service.delete_template(db, name)
     if not deleted:
@@ -315,7 +315,7 @@ async def toggle_template(
     name: str,
     request: TemplateToggleRequest,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(require_role("admin")),
 ):
     try:
         tmpl = prompt_template_service.toggle_template(db, name, request.enabled)

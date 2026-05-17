@@ -134,16 +134,25 @@ class ChannelService:
 
         now = bj_now()
 
-        # Stale recovery: reset items assigned > 3 min ago
+        # Stale recovery: reset items assigned > 5 min ago
+        # Skip items whose device is still online (slow but alive).
         # Also reset the associated RUNNING task to PENDING to prevent
-        # duplicate execution when the item is re-claimed before the
-        # task_service stale recovery (10 min) kicks in.
+        # duplicate execution when the item is re-claimed.
         from datetime import timedelta
-        stale_threshold = now - timedelta(seconds=180)
+        import os
+        stale_threshold = now - timedelta(seconds=300)
+        online_threshold = now - timedelta(seconds=120)
+        online_device_ids = {
+            d[0] for d in db.query(DBDevice.id).filter(
+                DBDevice.last_seen_at.isnot(None),
+                DBDevice.last_seen_at >= online_threshold,
+            ).all()
+        }
         stale_items = db.query(ChannelItem).filter(
             ChannelItem.status == "assigned",
             ChannelItem.assigned_at.isnot(None),
             ChannelItem.assigned_at < stale_threshold,
+            ~ChannelItem.assigned_device_id.in_(online_device_ids),
         ).all()
         stale_channel_ids = set()
         stale_task_ids = []

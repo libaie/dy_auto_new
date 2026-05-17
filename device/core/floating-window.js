@@ -249,6 +249,7 @@ var floatingWindow = {
         '<horizontal marginBottom="4">' +
           '<text text="运行日志" textSize="16" textColor="#00ff00" layout_weight="1"/>' +
           '<text id="btnClear" text="清除" textSize="12" textColor="#ffff00" padding="4" margin="4"/>' +
+          '<text id="btnStop" text="停止" textSize="12" textColor="#ff4444" padding="4" margin="4"/>' +
           '<text id="btnClose" text="关闭" textSize="12" textColor="#ff6666" padding="4" margin="4"/>' +
         '</horizontal>' +
         '<list id="logList" layout_weight="1" h="*">' +
@@ -297,6 +298,16 @@ var floatingWindow = {
       }
     };
     logger.addListener(this._logListener);
+
+    this._logWindow.btnStop.on("click", function () {
+      dialogs.confirm("确认", "确定要停止进程吗？", function (ok) {
+        if (ok) {
+          logger.info(TAG, "用户手动停止进程");
+          self.destroy();
+          exit();
+        }
+      });
+    });
 
     this._logWindow.btnClose.on("click", function () {
       self._hideLogWindow();
@@ -436,11 +447,15 @@ var floatingWindow = {
     this._pairWindow = floaty.window(
       '<card w="280" cardCornerRadius="20" cardBackgroundColor="#ffffff" cardElevation="16">' +
         '<vertical>' +
-          '<vertical bg="#f59e0b" padding="20 24 20 20">' +
-            '<text text="⏳" textSize="28" gravity="center"/>' +
-            '<text text="等待审批" textSize="18" textColor="#ffffff" gravity="center" textStyle="bold" marginTop="8"/>' +
-            '<text text="配令人求已发送" textSize="12" textColor="#fef3c7" gravity="center" marginTop="4"/>' +
-          '</vertical>' +
+          '<frame>' +
+            '<vertical bg="#f59e0b" padding="20 24 20 20">' +
+              '<text text="⏳" textSize="28" gravity="center"/>' +
+              '<text text="等待审批" textSize="18" textColor="#ffffff" gravity="center" textStyle="bold" marginTop="8"/>' +
+              '<text text="配令人求已发送" textSize="12" textColor="#fef3c7" gravity="center" marginTop="4"/>' +
+            '</vertical>' +
+            '<text id="btnWaitingClose" text="✕" textSize="14" textColor="#ffffff" ' +
+              'padding="4 8 4 8" layout_gravity="right|top" margin="6"/>' +
+          '</frame>' +
           '<vertical padding="24 20 20 20" gravity="center">' +
             '<text text="请在电脑管理端批准此设备" textSize="14" textColor="#374151" gravity="center"/>' +
             '<text text="配对请求等待中..." textSize="13" textColor="#9ca3af" gravity="center" marginTop="6"/>' +
@@ -449,6 +464,10 @@ var floatingWindow = {
         '</vertical>' +
       '</card>'
     );
+
+    this._pairWindow.btnWaitingClose.on("click", function () {
+      self.showMainUI();
+    });
 
     var waitW = dpToPx(280);
     this._pairWindow.setPosition(

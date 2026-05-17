@@ -1,11 +1,1 @@
-accounts:
-  - id: "acc-001"
-    nickname: "测试账号1"
-    douyin_id: "test_user_001"
-    status: "active"
-    daily_limits:
-      likes: 50
-      comments: 20
-      follows: 20
-      dms: 10
-      replies: 15
+accounts: []

@@ -557,7 +557,7 @@ class ChannelService:
         keyword: Optional[str] = None,
         user_id: Optional[str] = None,
     ) -> ChannelItem:
-        """Edit a single channel item. Only pending/assigned items allowed."""
+        """Edit a single channel item. Only pending items allowed."""
         item = db.query(ChannelItem).filter(ChannelItem.id == item_id).first()
         if not item:
             raise ValueError(f"Item {item_id} 不存在")
@@ -565,8 +565,8 @@ class ChannelService:
             ch = db.query(Channel).filter(Channel.id == item.channel_id, Channel.user_id == user_id).first()
             if not ch:
                 raise ValueError(f"Item {item_id} 不属于当前用户")
-        if item.status not in ("pending", "assigned"):
-            raise ValueError("只能编辑待处理或执行中的子项")
+        if item.status != "pending":
+            raise ValueError("只能编辑待处理的子项")
 
         if account_id is not None:
             acc = db.query(Account).filter(Account.id == account_id, Account.status == "active").first()
@@ -669,7 +669,7 @@ class ChannelService:
                 if owned_channels is not None and item.channel_id not in owned_channels:
                     skipped.append(item_id)
                     continue
-                if item.status not in ("pending", "assigned"):
+                if item.status != "pending":
                     skipped.append(item_id)
                     continue
                 if account_id is not None and valid_group_ids:

@@ -245,22 +245,32 @@ const allSelected = computed(() => {
 })
 
 const groupMemberIds = ref(new Set())
+const membersLoaded = ref(false)
 
 const editableAccounts = computed(() => {
-  if (groupMemberIds.value.size === 0) return accounts.value
+  if (!membersLoaded.value) return accounts.value
   return accounts.value.filter(a => groupMemberIds.value.has(a.id))
 })
 
-// Watch group selector changes → re-fetch members
-watch(() => channelForm.value.group_id, async (gid) => {
-  if (!gid || !editingChannel.value) return
+async function loadMembersForGroup(gid) {
+  if (!gid) return
   try {
     const resp = await listMembers(gid)
     const members = resp.data.members || []
     groupMemberIds.value = new Set(members.map(m => m.id))
+    membersLoaded.value = true
   } catch (e) {
     console.error('Failed to load members for group:', gid, e)
+    // On failure, clear — don't silently show all accounts
+    groupMemberIds.value = new Set()
+    membersLoaded.value = true
   }
+}
+
+// Watch group selector changes → re-fetch members
+watch(() => channelForm.value.group_id, async (gid) => {
+  if (!gid || !editingChannel.value) return
+  await loadMembersForGroup(gid)
 })
 
 // Device filtering by bound account
@@ -310,13 +320,7 @@ async function saveChannel() {
     await editChannelMeta(props.channel.id, payload)
     editingChannel.value = false
     await loadDetail()
-    // Reload group members in case group changed
-    const gid = detail.value.group_id
-    if (gid) {
-      const resp = await listMembers(gid)
-      const members = resp.data.members || []
-      groupMemberIds.value = new Set(members.map(m => m.id))
-    }
+    if (detail.value.group_id) await loadMembersForGroup(detail.value.group_id)
     emit('refresh')
   } catch (e) {
     alert('保存失败: ' + (e.response?.data?.detail || e.message))
@@ -391,17 +395,16 @@ onMounted(async () => {
   await loadDetail()
   const gid = detail.value.group_id
   try {
-    const [accResp, devResp, grpResp, memberResp] = await Promise.all([
+    const [accResp, devResp, grpResp] = await Promise.all([
       listAccounts(),
       listDevices(),
       listGroups(),
-      gid ? listMembers(gid) : Promise.resolve({ data: { members: [] } }),
     ])
     accounts.value = accResp.data.accounts || accResp.data || []
     devices.value = devResp.data.devices || devResp.data || []
     groups.value = grpResp.data.groups || grpResp.data || []
-    const members = memberResp.data.members || []
-    groupMemberIds.value = new Set(members.map(m => m.id))
+    if (gid) await loadMembersForGroup(gid)
+    else membersLoaded.value = true
   } catch (e) {
     console.error('Failed to load ref data:', e)
   }

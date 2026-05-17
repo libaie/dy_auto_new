@@ -498,6 +498,30 @@ class ChannelAppendItems(BaseModel):
     keywords: list[str] = Field(..., min_length=1, max_length=500)
 
 
+class ChannelEditRequest(BaseModel):
+    """PUT /api/channels/{id} — edit channel metadata (all fields optional)"""
+    group_id: Optional[str] = None
+    account_mode: Optional[str] = Field(None, pattern="^(single_account|round_robin)$")
+    account_id: Optional[str] = None
+    params_template: Optional[dict[str, Any]] = None
+    cooldown_seconds: Optional[int] = Field(None, ge=30, le=3600)
+    sync_to_items: bool = False
+
+
+class ChannelItemEditRequest(BaseModel):
+    """PUT /api/channel-items/{item_id} — edit a single pending/assigned item"""
+    account_id: Optional[str] = None
+    assigned_device_id: Optional[str] = None
+    keyword: Optional[str] = Field(None, min_length=1, max_length=200)
+
+
+class BatchEditRequest(BaseModel):
+    """PUT /api/channel-items/batch — batch edit pending/assigned items"""
+    item_ids: list[str] = Field(..., min_length=1, max_length=500)
+    account_id: Optional[str] = None
+    assigned_device_id: Optional[str] = None
+
+
 class ChannelItemResponse(BaseModel):
     id: str
     keyword: str

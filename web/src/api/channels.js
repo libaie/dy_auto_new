@@ -27,3 +27,15 @@ export function appendChannelItems(id, keywords) {
 export function updateChannelItem(channelId, itemId, data) {
   return client.patch(`/channels/${channelId}/items/${itemId}`, data);
 }
+
+export function editChannelMeta(id, data) {
+  return client.put(`/channels/${id}`, data);
+}
+
+export function editChannelItem(itemId, data) {
+  return client.put(`/channels/items/${itemId}`, data);
+}
+
+export function batchEditItems(data) {
+  return client.put('/channels/items/batch', data);
+}

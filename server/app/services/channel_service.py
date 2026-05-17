@@ -473,6 +473,179 @@ class ChannelService:
             ch.completed_at = None
             db.flush()
 
+    def edit_channel(
+        self,
+        db: Session,
+        channel_id: str,
+        group_id: Optional[str] = None,
+        account_mode: Optional[str] = None,
+        account_id: Optional[str] = None,
+        params_template: Optional[dict] = None,
+        cooldown_seconds: Optional[int] = None,
+        sync_to_items: bool = False,
+        user_id: Optional[str] = None,
+    ) -> Channel:
+        """Edit channel metadata. Only active/paused channels allowed."""
+        ch = self.get_channel(db, channel_id, user_id=user_id)
+        if not ch:
+            raise ValueError(f"通道 {channel_id} 不存在")
+        if ch.status not in ("active", "paused"):
+            raise ValueError("只能编辑活跃或暂停状态的通道")
+
+        if all(v is None for v in (group_id, account_mode, account_id, params_template, cooldown_seconds)):
+            raise ValueError("至少提供一个要修改的字段")
+
+        if group_id is not None:
+            group = db.query(AccountGroup).filter(AccountGroup.id == group_id).first()
+            if not group:
+                raise ValueError(f"分组 {group_id} 不存在")
+            ch.group_id = group_id
+
+        if account_mode is not None:
+            ch.account_mode = account_mode
+
+        if account_id is not None:
+            acc = db.query(Account).filter(Account.id == account_id, Account.status == "active").first()
+            if not acc:
+                raise ValueError(f"账号 {account_id} 不存在或非 active 状态")
+            effective_group_id = group_id if group_id is not None else ch.group_id
+            member = db.query(AccountGroupMember).filter(
+                AccountGroupMember.group_id == effective_group_id,
+                AccountGroupMember.account_id == account_id,
+            ).first()
+            if not member:
+                raise ValueError(f"账号 {account_id} 不属于分组 {effective_group_id}")
+            ch.account_id = account_id
+
+        if params_template is not None:
+            ch.params_template = params_template
+
+        if cooldown_seconds is not None:
+            ch.cooldown_seconds = cooldown_seconds
+
+        # Sync to pending/assigned items when requested
+        if sync_to_items:
+            if account_id is not None:
+                db.query(ChannelItem).filter(
+                    ChannelItem.channel_id == channel_id,
+                    ChannelItem.status.in_(["pending", "assigned"]),
+                ).update({"account_id": account_id}, synchronize_session=False)
+            elif group_id is not None and ch.account_mode == "round_robin":
+                active_accounts = _get_active_accounts(db, ch.group_id)
+                if active_accounts:
+                    pending_items = db.query(ChannelItem).filter(
+                        ChannelItem.channel_id == channel_id,
+                        ChannelItem.status.in_(["pending", "assigned"]),
+                    ).order_by(ChannelItem.queue_position).all()
+                    account_ids = self._round_robin_assign(
+                        db, [i.keyword for i in pending_items], active_accounts
+                    )
+                    for i, item in enumerate(pending_items):
+                        item.account_id = account_ids[i]
+
+        db.commit()
+        db.refresh(ch)
+        return ch
+
+    def edit_item(
+        self,
+        db: Session,
+        item_id: str,
+        account_id: Optional[str] = None,
+        assigned_device_id: Optional[str] = None,
+        keyword: Optional[str] = None,
+        user_id: Optional[str] = None,
+    ) -> ChannelItem:
+        """Edit a single channel item. Only pending/assigned items allowed."""
+        item = db.query(ChannelItem).filter(ChannelItem.id == item_id).first()
+        if not item:
+            raise ValueError(f"Item {item_id} 不存在")
+        if user_id:
+            ch = db.query(Channel).filter(Channel.id == item.channel_id, Channel.user_id == user_id).first()
+            if not ch:
+                raise ValueError(f"Item {item_id} 不属于当前用户")
+        if item.status not in ("pending", "assigned"):
+            raise ValueError("只能编辑待处理或执行中的子项")
+
+        if account_id is not None:
+            acc = db.query(Account).filter(Account.id == account_id, Account.status == "active").first()
+            if not acc:
+                raise ValueError(f"账号 {account_id} 不存在或非 active 状态")
+            ch = db.query(Channel).filter(Channel.id == item.channel_id).first()
+            if ch:
+                member = db.query(AccountGroupMember).filter(
+                    AccountGroupMember.group_id == ch.group_id,
+                    AccountGroupMember.account_id == account_id,
+                ).first()
+                if not member:
+                    raise ValueError(f"账号 {account_id} 不属于通道分组 {ch.group_id}")
+            item.account_id = account_id
+
+        if assigned_device_id is not None:
+            dev = db.query(DBDevice).filter(DBDevice.id == assigned_device_id).first()
+            if not dev:
+                raise ValueError(f"设备 {assigned_device_id} 不存在")
+            item.assigned_device_id = assigned_device_id
+
+        if keyword is not None:
+            if not keyword.strip():
+                raise ValueError("关键词不能为空")
+            item.keyword = keyword
+
+        db.commit()
+        db.refresh(item)
+        return item
+
+    def batch_edit_items(
+        self,
+        db: Session,
+        item_ids: list[str],
+        account_id: Optional[str] = None,
+        assigned_device_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+    ) -> dict:
+        """Batch edit items. Failures don't block successes."""
+        updated = 0
+        skipped = []
+        errors = []
+
+        if account_id is not None:
+            acc = db.query(Account).filter(Account.id == account_id, Account.status == "active").first()
+            if not acc:
+                return {"updated": 0, "skipped": [], "errors": [f"账号 {account_id} 不存在或非 active 状态"]}
+
+        if assigned_device_id is not None:
+            dev = db.query(DBDevice).filter(DBDevice.id == assigned_device_id).first()
+            if not dev:
+                return {"updated": 0, "skipped": [], "errors": [f"设备 {assigned_device_id} 不存在"]}
+
+        for item_id in item_ids:
+            try:
+                item = db.query(ChannelItem).filter(ChannelItem.id == item_id).first()
+                if not item:
+                    errors.append(f"{item_id}: 不存在")
+                    continue
+                if user_id:
+                    ch = db.query(Channel).filter(Channel.id == item.channel_id, Channel.user_id == user_id).first()
+                    if not ch:
+                        skipped.append(item_id)
+                        continue
+                if item.status not in ("pending", "assigned"):
+                    skipped.append(item_id)
+                    continue
+
+                if account_id is not None:
+                    item.account_id = account_id
+                if assigned_device_id is not None:
+                    item.assigned_device_id = assigned_device_id
+
+                updated += 1
+            except Exception as e:
+                errors.append(f"{item_id}: {str(e)}")
+
+        db.commit()
+        return {"updated": updated, "skipped": skipped, "errors": errors}
+
     def update_item_status(self, db: Session, item_id: str, new_status: str, user_id: Optional[str] = None):
         """Update a single channel item status (skip/requeue)."""
         item = db.query(ChannelItem).filter(ChannelItem.id == item_id).first()

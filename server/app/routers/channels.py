@@ -6,7 +6,7 @@ from app.database import get_db
 from app.deps import verify_admin_token, require_role
 from app.models import (
     ChannelCreate, ChannelUpdate, ChannelAppendItems,
-    ChannelItemUpdate,
+    ChannelItemUpdate, ChannelEditRequest, ChannelItemEditRequest, BatchEditRequest,
 )
 from app.services.channel_service import channel_service
 from app.ws_manager import pair_ws_manager
@@ -211,3 +211,92 @@ async def update_item(
         raise HTTPException(status_code=400, detail=str(e))
     await pair_ws_manager.broadcast_to_admins({"event": "channels_changed"})
     return {"status": "updated", "item_id": item_id}
+
+
+# ── Channel edit endpoints ──
+# NOTE: /items/* routes must be registered before /{channel_id} to avoid
+# "items" being captured as a channel_id parameter.
+
+
+@router.put("/items/batch")
+async def batch_edit_items(
+    request: BatchEditRequest,
+    db: Session = Depends(get_db),
+    user = Depends(verify_admin_token),
+):
+    user_id, role = user
+    scope_user_id = None if role == "admin" else user_id
+    result = channel_service.batch_edit_items(
+        db,
+        request.item_ids,
+        account_id=request.account_id,
+        assigned_device_id=request.assigned_device_id,
+        user_id=scope_user_id,
+    )
+    await pair_ws_manager.broadcast_to_admins({"event": "channels_changed"})
+    return result
+
+
+@router.put("/items/{item_id}")
+async def edit_channel_item(
+    item_id: str,
+    request: ChannelItemEditRequest,
+    db: Session = Depends(get_db),
+    user = Depends(verify_admin_token),
+):
+    user_id, role = user
+    scope_user_id = None if role == "admin" else user_id
+    try:
+        item = channel_service.edit_item(
+            db,
+            item_id,
+            account_id=request.account_id,
+            assigned_device_id=request.assigned_device_id,
+            keyword=request.keyword,
+            user_id=scope_user_id,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    await pair_ws_manager.broadcast_to_admins({"event": "channels_changed"})
+
+    account_nickname = ""
+    device_name = ""
+    if item.account_id:
+        acc = db.query(Account).filter(Account.id == item.account_id).first()
+        account_nickname = acc.nickname if acc else ""
+    if item.assigned_device_id:
+        dev = db.query(Device).filter(Device.id == item.assigned_device_id).first()
+        device_name = dev.name if dev else ""
+
+    return _item_to_response(item, account_nickname, device_name)
+
+
+@router.put("/{channel_id}")
+async def edit_channel(
+    channel_id: str,
+    request: ChannelEditRequest,
+    db: Session = Depends(get_db),
+    user = Depends(verify_admin_token),
+):
+    user_id, role = user
+    scope_user_id = None if role == "admin" else user_id
+    try:
+        ch = channel_service.edit_channel(
+            db,
+            channel_id,
+            group_id=request.group_id,
+            account_mode=request.account_mode,
+            account_id=request.account_id,
+            params_template=request.params_template,
+            cooldown_seconds=request.cooldown_seconds,
+            sync_to_items=request.sync_to_items,
+            user_id=scope_user_id,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    await pair_ws_manager.broadcast_to_admins({"event": "channels_changed"})
+    group = db.query(AccountGroup).filter(AccountGroup.id == ch.group_id).first()
+    stats = channel_service.get_channel_stats(db, ch.id)
+    return _channel_to_response(ch, stats, group.name if group else "")

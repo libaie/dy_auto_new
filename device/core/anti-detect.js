@@ -199,13 +199,6 @@ var antiDetect = {
    * @returns {*} 操作返回值
    */
   wrapAction: function (actionName, actionFn) {
-    // 时间窗口检查：非活跃时段加长延迟，但仍执行操作
-    if (!this.isActiveHour()) {
-      var offHoursDelay = Math.floor(Math.random() * 15000 + 5000); // 5-20秒
-      logger.info(TAG, "不在活跃时段，延迟 " + Math.round(offHoursDelay / 1000) + "s");
-      sleep(offHoursDelay);
-    }
-
     var timeMultiplier = this.getTimeMultiplier();
     this.randomDelay(actionName);
 

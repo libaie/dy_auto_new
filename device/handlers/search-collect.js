@@ -355,13 +355,15 @@ SearchCollectHandler.execute = function (params) {
       sleep(1500);
     }
     if (!this._interactWithVideo("", stats, params)) stats.fail_count++;
-    // 确保评论区关闭，防止残留到下一个视频
-    this.safeClick("comment_off_btn", 2);
-    sleep(400);
+    // 只有评论区实际打开过才关闭（零评论跳过的视频没打开面板，点 comment_off_btn 会报错）
     if (uiOperator.isOnPage("is_comment_view")) {
-      logger.info(TAG, "评论区未关闭，back 兜底");
-      back();
-      sleep(500);
+      this.safeClick("comment_off_btn", 2);
+      sleep(400);
+      if (uiOperator.isOnPage("is_comment_view")) {
+        logger.info(TAG, "评论区未关闭，back 兜底");
+        back();
+        sleep(500);
+      }
     }
   }
   shell("am start -a android.intent.action.VIEW -d 'snssdk1128://search/result'", true);

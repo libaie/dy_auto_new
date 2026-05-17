@@ -124,6 +124,7 @@ class UISelector(Base):
     enabled = Column(Boolean, nullable=False, default=True)
     category = Column(String(50), nullable=True, default=None, index=True)
     purpose = Column(String(20), nullable=False, default="locate")  # locate | extract
+    strategy_logic = Column(String(10), nullable=False, default="and")  # and | or — inter-strategy logic for page_detect
     extract_field = Column(String(20), nullable=True)  # text | desc | id | className
     clean_mode = Column(String(20), nullable=True)     # raw | regex | ai
     clean_pattern = Column(Text, nullable=True)         # regex pattern

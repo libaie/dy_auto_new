@@ -491,10 +491,17 @@ var uiOperator = {
     timeout = timeout || 300;
     var config = selectorLoader.get(actionName);
     if (!config || config.purpose !== "page_detect") return false;
-    for (var i = 0; i < config.strategies.length; i++) {
-      if (!this._findByStrategy(config.strategies[i])) {
-        return false;
+    var logic = config.strategy_logic || "and";
+    var strategies = config.strategies;
+    if (logic === "or") {
+      for (var i = 0; i < strategies.length; i++) {
+        if (this._findByStrategy(strategies[i])) return true;
       }
+      return false;
+    }
+    // default: AND — all strategies must match
+    for (var j = 0; j < strategies.length; j++) {
+      if (!this._findByStrategy(strategies[j])) return false;
     }
     return true;
   },

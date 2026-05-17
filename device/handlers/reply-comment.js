@@ -1,5 +1,5 @@
 // device/handlers/reply-comment.js
-var SearchBaseHandler = require("./search-base");
+var CommentBaseHandler = require("./comment-base");
 var aiAnalyzer = require("../core/ai-analyzer");
 var uiOperator = require("../core/ui-operator");
 var antiDetect = require("../core/anti-detect");
@@ -10,504 +10,344 @@ var commentUtils = require("./comment-utils");
 var TAG = "评论回复";
 var flowContext = require("../core/flow-context");
 
-/**
- * 评论回复 + 关注 + 私信 Handler
- * 继承 SearchBaseHandler，复用搜索导航逻辑
- *
- * 完整流程:
- * 1. 搜索 → 排序 → 关闭弹出框 → 点击第一个视频
- * 2. 打开评论区
- * 3. 读取评论列表，按时效筛选
- * 4. 对符合条件的评论:
- *    a. AI 分析并生成回复
- *    b. 回复评论
- *    c. 点击评论者头像进入主页
- *    d. 关注
- *    e. 私信
- *    f. 返回评论区
- *
- * params:
- *   - keyword: string (搜索关键词)
- *   - content: string (私信内容，可选)
- *   - count: number (处理数量)
- *   - sort_by: string (排序方式: "latest"|"most_liked")
- *   - max_age_days: number (评论最大天数，默认 5)
- */
-var ReplyCommentHandler = Object.create(SearchBaseHandler);
+var ReplyCommentHandler = Object.create(CommentBaseHandler);
 
-ReplyCommentHandler.execute = function (params) {
+ReplyCommentHandler._config = { videoTimeoutMs: 120000, interVideoDelay: 2500 };
+
+ReplyCommentHandler._beforeSearch = function (params) {
+  this._dest = aiAnalyzer.resolveDestination(params.keyword);
+};
+
+ReplyCommentHandler._initStats = function (params) {
+  return { videos_processed: 0, success_count: 0, fail_count: 0, skipped: 0,
+    follow_count: 0, dm_count: 0, details: [] };
+};
+
+ReplyCommentHandler._onVideoSkipped = function (params, stats, videoIndex) {
+  stats.videos_processed++;
+};
+
+ReplyCommentHandler._ensureCommentsOpen = function (params, videoIndex) {
+  var videoStartTime = Date.now();
+  var VIDEO_TIMEOUT = this._config.videoTimeoutMs;
+  for (var retry = 0; retry < 2; retry++) {
+    if (Date.now() - videoStartTime > VIDEO_TIMEOUT) break;
+    this.safeClick("video_comment_btn", 2);
+    sleep(2000);
+    if (uiOperator.isOnPage("is_comment_view")) {
+      flowContext.enter("comment");
+      return true;
+    }
+    logger.info(TAG, "评论区未打开，重试 (" + (retry + 1) + "/2)");
+  }
+  logger.warn(TAG, "评论区打开失败，跳过此视频");
+  return false;
+};
+
+ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
   var keyword = params.keyword;
   var content = params.content || "";
   var count = (params.count === -1) ? Infinity : (params.count || 5);
-  var videoCount = (params.video_count === -1) ? Infinity : (params.video_count || 3);
-  var sortBy = params.sort_by || "latest";
   var maxAgeDays = (params.max_age_days === -1) ? Infinity : (params.max_age_days || 5);
-  // 每日上限（从服务端下发或设备配置获取）
   var maxFollows = params.max_follows || 20;
   var maxDMs = params.max_dms || 10;
-
-  // 加载服务端提示词模板
-  aiAnalyzer.useTemplate(params.prompt_template_id);
-
-  var dest = aiAnalyzer.resolveDestination(keyword);
-
-  if (!keyword) {
-    return { success: false, error: "缺少关键词" };
-  }
-
-  logger.info(TAG, "开始: 关键词='" + keyword + "', 视频数=" + videoCount +
-    ", 每视频评论=" + count + ", 排序=" + sortBy + ", 最大天数=" + maxAgeDays + "天");
-
   var taskId = params.task_id || "";
+  var dest = this._dest;
+  var VIDEO_TIMEOUT = this._config.videoTimeoutMs;
+
   function _reportProgress(step, detail, prog) {
     if (taskId) { try { apiClient.reportProgress(taskId, step, detail, prog); } catch (e) {} }
   }
 
-  if (!this.ensureAppActive()) {
-    return { success: false, error: "打开抖音失败" };
-  }
+  var videoStartTime = Date.now();
+  var commentCount = 0;  // 0 = unknown, will be set by comment loop bottom detection
+  var processed = 0;
+  var totalRead = 0;
+  var prevItemCount = 0;
+  var emptyStreak = 0;
 
-  // 1. 搜索 → 排序 → 关闭弹出框（不打开视频）
-  if (!this._searchAndSort(keyword, sortBy)) {
-    return { success: false, error: "搜索排序失败" };
-  }
+  var items = uiOperator.findElements("comment_list", 3000);
 
-  var stats = { videos_processed: 0, success_count: 0, fail_count: 0, skipped: 0,
-    follow_count: 0, dm_count: 0, details: [] };
-
-  // 2. 逐个视频处理
-  // 第一个视频从搜索结果点击进入
-  if (!this._clickSearchResult(0)) {
-    return { success: false, error: "点击第一个视频失败" };
-  }
-  sleep(2000);
-
-  for (var v = 0; v < videoCount; v++) {
-    var videoStartTime = Date.now();
-    var VIDEO_TIMEOUT = 120000;  // 单视频超时 2 分钟，防止卡死
-    logger.info(TAG, "=== 视频 " + (v + 1) + "/" + videoCount + " ===");
-    _reportProgress("视频 " + (v + 1) + "/" + videoCount, "关键词: " + keyword, (v / videoCount));
-
-    // 验证在视频详情页 + 预判评论数
-    var commentCount = 0;
-    var commentBtn = null;
-    for (var wait = 0; wait < 5; wait++) {
-      if (Date.now() - videoStartTime > VIDEO_TIMEOUT) {
-        logger.warn(TAG, "视频 " + (v + 1) + " 等待进入视频页超时，跳过"); break;
-      }
-      commentBtn = uiOperator.findElement("video_comment_btn", 2000);
-      if (commentBtn) break;
-      logger.info(TAG, "等待进入视频页 (" + (wait + 1) + "/5)");
-    }
-    if (!commentBtn) {
-      logger.warn(TAG, "未进入视频详情页，跳过");
-      continue;
-    }
-    var cc = commentUtils.preCheckCommentCount(commentBtn);
-    commentCount = cc.count > 0 ? cc.count : 0;
-    logger.info(TAG, "视频 " + (v + 1) + " 评论按钮 desc: '" + cc.rawDesc + "'");
-    logger.info(TAG, "视频 " + (v + 1) + " 评论数: " + (commentCount || "未知"));
-
-    if (commentCount === 0) {
-      logger.info(TAG, "该视频无评论，跳过");
-      stats.videos_processed++;
-      if (v < videoCount - 1) { if (uiOperator.findElement("is_video_view", 1000)) { press(device.width / 2, device.height / 2, 80); sleep(300); } uiOperator.swipeUp(); sleep(2500); }
-      continue;
-    }
-
-    // 2c. 打开评论区（带重试）
-    var commentsOpened = false;
-    for (var retry = 0; retry < 2; retry++) {
-      if (Date.now() - videoStartTime > VIDEO_TIMEOUT) break;
-      // 点击评论入口
-      this.safeClick("video_comment_btn", 2);
-      sleep(2000);
-      // 验证是否真正打开
-      if (uiOperator.isOnPage("is_comment_view")) {
-        commentsOpened = true;
-        flowContext.enter("comment");
+  while (processed < count && (commentCount === 0 || totalRead < commentCount)) {
+    if (items.length === 0) {
+      emptyStreak++;
+      if (emptyStreak >= 2) {
+        logger.info(TAG, "评论列表连续为空，已到底");
         break;
       }
-      logger.info(TAG, "评论区未打开，重试 (" + (retry + 1) + "/2)");
+    } else {
+      emptyStreak = 0;
     }
-    if (!commentsOpened) {
-      logger.warn(TAG, "评论区打开失败，跳过此视频");
-      continue;
+    if (Date.now() - videoStartTime > VIDEO_TIMEOUT) {
+      logger.warn(TAG, "视频 " + (videoIndex + 1) + " 处理超时 (" +
+        Math.round((Date.now() - videoStartTime) / 1000) + "s)，强制跳过");
+      break;
     }
+    if (items.length <= prevItemCount && totalRead >= items.length && prevItemCount > 0) {
+      logger.info(TAG, "评论已到底（可见" + items.length + "条/已读" + totalRead + "条），停止");
+      break;
+    }
+    prevItemCount = items.length;
 
-    // 2d. 逐批读取+处理评论（不限批次，直到读完所有或达成目标）
-    var processed = 0;
-    var totalRead = 0;
-    var prevItemCount = 0;
-    var emptyStreak = 0;  // 连续空列表计数器，防止死循环
+    for (var i = totalRead; i < items.length && processed < count; i++) {
+      if (Date.now() - videoStartTime > VIDEO_TIMEOUT) {
+        logger.warn(TAG, "评论处理超时，跳出内循环");
+        break;
+      }
+      try {
+      var comment = this._parseCommentItem(items[i]);
+      if (!comment) { stats.skipped++; totalRead++; continue; }
 
-    var items = uiOperator.findElements("comment_list", 3000);
+      if (comment.nickname === "unknown" || !comment.text ||
+          comment.text.indexOf("发条评论") !== -1) {
+        stats.skipped++; totalRead++; continue;
+      }
 
-    while (processed < count && (commentCount === 0 || totalRead < commentCount)) {
-      // 连续空列表保护：2 次迭代 items 都为空则到底
-      if (items.length === 0) {
-        emptyStreak++;
-        if (emptyStreak >= 2) {
-          logger.info(TAG, "评论列表连续为空，已到底");
-          break;
+      if (comment.isAuthor) {
+        logger.info(TAG, "跳过作者评论: " + comment.nickname);
+        stats.skipped++; totalRead++; continue;
+      }
+
+      if (!this._filterByTime([comment], maxAgeDays).length) {
+        stats.skipped++; totalRead++; continue;
+      }
+
+      if (!commentUtils.localPreFilter(comment.text)) {
+        logger.info(TAG, "跳过无意义评论（纯表情/短文本）: " + comment.text.substring(0, 20));
+        stats.skipped++; totalRead++;
+        continue;
+      }
+
+      var canReply = true;
+      try {
+        var claimResult = apiClient.claimCommentReply(comment.nickname, comment.text);
+        canReply = claimResult && claimResult.claimed;
+      } catch (e) {}
+      if (!canReply) {
+        logger.info(TAG, "评论已被回复过（全局去重）: " + comment.nickname);
+        stats.skipped++; totalRead++;
+        continue;
+      }
+
+      logger.info(TAG, "分析 " + (processed + 1) + "/" + count +
+        ": [" + comment.nickname + "] " + comment.text.substring(0, 30));
+
+      var analysis = aiAnalyzer.analyzeComment({
+        searchKeyword: keyword,
+        nickname: comment.nickname,
+        commentText: comment.text,
+      });
+
+      if (!analysis) {
+        stats.skipped++; totalRead++;
+        continue;
+      }
+
+      logger.info(TAG, "分数=" + analysis.score + ", 层级=" + analysis.tier +
+        ", 意图=" + (analysis.dimensions ? analysis.dimensions.intent : "未知"));
+
+      if (analysis.score < aiAnalyzer.SCORE_THRESHOLD) {
+        logger.info(TAG, "分数 " + analysis.score + " 低于阈值，跳过");
+        stats.skipped++; totalRead++;
+        continue;
+      }
+
+      if (analysis.dimensions && analysis.dimensions.lead_quality) {
+        var lq = analysis.dimensions.lead_quality;
+        if (lq.is_bot || lq.is_competitor) {
+          logger.info(TAG, "检测到水军/同行，跳过");
+          stats.skipped++; totalRead++;
+          continue;
         }
+      }
+
+      // 回复
+      logger.info(TAG, "回复: '" + analysis.reply.substring(0, 30) + "...'");
+      if (comment.replyBtn) {
+        logger.info(TAG, "点击回复按钮...");
+        comment.replyBtn.click();
+        sleep(1000);
       } else {
-        emptyStreak = 0;
+        logger.info(TAG, "无回复按钮，直接输入");
       }
-      // 视频级超时保护：单视频处理超过 2 分钟强制切下一个
-      if (Date.now() - videoStartTime > VIDEO_TIMEOUT) {
-        logger.warn(TAG, "视频 " + (v + 1) + " 处理超时 (" +
-          Math.round((Date.now() - videoStartTime) / 1000) + "s)，强制跳过");
-        break;
-      }
-      // 检查是否已到底：可见条目不再增长且已全部读取
-      // （无论 commentCount 是否已知，RecyclerView 不加载新条目就到底了）
-      if (items.length <= prevItemCount && totalRead >= items.length && prevItemCount > 0) {
-        logger.info(TAG, "评论已到底（可见" + items.length + "条/已读" + totalRead + "条），停止");
-        break;
-      }
-      prevItemCount = items.length;
-
-      // 处理本批新评论（每条独立 try-catch，失败不级联）
-      for (var i = totalRead; i < items.length && processed < count; i++) {
-        if (Date.now() - videoStartTime > VIDEO_TIMEOUT) {
-          logger.warn(TAG, "评论处理超时，跳出内循环");
-          break;
-        }
+      logger.info(TAG, "开始输入回复...");
+      if (this._replyToComment(analysis.reply, comment.nickname)) {
+        stats.success_count++;
+        try { apiClient.saveCommentAIReply(comment.nickname, comment.text, analysis.reply, taskId, dest ? dest.province : null, dest ? dest.city : null, dest ? dest.attraction : null); } catch (e) {}
         try {
-        var comment = this._parseCommentItem(items[i]);
-        if (!comment) { stats.skipped++; totalRead++; continue; }
-
-        // 跳过假评论（占位符/空昵称/空文本）
-        if (comment.nickname === "unknown" || !comment.text ||
-            comment.text.indexOf("发条评论") !== -1) {
-          stats.skipped++; totalRead++; continue;
-        }
-
-        // 跳过作者自己的评论
-        if (comment.isAuthor) {
-          logger.info(TAG, "跳过作者评论: " + comment.nickname);
-          stats.skipped++; totalRead++; continue;
-        }
-
-        // 时效筛选
-        if (!this._filterByTime([comment], maxAgeDays).length) {
-          stats.skipped++; totalRead++; continue;
-        }
-
-        // 本地预过滤：纯表情/无意义评论先拦掉，避免无价值的 claim 和 AI 调用
-        if (!commentUtils.localPreFilter(comment.text)) {
-          logger.info(TAG, "跳过无意义评论（纯表情/短文本）: " + comment.text.substring(0, 20));
-          stats.skipped++; totalRead++;
-          _reportProgress("视频 " + (v + 1) + "/" + videoCount,
-            "已跳过 " + stats.skipped + " 条（无意义）",
-            (v + totalRead / Math.max(commentCount, 1)) / videoCount);
-          continue;
-        }
-
-        // 全局去重：原子检查+标记（预过滤之后才调 API，避免浪费 claim）
-        var canReply = true;
-        try {
-          var claimResult = apiClient.claimCommentReply(comment.nickname, comment.text);
-          canReply = claimResult && claimResult.claimed;
-        } catch (e) { /* 网络异常默认放行 */ }
-        if (!canReply) {
-          logger.info(TAG, "评论已被回复过（全局去重）: " + comment.nickname);
-          stats.skipped++; totalRead++;
-          _reportProgress("视频 " + (v + 1) + "/" + videoCount,
-            "已跳过 " + stats.skipped + " 条（去重）",
-            (v + totalRead / Math.max(commentCount, 1)) / videoCount);
-          continue;
-        }
-
-        logger.info(TAG, "分析 " + (processed + 1) + "/" + count +
-          ": [" + comment.nickname + "] " + comment.text.substring(0, 30));
-
-        var analysis = aiAnalyzer.analyzeComment({
-          searchKeyword: keyword,
-          nickname: comment.nickname,
-          commentText: comment.text,
-        });
-
-        if (!analysis) {
-          stats.skipped++; totalRead++;
-          _reportProgress("视频 " + (v + 1) + "/" + videoCount,
-            "已跳过 " + stats.skipped + " 条（分析失败）",
-            (v + totalRead / Math.max(commentCount, 1)) / videoCount);
-          continue;
-        }
-
-        logger.info(TAG, "分数=" + analysis.score + ", 层级=" + analysis.tier +
-          ", 意图=" + (analysis.dimensions ? analysis.dimensions.intent : "未知"));
-
-        if (analysis.score < aiAnalyzer.SCORE_THRESHOLD) {
-          logger.info(TAG, "分数 " + analysis.score + " 低于阈值，跳过");
-          stats.skipped++; totalRead++;
-          _reportProgress("视频 " + (v + 1) + "/" + videoCount,
-            "已跳过 " + stats.skipped + " 条（" + analysis.score + "分）",
-            (v + totalRead / Math.max(commentCount, 1)) / videoCount);
-          continue;
-        }
-
-        if (analysis.dimensions && analysis.dimensions.lead_quality) {
-          var lq = analysis.dimensions.lead_quality;
-          if (lq.is_bot || lq.is_competitor) {
-            logger.info(TAG, "检测到水军/同行，跳过");
-            stats.skipped++; totalRead++;
-            _reportProgress("视频 " + (v + 1) + "/" + videoCount,
-              "已跳过 " + stats.skipped + " 条（水军/同行）",
-              (v + totalRead / Math.max(commentCount, 1)) / videoCount);
-            continue;
+          var commentReport = {
+            nickname: comment.nickname, content: comment.text,
+            time_str: comment.time || "", is_author: comment.isAuthor || false,
+            reply_count: "", like_count: "", ai_reply: analysis.reply,
+          };
+          if (dest) {
+            commentReport.intended_province = dest.province || "";
+            commentReport.intended_city = dest.city || "";
+            commentReport.intended_attraction = dest.attraction || "";
           }
-        }
+          apiClient.collectReport({ task_id: taskId, keyword: keyword, comment: commentReport, data_source_type: 0 });
+        } catch (e) {}
+      } else {
+        stats.fail_count++;
+        try { apiClient.releaseCommentReply(comment.nickname, comment.text); } catch (e) {}
+        totalRead++;
+        continue;
+      }
 
-        // 回复
-        logger.info(TAG, "回复: '" + analysis.reply.substring(0, 30) + "...'");
-        // 点击回复按钮，预先唤起输入框（部分评论项可能没有回复按钮，需兼容）
-        if (comment.replyBtn) {
-          logger.info(TAG, "点击回复按钮...");
-          comment.replyBtn.click();
-          sleep(1000);
-        } else {
-          logger.info(TAG, "无回复按钮，直接输入");
-        }
-        logger.info(TAG, "开始输入回复...");
-        if (this._replyToComment(analysis.reply, comment.nickname)) {
-          stats.success_count++;
-          // 保存 AI 回复到采集记录，供前端展示
-          try { apiClient.saveCommentAIReply(comment.nickname, comment.text, analysis.reply, params.task_id, dest ? dest.province : null, dest ? dest.city : null, dest ? dest.attraction : null); } catch (e) {}
-          // 采集评论数据（保留 AI 回复）
-          try {
-            var commentReport = {
-              nickname: comment.nickname, content: comment.text,
-              time_str: comment.time || "", is_author: comment.isAuthor || false,
-              reply_count: "", like_count: "", ai_reply: analysis.reply,
-            };
-            if (dest) {
-              commentReport.intended_province = dest.province || "";
-              commentReport.intended_city = dest.city || "";
-              commentReport.intended_attraction = dest.attraction || "";
+      stats.details.push({
+        video: videoIndex + 1, nickname: comment.nickname,
+        comment: comment.text,
+        score: analysis.score, tier: analysis.tier,
+        intent: analysis.dimensions ? analysis.dimensions.intent : "unknown",
+        reply: analysis.reply,
+      });
+
+      // 关注+私信
+      sleep(Math.floor(Math.random() * 500 + 800));
+      var shouldFollow = analysis.tier === "high" || analysis.tier === "medium";
+      var shouldDM = analysis.tier === "high";
+      var canFollow = shouldFollow && stats.follow_count < maxFollows;
+      var canDM = shouldDM && stats.dm_count < maxDMs;
+      if (canFollow || canDM) {
+        if (this._enterCommenterProfile(comment.commentAuthorAvatarEl, comment.nickname)) {
+          var profileStart = Date.now();
+          var PROFILE_TIMEOUT = 30000;
+
+          var isPrivate = !!uiOperator.findElement("user_is_private", 2000);
+          if (isPrivate) {
+            logger.info(TAG, "私密账号，跳过关注和私信");
+          } else {
+            var userData = this._collectProfileData();
+            if (userData) {
+              var lastDetail = stats.details[stats.details.length - 1];
+              if (lastDetail) lastDetail.user = userData;
+              userData._keyword = keyword;
+              userData._taskId = taskId;
+              if (dest) {
+                userData._intended_province = dest.province || "";
+                userData._intended_city = dest.city || "";
+                userData._intended_attraction = dest.attraction || "";
+              }
+              try { apiClient.saveUserProfile(userData); } catch (e) {}
+              try { apiClient.collectReport({ task_id: taskId, keyword: keyword, user: userData, data_source_type: 0 }); } catch (e) {}
             }
-            apiClient.collectReport({ task_id: taskId, keyword: keyword, comment: commentReport, data_source_type: 0 });
-          } catch (e) {}
-        } else {
-          stats.fail_count++;
-          // 回复失败 → 释放 global claim，避免误标记为"已回复"
-          try { apiClient.releaseCommentReply(comment.nickname, comment.text); } catch (e) {}
-          totalRead++;
-          continue;
-        }
+            if (Date.now() - profileStart < PROFILE_TIMEOUT && canFollow && this._followUser()) {
+              stats.follow_count++;
+            }
+            sleep(Math.floor(Math.random() * 500 + 800));
 
-        stats.details.push({
-          video: v + 1, nickname: comment.nickname,
-          comment: comment.text,
-          score: analysis.score, tier: analysis.tier,
-          intent: analysis.dimensions ? analysis.dimensions.intent : "unknown",
-          reply: analysis.reply,
-        });
-
-        // 关注+私信（AI 语义分析决定动作）
-        // high → 关注+私信 | medium → 仅关注 | low → 只回复
-        sleep(Math.floor(Math.random() * 500 + 800));
-        var shouldFollow = analysis.tier === "high" || analysis.tier === "medium";
-        var shouldDM = analysis.tier === "high";
-        var canFollow = shouldFollow && stats.follow_count < maxFollows;
-        var canDM = shouldDM && stats.dm_count < maxDMs;
-        if (canFollow || canDM) {
-          if (this._enterCommenterProfile(comment.commentAuthorAvatarEl, comment.nickname)) {
-            // 个人主页操作超时保护（30s），防止卡死在异常页面
-            var profileStart = Date.now();
-            var PROFILE_TIMEOUT = 30000;
-
-            // 进主页先判断是否私密账号 — 是则跳过后续所有操作
-            var isPrivate = !!uiOperator.findElement("user_is_private", 2000);
-            if (isPrivate) {
-              logger.info(TAG, "私密账号，跳过关注和私信");
-            } else {
-              // 采集用户主页数据
-              var userData = this._collectProfileData();
-              if (userData) {
-                var lastDetail = stats.details[stats.details.length - 1];
-                if (lastDetail) lastDetail.user = userData;
-                userData._keyword = keyword;
-                userData._taskId = taskId;
-                if (dest) {
-                  userData._intended_province = dest.province || "";
-                  userData._intended_city = dest.city || "";
-                  userData._intended_attraction = dest.attraction || "";
-                }
-                try { apiClient.saveUserProfile(userData); } catch (e) {}
-                // 采集用户数据上报
-                try { apiClient.collectReport({ task_id: taskId, keyword: keyword, user: userData, data_source_type: 0 }); } catch (e) {}
-              }
-              if (Date.now() - profileStart < PROFILE_TIMEOUT && canFollow && this._followUser()) {
-                stats.follow_count++;
-              }
-              sleep(Math.floor(Math.random() * 500 + 800));
-
-              if (Date.now() - profileStart < PROFILE_TIMEOUT && canDM) {
-                // 优先 AI 生成私信内容，失败兜底用 params.content
-                var dmContent = "";
-                var dmIntent = "other";
-                try {
-                  dmIntent = (analysis.dimensions && analysis.dimensions.intent) || "other";
-                  var aiDM = aiAnalyzer.generateDM({
-                    searchKeyword: keyword, nickname: comment.nickname,
-                    commentText: comment.text, tier: dmIntent,
-                    intendedCity: (dest && (dest.city || dest.attraction || dest.province)) || "",
+            if (Date.now() - profileStart < PROFILE_TIMEOUT && canDM) {
+              var dmContent = "";
+              var dmIntent = "other";
+              try {
+                dmIntent = (analysis.dimensions && analysis.dimensions.intent) || "other";
+                var aiDM = aiAnalyzer.generateDM({
+                  searchKeyword: keyword, nickname: comment.nickname,
+                  commentText: comment.text, tier: dmIntent,
+                  intendedCity: (dest && (dest.city || dest.attraction || dest.province)) || "",
+                });
+                if (aiDM) dmContent = aiDM;
+              } catch (e) {}
+              if (!dmContent && content) dmContent = content;
+              if (dmContent) {
+                var recipientId = (userData && userData.douyin_id) || "";
+                if (recipientId) {
+                  var dmClaimResult = apiClient.claimDMRecipient({
+                    account_id: params.account_id,
+                    recipient_douyin_id: recipientId,
+                    recipient_nickname: comment.nickname,
                   });
-                  if (aiDM) dmContent = aiDM;
-                } catch (e) { /* ignore */ }
-                if (!dmContent && content) dmContent = content;
-                if (dmContent) {
-                  var recipientId = (userData && userData.douyin_id) || "";
-                  if (recipientId) {
-                    // 全局去重：服务端原子 claim
-                    var claimResult = apiClient.claimDMRecipient({
-                      account_id: params.account_id,
-                      recipient_douyin_id: recipientId,
-                      recipient_nickname: comment.nickname,
-                    });
-                    if (claimResult && claimResult.claimed) {
-                      var sent = this._sendDM(dmContent);
-                      if (sent) {
-                        apiClient.reportDMSend({
-                          conversation_id: claimResult.conversation_id,
-                          stage: dmIntent,
-                          intent: dmIntent,
-                          keyword: keyword,
-                          content: dmContent,
-                        });
-                        stats.dm_count++;
-                      } else {
-                        apiClient.releaseDMRecipient({
-                          conversation_id: claimResult.conversation_id,
-                        });
-                      }
+                  if (dmClaimResult && dmClaimResult.claimed) {
+                    var sent = this._sendDM(dmContent);
+                    if (sent) {
+                      apiClient.reportDMSend({
+                        conversation_id: dmClaimResult.conversation_id,
+                        stage: dmIntent, intent: dmIntent, keyword: keyword, content: dmContent,
+                      });
+                      stats.dm_count++;
                     } else {
-                      logger.info(TAG, "用户 " + comment.nickname + " 已被其他设备 DM，跳过");
+                      apiClient.releaseDMRecipient({ conversation_id: dmClaimResult.conversation_id });
                     }
                   } else {
-                    // 无抖音 ID，用昵称 djb2 hash 生成 fallback 标识，保持去重机制
-                    var fbNick = comment.nickname || "unknown";
-                    var fbHash = 0;
-                    for (var hi = 0; hi < fbNick.length; hi++) {
-                      fbHash = ((fbHash << 5) - fbHash) + fbNick.charCodeAt(hi); fbHash |= 0;
-                    }
-                    var fallbackId = "fb_" + Math.abs(fbHash).toString(16);
-                    claimResult = apiClient.claimDMRecipient({
-                      account_id: params.account_id,
-                      recipient_douyin_id: fallbackId,
-                      recipient_nickname: comment.nickname,
-                    });
-                    if (claimResult && claimResult.claimed) {
-                      var sent2 = this._sendDM(dmContent);
-                      if (sent2) {
-                        apiClient.reportDMSend({
-                          conversation_id: claimResult.conversation_id,
-                          stage: dmIntent, intent: dmIntent, keyword: keyword, content: dmContent,
-                        });
-                        stats.dm_count++;
-                      } else {
-                        apiClient.releaseDMRecipient({ conversation_id: claimResult.conversation_id });
-                      }
+                    logger.info(TAG, "用户 " + comment.nickname + " 已被其他设备 DM，跳过");
+                  }
+                } else {
+                  var fbNick = comment.nickname || "unknown";
+                  var fbHash = 0;
+                  for (var hi = 0; hi < fbNick.length; hi++) {
+                    fbHash = ((fbHash << 5) - fbHash) + fbNick.charCodeAt(hi); fbHash |= 0;
+                  }
+                  var fallbackId = "fb_" + Math.abs(fbHash).toString(16);
+                  dmClaimResult = apiClient.claimDMRecipient({
+                    account_id: params.account_id,
+                    recipient_douyin_id: fallbackId,
+                    recipient_nickname: comment.nickname,
+                  });
+                  if (dmClaimResult && dmClaimResult.claimed) {
+                    var sent2 = this._sendDM(dmContent);
+                    if (sent2) {
+                      apiClient.reportDMSend({
+                        conversation_id: dmClaimResult.conversation_id,
+                        stage: dmIntent, intent: dmIntent, keyword: keyword, content: dmContent,
+                      });
+                      stats.dm_count++;
+                    } else {
+                      apiClient.releaseDMRecipient({ conversation_id: dmClaimResult.conversation_id });
                     }
                   }
                 }
-                sleep(Math.floor(Math.random() * 500 + 800));
               }
+              sleep(Math.floor(Math.random() * 500 + 800));
             }
-
-            if (Date.now() - profileStart > PROFILE_TIMEOUT) {
-              logger.warn(TAG, "主页操作超时 (" + Math.round((Date.now() - profileStart) / 1000) + "s)，强制返回");
-            }
-
-            // 确保回到评论区
-            this._returnToComments();
-            // 二次确认，不在评论区就重试
-            var onComment = uiOperator.isOnPage("is_comment_view");
-            if (!onComment) {
-              back(); sleep(800);
-              this._openComments();
-              sleep(1500);
-              onComment = uiOperator.isOnPage("is_comment_view");
-            }
-            if (!onComment) {
-              logger.warn(TAG, "返回评论区失败，跳过后续评论");
-              processed = count;  // 终止 while 循环
-              break;
-            }
-            // 刷新评论列表（位置已变，旧 items 已失效）
-            uiOperator.swipeUp();
-            sleep(800);
-            items = uiOperator.findElements("comment_list", 3000);
-            prevItemCount = items.length;  // 用刷新后的实际条目数，避免多一次无效循环
-            videoStartTime = Date.now();   // 重置超时计时，profile 操作时间不计入评论处理
-          } else {
-            logger.warn(TAG, "进入主页失败，跳过关注+私信");
-            this._dismissKeyboard();
           }
-        }
-        sleep(1000);
 
-        processed++;
-        totalRead++;
-        _reportProgress("视频 " + (v + 1) + "/" + videoCount,
-          "已回复 " + stats.success_count + " 条，跳过 " + stats.skipped + " 条",
-          (v + processed / count) / videoCount);
-        antiDetect.maybePause();
-        } catch (e) {
-          logger.error(TAG, "处理评论异常: " + e.message + "，跳过继续");
-          stats.skipped++; totalRead++;
-          // 恢复到评论面板
-          try { this._returnToComments(); } catch (e2) { /* ignore */ }
+          if (Date.now() - profileStart > PROFILE_TIMEOUT) {
+            logger.warn(TAG, "主页操作超时 (" + Math.round((Date.now() - profileStart) / 1000) + "s)，强制返回");
+          }
+
+          this._returnToComments();
+          var onComment = uiOperator.isOnPage("is_comment_view");
+          if (!onComment) {
+            back(); sleep(800);
+            this._openComments();
+            sleep(1500);
+            onComment = uiOperator.isOnPage("is_comment_view");
+          }
+          if (!onComment) {
+            logger.warn(TAG, "返回评论区失败，跳过后续评论");
+            return "break";
+          }
+          uiOperator.swipeUp();
+          sleep(800);
+          items = uiOperator.findElements("comment_list", 3000);
+          prevItemCount = items.length;
+          videoStartTime = Date.now();
+        } else {
+          logger.warn(TAG, "进入主页失败，跳过关注+私信");
+          this._dismissKeyboard();
         }
       }
+      sleep(1000);
 
-      // 还需更多评论，滑动加载
-      if (processed < count && (commentCount === 0 || totalRead < commentCount)) {
-        uiOperator.swipeUp();
-        sleep(1500);
-        items = uiOperator.findElements("comment_list", 3000);
+      processed++;
+      totalRead++;
+      _reportProgress("视频 " + (videoIndex + 1) + "/" + params.video_count,
+        "已回复 " + stats.success_count + " 条，跳过 " + stats.skipped + " 条",
+        (videoIndex + processed / count) / (params.video_count || 3));
+      antiDetect.maybePause();
+      } catch (e) {
+        logger.error(TAG, "处理评论异常: " + e.message + "，跳过继续");
+        stats.skipped++; totalRead++;
+        try { this._returnToComments(); } catch (e2) {}
       }
     }
 
-    stats.videos_processed++;
-    antiDetect.maybePause();
-
-    // 当前视频处理完，切到下一个（最后一个不用切）
-    if (v < videoCount - 1) {
-      this.safeClick("comment_off_btn", 2);
-      sleep(400);
+    if (processed < count && (commentCount === 0 || totalRead < commentCount)) {
       uiOperator.swipeUp();
-      sleep(2500);
+      sleep(1500);
+      items = uiOperator.findElements("comment_list", 3000);
     }
   }
-
-  logger.info(TAG, "完成. " + JSON.stringify(stats));
-  return { success: true, result: stats };
-};
-
-/**
- * 搜索 → 排序 → 关闭弹出框（不打开视频）
- * @param {string} keyword
- * @param {string} sortBy
- * @returns {boolean}
- */
-ReplyCommentHandler._searchAndSort = function (keyword, sortBy) {
-  if (!this._openSearch()) return false;
-  if (!this._inputKeyword(keyword)) return false;
-  if (!this._clickSuggestion(keyword)) {
-    if (!this._submitSearch()) return false;
-  }
-  sleep(3000);
-  this._clickVideoTab();
-  sleep(2000);
-  if (sortBy) {
-    this._sortResults(sortBy);
-    sleep(1500);
-  }
-  return true;
 };
 
 /**

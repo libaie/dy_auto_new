@@ -1,5 +1,5 @@
 // device/handlers/search-collect.js
-var SearchBaseHandler = require("./search-base");
+var CommentBaseHandler = require("./comment-base");
 var uiOperator = require("../core/ui-operator");
 var aiAnalyzer = require("../core/ai-analyzer");
 var apiClient = require("../core/api-client");
@@ -8,62 +8,71 @@ var commentUtils = require("./comment-utils");
 
 var TAG = "采集";
 
-var SearchCollectHandler = Object.create(SearchBaseHandler);
+var SearchCollectHandler = Object.create(CommentBaseHandler);
 
-SearchCollectHandler._interactWithVideo = function (content, stats, params) {
-  params = params || {};
-  var taskId = (stats._taskId || "");
-  var keyword = (stats._keyword || "");
-  this._currentDest = aiAnalyzer.resolveDestination(keyword);
-  var t0 = Date.now();
+SearchCollectHandler._config = { videoTimeoutMs: 0, interVideoDelay: 1500 };
 
-  // 防止上个视频评论区残留：若已在评论页，先退回到视频页
+SearchCollectHandler.execute = function (params) {
+  if (params.share_links && params.share_links.length > 0) {
+    return this._executeShareLinks(params);
+  }
+  return CommentBaseHandler.execute.call(this, params);
+};
+
+SearchCollectHandler._beforeSearch = function (params) {
+  this._currentDest = aiAnalyzer.resolveDestination(params.keyword);
+};
+
+SearchCollectHandler._initStats = function (params) {
+  return { success_count: 0, fail_count: 0, details: [],
+    _taskId: params.task_id || "", _keyword: params.keyword || "" };
+};
+
+SearchCollectHandler._shouldProcessVideo = function (params, videoIndex) {
+  // 残留在评论区则先退出
   if (uiOperator.isOnPage("is_comment_view")) {
     logger.info(TAG, "[耗时] 检测到评论面板残留，back 回到视频页");
     back();
     sleep(800);
   }
+  return CommentBaseHandler._shouldProcessVideo.call(this, params, videoIndex);
+};
 
-  var dataSourceType = uiOperator.findElement("is_shopping_cart", 500) ? 1 : 0;
-  logger.info(TAG, "[耗时] 数据来源类型: " + (dataSourceType === 1 ? "带货视频" : "普通视频"));
-
-  // 预检评论数：零评论视频点评论按钮会直接唤起键盘，提前跳过
-  var commentBtn = uiOperator.findElement("video_comment_btn", 2000);
-  var cc = commentUtils.preCheckCommentCount(commentBtn);
-  logger.info(TAG, "[耗时] 评论按钮 desc: '" + cc.rawDesc + "'");
-  logger.info(TAG, "[耗时] 评论数: " + (cc.count >= 0 ? cc.count : "未知"));
-  if (cc.count === 0) {
-    logger.info(TAG, "[耗时] 该视频无评论，跳过 (耗时 " + (Date.now() - t0) + "ms)");
-    return false;
+SearchCollectHandler._closeComments = function () {
+  this.safeClick("comment_off_btn", 2);
+  sleep(400);
+  if (uiOperator.isOnPage("is_comment_view")) {
+    logger.info(TAG, "评论区未关闭，back 兜底");
+    back();
+    sleep(500);
   }
+};
 
-  logger.info(TAG, "[耗时] 尝试打开评论区...");
-  if (!this._openComments()) {
-    logger.warn(TAG, "[耗时] 评论区打开失败, 跳过此视频 (耗时 " + (Date.now() - t0) + "ms)");
-    return false;
-  }
-  logger.info(TAG, "[耗时] 评论区已打开 (耗时 " + (Date.now() - t0) + "ms)");
-
-  var collected = 0;
-  var visitedUsers = {};
-  var seenComments = {};
+SearchCollectHandler._processComments = function (params, stats, videoIndex) {
+  var keyword = params.keyword;
+  var taskId = params.task_id || "";
   var maxComments = (params.count === -1) ? Infinity : (params.count || 50);
-
   var maxAgeDays = (params.max_age_days === -1) ? Infinity : (params.max_age_days || 30);
   var now = new Date();
   var cutoff = (maxAgeDays === Infinity) ? new Date(0) : new Date(now.getTime() - maxAgeDays * 24 * 60 * 60 * 1000);
 
+  var dataSourceType = uiOperator.findElement("is_shopping_cart", 500) ? 1 : 0;
+  logger.info(TAG, "[耗时] 数据来源类型: " + (dataSourceType === 1 ? "带货视频" : "普通视频"));
+
+  var collected = 0;
+  var visitedUsers = {};
+  var seenComments = {};
   var consecutiveEmpty = 0;
   var consecutiveOld = 0;
   var scroll = 0;
   var reopenFailed = false;
+  var t0 = Date.now();
 
   while (true) {
     if (consecutiveEmpty >= 5) {
       logger.info(TAG, "[耗时] 连续 " + consecutiveEmpty + " 轮无有效评论, 停止");
       break;
     }
-
     if (consecutiveOld >= 5) {
       logger.info(TAG, "[耗时] 连续 " + consecutiveOld + " 轮评论日期均超过 " + maxAgeDays + " 天, 停止");
       break;
@@ -87,50 +96,43 @@ SearchCollectHandler._interactWithVideo = function (content, stats, params) {
       var comment = commentUtils.parseCommentItem(items[i], this);
       if (!comment) { logger.debug(TAG, "  [" + i + "] 解析失败 (" + (Date.now() - tItem) + "ms)"); continue; }
 
-      // ① 本地过滤: 纯表情/短文本 + 提示词模板 exclude 关键词
       if (!commentUtils.localPreFilter(comment.text)) {
         localSkipped++;
-        logger.debug(TAG, "  [" + i + "] 本地淘汰(纯表情/短文本): " + comment.nickname + " (" + (Date.now() - tItem) + "ms)");
+        logger.debug(TAG, "  [" + i + "] 本地淘汰(纯表情/短文本): " + comment.nickname);
         continue;
       }
       var localCheck = aiAnalyzer._localRelevanceCheck(comment.text);
       if (localCheck === false) {
         localSkipped++;
-        logger.info(TAG, "  [" + i + "] 本地淘汰(exclude): " + comment.nickname + " (" + (Date.now() - tItem) + "ms)");
+        logger.info(TAG, "  [" + i + "] 本地淘汰(exclude): " + comment.nickname);
         continue;
       }
 
-      // ② 时效过滤
-      var tAge = Date.now();
       var commentDate = commentUtils.parseTime(comment.time);
       if (!commentDate || commentDate < cutoff) {
         oldThisScroll++;
-        logger.debug(TAG, "  [" + i + "] 过期: " + comment.nickname + " (" + (Date.now() - tItem) + "ms)");
+        logger.debug(TAG, "  [" + i + "] 过期: " + comment.nickname);
         continue;
       }
 
-      // ③ 查重过滤
       var dedupKey = comment.nickname + "|" + comment.text.substring(0, 80);
       if (seenComments[dedupKey]) { dupSkipped++; continue; }
       seenComments[dedupKey] = true;
 
-      // ④ AI 语义分析（最昂贵，放最后）
       comment._keyword = keyword;
       var tAI = Date.now();
-      if (!this._aiQualify(comment)) { aiSkipped++; logger.info(TAG, "  [" + i + "] AI淘汰: " + comment.nickname + " (前置" + (tAI - tItem) + "ms + AI " + (Date.now() - tAI) + "ms)"); continue; }
+      if (!this._aiQualify(comment)) { aiSkipped++; logger.info(TAG, "  [" + i + "] AI淘汰: " + comment.nickname); continue; }
       validThisScroll++;
 
-      logger.info(TAG, "  [" + i + "] ★符合: " + comment.nickname + " (前置" + (tAI - tItem) + "ms + AI " + (Date.now() - tAI) + "ms)");
+      logger.info(TAG, "  [" + i + "] ★符合: " + comment.nickname);
       var commentData = this._collectCommentData(items[i], comment);
 
       var userData = null;
       var needReopen = false;
       if (!visitedUsers[comment.nickname]) {
         visitedUsers[comment.nickname] = true;
-        var tUser = Date.now();
         try {
           userData = this._collectUserData(items[i]);
-          logger.info(TAG, "[耗时] 用户数据采集完成: " + (userData ? userData.nickname : "null") + " (" + (Date.now() - tUser) + "ms)");
         } catch (e) { logger.warn(TAG, "用户数据采集失败: " + e.message); }
         needReopen = true;
       }
@@ -152,21 +154,15 @@ SearchCollectHandler._interactWithVideo = function (content, stats, params) {
       logger.info(TAG, "[耗时] 评论区重开失败，停止 (已采集 " + collected + " 条)");
       break;
     }
-
     if (collected >= maxComments) {
       logger.info(TAG, "[耗时] 已采集 " + collected + " 条, 达到目标");
       break;
     }
 
-    // 本轮滚动耗时摘要
-    logger.info(TAG, "[耗时] ══ 第 " + scroll + " 轮完成: 符合=" + validThisScroll + " AI淘汰=" + aiSkipped + " 过期=" + oldThisScroll + " 本地淘汰=" + localSkipped + " 重复=" + dupSkipped + " (处理耗时 " + (Date.now() - tScrollStart) + "ms)");
+    logger.info(TAG, "[耗时] ══ 第 " + scroll + " 轮完成: 符合=" + validThisScroll + " AI淘汰=" + aiSkipped + " 过期=" + oldThisScroll + " 本地淘汰=" + localSkipped + " 重复=" + dupSkipped);
 
     if (validThisScroll === 0 && oldThisScroll === 0) {
-      if (aiSkipped > 0) {
-        consecutiveEmpty = 0;  // 有评论但AI筛选未过，不计入空滚
-      } else {
-        consecutiveEmpty++;
-      }
+      consecutiveEmpty = aiSkipped > 0 ? 0 : consecutiveEmpty + 1;
       consecutiveOld = 0;
     } else if (validThisScroll === 0 && oldThisScroll > 0) {
       consecutiveEmpty = 0;
@@ -189,7 +185,6 @@ SearchCollectHandler._interactWithVideo = function (content, stats, params) {
   logger.info(TAG, "[耗时] 视频采集完成: " + collected + " 条 (总耗时 " + (Date.now() - t0) + "ms)");
   stats.details.push("collected: " + collected);
   stats.success_count += collected;
-  return collected > 0;
 };
 
 SearchCollectHandler._openComments = function () {
@@ -271,93 +266,47 @@ SearchCollectHandler._reportCollection = function (taskId, keyword, commentData,
 };
 
 SearchCollectHandler.execute = function (params) {
-  aiAnalyzer.useTemplate(params.prompt_template_id);
-  if (!this.ensureAppActive()) return { success: false, error: "打开抖音失败" };
-
-  var taskId = params.task_id || "";
-
-  // 分享链接模式
   if (params.share_links && params.share_links.length > 0) {
-    var links = params.share_links;
-    logger.info(TAG, "分享链接采集: " + links.length + " 个链接, 关键词='" + (params.keyword || "") + "', 每视频评论=" + (params.count || 50));
-    var linkStats = { success_count: 0, fail_count: 0, details: [], _taskId: taskId, _keyword: params.keyword || "" };
-
-    for (var li = 0; li < links.length; li++) {
-      var link = (links[li] || "").trim();
-      if (!link) continue;
-      logger.info(TAG, "第 " + (li + 1) + "/" + links.length + " 个链接: " + link.substring(0, 40) + "...");
-
-      if (!this._openSearch()) { linkStats.fail_count++; continue; }
-      var urlMatch = link.match(/https?:\/\/v\.douyin\.com\/[A-Za-z0-9_?=&%]+\/?/);
-      var pasteText = urlMatch ? urlMatch[0] : link;
-      if (!this._inputKeyword(pasteText)) { linkStats.fail_count++; continue; }
-      sleep(300);
-      if (!this._submitSearch()) { linkStats.fail_count++; continue; }
-      sleep(2000);
-      if (!uiOperator.isOnPage("is_video_view")) {
-        logger.info(TAG, "未自动跳转视频页，尝试点击搜索结果");
-        this._clickSearchResult(0);
-        sleep(1700);
-      }
-
-      if (!this._interactWithVideo("", linkStats, params)) linkStats.fail_count++;
-      this.safeClick("comment_off_btn", 2);
-      sleep(400);
-      this._backToSearchResults();
-    }
-    logger.info(TAG, "链接采集完成: " + JSON.stringify(linkStats));
-    return { success: true, result: linkStats };
+    return this._executeShareLinks(params);
   }
+  return CommentBaseHandler.execute.call(this, params);
+};
 
-  // 关键词搜索模式
-  var keyword = params.keyword;
-  var videoCount = (params.video_count === -1) ? 200 : (params.video_count || params.count || 5);
-  if (!keyword) return { success: false, error: "缺少关键词或分享链接" };
-  logger.info(TAG, "采集: '" + keyword + "', 视频=" + videoCount + ", 每视频评论=" + (params.count || 50));
+SearchCollectHandler._executeShareLinks = function (params) {
+  var links = params.share_links;
+  var taskId = params.task_id || "";
+  logger.info(TAG, "分享链接采集: " + links.length + " 个链接, 关键词='" + (params.keyword || "") + "'");
+  var linkStats = { success_count: 0, fail_count: 0, details: [], _taskId: taskId, _keyword: params.keyword || "" };
 
-  if (!this._openSearch()) return { success: false, error: "打开搜索页失败" };
-  if (!this._inputKeyword(keyword)) return { success: false, error: "输入关键词失败" };
-  sleep(1000);
-  if (!this._clickSuggestion(keyword)) {
-    if (!this._submitSearch()) return { success: false, error: "提交搜索失败" };
-  }
-  sleep(2000);
-  this._clickVideoTab();
-  sleep(1000);
+  for (var li = 0; li < links.length; li++) {
+    var link = (links[li] || "").trim();
+    if (!link) continue;
+    logger.info(TAG, "第 " + (li + 1) + "/" + links.length + " 个链接: " + link.substring(0, 40) + "...");
 
-  var sortBy = params.sort_by || '';
-  if (sortBy) {
-    this._sortResults(sortBy);
-    sleep(800);
-  }
-
-  var stats = { success_count: 0, fail_count: 0, details: [], _taskId: taskId, _keyword: keyword };
-  for (var i = 0; i < videoCount; i++) {
-    logger.info(TAG, "第 " + (i + 1) + "/" + videoCount + " 个视频");
-    if (i === 0) {
-      if (!this._clickSearchResult(0)) break;
+    if (!this._openSearch()) { linkStats.fail_count++; continue; }
+    var urlMatch = link.match(/https?:\/\/v\.douyin\.com\/[A-Za-z0-9_?=&%]+\/?/);
+    var pasteText = urlMatch ? urlMatch[0] : link;
+    if (!this._inputKeyword(pasteText)) { linkStats.fail_count++; continue; }
+    sleep(300);
+    if (!this._submitSearch()) { linkStats.fail_count++; continue; }
+    sleep(2000);
+    if (!uiOperator.isOnPage("is_video_view")) {
+      logger.info(TAG, "未自动跳转视频页，尝试点击搜索结果");
+      this._clickSearchResult(0);
       sleep(1700);
-    } else {
-      // 开关评论区后已在视频播放页，直接上滑切换到下一个搜索结果视频
-      uiOperator.swipeUp();
-      sleep(1500);
     }
-    if (!this._interactWithVideo("", stats, params)) stats.fail_count++;
-    // 只有评论区实际打开过才关闭（零评论跳过的视频没打开面板，点 comment_off_btn 会报错）
-    if (uiOperator.isOnPage("is_comment_view")) {
-      this.safeClick("comment_off_btn", 2);
-      sleep(400);
-      if (uiOperator.isOnPage("is_comment_view")) {
-        logger.info(TAG, "评论区未关闭，back 兜底");
-        back();
-        sleep(500);
-      }
-    }
+
+    if (!CommentBaseHandler._shouldProcessVideo.call(this, params, 0)) { linkStats.fail_count++; }
+    else if (commentUtils.openComments()) {
+      this._processComments(params, linkStats, 0);
+    } else { linkStats.fail_count++; }
+
+    this.safeClick("comment_off_btn", 2);
+    sleep(400);
+    this._backToSearchResults();
   }
-  shell("am start -a android.intent.action.VIEW -d 'snssdk1128://search/result'", true);
-  sleep(2000);
-  logger.info(TAG, "采集完成: " + JSON.stringify(stats));
-  return { success: true, result: stats };
+  logger.info(TAG, "链接采集完成: " + JSON.stringify(linkStats));
+  return { success: true, result: linkStats };
 };
 
 

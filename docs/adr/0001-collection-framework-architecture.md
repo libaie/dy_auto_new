@@ -92,9 +92,11 @@ parseCommentItem: function (item, handler) {
 **收益**：消除 170 行重复代码。选择器逻辑单点维护。
 **成本**：所有调用点需传入 `this`。约 3 处修改。
 
-### R2: AI 降级模式
+### R2: AI 降级模式 — **REJECTED**
 
-在 `_aiQualify` 中追踪连续 AI 失败次数。当 >= 3 次连续失败时，切换到"全量采集"模式。
+~~在 `_aiQualify` 中追踪连续 AI 失败次数。当 >= 3 次连续失败时，切换到"全量采集"模式。~~
+
+**否决原因**: 所有符合本地过滤的评论必须经过 AI 分析，不可跳过。AI 筛选是数据质量的核心保障。
 
 ```javascript
 SearchCollectHandler._aiQualify = function (comment) {
@@ -135,7 +137,7 @@ SearchCollectHandler._aiQualify = function (comment) {
 | 优先级 | 建议 | 原因 |
 |--------|------|------|
 | **立即** | R1 (去重) | 消除架构债务根源，防止后续 bug |
-| **立即** | R2 (降级) | AI 不可用时采集归零是生产级 bug |
+| ~~立即~~ | ~~R2 (降级)~~ | **REJECTED** — 所有评论必须经 AI 分析，不可跳过 |
 | **本迭代** | R4 (拆分) | 降低调试成本，改动最小 |
 | **下迭代** | R3 (批量) | 需服务端配合 |
 | **下迭代** | R5 (统一入口) | 纯清理，不影响功能 |
@@ -144,7 +146,6 @@ SearchCollectHandler._aiQualify = function (comment) {
 
 ### Positive
 - **R1**: 选择器逻辑单点维护，bug 修复一劳永逸
-- **R2**: 采集鲁棒性大幅提升，网络波动不丢数据
 - **R3**: 网络开销降低 90%，设备端省电
 - **R4**: 调试效率提升，新人能快速理解数据流
 
@@ -154,4 +155,3 @@ SearchCollectHandler._aiQualify = function (comment) {
 
 ### Risks
 - **R1 风险**: handler 为 null 时独立模式兜底已存在且验证通过 — 低风险
-- **R2 风险**: 降级模式采集低质量评论 → 标记 `ai_degraded`，后端可过滤

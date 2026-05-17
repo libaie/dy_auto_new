@@ -118,7 +118,7 @@ class TestPipelineAPI:
             "title": "Pipeline Test", "logline": "test", "genre": "drama",
             "total_episodes": 5, "target_duration": 60,
         }).json()["series"]["id"]
-        resp = client.post("/api/pipeline/start", params={
+        resp = client.post("/api/pipeline/start", json={
             "series_id": series_id, "mode": "step_by_step",
         })
         return series_id, resp
@@ -148,20 +148,52 @@ class TestPipelineAPI:
 
 
 class TestAIConfigAPI:
-    def test_get_models_empty(self, client):
-        resp = client.get("/api/ai-config/models")
+    def test_list_and_create_model(self, client):
+        """New AIModel CRUD — list seeded models, then create one."""
+        resp = client.get("/api/ai-models")
         assert resp.status_code == 200
-        assert resp.json()["ok"] is True
-        assert isinstance(resp.json()["models"], dict)
+        data = resp.json()
+        assert data["ok"] is True
+        assert isinstance(data["models"], list)
 
-    def test_update_models(self, client):
-        resp = client.put("/api/ai-config/models", json={
-            "llm_provider": "deepseek",
-            "llm_model": "deepseek-chat",
+        # Create a new model
+        resp2 = client.post("/api/ai-models", json={
+            "name": "Test Model",
+            "model_type": "llm",
+            "provider": "openai",
+            "base_url": "https://test.openai.com/v1",
+            "api_key": "sk-test-123",
+            "model_name": "gpt-test",
         })
-        assert resp.status_code == 200
-        assert resp.json()["ok"] is True
+        assert resp2.status_code == 200
+        assert resp2.json()["model"]["name"] == "Test Model"
+        assert resp2.json()["model"]["api_key"] == "sk-test-123"
 
-        # Verify persistence
-        resp2 = client.get("/api/ai-config/models")
-        assert resp2.json()["models"]["llm_provider"] == "deepseek"
+    def test_update_and_delete_model(self, client):
+        """Update then delete a model."""
+        # Create
+        resp = client.post("/api/ai-models", json={
+            "name": "To Update", "model_type": "tts", "provider": "edge-tts",
+            "model_name": "tts-test",
+        })
+        model_id = resp.json()["model"]["id"]
+
+        # Update
+        resp2 = client.put(f"/api/ai-models/{model_id}", json={
+            "name": "Updated Name", "enabled": False,
+        })
+        assert resp2.status_code == 200
+        assert resp2.json()["model"]["name"] == "Updated Name"
+        assert resp2.json()["model"]["enabled"] is False
+
+        # Verify via detail
+        resp3 = client.get(f"/api/ai-models/{model_id}")
+        assert resp3.json()["model"]["name"] == "Updated Name"
+
+        # Delete
+        resp4 = client.delete(f"/api/ai-models/{model_id}")
+        assert resp4.status_code == 200
+
+        # Gone
+        resp5 = client.get(f"/api/ai-models/{model_id}")
+        assert resp5.status_code == 404

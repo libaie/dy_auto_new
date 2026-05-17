@@ -66,12 +66,13 @@ describe('API Clients', () => {
   })
 
   describe('pipeline API', () => {
-    it('startPipeline calls POST with params', async () => {
+    it('startPipeline calls POST with body payload', async () => {
       const { startPipeline } = await import('../api/pipeline.js')
       mockPost.mockResolvedValue({ data: { ok: true } })
-      await startPipeline('sid', 'eid', 'step_by_step')
-      expect(mockPost).toHaveBeenCalledWith('/pipeline/start', null, {
-        params: { series_id: 'sid', episode_id: 'eid', mode: 'step_by_step' }
+      await startPipeline('sid', 'eid', 'step_by_step', { imageModel: 'img-id' }, null)
+      expect(mockPost).toHaveBeenCalledWith('/pipeline/start', {
+        series_id: 'sid', episode_id: 'eid', mode: 'step_by_step',
+        model_ids: { imageModel: 'img-id' }, director_plan: null,
       })
     })
 
@@ -84,11 +85,32 @@ describe('API Clients', () => {
   })
 
   describe('aiConfig API', () => {
-    it('updateModels calls PUT /ai-config/models', async () => {
-      const { updateModels } = await import('../api/aiConfig.js')
-      mockPut.mockResolvedValue({ data: { ok: true } })
-      await updateModels({ llm_provider: 'deepseek' })
-      expect(mockPut).toHaveBeenCalledWith('/ai-config/models', { llm_provider: 'deepseek' })
+    it('listModels calls GET /ai-models', async () => {
+      const { listModels } = await import('../api/aiConfig.js')
+      mockGet.mockResolvedValue({ data: { ok: true, models: [] } })
+      await listModels({ model_type: 'llm' })
+      expect(mockGet).toHaveBeenCalledWith('/ai-models', { params: { model_type: 'llm' } })
+    })
+
+    it('getModelOptions calls GET /ai-models/options', async () => {
+      const { getModelOptions } = await import('../api/aiConfig.js')
+      mockGet.mockResolvedValue({ data: { ok: true, options: [] } })
+      await getModelOptions('llm')
+      expect(mockGet).toHaveBeenCalledWith('/ai-models/options', { params: { model_type: 'llm' } })
+    })
+
+    it('createModel calls POST /ai-models', async () => {
+      const { createModel } = await import('../api/aiConfig.js')
+      mockPost.mockResolvedValue({ data: { ok: true } })
+      await createModel({ name: 'Test', model_type: 'llm', provider: 'deepseek' })
+      expect(mockPost).toHaveBeenCalledWith('/ai-models', { name: 'Test', model_type: 'llm', provider: 'deepseek' })
+    })
+
+    it('testModelConnection calls POST /ai-models/:id/test', async () => {
+      const { testModelConnection } = await import('../api/aiConfig.js')
+      mockPost.mockResolvedValue({ data: { ok: true } })
+      await testModelConnection('uuid-123')
+      expect(mockPost).toHaveBeenCalledWith('/ai-models/uuid-123/test')
     })
   })
 })

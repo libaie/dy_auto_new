@@ -70,7 +70,8 @@ class SelectorService:
     def create_selector(self, db: Session, action_name: str, strategies: list,
                         platform_version: str = "default", version: int = 1,
                         description: str = "", category: str = "",
-                        purpose: str = "locate", extract_field: str = None,
+                        purpose: str = "locate", strategy_logic: str = "and",
+                        extract_field: str = None,
                         clean_mode: str = None, clean_pattern: str = None,
                         clean_prompt: str = None) -> dict:
         """Create a new UI selector."""
@@ -89,6 +90,7 @@ class SelectorService:
             version=version,
             category=category or None,
             purpose=purpose or "locate",
+            strategy_logic=strategy_logic or "and",
             extract_field=extract_field,
             clean_mode=clean_mode,
             clean_pattern=clean_pattern,
@@ -102,7 +104,8 @@ class SelectorService:
     def update_selector(self, db: Session, action_name: str,
                         strategies: list = None, platform_version: str = None,
                         description: str = None, category: str = None,
-                        purpose: str = None, extract_field: str = None,
+                        purpose: str = None, strategy_logic: str = None,
+                        extract_field: str = None,
                         clean_mode: str = None, clean_pattern: str = None,
                         clean_prompt: str = None) -> dict:
         """Update an existing selector. Auto-bumps version on any change."""
@@ -120,6 +123,8 @@ class SelectorService:
             sel.category = category or None
         if purpose is not None:
             sel.purpose = purpose
+        if strategy_logic is not None:
+            sel.strategy_logic = strategy_logic
         if extract_field is not None:
             sel.extract_field = extract_field
         if clean_mode is not None:

@@ -364,6 +364,7 @@ function openCreateDialog() {
   form.strategies = '[]'
   form.category = ''
   form.purpose = 'locate'
+  form.strategy_logic = 'and'
   form.extract_field = 'text'
   form.clean_mode = 'raw'
   form.clean_pattern = ''
@@ -385,6 +386,7 @@ function openEditDialog(sel) {
   form.strategies = JSON.stringify(sel.strategies || [], null, 2)
   form.category = sel.category || ''
   form.purpose = sel.purpose || 'locate'
+  form.strategy_logic = sel.strategy_logic || 'and'
   form.extract_field = sel.extract_field || 'text'
   form.clean_mode = sel.clean_mode || 'raw'
   form.clean_pattern = sel.clean_pattern || ''
@@ -423,6 +425,7 @@ async function handleSave() {
     description: form.description.trim() || '',
     category: form.category || '',
     purpose: form.purpose || 'locate',
+    strategy_logic: form.purpose === 'page_detect' ? (form.strategy_logic || 'and') : undefined,
     extract_field: form.purpose === 'extract' ? (form.extract_field || 'text') : undefined,
     clean_mode: form.purpose === 'extract' ? (form.clean_mode || 'raw') : undefined,
     clean_pattern: form.purpose === 'extract' && form.clean_mode === 'regex' ? (form.clean_pattern || undefined) : undefined,
@@ -835,10 +838,33 @@ onMounted(fetchSelectors)
                         class="flex-1 px-4 py-2 text-sm font-medium transition-colors"
                         @click="form.purpose = 'page_detect'"
                       >
-                        页面检测（多控件 AND 判定）
+                        页面检测（多控件判定）
                       </button>
                     </div>
-                    <p class="mt-1 text-xs text-slate-500">定位：查找控件并点击/输入；取值：读取控件属性值；页面检测：所有策略必须同时命中才判定页面存在</p>
+                    <!-- strategy_logic: only for page_detect -->
+                    <div v-if="form.purpose === 'page_detect'" class="mt-3">
+                      <label class="text-sm font-medium text-slate-300">策略间逻辑</label>
+                      <div class="mt-2 flex gap-2">
+                        <button
+                          type="button"
+                          :class="form.strategy_logic === 'and' ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' : 'text-slate-500 hover:text-slate-300 border-transparent'"
+                          class="px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors"
+                          @click="form.strategy_logic = 'and'"
+                        >
+                          AND（全部命中）
+                        </button>
+                        <button
+                          type="button"
+                          :class="form.strategy_logic === 'or' ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' : 'text-slate-500 hover:text-slate-300 border-transparent'"
+                          class="px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors"
+                          @click="form.strategy_logic = 'or'"
+                        >
+                          OR（任一命中）
+                        </button>
+                      </div>
+                      <p class="mt-1 text-xs text-slate-500">AND：所有策略必须同时命中；OR：任意策略命中即判定页面存在</p>
+                    </div>
+                    <p class="mt-1 text-xs text-slate-500">定位：查找控件并点击/输入；取值：读取控件属性值；页面检测：多控件组合判定当前页面</p>
                   </div>
 
                   <!-- extract fields (shown when purpose=extract) -->

@@ -20,6 +20,7 @@ class SelectorCreateRequest(BaseModel):
     description: str = ""
     category: str = ""
     purpose: str = "locate"
+    strategy_logic: str = "and"
     extract_field: Optional[str] = None
     clean_mode: Optional[str] = None
     clean_pattern: Optional[str] = None
@@ -32,6 +33,7 @@ class SelectorUpdateRequest(BaseModel):
     description: Optional[str] = None
     category: Optional[str] = None
     purpose: Optional[str] = None
+    strategy_logic: Optional[str] = None
     extract_field: Optional[str] = None
     clean_mode: Optional[str] = None
     clean_pattern: Optional[str] = None
@@ -81,6 +83,7 @@ async def create_selector(
             description=request.description,
             category=request.category,
             purpose=request.purpose,
+            strategy_logic=request.strategy_logic,
             extract_field=request.extract_field,
             clean_mode=request.clean_mode,
             clean_pattern=request.clean_pattern,
@@ -114,6 +117,7 @@ async def update_selector(
             description=request.description,
             category=request.category,
             purpose=request.purpose,
+            strategy_logic=request.strategy_logic,
             extract_field=request.extract_field,
             clean_mode=request.clean_mode,
             clean_pattern=request.clean_pattern,

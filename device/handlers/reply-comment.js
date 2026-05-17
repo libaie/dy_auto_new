@@ -466,18 +466,8 @@ ReplyCommentHandler.execute = function (params) {
 
     // 当前视频处理完，切到下一个（最后一个不用切）
     if (v < videoCount - 1) {
-      // 1. comment_off_btn 关闭评论面板
       this.safeClick("comment_off_btn", 2);
-      sleep(600);
-      // 2. 确认关闭，否则 back 兜底
-      if (uiOperator.findElement("is_comment_view", 300)) {
-        back(); sleep(600);
-      }
-      // 3. 暂停视频 → 上滑切下一个
-      if (uiOperator.findElement("is_video_view", 1000)) {
-        press(device.width / 2, device.height / 2, 80);
-        sleep(300);
-      }
+      sleep(400);
       uiOperator.swipeUp();
       sleep(2500);
     }

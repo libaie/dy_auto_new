@@ -135,8 +135,11 @@ SearchBaseHandler._openSearch = function () {
   var clicked = this.safeClick("search_tab", 3);
   if (clicked) {
     sleep(Math.floor(Math.random() * 1000 + 1000));
-    flowContext.enter("search");
-    return true;
+    if (uiOperator.isOnPage("is_search_view")) {
+      flowContext.enter("search");
+      return true;
+    }
+    logger.warn(TAG, "点击 search_tab 后未进入搜索页，重试");
   }
 
   // 2. 搜索入口找不到，可能在子页面，最多 back 3 次（不摧毁页面状态）
@@ -146,8 +149,11 @@ SearchBaseHandler._openSearch = function () {
     clicked = this.safeClick("search_tab", 2);
     if (clicked) {
       sleep(Math.floor(Math.random() * 1000 + 1000));
-      flowContext.enter("search");
-      return true;
+      if (uiOperator.isOnPage("is_search_view")) {
+        flowContext.enter("search");
+        return true;
+      }
+      logger.warn(TAG, "back 后点击 search_tab 未进入搜索页，继续重试");
     }
   }
 
@@ -159,8 +165,11 @@ SearchBaseHandler._openSearch = function () {
     clicked = this.safeClick("search_tab", 3);
     if (clicked) {
       sleep(Math.floor(Math.random() * 1000 + 1000));
-      flowContext.enter("search");
-      return true;
+      if (uiOperator.isOnPage("is_search_view")) {
+        flowContext.enter("search");
+        return true;
+      }
+      logger.warn(TAG, "冷启动后点击 search_tab 未进入搜索页");
     }
   }
   return false;

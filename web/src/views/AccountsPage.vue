@@ -21,6 +21,16 @@ import { useToastStore } from '../stores/toast.js'
 import TipIcon from '../components/TipIcon.vue'
 import { useWebSocket } from '../composables/useWebSocket.js'
 
+const DAILY_LIMIT_FIELDS = [
+  { key: 'likes', label: '点赞', max: 200 },
+  { key: 'comments', label: '评论', max: 100 },
+  { key: 'follows', label: '关注', max: 100 },
+  { key: 'dms', label: '私信', max: 50 },
+  { key: 'replies', label: '回复', max: 100 },
+]
+
+const DEFAULT_LIMITS = { likes: 50, comments: 20, follows: 20, dms: 10, replies: 15 }
+
 // --- Data state ---
 const accounts = ref([])
 const total = ref(0)
@@ -39,9 +49,9 @@ const defaultForm = {
   douyin_id: '',
   group: '',
   status: 'active',
-  daily_limits: '',
+  unlimited: false,
+  limits: { ...DEFAULT_LIMITS },
 }
-const dailyLimitsError = ref(null)
 const form = reactive({ ...defaultForm })
 const editingId = ref(null)
 
@@ -111,8 +121,9 @@ function openCreateDialog() {
   isEditing.value = false
   editingId.value = null
   Object.assign(form, defaultForm)
+  form.limits = { ...DEFAULT_LIMITS }
+  form.unlimited = false
   formError.value = null
-  dailyLimitsError.value = null
   showFormDialog.value = true
 }
 
@@ -124,10 +135,21 @@ function openEditDialog(account) {
   form.douyin_id = account.douyin_id || ''
   form.group = account.group || ''
   form.status = account.status || 'active'
-  form.daily_limits =
-    account.daily_limits != null ? JSON.stringify(account.daily_limits) : ''
+  const dl = account.daily_limits
+  if (dl && typeof dl === 'object' && Object.keys(dl).length > 0) {
+    form.unlimited = false
+    form.limits = {
+      likes: dl.likes ?? DEFAULT_LIMITS.likes,
+      comments: dl.comments ?? DEFAULT_LIMITS.comments,
+      follows: dl.follows ?? DEFAULT_LIMITS.follows,
+      dms: dl.dms ?? DEFAULT_LIMITS.dms,
+      replies: dl.replies ?? DEFAULT_LIMITS.replies,
+    }
+  } else {
+    form.unlimited = true
+    form.limits = { ...DEFAULT_LIMITS }
+  }
   formError.value = null
-  dailyLimitsError.value = null
   showFormDialog.value = true
 }
 
@@ -146,26 +168,7 @@ async function handleSave() {
     douyin_id: form.douyin_id.trim() || undefined,
     group: form.group.trim() || undefined,
     status: form.status,
-  }
-
-  if (form.daily_limits === '' || form.daily_limits == null) {
-    payload.daily_limits = null
-  } else {
-    try {
-      const parsed = JSON.parse(form.daily_limits)
-      if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
-        payload.daily_limits = parsed
-        dailyLimitsError.value = null
-      } else {
-        dailyLimitsError.value = '每日限额需为 JSON 对象格式，如 {"like": 50, "comment": 20}'
-        saving.value = false
-        return
-      }
-    } catch {
-      dailyLimitsError.value = 'JSON 格式不正确，请检查'
-      saving.value = false
-      return
-    }
+    daily_limits: form.unlimited ? {} : { ...form.limits },
   }
 
   try {
@@ -327,13 +330,6 @@ onMounted(fetchAccounts)
                 >
                   {{ formError }}
                 </div>
-                <div
-                  v-if="dailyLimitsError"
-                  class="mt-3 bg-amber-500/10 border border-amber-500/20 text-amber-400 text-sm px-3 py-2 rounded-lg"
-                >
-                  {{ dailyLimitsError }}
-                </div>
-
                 <form class="mt-4 space-y-4" @submit.prevent="handleSave">
                   <!-- Nickname -->
                   <div>
@@ -414,20 +410,29 @@ onMounted(fetchAccounts)
 
                   <!-- Daily Limits -->
                   <div>
-                    <label
-                      for="daily_limits"
-                      class="flex items-center gap-1.5 text-sm font-medium text-slate-300"
-                    >
-                      每日限额
-                      <TipIcon text="按操作类型设置每日上限，JSON 格式。如 {&quot;like&quot;: 50, &quot;comment&quot;: 20}，留空不限制" width="w-96" />
-                    </label>
-                    <textarea
-                      id="daily_limits"
-                      v-model="form.daily_limits"
-                      rows="3"
-                      class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 font-mono"
-                      placeholder='{"like": 50, "comment": 20}'
-                    ></textarea>
+                    <div class="flex items-center justify-between mb-2">
+                      <label class="flex items-center gap-1.5 text-sm font-medium text-slate-300">
+                        每日限额
+                        <TipIcon text="每种操作类型每日执行上限，超出后自动跳过该操作" width="w-80" />
+                      </label>
+                      <label class="flex items-center gap-2 text-xs text-slate-400 cursor-pointer select-none">
+                        <input type="checkbox" v-model="form.unlimited" class="accent-indigo-600 rounded" />
+                        不限制
+                      </label>
+                    </div>
+                    <div v-if="!form.unlimited" class="grid grid-cols-5 gap-2">
+                      <div v-for="f in DAILY_LIMIT_FIELDS" :key="f.key" class="text-center">
+                        <label :for="'limit-' + f.key" class="text-xs text-slate-400 block mb-1">{{ f.label }}</label>
+                        <input
+                          :id="'limit-' + f.key"
+                          v-model.number="form.limits[f.key]"
+                          type="number"
+                          min="0"
+                          :max="f.max"
+                          class="w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-slate-200 text-center"
+                        />
+                      </div>
+                    </div>
                   </div>
 
                   <!-- Buttons -->

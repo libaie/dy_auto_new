@@ -492,7 +492,7 @@ var uiOperator = {
     var config = selectorLoader.get(actionName);
     if (!config || config.purpose !== "page_detect") return false;
     for (var i = 0; i < config.strategies.length; i++) {
-      if (!this.findElement(config.strategies[i].value, timeout)) {
+      if (!this._findByStrategy(config.strategies[i])) {
         return false;
       }
     }

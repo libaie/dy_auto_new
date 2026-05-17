@@ -136,8 +136,8 @@ var calibrator = {
     var cx = Math.round(xPercent * device.width);
     var cy = Math.round(yPercent * device.height);
 
-    // 裁剪区域：以坐标为中心，取 80x80 到 120x120 的弹性区域
-    var cropSize = Math.round(Math.min(device.width, device.height) * 0.08);
+    // 裁剪区域：以坐标为中心，取 10% 最小维度的弹性区域（±20% padding）
+    var cropSize = Math.round(Math.min(device.width, device.height) * 0.10);
     cropSize = Math.max(40, Math.min(cropSize, 120));
     var left = Math.max(0, cx - cropSize);
     var top = Math.max(0, cy - cropSize);

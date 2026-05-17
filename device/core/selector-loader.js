@@ -16,6 +16,8 @@ var selectorLoader = global.__selectorLoader || {
    * 初始化 — 从后端拉取全量选择器（带重试）
    */
   init: function () {
+    // 第一时间捕获设备分辨率，后续 syncTemplates 等依赖
+    this._resolution = device.width + "x" + device.height;
     var maxRetries = 3;
     for (var attempt = 1; attempt <= maxRetries; attempt++) {
       logger.info(TAG, "从服务端加载选择器 (尝试 " + attempt + "/" + maxRetries + ")...");
@@ -35,9 +37,14 @@ var selectorLoader = global.__selectorLoader || {
           this._initialized = true;
           logger.info(TAG, "已加载 " + Object.keys(this._cache).length + " 个选择器, 版本=" + this._version);
           this.syncTemplates();
-          // 新分辨率设备：选择器过少说明无匹配 profile，触发标定
-          if (Object.keys(this._cache).length < 15) {
-            logger.warn(TAG, "选择器数量异常 (" + Object.keys(this._cache).length + ")，触发自动标定");
+          // 检查关键选择器是否缺失 → 触发标定
+          var criticalActions = ["search_tab", "video_comment_btn", "comment_list", "follow_button"];
+          var missing = [];
+          for (var ci = 0; ci < criticalActions.length; ci++) {
+            if (!this._cache[criticalActions[ci]]) missing.push(criticalActions[ci]);
+          }
+          if (missing.length > 0) {
+            logger.warn(TAG, "缺少关键选择器 (" + missing.join(",") + ")，触发自动标定");
             try {
               var calibrator = require("./calibrator");
               calibrator.run();

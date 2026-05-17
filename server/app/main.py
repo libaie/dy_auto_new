@@ -113,6 +113,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Global exception log middleware — catches unhandled 500s with full traceback
+from fastapi import Request
+from fastapi.responses import JSONResponse
+import traceback as _traceback
+import logging
+_logger = logging.getLogger("app")
+
+@app.middleware("http")
+async def _catch_unhandled_errors(request: Request, call_next):
+    try:
+        return await call_next(request)
+    except Exception:
+        _logger.error("UNHANDLED 500: %s %s\n%s", request.method, request.url.path, _traceback.format_exc())
+        return JSONResponse(status_code=500, content={"detail": "Internal Server Error"})
+
+
 app.include_router(device.router)
 app.include_router(tasks.router)
 app.include_router(accounts.router)

@@ -315,7 +315,8 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
           }
           if (!onComment) {
             logger.warn(TAG, "返回评论区失败，跳过后续评论");
-            return "break";
+            processed = count;
+            break;
           }
           uiOperator.swipeUp();
           sleep(800);

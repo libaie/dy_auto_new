@@ -397,6 +397,11 @@ async def ws_device_status(websocket: WebSocket):
                         break
                     if msg == "ping":
                         await websocket.send_text("pong")
+                        # WS ping 即心跳 — 直接更新 last_seen_at
+                        try:
+                            device_service.update_heartbeat(db, device_id)
+                        except Exception:
+                            pass
                 except asyncio.TimeoutError:
                     try:
                         await websocket.send_text("ping")

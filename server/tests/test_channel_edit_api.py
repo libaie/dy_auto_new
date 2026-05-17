@@ -149,8 +149,10 @@ def test_batch_edit_skips_completed(db):
 
 
 def test_batch_edit_nonexistent_item(db):
+    # Need a valid account to bypass early account-existence check
+    ch = _create_channel(db, group_id="grp-cbe-3", account_ids=["cbe-3a", "cbe-3b"])
     resp = client.put("/api/channels/items/batch", json={
-        "item_ids": ["fake-id-x"], "account_id": "cbe-1a",
+        "item_ids": ["fake-id-x"], "account_id": "cbe-3a",
     })
     assert resp.status_code == 200
     assert any("fake-id-x" in e for e in resp.json()["errors"])

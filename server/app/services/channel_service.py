@@ -572,7 +572,10 @@ class ChannelService:
             acc = db.query(Account).filter(Account.id == account_id, Account.status == "active").first()
             if not acc:
                 raise ValueError(f"账号 {account_id} 不存在或非 active 状态")
-            ch = db.query(Channel).filter(Channel.id == item.channel_id).first()
+            ch = db.query(Channel).filter(
+                Channel.id == item.channel_id,
+                Channel.deleted_at.is_(None),
+            ).first()
             if ch:
                 member = db.query(AccountGroupMember).filter(
                     AccountGroupMember.group_id == ch.group_id,
@@ -625,8 +628,11 @@ class ChannelService:
         item_map = {i.id: i for i in items}
 
         # Pre-load channel ownership for user-scoping
-        if user_id and items:
+        channel_ids = []
+        if items:
             channel_ids = list(set(i.channel_id for i in items))
+
+        if user_id and channel_ids:
             owned_channels = set(
                 ch[0] for ch in db.query(Channel.id).filter(
                     Channel.id.in_(channel_ids),
@@ -635,6 +641,24 @@ class ChannelService:
             )
         else:
             owned_channels = None
+
+        # Pre-load channel-group mapping for group membership validation
+        valid_group_ids = set()
+        if account_id is not None and channel_ids:
+            channels = db.query(Channel).filter(
+                Channel.id.in_(channel_ids),
+                Channel.deleted_at.is_(None),
+            ).all()
+            channel_group_map = {c.id: c.group_id for c in channels}
+            group_ids = list(set(channel_group_map.values()))
+            if group_ids:
+                rows = db.query(AccountGroupMember.group_id).filter(
+                    AccountGroupMember.group_id.in_(group_ids),
+                    AccountGroupMember.account_id == account_id,
+                ).all()
+                valid_group_ids = set(r[0] for r in rows)
+        else:
+            channel_group_map = {}
 
         for item_id in item_ids:
             try:
@@ -648,6 +672,11 @@ class ChannelService:
                 if item.status not in ("pending", "assigned"):
                     skipped.append(item_id)
                     continue
+                if account_id is not None and valid_group_ids:
+                    item_group = channel_group_map.get(item.channel_id)
+                    if item_group and item_group not in valid_group_ids:
+                        skipped.append(item_id)
+                        continue
 
                 if account_id is not None:
                     item.account_id = account_id

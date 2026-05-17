@@ -4,7 +4,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.db_models import Base, Task, ChainInstance, DailyStats, Account, AccountGroup, AccountGroupMember, Channel, ChannelItem, Character, Scene, Series, Episode, PipelineRun, AuditReport, ReferenceData, series_characters, series_scenes
+from app.db_models import Base, Task, ChainInstance, DailyStats, Account, AccountGroup, AccountGroupMember, Channel, ChannelItem, Character, Scene, Series, Episode, PipelineRun, AuditReport, ReferenceData, AIModel, series_characters, series_scenes
 from app.database import get_db
 from app.main import app
 from app.seed import seed_accounts, seed_selectors
@@ -12,7 +12,7 @@ from app.seed import seed_accounts, seed_selectors
 # Tables to clean between tests (order matters for FK constraints)
 _CLEANUP_TABLES = [
     Task, DailyStats, AccountGroupMember, AccountGroup, ChainInstance,
-    ChannelItem, Channel, ReferenceData,
+    ChannelItem, Channel, ReferenceData, AIModel,
     AuditReport, PipelineRun, Episode,  # weak FK to Series/Episode
 ]
 _CLEANUP_M2M = [series_characters, series_scenes, Series, Character, Scene]  # M2M first, then parent tables
@@ -74,7 +74,7 @@ def _isolate_test(test_db):
 def admin_auth_override():
     """Override admin auth for all tests to pass without JWT."""
     from app.deps import verify_admin_token
-    app.dependency_overrides[verify_admin_token] = lambda: "test-user"
+    app.dependency_overrides[verify_admin_token] = lambda: ("test-user-id", "admin")
     yield
     app.dependency_overrides.pop(verify_admin_token, None)
 

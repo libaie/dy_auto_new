@@ -4,6 +4,7 @@
 
 var uiOperator = require("../core/ui-operator");
 var selectorLoader = require("../core/selector-loader");
+var selectorResolver = require("../core/selector-resolver");
 var logger = require("../utils/logger");
 
 var TAG = "评论工具";
@@ -60,10 +61,10 @@ var commentUtils = {
   parseCommentItem: function (item, handler) {
     var findChild = (handler && handler._findChildBySelector)
       ? function (p, a) { return handler._findChildBySelector(p, a); }
-      : _findChildBySelector;
+      : function (p, a) { return selectorResolver.findChildBySelector(p, a); };
     var extractVal = (handler && handler._extractChildValue)
       ? function (el, a, fb) { return handler._extractChildValue(el, a, fb); }
-      : _extractChildValue;
+      : function (el, a, fb) { return selectorResolver.extractChildValue(el, a, fb); };
 
     try {
       // 昵称
@@ -347,192 +348,5 @@ localPreFilter: function (text) {
     return null;
   },
 };
-
-// ---- 内部辅助 (从 BaseHandler 提取，策略驱动的子元素查找) ----
-
-function _findChildBySelector(parent, actionName) {
-  try {
-    var selector = selectorLoader.get(actionName);
-    if (!selector) return null;
-    var strategies = selector.strategies.slice().sort(function (a, b) { return a.priority - b.priority; });
-    for (var i = 0; i < strategies.length; i++) {
-      var el = _findByStrategyInParent(parent, strategies[i]);
-      if (el) return el;
-    }
-  } catch (e) {}
-  return null;
-}
-
-function _findByStrategyInParent(parent, strategy) {
-  if (strategy.conditions && strategy.conditions.length > 0) {
-    return _findByConditionsInParent(parent, strategy);
-  }
-  if (strategy.type === "chain") {
-    return _findByChainInParent(parent, strategy.steps || []);
-  }
-  return _findByCondInParent(parent, strategy);
-}
-
-function _findByCondInParent(parent, cond) {
-  var matchMode = cond.match_mode || "exact";
-  try {
-    if (matchMode === "contains") {
-      switch (cond.type) {
-        case "text": return parent.findOne(textContains(cond.value));
-        case "desc": return parent.findOne(descContains(cond.value));
-        case "id": return parent.findOne(idContains(cond.value));
-        case "className": return parent.findOne(classNameContains(cond.value));
-      }
-    } else {
-      switch (cond.type) {
-        case "text": return parent.findOne(text(cond.value));
-        case "desc": return parent.findOne(desc(cond.value));
-        case "id": return parent.findOne(id(cond.value));
-        case "className": return parent.findOne(className(cond.value));
-      }
-    }
-  } catch (e) {}
-  return null;
-}
-
-function _findAllByCondInParent(parent, cond) {
-  var matchMode = cond.match_mode || "exact";
-  try {
-    if (matchMode === "contains") {
-      switch (cond.type) {
-        case "text": return parent.find(textContains(cond.value));
-        case "desc": return parent.find(descContains(cond.value));
-        case "id": return parent.find(idContains(cond.value));
-        case "className": return parent.find(classNameContains(cond.value));
-      }
-    } else {
-      switch (cond.type) {
-        case "text": return parent.find(text(cond.value));
-        case "desc": return parent.find(desc(cond.value));
-        case "id": return parent.find(id(cond.value));
-        case "className": return parent.find(className(cond.value));
-      }
-    }
-  } catch (e) {}
-  return [];
-}
-
-function _findByConditionsInParent(parent, strategy) {
-  var conditions = strategy.conditions;
-  var logic = strategy.logic || "and";
-
-  if (conditions.length === 1) {
-    return _findByCondInParent(parent, conditions[0]);
-  }
-
-  if (logic === "or") {
-    for (var j = 0; j < conditions.length; j++) {
-      var el = _findByCondInParent(parent, conditions[j]);
-      if (el) return el;
-    }
-    return null;
-  }
-
-  var candidates = _findAllByCondInParent(parent, conditions[0]);
-  for (var m = 0; m < candidates.length; m++) {
-    var allMatch = true;
-    for (var n = 1; n < conditions.length; n++) {
-      if (!uiOperator._elementMatchesCondition(candidates[m], conditions[n])) {
-        allMatch = false;
-        break;
-      }
-    }
-    if (allMatch) return candidates[m];
-  }
-  return null;
-}
-
-function _findByChainInParent(parent, steps) {
-  if (!steps || steps.length === 0) return null;
-
-  var sel = null;
-  var navStartIdx = steps.length;
-  for (var i = 0; i < steps.length; i++) {
-    var nav = steps[i].nav || "filter";
-    if (nav !== "filter") { navStartIdx = i; break; }
-    if (!sel) { sel = uiOperator._makeSelector(steps[i]); }
-    else { sel = uiOperator._chainSelector(sel, steps[i]); }
-    if (!sel) return null;
-  }
-
-  var el = null;
-  if (sel) {
-    var candidates = parent.find(sel);
-    if (candidates && candidates.length > 0) {
-      for (var k = 0; k < candidates.length; k++) {
-        if (uiOperator._isOnScreen(candidates[k])) { el = candidates[k]; break; }
-      }
-    }
-  } else {
-    el = parent;
-  }
-  if (!el) return null;
-
-  for (var m = navStartIdx; m < steps.length; m++) {
-    var navStep = steps[m];
-    var navAction = navStep.nav || "filter";
-    if (navAction === "parent") {
-      try { el = el.parent(); } catch (e) { return null; }
-      if (!el) return null;
-    } else if (navAction === "child") {
-      var childSel = uiOperator._makeSelector(navStep);
-      if (!childSel) return null;
-      try {
-        var children = el.find(childSel);
-        if (!children || children.length === 0) return null;
-        var idx = navStep.index || 0;
-        var found = 0; el = null;
-        for (var c = 0; c < children.length; c++) {
-          if (uiOperator._isOnScreen(children[c])) {
-            if (found === idx) { el = children[c]; break; }
-            found++;
-          }
-        }
-        if (!el) return null;
-      } catch (e) { return null; }
-    } else if (navAction === "sibling") {
-      var siblingSel = uiOperator._makeSelector(navStep);
-      if (!siblingSel) return null;
-      try {
-        var p = el.parent();
-        if (!p) return null;
-        var siblings = p.find(siblingSel);
-        if (!siblings || siblings.length === 0) return null;
-        var sibIdx = navStep.index || 0;
-        var sf = 0; el = null;
-        for (var s = 0; s < siblings.length; s++) {
-          if (uiOperator._isOnScreen(siblings[s])) {
-            if (sf === sibIdx) { el = siblings[s]; break; }
-            sf++;
-          }
-        }
-        if (!el) return null;
-      } catch (e) { return null; }
-    } else {
-      // filter: 对当前元素施加条件过滤
-      if (!uiOperator._elementMatchesStep(el, navStep)) return null;
-    }
-  }
-  return el;
-}
-
-function _extractChildValue(el, actionName, fallback) {
-  try {
-    var selector = selectorLoader.get(actionName);
-    if (selector && selector.purpose === "extract") {
-      var val = uiOperator.extractValue(el, selector);
-      if (val != null) return val;
-    }
-    if (el.text && typeof el.text === "function") {
-      return el.text() || fallback;
-    }
-    try { return el.desc() || fallback; } catch (e) { return fallback; }
-  } catch (e) { return fallback; }
-}
 
 module.exports = commentUtils;

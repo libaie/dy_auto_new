@@ -277,7 +277,7 @@ SearchCollectHandler.execute = function (params) {
       sleep(300);
       if (!this._submitSearch()) { linkStats.fail_count++; continue; }
       sleep(2000);
-      if (!uiOperator.isOnPage("video")) {
+      if (!uiOperator.isOnPage("is_video_view")) {
         logger.info(TAG, "未自动跳转视频页，尝试点击搜索结果");
         this._clickSearchResult(0);
         sleep(1700);

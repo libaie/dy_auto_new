@@ -31,12 +31,12 @@ SearchCommentHandler._interactWithVideo = function (content, stats) {
   }
 
   // 0. 确认进入视频详情页
-  if (!uiOperator.isOnPage("video")) {
+  if (!uiOperator.isOnPage("is_video_view")) {
     logger.info(TAG, "未检测到视频详情页，尝试点击屏幕中心进入");
     press(Math.round(device.width * 0.5), Math.round(device.height * 0.5), 80);
     sleep(2000);
   }
-  if (!uiOperator.isOnPage("video")) {
+  if (!uiOperator.isOnPage("is_video_view")) {
     logger.warn(TAG, "未进入视频详情页");
     return false;
   }

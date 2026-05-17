@@ -172,7 +172,7 @@ SearchBaseHandler._openSearch = function () {
  */
 SearchBaseHandler._inputKeyword = function (keyword) {
   // 确认在搜索页
-  if (!uiOperator.isOnPage("search")) {
+  if (!uiOperator.isOnPage("is_search_view")) {
     logger.warn(TAG, "搜索输入框未找到：不在搜索页");
     return false;
   }
@@ -446,7 +446,7 @@ SearchBaseHandler._goBack = function () {
 SearchBaseHandler._backToSearchResults = function () {
   var maxBacks = 5;
   for (var i = 0; i < maxBacks; i++) {
-    if (uiOperator.isOnPage("search_result_list") || uiOperator.isOnPage("search")) {
+    if (uiOperator.isOnPage("search_result_list") || uiOperator.isOnPage("is_search_view")) {
       logger.info(TAG, "已在搜索列表页 (back " + i + " 次)");
       flowContext.enter("search");
       return true;

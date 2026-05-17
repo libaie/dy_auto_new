@@ -126,7 +126,7 @@ ReplyCommentHandler.execute = function (params) {
       this.safeClick("video_comment_btn", 2);
       sleep(2000);
       // 验证是否真正打开
-      if (uiOperator.isOnPage("comment")) {
+      if (uiOperator.isOnPage("is_comment_view")) {
         commentsOpened = true;
         flowContext.enter("comment");
         break;
@@ -412,12 +412,12 @@ ReplyCommentHandler.execute = function (params) {
             // 确保回到评论区
             this._returnToComments();
             // 二次确认，不在评论区就重试
-            var onComment = uiOperator.isOnPage("comment");
+            var onComment = uiOperator.isOnPage("is_comment_view");
             if (!onComment) {
               back(); sleep(800);
               this._openComments();
               sleep(1500);
-              onComment = uiOperator.isOnPage("comment");
+              onComment = uiOperator.isOnPage("is_comment_view");
             }
             if (!onComment) {
               logger.warn(TAG, "返回评论区失败，跳过后续评论");
@@ -759,7 +759,7 @@ ReplyCommentHandler._enterCommenterProfile = function (commentAuthorAvatarEl, ni
   var avatarClicked = this.safeClick("comment_author_avatar", 2);
   if (avatarClicked) {
     sleep(2000);
-    if (uiOperator.isOnPage("profile")) {
+    if (uiOperator.isOnPage("is_user_view")) {
       flowContext.enter("profile");
       return true;
     }
@@ -772,7 +772,7 @@ ReplyCommentHandler._enterCommenterProfile = function (commentAuthorAvatarEl, ni
     if (nameEl) {
       nameEl.parent().click();
       sleep(2000);
-      if (uiOperator.isOnPage("profile")) {
+      if (uiOperator.isOnPage("is_user_view")) {
         flowContext.enter("profile");
         return true;
       }
@@ -962,28 +962,28 @@ ReplyCommentHandler._returnToComments = function () {
   var maxBacks = 5;
   for (var i = 0; i < maxBacks; i++) {
     // 已在评论面板 → 完成
-    if (uiOperator.isOnPage("comment")) {
+    if (uiOperator.isOnPage("is_comment_view")) {
       logger.info(TAG, "回到评论区 (back " + i + " 次)");
       flowContext.enter("comment");
       return;
     }
 
     // 在个人主页 → back
-    if (uiOperator.isOnPage("profile")) {
+    if (uiOperator.isOnPage("is_user_view")) {
       logger.info(TAG, "在个人主页，back 到评论区");
       back(); sleep(800);
       continue;
     }
 
     // 在私信页 → back
-    if (uiOperator.isOnPage("dm")) {
+    if (uiOperator.isOnPage("is_dm_view")) {
       logger.info(TAG, "在私信页，back 到个人主页");
       back(); sleep(800);
       continue;
     }
 
     // 已确认是视频详情页 → 判断上下文
-    if (uiOperator.isOnPage("video")) {
+    if (uiOperator.isOnPage("is_video_view")) {
       if (flowContext.is("profile")) {
         // 从个人主页误触进来的 → back
         logger.info(TAG, "检测到误触（profile→video），back");

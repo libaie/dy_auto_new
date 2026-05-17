@@ -17,6 +17,7 @@ class SelectorCreateRequest(BaseModel):
     action_name: str
     strategies: list[dict]
     platform_version: str = "default"
+    resolution_profile: str = "default"
     description: str = ""
     category: str = ""
     purpose: str = "locate"
@@ -30,6 +31,7 @@ class SelectorCreateRequest(BaseModel):
 class SelectorUpdateRequest(BaseModel):
     strategies: Optional[list[dict]] = None
     platform_version: Optional[str] = None
+    resolution_profile: Optional[str] = None
     description: Optional[str] = None
     category: Optional[str] = None
     purpose: Optional[str] = None
@@ -80,6 +82,7 @@ async def create_selector(
             db, action_name=request.action_name,
             strategies=request.strategies,
             platform_version=request.platform_version,
+            resolution_profile=request.resolution_profile,
             description=request.description,
             category=request.category,
             purpose=request.purpose,
@@ -114,6 +117,7 @@ async def update_selector(
             db, action_name=action_name,
             strategies=request.strategies,
             platform_version=request.platform_version,
+            resolution_profile=request.resolution_profile,
             description=request.description,
             category=request.category,
             purpose=request.purpose,
@@ -182,9 +186,10 @@ async def toggle_selector(
 
 @router.get("/templates")
 def list_templates(
+    resolution: str = Query(None),
     user = Depends(verify_admin_token),
 ):
-    templates = template_service.list_templates()
+    templates = template_service.list_templates(resolution=resolution)
     return {"templates": templates, "total": len(templates)}
 
 
@@ -192,6 +197,7 @@ def list_templates(
 async def upload_template(
     file: UploadFile = FastAPIFile(...),
     action_name: str = "",
+    resolution: str = Query("default"),
     user = Depends(require_role("admin")),
 ):
     import os
@@ -205,16 +211,17 @@ async def upload_template(
 
     safe_name = (action_name or "template").replace("/", "_").replace("\\", "_")
     filename = f"{safe_name}_{int(time.time() * 1000)}{ext}"
-    template_service.save_template(filename, content)
-    return {"filename": filename, "size": len(content)}
+    template_service.save_template(filename, content, resolution=resolution)
+    return {"filename": filename, "size": len(content), "resolution": resolution}
 
 
 @router.delete("/templates/{filename}")
 def delete_template(
     filename: str,
+    resolution: str = Query("default"),
     user = Depends(require_role("admin")),
 ):
-    deleted = template_service.delete_template(filename)
+    deleted = template_service.delete_template(filename, resolution=resolution)
     if not deleted:
         raise HTTPException(status_code=404, detail="模板文件不存在")
     return {"deleted": True, "filename": filename}

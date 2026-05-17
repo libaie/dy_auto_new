@@ -627,10 +627,10 @@ def register_device(
 def get_selectors(
     version: int = Query(0),
     db: Session = Depends(get_db),
-    _: None = Depends(verify_device_secret),
+    device_id: str = Depends(verify_device_secret),
 ):
 
-    current_version, selectors = selector_service.get_all_selectors(db)
+    current_version, selectors = selector_service.get_all_selectors(db, device_id=device_id)
     if version == current_version:
         return {"version": current_version, "selectors": None, "changed": False}
 
@@ -798,23 +798,36 @@ async def generate_content(
 
 @router.get("/templates")
 def device_list_templates(
-    _: Optional[str] = Depends(verify_device_secret),
+    device_id: str = Depends(verify_device_secret),
+    db: Session = Depends(get_db),
 ):
-    """Return template list with MD5 hashes for incremental sync."""
+    """Return template list with MD5 hashes for incremental sync.
+    Filters by device resolution profile when available."""
     from app.services.template_service import template_service
-    templates = template_service.list_templates()
+    resolution = None
+    if device_id:
+        device = db.query(Device).filter(Device.id == device_id).first()
+        if device and device.screen_resolution:
+            resolution = device.screen_resolution
+    templates = template_service.list_templates(resolution=resolution)
     return {"templates": templates}
 
 
 @router.get("/templates/{filename}")
 def device_download_template(
     filename: str,
-    _: Optional[str] = Depends(verify_device_secret),
+    device_id: str = Depends(verify_device_secret),
+    db: Session = Depends(get_db),
 ):
-    """Download a single template image (binary)."""
+    """Download a single template image (binary). Falls back to 'default' resolution."""
     from app.services.template_service import template_service
     from fastapi.responses import FileResponse
-    filepath = template_service.get_template_path(filename)
+    resolution = "default"
+    if device_id:
+        device = db.query(Device).filter(Device.id == device_id).first()
+        if device and device.screen_resolution:
+            resolution = device.screen_resolution
+    filepath = template_service.get_template_path(filename, resolution=resolution)
     if not filepath:
         raise HTTPException(status_code=404, detail="模板文件不存在")
     return FileResponse(str(filepath), media_type="image/png", filename=filename)

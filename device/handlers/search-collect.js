@@ -20,6 +20,21 @@ SearchCollectHandler._interactWithVideo = function (content, stats, params) {
   var dataSourceType = uiOperator.findElement("is_shopping_cart", 500) ? 1 : 0;
   logger.info(TAG, "[耗时] 数据来源类型: " + (dataSourceType === 1 ? "带货视频" : "普通视频"));
 
+  // 预检评论数：零评论视频点评论按钮会直接唤起键盘，提前跳过
+  var commentBtn = uiOperator.findElement("video_comment_btn", 2000);
+  var commentCount = 0;
+  if (commentBtn && !commentBtn.isImage && !commentBtn.isCoordinate) {
+    try {
+      var numMatch = (commentBtn.desc() || "").match(/(\d+)/);
+      if (numMatch) commentCount = parseInt(numMatch[1]);
+    } catch (e) {}
+  }
+  logger.info(TAG, "[耗时] 评论数: " + (commentCount || "未知"));
+  if (commentCount === 0) {
+    logger.info(TAG, "[耗时] 该视频无评论，跳过 (耗时 " + (Date.now() - t0) + "ms)");
+    return false;
+  }
+
   logger.info(TAG, "[耗时] 尝试打开评论区...");
   if (!this._openComments()) {
     logger.warn(TAG, "[耗时] 评论区打开失败, 跳过此视频 (耗时 " + (Date.now() - t0) + "ms)");

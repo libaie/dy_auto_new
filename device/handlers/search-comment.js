@@ -46,6 +46,19 @@ SearchCommentHandler._interactWithVideo = function (content, stats) {
     return false;
   }
 
+  // 预检评论数：零评论视频点评论按钮会直接唤起键盘，跳过
+  var commentCount = 0;
+  if (!commentBtn.isImage && !commentBtn.isCoordinate) {
+    try {
+      var numMatch = (commentBtn.desc() || "").match(/(\d+)/);
+      if (numMatch) commentCount = parseInt(numMatch[1]);
+    } catch (e) {}
+  }
+  if (commentCount === 0) {
+    logger.info(TAG, "该视频无评论，跳过");
+    return false;
+  }
+
   // 1. 点击评论入口按钮，打开评论面板
   var commentClicked = uiOperator.clickElement(commentBtn);
   if (!commentClicked) {

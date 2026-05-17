@@ -290,6 +290,19 @@ var apiClient = {
     return response;
   },
 
+  collectReport: function (payload) {
+    var response = this.post("/api/device/collect-report", payload);
+    if (!response && !isOnline) {
+      if (offlineQueue.length >= netConfig.offlineQueueMax) {
+        logger.warn(TAG, "离线队列已满，丢弃最旧项");
+        offlineQueue.shift();
+      }
+      logger.info(TAG, "采集数据加入离线队列");
+      offlineQueue.push({ path: "/api/device/collect-report", body: payload, retries: 0 });
+    }
+    return response;
+  },
+
   heartbeat: function () {
     return this.post("/api/device/heartbeat", { device_id: config.deviceId });
   },
@@ -392,14 +405,18 @@ var apiClient = {
     return this.post("/api/device/dm-release-recipient", data);
   },
 
-  saveCommentAIReply: function (nickname, text, aiReply, taskId) {
-    return this.post("/api/device/comment-ai-reply", {
+  saveCommentAIReply: function (nickname, text, aiReply, taskId, intendedProvince, intendedCity, intendedAttraction) {
+    var data = {
       nickname: nickname, text: text, ai_reply: aiReply, task_id: taskId || null,
-    });
+    };
+    if (intendedProvince != null) data.intended_province = intendedProvince;
+    if (intendedCity != null) data.intended_city = intendedCity;
+    if (intendedAttraction != null) data.intended_attraction = intendedAttraction;
+    return this.post("/api/device/comment-ai-reply", data);
   },
 
   saveUserProfile: function (data) {
-    return this.post("/api/device/user-profile", {
+    var payload = {
       nickname: data.nickname,
       douyin_id: data.douyin_id || "",
       fans_count: data.fans_count || "",
@@ -412,7 +429,11 @@ var apiClient = {
       is_private: data.is_private || "",
       keyword: data._keyword || "",
       task_id: data._taskId || "",
-    });
+    };
+    if (data._intended_province) payload.intended_province = data._intended_province;
+    if (data._intended_city) payload.intended_city = data._intended_city;
+    if (data._intended_attraction) payload.intended_attraction = data._intended_attraction;
+    return this.post("/api/device/user-profile", payload);
   },
 
   uploadUserAvatar: function (douyinId, imageBase64) {

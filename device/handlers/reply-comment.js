@@ -276,6 +276,20 @@ ReplyCommentHandler.execute = function (params) {
           stats.success_count++;
           // 保存 AI 回复到采集记录，供前端展示
           try { apiClient.saveCommentAIReply(comment.nickname, comment.text, analysis.reply, params.task_id, dest ? dest.province : null, dest ? dest.city : null, dest ? dest.attraction : null); } catch (e) {}
+          // 采集评论数据（保留 AI 回复）
+          try {
+            var commentReport = {
+              nickname: comment.nickname, content: comment.text,
+              time_str: comment.time || "", is_author: comment.isAuthor || false,
+              reply_count: "", like_count: "", ai_reply: analysis.reply,
+            };
+            if (dest) {
+              commentReport.intended_province = dest.province || "";
+              commentReport.intended_city = dest.city || "";
+              commentReport.intended_attraction = dest.attraction || "";
+            }
+            apiClient.collectReport({ task_id: taskId, keyword: keyword, comment: commentReport, data_source_type: 0 });
+          } catch (e) {}
         } else {
           stats.fail_count++;
           // 回复失败 → 释放 global claim，避免误标记为"已回复"
@@ -323,6 +337,8 @@ ReplyCommentHandler.execute = function (params) {
                   userData._intended_attraction = dest.attraction || "";
                 }
                 try { apiClient.saveUserProfile(userData); } catch (e) {}
+                // 采集用户数据上报
+                try { apiClient.collectReport({ task_id: taskId, keyword: keyword, user: userData, data_source_type: 0 }); } catch (e) {}
               }
               if (Date.now() - profileStart < PROFILE_TIMEOUT && canFollow && this._followUser()) {
                 stats.follow_count++;

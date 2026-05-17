@@ -369,6 +369,8 @@ async def _run_all_layers(run_id: str, director_plan: dict | None = None):
                 val = _res.get(key)
                 if val:
                     common[key] = val
+                    if key == "images":
+                        common.setdefault("image_urls", val)
 
         for layer_def in LAYER_DEFS:
             i = layer_def["index"]

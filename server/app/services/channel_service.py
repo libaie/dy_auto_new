@@ -139,7 +139,6 @@ class ChannelService:
         # Also reset the associated RUNNING task to PENDING to prevent
         # duplicate execution when the item is re-claimed.
         from datetime import timedelta
-        import os
         stale_threshold = now - timedelta(seconds=300)
         online_threshold = now - timedelta(seconds=120)
         online_device_ids = {

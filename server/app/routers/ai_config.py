@@ -52,7 +52,7 @@ def _model_dict(m: AIModel, reveal: bool = False) -> dict:
     return {
         "id": m.id, "name": m.name, "model_type": m.model_type,
         "provider": m.provider, "base_url": m.base_url or "",
-        "api_key": ak or ("****" if m.api_key and not reveal else ""),
+        "api_key": ak or ("****" if m.api_key and reveal else ""),
         "api_secret": asc,
         "model_name": m.model_name or "",
         "config_json": m.config_json or {},

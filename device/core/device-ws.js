@@ -168,7 +168,7 @@ var deviceWs = {
       if (!this._client) {
         this._client = new OkHttpClient.Builder()
           .readTimeout(0, java.util.concurrent.TimeUnit.MILLISECONDS)
-          .pingInterval(30, java.util.concurrent.TimeUnit.SECONDS)
+          .pingInterval(15, java.util.concurrent.TimeUnit.SECONDS)
           .build();
       }
 
@@ -192,7 +192,7 @@ var deviceWs = {
             logger.error(TAG, "发送认证消息失败: " + e.message);
           }
 
-          // 启动应用层心跳（每 30 秒发一次 ping）
+          // 启动应用层心跳（每 15 秒发一次 ping，防止 NAT/防火墙切断空闲连接）
           self._startPing();
           // 通知连接成功（用于重连后重新 poll）
           if (self._onConnected) {
@@ -260,7 +260,7 @@ var deviceWs = {
           self._scheduleReconnect();
         }
       }
-    }, 30000);
+    }, 15000);
   },
 
   _cleanup: function () {

@@ -386,29 +386,29 @@ async def ws_device_status(websocket: WebSocket):
         # Check for pending tasks and notify device
         await _notify_pending_tasks(db, device_id)
 
+        import logging
+        _ws_log = logging.getLogger("device_ws")
         try:
             while True:
-                # Keep alive — wait for client messages (text ping/close)
-                # OkHttp protocol-level pings may not be seen by Starlette,
-                # so we use a longer timeout and rely on device-side app-level pings
                 try:
                     msg = await asyncio.wait_for(websocket.receive_text(), timeout=120)
-                    # Device explicitly disconnecting (script shutdown)
                     if msg == '{"event":"device_disconnect"}':
+                        _ws_log.info("device %s disconnected (explicit)", device_id)
                         break
-                    # Echo back as acknowledgment (device can ignore)
                     if msg == "ping":
                         await websocket.send_text("pong")
                 except asyncio.TimeoutError:
-                    # No message for 120s — send a server-side ping to probe liveness
                     try:
                         await websocket.send_text("ping")
                         msg = await asyncio.wait_for(websocket.receive_text(), timeout=10)
-                    except (asyncio.TimeoutError, Exception):
-                        # Device is unresponsive, close connection
+                    except asyncio.TimeoutError:
+                        _ws_log.warning("device %s unresponsive to ping", device_id)
                         break
-        except (asyncio.TimeoutError, Exception):
-            pass
+                    except Exception:
+                        _ws_log.warning("device %s error during ping probe", device_id, exc_info=True)
+                        break
+        except Exception:
+            _ws_log.warning("device %s WS loop exited with error", device_id, exc_info=True)
         finally:
             # 只在本连接仍是活跃连接时才标记离线（避免重连竞态）
             if pair_ws_manager._device_status_connections.get(device_id) is websocket:

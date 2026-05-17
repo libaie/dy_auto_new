@@ -425,7 +425,11 @@ NurtureHandler._commentOnVideo = function (templateId) {
       var rawDesc = commentBtn.desc() || "";
       logger.info(TAG, "评论按钮 desc: '" + rawDesc + "'");
       var cmNumMatch = rawDesc.match(/(\d+)/);
-      if (cmNumMatch) commentCount = parseInt(cmNumMatch[1]);
+      if (cmNumMatch) {
+        commentCount = parseInt(cmNumMatch[1]);
+      } else if (rawDesc.length > 0) {
+        commentCount = 0;
+      }
     } catch (e) {}
   }
   logger.info(TAG, "评论数: " + (commentCount >= 0 ? commentCount : "未知"));

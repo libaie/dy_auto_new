@@ -35,7 +35,12 @@ SearchCollectHandler._interactWithVideo = function (content, stats, params) {
       var rawDesc = commentBtn.desc() || "";
       logger.info(TAG, "[耗时] 评论按钮 desc: '" + rawDesc + "'");
       var numMatch = rawDesc.match(/(\d+)/);
-      if (numMatch) commentCount = parseInt(numMatch[1]);
+      if (numMatch) {
+        commentCount = parseInt(numMatch[1]);
+      } else if (rawDesc.length > 0) {
+        // desc 有文本但无数字 → 零评论
+        commentCount = 0;
+      }
     } catch (e) {}
   }
   logger.info(TAG, "[耗时] 评论数: " + (commentCount >= 0 ? commentCount : "未知"));

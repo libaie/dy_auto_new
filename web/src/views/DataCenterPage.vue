@@ -30,6 +30,11 @@ const filterAccountId = ref('')
 const filterStage = ref('')
 const filterStatus = ref('')
 const filterTaskId = ref('')
+const filterPrivate = ref('')
+const filterDateFrom = ref('')
+const filterDateTo = ref('')
+const sortBy = ref('')
+const sortOrder = ref('desc')
 
 // Ref data
 const accounts = ref([])
@@ -81,6 +86,10 @@ async function fetchData() {
     } else if (activeTab.value === 'users') {
       if (filterKeyword.value) params.keyword = filterKeyword.value
       if (filterAccountId.value) params.account_id = filterAccountId.value
+      if (filterPrivate.value) params.is_private = filterPrivate.value
+      if (filterDateFrom.value) params.date_from = filterDateFrom.value
+      if (filterDateTo.value) params.date_to = filterDateTo.value
+      if (sortBy.value) { params.sort_by = sortBy.value; params.sort_order = sortOrder.value }
       resp = await listUsers(params)
     } else {
       if (filterAccountId.value) params.account_id = filterAccountId.value
@@ -114,6 +123,10 @@ async function doExport(all) {
     } else if (activeTab.value === 'users') {
       if (filterKeyword.value) params.keyword = filterKeyword.value
       if (filterAccountId.value) params.account_id = filterAccountId.value
+      if (filterPrivate.value) params.is_private = filterPrivate.value
+      if (filterDateFrom.value) params.date_from = filterDateFrom.value
+      if (filterDateTo.value) params.date_to = filterDateTo.value
+      if (sortBy.value) { params.sort_by = sortBy.value; params.sort_order = sortOrder.value }
     } else if (activeTab.value === 'conversations') {
       if (filterAccountId.value) params.account_id = filterAccountId.value
       if (filterStage.value) params.stage = filterStage.value
@@ -146,6 +159,23 @@ async function doExport(all) {
   } catch (e) {
     toast.error('导出失败: ' + (e.message || '未知错误'))
   } finally { exporting.value = false }
+}
+
+const avatarGradients = [
+  'linear-gradient(135deg, #6366f1, #a855f7)',
+  'linear-gradient(135deg, #06b6d4, #3b82f6)',
+  'linear-gradient(135deg, #f59e0b, #ef4444)',
+  'linear-gradient(135deg, #10b981, #06b6d4)',
+  'linear-gradient(135deg, #ec4899, #f97316)',
+  'linear-gradient(135deg, #8b5cf6, #3b82f6)',
+  'linear-gradient(135deg, #14b8a6, #84cc16)',
+  'linear-gradient(135deg, #f43f5e, #a855f7)',
+]
+function avatarGradient(name) {
+  if (!name) return avatarGradients[0]
+  let hash = 0
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
+  return avatarGradients[Math.abs(hash) % avatarGradients.length]
 }
 
 const stageBadgeClass = (s) => ({
@@ -181,7 +211,7 @@ onMounted(async () => {
       <button
         v-for="tab in tabs" :key="tab.key"
         @click="switchTab(tab.key)"
-        class="relative px-4 py-2.5 text-sm font-medium transition-colors duration-200"
+        class="relative px-4 py-2.5 text-sm font-medium transition-colors duration-200 cursor-pointer"
         :class="activeTab === tab.key ? 'text-sky-300' : 'text-slate-400 hover:text-slate-200'"
       >
         {{ tab.label }}
@@ -232,64 +262,184 @@ onMounted(async () => {
 
     <!-- Comments Tab -->
     <div v-if="activeTab === 'comments'">
-      <div v-if="loading" class="text-center py-12 text-slate-400">加载中...</div>
-      <div v-else-if="items.length === 0" class="text-center py-12 text-slate-500">暂无评论数据</div>
+      <div v-if="loading" class="flex items-center justify-center py-16">
+        <svg class="animate-spin h-7 w-7 text-cyan-400/60" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+      </div>
+      <div v-else-if="items.length === 0" class="flex flex-col items-center justify-center py-16 text-slate-400">
+        <div class="relative mb-4">
+          <div class="absolute inset-0 rounded-full blur-xl opacity-20" style="background: var(--accent-glow-soft);"></div>
+          <svg class="h-14 w-14 relative opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+        </div>
+        <p class="text-sm text-slate-500">暂无评论数据</p>
+      </div>
       <div v-else class="card overflow-hidden">
-        <table class="w-full text-sm">
-          <thead>
-            <tr class="text-left text-xs text-slate-400 border-b" style="border-color: var(--border-subtle);">
-              <th class="px-4 py-3 font-medium">昵称</th>
-              <th class="px-4 py-3 font-medium">内容</th>
-              <th class="px-4 py-3 font-medium">AI回复</th>
-              <th class="px-4 py-3 font-medium">关键词</th>
-              <th class="px-4 py-3 font-medium w-16">点赞</th>
-              <th class="px-4 py-3 font-medium">IP属地</th>
-              <th class="px-4 py-3 font-medium w-12">作者</th>
-              <th class="px-4 py-3 font-medium w-28">评论时间</th>
-              <th class="px-4 py-3 font-medium w-28">采集时间</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y" style="border-color: var(--border-subtle);">
-            <tr v-for="item in items" :key="item.id" class="hover:bg-white/5 transition-colors">
-              <td class="px-4 py-3 text-slate-200 font-medium">{{ item.nickname }}</td>
-              <td class="px-4 py-3 text-slate-400 max-w-[200px] truncate" :title="item.content">{{ item.content }}</td>
-              <td class="px-4 py-3 text-emerald-400 max-w-[200px] truncate" :title="item.ai_reply">{{ item.ai_reply || '-' }}</td>
-              <td class="px-4 py-3 text-slate-500">{{ item.keyword || '-' }}</td>
-              <td class="px-4 py-3 text-slate-400 font-mono text-xs">{{ item.like_count || '0' }}</td>
-              <td class="px-4 py-3 text-slate-500 text-xs">{{ item.location || '-' }}</td>
-              <td class="px-4 py-3"><span v-if="item.is_author" class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">作者</span><span v-else class="text-slate-600">-</span></td>
-              <td class="px-4 py-3 text-slate-500 text-xs">{{ item.time_str ? formatDate(item.time_str) : '-' }}</td>
-              <td class="px-4 py-3 text-slate-500 text-xs">{{ formatDate(item.created_at) }}</td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr>
+                <th class="px-4 py-3 text-left">昵称</th>
+                <th class="px-4 py-3 text-left w-[18%]">评论内容</th>
+                <th class="px-4 py-3 text-left w-[18%]">AI回复</th>
+                <th class="px-4 py-3 text-left">关键词</th>
+                <th class="px-4 py-3 text-right w-14">点赞</th>
+                <th class="px-4 py-3 text-left">IP属地</th>
+                <th class="px-4 py-3 text-left">意向省份</th>
+                <th class="px-4 py-3 text-left">意向城市</th>
+                <th class="px-4 py-3 text-left">意向景点</th>
+                <th class="px-4 py-3 text-center w-14">作者</th>
+                <th class="px-4 py-3 text-center w-16">来源</th>
+                <th class="px-4 py-3 text-right w-24">评论时间</th>
+                <th class="px-4 py-3 text-right w-24">采集时间</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y" style="border-color: var(--border-subtle);">
+              <tr v-for="item in items" :key="item.id" class="group transition-colors duration-150" style="background: transparent;">
+                <td class="px-4 py-3">
+                  <span class="text-slate-200 font-medium">{{ item.nickname }}</span>
+                </td>
+                <td class="px-4 py-3">
+                  <span class="text-slate-400 line-clamp-2 text-xs leading-relaxed" :title="item.content">{{ item.content }}</span>
+                </td>
+                <td class="px-4 py-3">
+                  <span v-if="item.ai_reply" class="text-emerald-400/80 line-clamp-2 text-xs leading-relaxed" :title="item.ai_reply">{{ item.ai_reply }}</span>
+                  <span v-else class="text-slate-600">-</span>
+                </td>
+                <td class="px-4 py-3">
+                  <span v-if="item.keyword" class="inline-block text-[11px] px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-400/80">{{ item.keyword }}</span>
+                  <span v-else class="text-slate-600">-</span>
+                </td>
+                <td class="px-4 py-3 text-right font-mono text-xs tabular-nums" :class="item.like_count > 0 ? 'text-amber-400/80' : 'text-slate-600'">{{ item.like_count || '0' }}</td>
+                <td class="px-4 py-3 text-xs text-slate-500">{{ item.location || '-' }}</td>
+                <td class="px-4 py-3 text-xs">
+                  <span v-if="item.intended_province" class="text-amber-300/80">{{ item.intended_province }}</span>
+                  <span v-else class="text-slate-600">-</span>
+                </td>
+                <td class="px-4 py-3 text-xs">
+                  <span v-if="item.intended_city" class="text-purple-300/80">{{ item.intended_city }}</span>
+                  <span v-else class="text-slate-600">-</span>
+                </td>
+                <td class="px-4 py-3 text-xs">
+                  <span v-if="item.intended_attraction" class="text-cyan-300/80">{{ item.intended_attraction }}</span>
+                  <span v-else class="text-slate-600">-</span>
+                </td>
+                <td class="px-4 py-3 text-center">
+                  <span v-if="item.is_author" class="inline-block text-[10px] px-1.5 py-0.5 rounded font-medium" style="background: rgba(245,158,11,0.15); color: #fbbf24;">作者</span>
+                  <span v-else class="text-slate-600">-</span>
+                </td>
+                <td class="px-4 py-3 text-center">
+                  <span class="inline-block text-[10px] px-1.5 py-0.5 rounded font-medium" :class="item.data_source_type === 1 ? 'bg-rose-500/15 text-rose-400' : 'bg-slate-500/10 text-slate-500'">{{ item.data_source_type === 1 ? '带货' : '普通' }}</span>
+                </td>
+                <td class="px-4 py-3 text-right text-xs text-slate-500 tabular-nums whitespace-nowrap">{{ item.time_str ? formatDate(item.time_str) : '-' }}</td>
+                <td class="px-4 py-3 text-right text-xs text-slate-500 tabular-nums whitespace-nowrap">{{ formatDate(item.created_at) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
 
     <!-- Users Tab -->
     <div v-if="activeTab === 'users'">
-      <div v-if="loading" class="text-center py-12 text-slate-400">加载中...</div>
-      <div v-else-if="items.length === 0" class="text-center py-12 text-slate-500">暂无用户数据</div>
-      <div v-else class="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        <div v-for="user in items" :key="user.id" class="card p-4 hover:border-sky-500/30 transition-colors cursor-default">
-          <div class="flex items-center gap-3 mb-3">
-            <div class="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white" style="background: linear-gradient(135deg, #6366f1, #a855f7);">
-              {{ (user.nickname || '?')[0] }}
+      <!-- User-specific filters -->
+      <div class="flex items-center gap-3 mb-4 flex-wrap">
+        <select v-model="filterPrivate" @change="handleSearch" class="rounded-lg border px-3 py-1.5 text-sm" style="border-color: var(--border-default); background: var(--bg-surface); color: var(--text-primary);">
+          <option value="">全部账号</option>
+          <option value="no">公开账号</option>
+          <option value="yes">私密账号</option>
+        </select>
+        <input type="date" v-model="filterDateFrom" @change="handleSearch" class="rounded-lg border px-3 py-1.5 text-sm w-36" title="采集开始日期" />
+        <span class="text-slate-500 text-xs">至</span>
+        <input type="date" v-model="filterDateTo" @change="handleSearch" class="rounded-lg border px-3 py-1.5 text-sm w-36" title="采集结束日期" />
+        <select v-model="sortBy" @change="handleSearch" class="rounded-lg border px-3 py-1.5 text-sm" style="border-color: var(--border-default); background: var(--bg-surface); color: var(--text-primary);">
+          <option value="">默认排序</option>
+          <option value="fans_count">粉丝数</option>
+          <option value="likes_count">获赞数</option>
+          <option value="follow_count">关注数</option>
+          <option value="works_count">作品数</option>
+          <option value="created_at">采集时间</option>
+        </select>
+        <button
+          v-if="sortBy"
+          @click="sortOrder = sortOrder === 'desc' ? 'asc' : 'desc'; fetchData()"
+          class="rounded-lg border px-2.5 py-1.5 text-sm transition cursor-pointer"
+          style="border-color: var(--border-default); color: var(--text-secondary);"
+          :class="sortOrder === 'asc' ? 'bg-sky-500/10 border-sky-500/30 text-sky-300' : 'hover:bg-white/5'"
+          :title="sortOrder === 'desc' ? '降序' : '升序'"
+        >
+          <svg class="w-3.5 h-3.5 inline transition-transform duration-200" :class="sortOrder === 'asc' ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
+          {{ sortOrder === 'desc' ? '降序' : '升序' }}
+        </button>
+      </div>
+
+      <div v-if="loading" class="flex items-center justify-center py-16">
+        <svg class="animate-spin h-7 w-7 text-cyan-400/60" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+      </div>
+      <div v-else-if="items.length === 0" class="flex flex-col items-center justify-center py-16 text-slate-400">
+        <div class="relative mb-4">
+          <div class="absolute inset-0 rounded-full blur-xl opacity-20" style="background: var(--accent-glow-soft);"></div>
+          <svg class="h-14 w-14 relative opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+        </div>
+        <p class="text-sm text-slate-500">暂无用户数据</p>
+      </div>
+      <div v-else class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div v-for="user in items" :key="user.id" class="card px-4 py-4 group cursor-default transition-all duration-200" style="border-color: var(--border-subtle);">
+          <!-- Header: Avatar + Identity -->
+          <div class="flex items-start gap-3 mb-4">
+            <div class="relative shrink-0">
+              <img v-if="user.avatar_url" :src="user.avatar_url" class="w-11 h-11 rounded-full object-cover ring-2 ring-white/5" :alt="user.nickname" />
+              <div v-else class="w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold text-white ring-2 ring-white/5" :style="{ backgroundImage: avatarGradient(user.nickname) }">
+                {{ (user.nickname || '?')[0] }}
+              </div>
+              <span v-if="user.is_private === '是'" class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-rose-500 flex items-center justify-center ring-2 ring-black" title="私密账号">
+                <svg class="w-2 h-2 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+              </span>
             </div>
-            <div class="min-w-0 flex-1">
-              <p class="text-sm font-semibold text-slate-200 truncate">{{ user.nickname || '-' }}</p>
-              <p class="text-xs text-slate-500 font-mono">{{ user.douyin_id || '-' }}</p>
+            <div class="min-w-0 flex-1 pt-0.5">
+              <div class="flex items-center gap-1.5">
+                <p class="text-sm font-semibold text-slate-100 truncate">{{ user.nickname || '未知' }}</p>
+                <span class="text-[9px] px-1 py-0.5 rounded font-medium shrink-0" :class="user.data_source_type === 1 ? 'bg-rose-500/15 text-rose-400' : 'bg-slate-500/10 text-slate-500'">{{ user.data_source_type === 1 ? '带货' : '普通' }}</span>
+              </div>
+              <p class="text-[11px] text-slate-500 font-mono mt-0.5 truncate">{{ user.douyin_id || '-' }}</p>
             </div>
           </div>
-          <div class="grid grid-cols-2 gap-2 text-xs">
-            <div><span class="text-slate-500">获赞</span><p class="text-slate-300 font-mono">{{ user.likes_count || '-' }}</p></div>
-            <div><span class="text-slate-500">关注</span><p class="text-slate-300 font-mono">{{ user.follow_count || '-' }}</p></div>
-            <div><span class="text-slate-500">粉丝</span><p class="text-slate-300 font-mono">{{ user.fans_count || '-' }}</p></div>
-            <div><span class="text-slate-500">作品</span><p class="text-slate-300 font-mono">{{ user.works_count || '-' }}</p></div>
+
+          <!-- Stats grid -->
+          <div class="grid grid-cols-4 gap-1 mb-3 p-2 rounded-lg" style="background: rgba(255,255,255,0.015);">
+            <div class="text-center">
+              <p class="text-sm font-bold tabular-nums" style="font-family: var(--font-mono); color: var(--accent-400);">{{ user.fans_count || '-' }}</p>
+              <p class="text-[10px] text-slate-500 mt-0.5">粉丝</p>
+            </div>
+            <div class="text-center">
+              <p class="text-sm font-bold tabular-nums" style="font-family: var(--font-mono); color: var(--amber-400);">{{ user.likes_count || '-' }}</p>
+              <p class="text-[10px] text-slate-500 mt-0.5">获赞</p>
+            </div>
+            <div class="text-center">
+              <p class="text-sm font-bold tabular-nums text-slate-300" style="font-family: var(--font-mono);">{{ user.follow_count || '-' }}</p>
+              <p class="text-[10px] text-slate-500 mt-0.5">关注</p>
+            </div>
+            <div class="text-center">
+              <p class="text-sm font-bold tabular-nums text-slate-300" style="font-family: var(--font-mono);">{{ user.works_count || '-' }}</p>
+              <p class="text-[10px] text-slate-500 mt-0.5">作品</p>
+            </div>
           </div>
-          <div class="flex items-center justify-between mt-3 pt-3 border-t text-xs" style="border-color: var(--border-subtle);">
-            <span class="text-slate-500">{{ user.gender || '-' }} {{ user.age || '' }}</span>
-            <span class="text-slate-500">{{ user.ip_location || '-' }}</span>
+
+          <!-- Destination -->
+          <div v-if="user.intended_province || user.intended_city || user.intended_attraction" class="mb-3 px-2 py-1.5 rounded-lg flex items-center gap-2 text-xs" style="background: rgba(139,92,246,0.06); border: 1px solid rgba(139,92,246,0.12);">
+            <svg class="w-3.5 h-3.5 text-purple-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            <span class="text-slate-400">{{ [user.intended_province, user.intended_city, user.intended_attraction].filter(Boolean).join(' · ') }}</span>
+          </div>
+
+          <!-- Footer: Meta -->
+          <div class="flex items-center gap-2 text-[11px] text-slate-500 pt-2 border-t" style="border-color: var(--border-subtle);">
+            <span v-if="user.gender || user.age" class="inline-flex items-center gap-1">
+              <svg class="w-3 h-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+              {{ user.gender || '?' }} {{ user.age || '' }}
+            </span>
+            <span class="opacity-30" v-if="(user.gender || user.age) && user.ip_location">|</span>
+            <span v-if="user.ip_location" class="inline-flex items-center gap-1">
+              <svg class="w-3 h-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+              {{ user.ip_location }}
+            </span>
           </div>
         </div>
       </div>
@@ -297,8 +447,16 @@ onMounted(async () => {
 
     <!-- Conversations Tab -->
     <div v-if="activeTab === 'conversations'">
-      <div v-if="loading" class="text-center py-12 text-slate-400">加载中...</div>
-      <div v-else-if="items.length === 0" class="text-center py-12 text-slate-500">暂无私信数据</div>
+      <div v-if="loading" class="flex items-center justify-center py-16">
+        <svg class="animate-spin h-7 w-7 text-cyan-400/60" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+      </div>
+      <div v-else-if="items.length === 0" class="flex flex-col items-center justify-center py-16 text-slate-400">
+        <div class="relative mb-4">
+          <div class="absolute inset-0 rounded-full blur-xl opacity-20" style="background: var(--accent-glow-soft);"></div>
+          <svg class="h-14 w-14 relative opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+        </div>
+        <p class="text-sm text-slate-500">暂无私信数据</p>
+      </div>
       <div v-else class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <div v-for="conv in items" :key="conv.id" class="card p-4 hover:border-sky-500/30 transition-colors cursor-default">
           <div class="flex items-center justify-between mb-3">

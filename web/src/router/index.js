@@ -127,6 +127,11 @@ const routes = [
         component: () => import('../views/PipelineMonitorPage.vue'),
       },
       {
+        path: 'users',
+        name: 'Users',
+        component: () => import('../views/UsersPage.vue'),
+      },
+      {
         path: 'settings',
         name: 'Settings',
         component: () => import('../views/SettingsPage.vue'),
@@ -144,8 +149,14 @@ const router = createRouter({
   routes,
 })
 
+const ADMIN_ONLY_PATHS = [
+  '/accounts', '/account-groups', '/devices', '/chain-templates', '/chain-instances',
+  '/selectors', '/settings', '/prompt-templates', '/ai-config', '/dict-manage',
+  '/characters', '/scenes', '/series', '/director', '/pipeline', '/stats',
+  '/users',
+]
+
 router.beforeEach((to, from, next) => {
-  // Lazy-init store once; Pinia must be installed before first navigation
   if (!router._authStore) {
     router._authStore = useAuthStore()
   }
@@ -153,6 +164,11 @@ router.beforeEach((to, from, next) => {
 
   if (to.matched.some((record) => record.meta.requiresAuth) && !authStore.isLoggedIn) {
     next('/login')
+    return
+  }
+
+  if (authStore.isLoggedIn && !authStore.isAdmin && ADMIN_ONLY_PATHS.some(p => to.path.startsWith(p))) {
+    next('/')
     return
   }
 

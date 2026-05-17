@@ -188,6 +188,21 @@ textarea:focus {
 
 select option { background: var(--bg-elevated); color: var(--text-primary); }
 
+/* === Date Input — dark mode compatible === */
+input[type="date"] {
+  color-scheme: dark;
+  cursor: pointer;
+}
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.7);
+  opacity: 0.6;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+input[type="date"]:hover::-webkit-calendar-picker-indicator {
+  opacity: 1;
+}
+
 /* === Table === */
 thead th {
   background: var(--bg-surface) !important;

@@ -540,8 +540,9 @@ class ChannelService:
                     account_ids = self._round_robin_assign(
                         db, [i.keyword for i in pending_items], active_accounts
                     )
-                    for i, item in enumerate(pending_items):
-                        item.account_id = account_ids[i]
+                    with db.begin_nested():
+                        for i, item in enumerate(pending_items):
+                            item.account_id = account_ids[i]
 
         db.commit()
         db.refresh(ch)
@@ -619,17 +620,31 @@ class ChannelService:
             if not dev:
                 return {"updated": 0, "skipped": [], "errors": [f"设备 {assigned_device_id} 不存在"]}
 
+        # Load all items in one query instead of N per-item queries
+        items = db.query(ChannelItem).filter(ChannelItem.id.in_(item_ids)).all()
+        item_map = {i.id: i for i in items}
+
+        # Pre-load channel ownership for user-scoping
+        if user_id and items:
+            channel_ids = list(set(i.channel_id for i in items))
+            owned_channels = set(
+                ch[0] for ch in db.query(Channel.id).filter(
+                    Channel.id.in_(channel_ids),
+                    Channel.user_id == user_id,
+                ).all()
+            )
+        else:
+            owned_channels = None
+
         for item_id in item_ids:
             try:
-                item = db.query(ChannelItem).filter(ChannelItem.id == item_id).first()
+                item = item_map.get(item_id)
                 if not item:
                     errors.append(f"{item_id}: 不存在")
                     continue
-                if user_id:
-                    ch = db.query(Channel).filter(Channel.id == item.channel_id, Channel.user_id == user_id).first()
-                    if not ch:
-                        skipped.append(item_id)
-                        continue
+                if owned_channels is not None and item.channel_id not in owned_channels:
+                    skipped.append(item_id)
+                    continue
                 if item.status not in ("pending", "assigned"):
                     skipped.append(item_id)
                     continue

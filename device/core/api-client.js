@@ -262,8 +262,10 @@ var apiClient = {
     return this.get("/api/device/poll", { device_id: config.deviceId });
   },
 
-  fetchTemplateList: function () {
-    return this.get("/api/device/templates");
+  fetchTemplateList: function (resolution) {
+    var path = "/api/device/templates";
+    if (resolution) path += "?resolution=" + encodeURIComponent(resolution);
+    return this.get(path);
   },
 
   uploadCalibration: function (templates, resolution) {

@@ -800,12 +800,12 @@ async def generate_content(
 def device_list_templates(
     device_id: str = Depends(verify_device_secret),
     db: Session = Depends(get_db),
+    resolution: str = Query(None),
 ):
     """Return template list with MD5 hashes for incremental sync.
     Filters by device resolution profile when available."""
     from app.services.template_service import template_service
-    resolution = None
-    if device_id:
+    if not resolution and device_id:
         device = db.query(Device).filter(Device.id == device_id).first()
         if device and device.screen_resolution:
             resolution = device.screen_resolution

@@ -27,7 +27,7 @@ def _ensure_resolution_dir(resolution: str) -> Path:
 def _safe_resolve(path: Path, parent: Path) -> bool:
     """Check that resolved path is within parent directory."""
     try:
-        return path.resolve().parent == parent.resolve() or path.resolve().parent.parent == parent.resolve()
+        return path.resolve().parent == parent.resolve()
     except Exception:
         return False
 
@@ -104,6 +104,8 @@ class TemplateService:
         """Save template to resolution subdirectory."""
         _ensure_resolution_dir(resolution)
         dest = TEMPLATE_DIR / resolution / filename
+        if not _safe_resolve(dest, TEMPLATE_DIR / resolution):
+            raise ValueError("Path traversal detected")
         dest.write_bytes(content)
         self._md5_cache.pop(f"{resolution}/{filename}", None)
         return dest

@@ -573,7 +573,7 @@ var uiOperator = {
             var newH = Math.round(tpl.getHeight() * scaleX);
             try {
               var scaled = images.scale(tpl, newW, newH);
-              if (scaled) { tpl.recycle(); tpl = scaled; }
+              if (scaled) { tpl.recycle(); tpl = scaled; threshold = (threshold || 0.8) - 0.05; }
             } catch (e) {
               logger.warn(TAG, "模板缩放失败: " + e.message);
             }

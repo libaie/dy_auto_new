@@ -35,6 +35,16 @@ var selectorLoader = global.__selectorLoader || {
           this._initialized = true;
           logger.info(TAG, "已加载 " + Object.keys(this._cache).length + " 个选择器, 版本=" + this._version);
           this.syncTemplates();
+          // 新分辨率设备：选择器过少说明无匹配 profile，触发标定
+          if (Object.keys(this._cache).length < 15) {
+            logger.warn(TAG, "选择器数量异常 (" + Object.keys(this._cache).length + ")，触发自动标定");
+            try {
+              var calibrator = require("./calibrator");
+              calibrator.run();
+            } catch (e) {
+              logger.warn(TAG, "自动标定失败: " + e.message);
+            }
+          }
           return;
         }
         logger.warn(TAG, "服务端返回空选择器 (尝试 " + attempt + ")");
@@ -191,7 +201,7 @@ var selectorLoader = global.__selectorLoader || {
    */
   syncTemplates: function () {
     try {
-      var response = apiClient.fetchTemplateList();
+      var response = apiClient.fetchTemplateList(this._resolution);
       if (!response || !response.templates) {
         logger.warn(TAG, "获取模板列表失败");
         return;

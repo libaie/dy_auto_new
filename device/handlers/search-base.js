@@ -190,8 +190,6 @@ SearchBaseHandler._inputKeyword = function (keyword) {
     logger.warn(TAG, "搜索输入框未找到");
     return false;
   }
-  editBox.click();
-  sleep(300);
   editBox.setText(keyword);
   sleep(500);
   logger.info(TAG, "输入关键词: '" + keyword + "'");

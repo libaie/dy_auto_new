@@ -374,7 +374,7 @@ onMounted(async () => {
     devices.value = devResp.data.devices || devResp.data || []
     groups.value = grpResp.data.groups || grpResp.data || []
     const members = memberResp.data.members || []
-    groupMemberIds.value = new Set(members.map(m => m.account_id))
+    groupMemberIds.value = new Set(members.map(m => m.id))
   } catch (e) {
     console.error('Failed to load ref data:', e)
   }

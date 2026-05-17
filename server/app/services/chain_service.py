@@ -37,6 +37,7 @@ class ChainService:
         template_id: str,
         account_ids: list[str],
         device_id: Optional[str] = None,
+        user_id: Optional[str] = None,
     ) -> dict:
         """Create chain instances for each account, skipping busy ones.
 
@@ -69,6 +70,7 @@ class ChainService:
                     template_id=template_id,
                     account_id=account_id,
                     device_id=device_id,
+                    user_id=user_id,
                     current_step=1,
                     total_steps=total_steps,
                     status="pending",
@@ -87,18 +89,19 @@ class ChainService:
 
         return results
 
-    def resolve_accounts_from_groups(self, db: Session, group_ids: list[str]) -> list[str]:
-        """Expand group IDs to unique active account IDs."""
-        account_ids = (
+    def resolve_accounts_from_groups(self, db: Session, group_ids: list[str], user_id: Optional[str] = None) -> list[str]:
+        """Expand group IDs to unique active account IDs, optionally scoped to user."""
+        query = (
             db.query(AccountGroupMember.account_id)
             .join(Account, Account.id == AccountGroupMember.account_id)
             .filter(
                 AccountGroupMember.group_id.in_(group_ids),
                 Account.status == "active",
             )
-            .distinct()
-            .all()
         )
+        if user_id:
+            query = query.filter(Account.user_id == user_id)
+        account_ids = query.distinct().all()
         return [a[0] for a in account_ids]
 
     def advance_chain(self, db: Session, task_id: str, status: str, result: dict = None):
@@ -151,6 +154,7 @@ class ChainService:
             type=step_type,
             account_id=chain.account_id,
             device_id=chain.device_id,
+            user_id=chain.user_id,
             params=step.get("params", {}),
             status="pending",
             chain_instance_id=chain.id,

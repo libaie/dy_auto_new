@@ -151,14 +151,16 @@ async def batch_create_tasks(
         raise HTTPException(status_code=422, detail=f"Invalid params for {ttype}: {str(e)}")
 
     from app.db_models import Account, AccountGroupMember, Channel, ChannelItem as DBChannelItem
-    from app.models import TaskType as TT
+    from app.models import TaskType as TT, TASK_PARAMS_VALIDATORS
 
     params = await _maybe_resolve_content_template(params, ttype, db=db)
     params = await _maybe_expand_keywords(params, ttype, db=db)
     raw_keywords = params.get("keywords", []) or ([params.get("keyword")] if params.get("keyword") else [])
     keywords = [k.strip() for k in raw_keywords if k and k.strip()]
 
-    if not keywords and not request.params.get("keyword"):
+    # Only require keywords for keyword-based task types (those with a params validator)
+    _needs_keywords = ttype in TASK_PARAMS_VALIDATORS
+    if _needs_keywords and not keywords and not request.params.get("keyword"):
         raise HTTPException(status_code=400, detail="关键词不能为空")
 
     # 关键词数量上限

@@ -388,6 +388,7 @@ async def ws_device_status(websocket: WebSocket):
 
         import logging
         _ws_log = logging.getLogger("device_ws")
+        from starlette.websockets import WebSocketDisconnect
         try:
             while True:
                 try:
@@ -419,9 +420,15 @@ async def ws_device_status(websocket: WebSocket):
                     except asyncio.TimeoutError:
                         _ws_log.warning("device %s unresponsive to ping", device_id)
                         break
+                    except WebSocketDisconnect:
+                        _ws_log.info("device %s disconnected during ping probe", device_id)
+                        break
                     except Exception:
                         _ws_log.warning("device %s error during ping probe", device_id, exc_info=True)
                         break
+                except WebSocketDisconnect as dis:
+                    _ws_log.info("device %s disconnected (code=%s)", device_id, dis.code)
+                    break
         except Exception:
             _ws_log.warning("device %s WS loop exited with error", device_id, exc_info=True)
         finally:

@@ -171,7 +171,7 @@
               <label class="text-xs text-slate-400 block mb-1">账号</label>
               <select v-model="editDialog.account_id" class="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white text-sm">
                 <option value="">不变更</option>
-                <option v-for="a in accounts" :key="a.id" :value="a.id">{{ a.nickname || a.id }}</option>
+                <option v-for="a in editableAccounts" :key="a.id" :value="a.id">{{ a.nickname || a.id }}</option>
               </select>
             </div>
             <div>
@@ -197,7 +197,7 @@ import { ref, computed, onMounted } from 'vue'
 import { getChannel, editChannelMeta, editChannelItem, batchEditItems } from '../api/channels.js'
 import { listAccounts } from '../api/accounts.js'
 import { listDevices } from '../api/devices.js'
-import { listGroups } from '../api/accountGroups.js'
+import { listGroups, listMembers } from '../api/accountGroups.js'
 
 const props = defineProps({ channel: Object })
 const emit = defineEmits(['close', 'refresh'])
@@ -244,8 +244,11 @@ const allSelected = computed(() => {
   return items.length > 0 && items.every(i => selectedIds.value.has(i.id))
 })
 
+const groupMemberIds = ref(new Set())
+
 const editableAccounts = computed(() => {
-  return accounts.value
+  if (groupMemberIds.value.size === 0) return accounts.value
+  return accounts.value.filter(a => groupMemberIds.value.has(a.id))
 })
 
 function isItemEditable(item) {
@@ -359,15 +362,19 @@ async function loadDetail() {
 
 onMounted(async () => {
   await loadDetail()
+  const gid = detail.value.group_id
   try {
-    const [accResp, devResp, grpResp] = await Promise.all([
+    const [accResp, devResp, grpResp, memberResp] = await Promise.all([
       listAccounts(),
       listDevices(),
       listGroups(),
+      gid ? listMembers(gid) : Promise.resolve({ data: { members: [] } }),
     ])
     accounts.value = accResp.data.accounts || accResp.data || []
     devices.value = devResp.data.devices || devResp.data || []
     groups.value = grpResp.data.groups || grpResp.data || []
+    const members = memberResp.data.members || []
+    groupMemberIds.value = new Set(members.map(m => m.account_id))
   } catch (e) {
     console.error('Failed to load ref data:', e)
   }

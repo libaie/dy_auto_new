@@ -33,6 +33,13 @@ LAYER_DEFS = [
     {"index": 5, "label": "postproduction",  "model_key": "ttsModel",   "desc": "后处理合成"},
 ]
 
+FORWARD_KEYS = {
+    0: ["image_urls", "images"],
+    1: ["narration", "content"],
+    2: ["title", "content"],
+    3: ["image_prompt"],
+}
+
 VIDEO_POLL_INTERVAL = 10
 VIDEO_POLL_TIMEOUTS = {
     "seedance": 180, "kling": 120, "wan": 120, "pixelle": 120, "default": 120,
@@ -352,19 +359,13 @@ async def _run_all_layers(run_id: str, director_plan: dict | None = None):
                 common["frame_count"] = len(frames)
 
         # Hydrate common from already-completed layers (resume support)
-        _FORWARD_KEYS = {
-            0: ["image_urls", "images"],
-            1: ["narration", "content"],
-            2: ["title", "content"],
-            3: ["image_prompt"],
-        }
         prev_layers = (run.layers_json or {}).items()
         for _li_str, _lr in prev_layers:
             _li = int(_li_str)
             if _lr.get("status") != "completed":
                 continue
             _res = _lr.get("result", {}) or {}
-            for key in _FORWARD_KEYS.get(_li, []):
+            for key in FORWARD_KEYS.get(_li, []):
                 val = _res.get(key)
                 if val:
                     common[key] = val
@@ -393,13 +394,7 @@ async def _run_all_layers(run_id: str, director_plan: dict | None = None):
             else:
                 result = await layer_fn(run, model_config, common, local_db)
                 # Forward layer output to subsequent layers via common
-                _FORWARD_KEYS = {
-                    0: ["image_urls", "images"],
-                    1: ["narration", "content"],
-                    2: ["title", "content"],
-                    3: ["image_prompt"],
-                }
-                for key in _FORWARD_KEYS.get(i, []):
+                for key in FORWARD_KEYS.get(i, []):
                     val = result.get(key)
                     if val:
                         common[key] = val

@@ -57,7 +57,7 @@ def _model_dict(m: AIModel, reveal: bool = False) -> dict:
         "model_name": m.model_name or "",
         "config_json": m.config_json or {},
         "enabled": m.enabled, "sort_order": m.sort_order,
-        "api_key_configured": bool(m.api_key),
+        "api_key_configured": bool(m.api_key) if reveal else False,
     }
 
 

@@ -20,10 +20,14 @@ from app.services.ai_generator import ai_generator
 
 
 async def _offline_checker():
-    """Background task: mark devices offline if no heartbeat or no WS connection."""
+    """Background task: mark devices offline based on heartbeat staleness only.
+    WS connection is a push optimization, not a liveness signal — devices
+    fall back to HTTP polling when WS drops, and are still online as long
+    as their heartbeat (last_seen_at) is current.
+    """
     from app.db_models import Device
     from app.ws_manager import pair_ws_manager
-    from datetime import datetime, timezone, timedelta
+    from datetime import timedelta
 
     while True:
         await asyncio.sleep(30)
@@ -31,31 +35,24 @@ async def _offline_checker():
         try:
             now = bj_now()
 
-            # 1. Devices online in DB but with no active WS connection → offline
             online_devices = db.query(Device).filter(Device.status == "online").all()
-            no_ws_ids = [
-                d.id for d in online_devices
-                if not pair_ws_manager.is_device_online(d.id)
-            ]
 
-            # 2. Devices with stale heartbeat (>5 min) → offline
-            cutoff_dt = now - timedelta(seconds=300)
+            # Stale heartbeat (>2 min) → device is truly offline
+            cutoff_dt = now - timedelta(seconds=120)
             stale_ids = [
                 d.id for d in online_devices
-                if d.id not in no_ws_ids and d.last_seen_at and d.last_seen_at < cutoff_dt
+                if d.last_seen_at is None or d.last_seen_at < cutoff_dt
             ]
 
-            all_offline_ids = no_ws_ids + stale_ids
-            if all_offline_ids:
-                # Mark devices offline
-                db.query(Device).filter(Device.id.in_(all_offline_ids)).update(
+            if stale_ids:
+                db.query(Device).filter(Device.id.in_(stale_ids)).update(
                     {"status": "offline"}, synchronize_session=False
                 )
 
-                # Mark RUNNING tasks on offline devices as FAILED (设备意外退出)
+                # Mark RUNNING tasks on offline devices as FAILED
                 from app.db_models import Task as DBTask
                 orphaned = db.query(DBTask).filter(
-                    DBTask.device_id.in_(all_offline_ids),
+                    DBTask.device_id.in_(stale_ids),
                     DBTask.status == "running",
                 ).all()
                 for t in orphaned:
@@ -65,7 +62,7 @@ async def _offline_checker():
 
                 db.commit()
 
-                for device_id in all_offline_ids:
+                for device_id in stale_ids:
                     await pair_ws_manager.broadcast_to_admins({
                         "event": "device_status_changed",
                         "device_id": device_id,

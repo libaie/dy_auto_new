@@ -410,22 +410,10 @@ async def ws_device_status(websocket: WebSocket):
         except Exception:
             _ws_log.warning("device %s WS loop exited with error", device_id, exc_info=True)
         finally:
-            # 只在本连接仍是活跃连接时才标记离线（避免重连竞态）
+            # 只在本连接仍是活跃连接时才清理（避免重连竞态）
+            # WS 断开不标记离线 — _offline_checker 通过心跳超时统一判定
             if pair_ws_manager._device_status_connections.get(device_id) is websocket:
                 pair_ws_manager.unregister_device_status(device_id)
-                db2 = next(get_db())
-                try:
-                    device_obj = db2.query(Device).filter(Device.id == device_id).first()
-                    if device_obj:
-                        device_obj.status = "offline"
-                        db2.commit()
-                finally:
-                    db2.close()
-                await pair_ws_manager.broadcast_to_admins({
-                    "event": "device_status_changed",
-                    "device_id": device_id,
-                    "status": "offline",
-                })
     finally:
         db.close()
 

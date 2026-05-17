@@ -2,6 +2,8 @@
 // 行业提示词统一配置 — 切换行业只需改 industry 字段或新增 industry 定义
 // ai-analyzer.js 读取此配置，不硬编码任何行业相关文本
 
+var logger = require("../utils/logger");
+
 var promptsConfig = {
   // 当前行业标识，可通过 setIndustry() 切换
   industry: "health",
@@ -340,6 +342,7 @@ var promptsConfig = {
           maxTokens: 120,
         },
       },
+
     },
   },
 
@@ -371,6 +374,9 @@ var promptsConfig = {
   setIndustry: function (name) {
     if (this.industries[name]) {
       this.industry = name;
+    } else if (name) {
+      logger.warn("配置", "未知行业: '" + name + "', 回退为 health");
+      this.industry = "health";
     }
   },
 };

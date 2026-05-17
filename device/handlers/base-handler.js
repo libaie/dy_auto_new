@@ -89,6 +89,9 @@ var BaseHandler = {
       var author = id("com.ss.android.ugc.aweme:id/nickname").findOne(2000);
       if (author && author.text()) parts.push(author.text());
 
+      var title = id("com.ss.android.ugc.aweme:id/title").findOne(2000);
+      if (title && title.text()) parts.push(title.text());
+
       var hashtags = className("android.widget.TextView").find();
       for (var i = 0; i < Math.min(hashtags.length, 10); i++) {
         var t = hashtags[i].text() || "";

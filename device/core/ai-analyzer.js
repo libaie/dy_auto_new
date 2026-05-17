@@ -25,13 +25,18 @@ var aiAnalyzer = {
     if (tmpl && tmpl.content) {
       var ok = promptsConfig.setOverride(tmpl.content);
       if (ok) {
+        promptsConfig.setIndustry(tmpl.industry || "health");
         logger.info(TAG, "使用服务端模板: " + tmpl.name + " (" + (tmpl.industry || "") + ")");
       } else {
         promptsConfig.setOverride(null);
+        promptsConfig.setIndustry("health");
+        this._destCache = {};
         logger.warn(TAG, "模板 " + tmpl.name + " 校验失败，回退本地配置");
       }
     } else {
       promptsConfig.setOverride(null);
+      promptsConfig.setIndustry("health");
+      this._destCache = {};
       if (id) logger.warn(TAG, "模板 " + id + " 未找到，使用本地默认配置");
     }
   },
@@ -41,8 +46,46 @@ var aiAnalyzer = {
    * @param {string} name — 行业标识，如 "health" / "travel"
    */
   setIndustry: function (name) {
+    if (promptsConfig.industry !== name) this._destCache = {};
     promptsConfig.setIndustry(name);
     logger.info(TAG, "切换行业: " + (promptsConfig.get().name || name));
+  },
+
+  getIndustry: function () {
+    return promptsConfig.industry;
+  },
+
+  _destCache: {},
+
+  resolveDestination: function (keyword) {
+    if (promptsConfig.industry !== "travel") return null;
+    if (!keyword) return null;
+    if (this._destCache[keyword]) return this._destCache[keyword];
+
+    var prompt = [
+      "将以下旅游关键词解析为目的地信息。",
+      "关键词：" + keyword,
+      "请输出一个 JSON：",
+      "{\"province\": \"省份\", \"city\": \"城市\", \"attraction\": \"景点\"}",
+      "如果关键词本身是省份或城市，对应字段填空字符串，其余字段正常填写。",
+      "只输出 JSON，不要其他文本。"
+    ].join("\n");
+
+    var content = this._callAI(prompt, 200, 0.1);
+    if (!content) return null;
+
+    try {
+      var jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        var data = JSON.parse(jsonMatch[0]);
+        this._destCache[keyword] = data;
+        logger.info(TAG, "目的地解析: " + keyword + " → " + JSON.stringify(data));
+        return data;
+      }
+    } catch (e) {
+      logger.warn(TAG, "目的地解析失败: " + keyword + " " + e.message);
+    }
+    return null;
   },
 
   /**
@@ -229,6 +272,7 @@ var aiAnalyzer = {
     var commentText = params.commentText || "";
     var tier = params.tier || "other";
     var videoText = params.videoText || "";
+    var intendedCity = params.intendedCity || params.intended_city || "";
 
     var dm = promptsConfig.get().dmOpener;
     var dw = promptsConfig.get().disabledWords;
@@ -255,6 +299,7 @@ var aiAnalyzer = {
       "- 对方昵称：" + nickname + "\n" +
       (commentText ? "- 对方的评论：" + commentText + "\n" : "") +
       (videoText ? "- 视频内容：" + videoText.substring(0, 300) + "\n" : "") +
+      (intendedCity ? "- 对方意向目的地：" + intendedCity + "\n" : "") +
       "- 命中分层：" + tier + "\n\n" +
       "请输出一条开场白，**只输出消息文本本身，不要引号、不要解释**。";
 
@@ -333,7 +378,7 @@ var aiAnalyzer = {
     }
     var tierText = tierLines.join("\n");
 
-    return "你是一个关心家人健康的普通抖音用户，同时具备评论分析能力。对【" + searchKeyword + "】相关评论进行语义分析和打分。\n\n" +
+    return "你具有评论语义分析能力。当前视频的搜索关键词是【" + searchKeyword + "】，它代表了视频的主题和内容方向，评论与关键词关联越紧密，越可能是有真实需求的用户。\n\n" +
       "## 身份设定\n" +
       "- 你是" + id.role + "\n" +
       "- " + id.constraints.join("\n- ") + "\n" +

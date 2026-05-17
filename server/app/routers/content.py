@@ -24,7 +24,7 @@ router = APIRouter(prefix="/api/content", tags=["content"])
 async def create_template(
     request: ContentTemplateCreate,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     result = content_service.create_template(
         db, name=request.name, category=request.category,
@@ -40,7 +40,7 @@ def list_templates(
     skip: int = 0,
     limit: int = 50,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     limit = min(limit, 100)
     templates, total = content_service.list_templates(db, category=category, skip=skip, limit=limit)
@@ -51,7 +51,7 @@ def list_templates(
 def get_template(
     template_id: str,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     tpl = content_service.get_template(db, template_id)
     if not tpl:
@@ -64,7 +64,7 @@ async def update_template(
     template_id: str,
     request: ContentTemplateUpdate,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     updates = request.model_dump(exclude_none=True)
     tpl = content_service.update_template(db, template_id, **updates)
@@ -78,7 +78,7 @@ async def update_template(
 async def delete_template(
     template_id: str,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     if not content_service.delete_template(db, template_id):
         raise HTTPException(status_code=404, detail="Template not found")
@@ -92,7 +92,7 @@ async def delete_template(
 async def add_sensitive_word(
     request: SensitiveWordCreate,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     try:
         result = content_service.add_sensitive_word(db, request.word)
@@ -107,7 +107,7 @@ def list_sensitive_words(
     skip: int = 0,
     limit: int = 200,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     words, total = content_service.list_sensitive_words(db, skip=skip, limit=limit)
     return {"words": words, "total": total}
@@ -117,7 +117,7 @@ def list_sensitive_words(
 async def delete_sensitive_word(
     word_id: str,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     if not content_service.delete_sensitive_word(db, word_id):
         raise HTTPException(status_code=404, detail="Word not found")
@@ -131,7 +131,7 @@ async def delete_sensitive_word(
 async def generate_content(
     request: GenerateRequest,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     try:
         content = await content_service.generate_from_template(
@@ -153,7 +153,7 @@ async def generate_content(
 async def generate_keywords(
     request: KeywordMatrixRequest,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     try:
         keywords = await content_service.generate_keyword_matrix(request.keyword, request.count, db=db)
@@ -169,7 +169,7 @@ async def generate_keywords(
 async def generate_regex(
     request: GenerateRegexRequest,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     try:
         regex = await content_service.generate_regex(db, request.description)
@@ -184,7 +184,7 @@ async def generate_regex(
 async def generate_clean_prompt(
     request: GenerateCleanPromptRequest,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     try:
         prompt = await content_service.generate_clean_prompt(db, request.description)

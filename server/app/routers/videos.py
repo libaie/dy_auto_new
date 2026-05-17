@@ -42,7 +42,7 @@ def list_videos(
     skip: int = 0,
     limit: int = 50,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     limit = min(limit, 100)
     query = db.query(GeneratedVideo)
@@ -60,7 +60,7 @@ def list_videos(
 def get_video(
     video_id: str,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     video = db.query(GeneratedVideo).filter(GeneratedVideo.id == video_id).first()
     if not video:
@@ -86,7 +86,8 @@ def download_video(
         except Exception:
             pass
     if not username and token:
-        username = verify_ws_admin_token(token)
+        result = verify_ws_admin_token(token)
+        username = result[0] if result[0] else None
     if not username:
         raise HTTPException(status_code=401, detail="请先登录")
 
@@ -105,7 +106,7 @@ def download_video(
 def delete_video(
     video_id: str,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     video = db.query(GeneratedVideo).filter(GeneratedVideo.id == video_id).first()
     if not video:

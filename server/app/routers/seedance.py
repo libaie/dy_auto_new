@@ -77,7 +77,7 @@ class SeedanceGenerateRequest(BaseModel):
 
 
 @api_router.post("/generate")
-async def seedance_generate(body: SeedanceGenerateRequest, db: Session = Depends(get_db), _: str = Depends(verify_admin_token)):
+async def seedance_generate(body: SeedanceGenerateRequest, db: Session = Depends(get_db), user = Depends(verify_admin_token)):
     """提交 Seedance 视频生成任务."""
     api_key = _get_api_key(db)
     client = _get_client(api_key)
@@ -108,7 +108,7 @@ async def seedance_generate(body: SeedanceGenerateRequest, db: Session = Depends
 
 
 @api_router.get("/task/{task_id}")
-async def seedance_get_task(task_id: str, db: Session = Depends(get_db), _: str = Depends(verify_admin_token)):
+async def seedance_get_task(task_id: str, db: Session = Depends(get_db), user = Depends(verify_admin_token)):
     """查询 Seedance 任务状态."""
     api_key = _get_api_key(db)
     client = _get_client(api_key)
@@ -193,10 +193,10 @@ PROXY_METHODS = ["GET", "POST", "PUT", "DELETE", "PATCH"]
 
 
 @proxy_router.api_route("/{path:path}", methods=PROXY_METHODS)
-async def proxy_seedance(path: str, request: Request, db: Session = Depends(get_db), _: str = Depends(verify_admin_token)):
+async def proxy_seedance(path: str, request: Request, db: Session = Depends(get_db), user = Depends(verify_admin_token)):
     return await _do_proxy(request, db, path)
 
 
 @proxy_router.api_route("/", methods=PROXY_METHODS)
-async def proxy_seedance_root(request: Request, db: Session = Depends(get_db), _: str = Depends(verify_admin_token)):
+async def proxy_seedance_root(request: Request, db: Session = Depends(get_db), user = Depends(verify_admin_token)):
     return await _do_proxy(request, db, "")

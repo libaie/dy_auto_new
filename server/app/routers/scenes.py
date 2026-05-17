@@ -44,7 +44,7 @@ def list_scenes(db: Session = Depends(get_db)):
 
 @router.post("")
 def create_scene(body: SceneCreate, db: Session = Depends(get_db),
-                 _: str = Depends(verify_admin_token)):
+                 user = Depends(verify_admin_token)):
     s = Scene(**body.model_dump())
     db.add(s); db.commit(); db.refresh(s)
     return {"ok": True, "scene": _to_dict(s)}
@@ -52,7 +52,7 @@ def create_scene(body: SceneCreate, db: Session = Depends(get_db),
 
 @router.put("/{scene_id}")
 def update_scene(scene_id: str, body: dict, db: Session = Depends(get_db),
-                 _: str = Depends(verify_admin_token)):
+                 user = Depends(verify_admin_token)):
     s = db.query(Scene).filter(Scene.id == scene_id).first()
     if not s:
         raise HTTPException(404, "Scene not found")
@@ -65,7 +65,7 @@ def update_scene(scene_id: str, body: dict, db: Session = Depends(get_db),
 
 @router.delete("/{scene_id}")
 def delete_scene(scene_id: str, db: Session = Depends(get_db),
-                 _: str = Depends(verify_admin_token)):
+                 user = Depends(verify_admin_token)):
     db.query(Scene).filter(Scene.id == scene_id).delete()
     db.commit()
     return {"ok": True}
@@ -73,7 +73,7 @@ def delete_scene(scene_id: str, db: Session = Depends(get_db),
 
 @router.post("/auto-generate")
 async def auto_generate_scenes(body: AutoGenerateInput, db: Session = Depends(get_db),
-                               _: str = Depends(verify_admin_token)):
+                               user = Depends(verify_admin_token)):
     """AI 根据故事文本自动生成场景描述。返回场景列表（不持久化），前端确认后逐个创建。"""
     user_prompt = f"""故事概要：{body.text}
 类型：{body.genre}

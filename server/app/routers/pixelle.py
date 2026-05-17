@@ -63,7 +63,7 @@ def _redact_secrets(config: dict) -> dict:
 
 @router.get("/config")
 async def get_pixelle_config(
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     """Read Pixelle-Video config.yaml (API keys redacted)."""
     return _redact_secrets(_read_pixelle_config())
@@ -73,7 +73,7 @@ async def get_pixelle_config(
 async def update_pixelle_config(
     body: PixelleConfigUpdate,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     """Update Pixelle-Video config.yaml with deep merge, then trigger reload."""
     current = _read_pixelle_config()
@@ -126,7 +126,8 @@ async def template_preview_image(
         except Exception:
             pass
     if not username and token:
-        username = verify_ws_admin_token(token)
+        result = verify_ws_admin_token(token)
+        username = result[0] if result[0] else None
     if not username:
         raise HTTPException(status_code=401, detail="请先登录")
 
@@ -151,7 +152,7 @@ async def template_preview_image(
 @router.get("/test-connection")
 async def test_connection(
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     """Test connectivity to Pixelle-Video."""
     cfg = _resolve_pixelle_config(db)
@@ -264,7 +265,7 @@ async def proxy_to_pixelle(
     path: str,
     request: Request,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     return await _do_proxy(request, db, path)
 
@@ -273,6 +274,6 @@ async def proxy_to_pixelle(
 async def proxy_root_to_pixelle(
     request: Request,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     return await _do_proxy(request, db, "")

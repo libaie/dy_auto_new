@@ -17,11 +17,6 @@ DEFAULT_CATEGORIES = [
     ("scene_lighting", "场景光照"),
     ("scene_mood", "场景氛围"),
     ("dataSourceTypes", "数据来源类型"),
-    ("llm_script_models", "脚本生成模型"),
-    ("image_models", "画面生成模型"),
-    ("video_models", "视频渲染模型"),
-    ("tts_models", "语音合成模型"),
-    ("audit_models", "质量审计模型"),
 ]
 
 DEFAULT_DATA = {
@@ -48,38 +43,6 @@ DEFAULT_DATA = {
     ],
     "dataSourceTypes": [
         ("0", "普通视频"), ("1", "带货视频"),
-    ],
-    "llm_script_models": [
-        ("qwen-max", "Qwen Max", "通义千问 · 阿里云"),
-        ("gpt-4o", "GPT-4o", "OpenAI 旗舰"),
-        ("deepseek-v3", "DeepSeek V3", "高性价比"),
-        ("claude-opus", "Claude Opus", "创意写作"),
-        ("ollama-local", "Ollama 本地", "开源本地部署"),
-    ],
-    "image_models": [
-        ("flux", "FLUX", "RunningHub · 高质量静态图"),
-        ("sdxl", "SDXL", "ComfyUI · 灵活可控"),
-        ("auto", "自动选择", "根据场景自动匹配"),
-    ],
-    "video_models": [
-        ("auto", "自动选择", "根据镜头类型智能切换"),
-        ("seedance", "Seedance 2.0", "字节跳动 · 人脸最优"),
-        ("kling", "Kling 3.0", "快手 · 4K AI导演"),
-        ("wan", "Wan 2.7", "阿里 · 开源 RunningHub"),
-        ("flux", "FLUX 静态图", "仅静态画面，无动态视频"),
-    ],
-    "tts_models": [
-        ("edge-tts", "Edge-TTS", "微软免费 · 40+语言"),
-        ("index-tts", "Index-TTS", "声音克隆 · 上传参考音频"),
-        ("spark-tts", "Spark-TTS", "火山引擎 · 高级合成"),
-        ("custom", "自定义 ComfyUI", "自托管 TTS 工作流"),
-    ],
-    "audit_models": [
-        ("auto", "自动选择", "根据内容类型自动"),
-        ("gemini", "Gemini", "Google 多模态审计"),
-        ("gpt-4o", "GPT-4o", "OpenAI 视觉审计"),
-        ("local", "本地 vLLM", "自托管审计模型"),
-        ("none", "跳过审计", "不进行质量检查"),
     ],
 }
 
@@ -115,7 +78,7 @@ class CategoryCreate(BaseModel):
 
 @router.post("/reference-categories")
 def create_category(body: CategoryCreate, db: Session = Depends(get_db),
-                    _: str = Depends(verify_admin_token)):
+                    user = Depends(verify_admin_token)):
     cat = ReferenceCategory(key=body.key, label=body.label, sort_order=body.sort_order)
     db.add(cat)
     try:
@@ -128,7 +91,7 @@ def create_category(body: CategoryCreate, db: Session = Depends(get_db),
 
 @router.put("/reference-categories/{cat_id}")
 def update_category(cat_id: str, body: dict, db: Session = Depends(get_db),
-                    _: str = Depends(verify_admin_token)):
+                    user = Depends(verify_admin_token)):
     cat = db.query(ReferenceCategory).filter(ReferenceCategory.id == cat_id).first()
     if not cat:
         raise HTTPException(404, "分类不存在")
@@ -151,7 +114,7 @@ def update_category(cat_id: str, body: dict, db: Session = Depends(get_db),
 
 @router.delete("/reference-categories/{cat_id}")
 def delete_category(cat_id: str, db: Session = Depends(get_db),
-                    _: str = Depends(verify_admin_token)):
+                    user = Depends(verify_admin_token)):
     cat = db.query(ReferenceCategory).filter(ReferenceCategory.id == cat_id).first()
     if not cat:
         raise HTTPException(404, "分类不存在")
@@ -185,7 +148,7 @@ class RefDataCreate(BaseModel):
 
 @router.post("/reference-data")
 def create_item(body: RefDataCreate, db: Session = Depends(get_db),
-                _: str = Depends(verify_admin_token)):
+                user = Depends(verify_admin_token)):
     item = ReferenceData(**body.model_dump())
     db.add(item)
     try:
@@ -198,7 +161,7 @@ def create_item(body: RefDataCreate, db: Session = Depends(get_db),
 
 @router.put("/reference-data/{item_id}")
 def update_item(item_id: str, body: dict, db: Session = Depends(get_db),
-                _: str = Depends(verify_admin_token)):
+                user = Depends(verify_admin_token)):
     item = db.query(ReferenceData).filter(ReferenceData.id == item_id).first()
     if not item: raise HTTPException(404)
     for k, v in body.items():
@@ -209,7 +172,7 @@ def update_item(item_id: str, body: dict, db: Session = Depends(get_db),
 
 @router.delete("/reference-data/{item_id}")
 def delete_item(item_id: str, db: Session = Depends(get_db),
-                _: str = Depends(verify_admin_token)):
+                user = Depends(verify_admin_token)):
     db.query(ReferenceData).filter(ReferenceData.id == item_id).delete()
     db.commit()
     return {"ok": True}
@@ -217,7 +180,7 @@ def delete_item(item_id: str, db: Session = Depends(get_db),
 
 @router.get("/reference-data/admin/{category}")
 def list_all_items(category: str, db: Session = Depends(get_db),
-                   _: str = Depends(verify_admin_token)):
+                   user = Depends(verify_admin_token)):
     """管理端：列出某分类所有项 (含 id, enabled)."""
     items = db.query(ReferenceData).filter(
         ReferenceData.category == category

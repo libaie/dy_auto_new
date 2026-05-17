@@ -16,7 +16,7 @@ router = APIRouter(prefix="/api/stats", tags=["stats"])
 @router.get("/dashboard")
 def dashboard_summary(
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     """Dashboard overview — account/device/task counts and status distribution."""
     # Account stats
@@ -61,7 +61,7 @@ def dashboard_summary(
 def daily_stats(
     date: Optional[str] = Query(None, description="YYYY-MM-DD, defaults to today"),
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     """Daily operation stats for all accounts."""
     if not date:
@@ -97,7 +97,7 @@ def daily_stats(
 def account_stats(
     account_id: str,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     """Stats for a specific account — today's counts and remaining quotas."""
     account = db.query(Account).filter(Account.id == account_id).first()
@@ -118,7 +118,7 @@ def account_stats(
 @router.get("/realtime")
 def realtime_stats(
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     """Realtime metrics for dashboard auto-refresh."""
     online_devices = db.query(Device).filter(Device.status == "online").count()

@@ -34,7 +34,7 @@ class EpisodeUpdate(BaseModel):
 
 @router.post("/{series_id}/auto-generate")
 async def auto_generate_series_assets(series_id: str, db: Session = Depends(get_db),
-                                      _: str = Depends(verify_admin_token)):
+                                      user = Depends(verify_admin_token)):
     """根据系列 logline 自动生成角色和场景，自动创建并关联到系列。"""
     s = db.query(Series).filter(Series.id == series_id).first()
     if not s:
@@ -208,7 +208,7 @@ def list_series(db: Session = Depends(get_db)):
 
 @router.post("")
 def create_series(body: SeriesCreate, db: Session = Depends(get_db),
-                  _: str = Depends(verify_admin_token)):
+                  user = Depends(verify_admin_token)):
     s = Series(**body.model_dump())
     db.add(s)
     db.flush()  # 确保 s.id 已生成，满足 Episode FK 约束
@@ -230,7 +230,7 @@ def get_series(series_id: str, db: Session = Depends(get_db)):
 
 @router.delete("/{series_id}")
 def delete_series(series_id: str, db: Session = Depends(get_db),
-                  _: str = Depends(verify_admin_token)):
+                  user = Depends(verify_admin_token)):
     s = db.query(Series).filter(Series.id == series_id).first()
     if not s:
         raise HTTPException(404, "Series not found")
@@ -247,7 +247,7 @@ def delete_series(series_id: str, db: Session = Depends(get_db),
 
 @router.post("/{series_id}/characters/{character_id}")
 def link_character(series_id: str, character_id: str, db: Session = Depends(get_db),
-                   _: str = Depends(verify_admin_token)):
+                   user = Depends(verify_admin_token)):
     s = db.query(Series).filter(Series.id == series_id).first()
     c = db.query(Character).filter(Character.id == character_id).first()
     if not s or not c:
@@ -258,7 +258,7 @@ def link_character(series_id: str, character_id: str, db: Session = Depends(get_
 
 @router.post("/{series_id}/scenes/{scene_id}")
 def link_scene(series_id: str, scene_id: str, db: Session = Depends(get_db),
-               _: str = Depends(verify_admin_token)):
+               user = Depends(verify_admin_token)):
     s = db.query(Series).filter(Series.id == series_id).first()
     sc = db.query(Scene).filter(Scene.id == scene_id).first()
     if not s or not sc:
@@ -271,7 +271,7 @@ def link_scene(series_id: str, scene_id: str, db: Session = Depends(get_db),
 
 @router.put("/{series_id}/episodes/{episode_id}")
 def update_episode(series_id: str, episode_id: str, body: EpisodeUpdate,
-                   db: Session = Depends(get_db), _: str = Depends(verify_admin_token)):
+                   db: Session = Depends(get_db), user = Depends(verify_admin_token)):
     ep = db.query(Episode).filter(
         Episode.id == episode_id, Episode.series_id == series_id
     ).first()

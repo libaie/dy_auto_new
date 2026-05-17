@@ -47,7 +47,7 @@ def list_characters(db: Session = Depends(get_db)):
 
 @router.post("")
 def create_character(body: CharacterCreate, db: Session = Depends(get_db),
-                     _: str = Depends(verify_admin_token)):
+                     user = Depends(verify_admin_token)):
     c = Character(**body.model_dump())
     db.add(c); db.commit(); db.refresh(c)
     return {"ok": True, "character": _to_dict(c)}
@@ -55,7 +55,7 @@ def create_character(body: CharacterCreate, db: Session = Depends(get_db),
 
 @router.put("/{character_id}")
 def update_character(character_id: str, body: dict, db: Session = Depends(get_db),
-                     _: str = Depends(verify_admin_token)):
+                     user = Depends(verify_admin_token)):
     c = db.query(Character).filter(Character.id == character_id).first()
     if not c:
         raise HTTPException(404, "Character not found")
@@ -68,7 +68,7 @@ def update_character(character_id: str, body: dict, db: Session = Depends(get_db
 
 @router.delete("/{character_id}")
 def delete_character(character_id: str, db: Session = Depends(get_db),
-                     _: str = Depends(verify_admin_token)):
+                     user = Depends(verify_admin_token)):
     db.query(Character).filter(Character.id == character_id).delete()
     db.commit()
     return {"ok": True}
@@ -76,7 +76,7 @@ def delete_character(character_id: str, db: Session = Depends(get_db),
 
 @router.post("/auto-generate")
 async def auto_generate_characters(body: AutoGenerateInput, db: Session = Depends(get_db),
-                                   _: str = Depends(verify_admin_token)):
+                                   user = Depends(verify_admin_token)):
     """AI 根据故事文本自动生成角色档案。返回角色列表（不持久化），前端确认后逐个创建。"""
     user_prompt = f"""故事概要：{body.text}
 类型：{body.genre}

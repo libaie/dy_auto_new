@@ -34,7 +34,7 @@ class DirectorPlanRequest(BaseModel):
 
 @router.post("/plan")
 async def build_plan(body: DirectorPlanRequest,
-                     _: str = Depends(verify_admin_token)):
+                     user = Depends(verify_admin_token)):
     """
     构建导演计划 (分镜表).
     自动为每帧选择最优模型路由.

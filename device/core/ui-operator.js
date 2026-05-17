@@ -487,12 +487,12 @@ var uiOperator = {
    * @param {number} timeout - 每个 strategy 的超时 ms，默认 300
    * @returns {boolean}
    */
-  isOnPage: function (actionName, timeout) {
-    timeout = timeout || 300;
+  isOnPage: function (actionName) {
     var config = selectorLoader.get(actionName);
     if (!config || config.purpose !== "page_detect") return false;
-    var logic = config.strategy_logic || "and";
     var strategies = config.strategies;
+    if (!strategies || strategies.length === 0) return false;
+    var logic = config.strategy_logic || "and";
     if (logic === "or") {
       for (var i = 0; i < strategies.length; i++) {
         if (this._findByStrategy(strategies[i])) return true;
@@ -520,7 +520,7 @@ var uiOperator = {
     }
     pages.sort(function (a, b) { return a.priority - b.priority; });
     for (var i = 0; i < pages.length; i++) {
-      if (this.isOnPage(pages[i].name, 300)) {
+      if (this.isOnPage(pages[i].name)) {
         return pages[i].name;
       }
     }

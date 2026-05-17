@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db, SessionLocal
-from app.deps import verify_admin_token
+from app.deps import verify_admin_token, require_role
 from app.db_models import PipelineRun, AIModel
 from app.services.crypto import decrypt
 from app.services.pixelle_client import _pixelle_request
@@ -307,7 +307,7 @@ _LAYER_FNS = [
 async def pipeline_start(
     body: PipelineStartRequest,
     db: Session = Depends(get_db),
-    user = Depends(verify_admin_token),
+    user = Depends(require_role("admin")),
 ):
     existing = db.query(PipelineRun).filter(
         PipelineRun.series_id == body.series_id,
@@ -351,6 +351,24 @@ async def _run_all_layers(run_id: str, director_plan: dict | None = None):
             if frames:
                 common["frame_count"] = len(frames)
 
+        # Hydrate common from already-completed layers (resume support)
+        _FORWARD_KEYS = {
+            0: ["image_urls", "images"],
+            1: ["narration", "content"],
+            2: ["title", "content"],
+            3: ["image_prompt"],
+        }
+        prev_layers = (run.layers_json or {}).items()
+        for _li_str, _lr in prev_layers:
+            _li = int(_li_str)
+            if _lr.get("status") != "completed":
+                continue
+            _res = _lr.get("result", {}) or {}
+            for key in _FORWARD_KEYS.get(_li, []):
+                val = _res.get(key)
+                if val:
+                    common[key] = val
+
         for layer_def in LAYER_DEFS:
             i = layer_def["index"]
             layers = run.layers_json or {}
@@ -385,6 +403,9 @@ async def _run_all_layers(run_id: str, director_plan: dict | None = None):
                     val = result.get(key)
                     if val:
                         common[key] = val
+                        # Normalize image keys so consumers (Seedance) find them
+                        if key == "images":
+                            common.setdefault("image_urls", val)
 
             layers[str(i)] = {"status": "completed", "result": result}
             run.layers_json = layers
@@ -408,7 +429,7 @@ async def _run_all_layers(run_id: str, director_plan: dict | None = None):
 
 @router.post("/resume/{run_id}")
 async def pipeline_resume(run_id: str, db: Session = Depends(get_db),
-                          user = Depends(verify_admin_token)):
+                          _ = Depends(require_role("admin"))):
     run = db.query(PipelineRun).filter(PipelineRun.id == run_id).first()
     if not run or run.status not in ("pending", "running", "paused"):
         raise HTTPException(400, "PipelineRun not resumable")
@@ -421,7 +442,8 @@ async def pipeline_resume(run_id: str, db: Session = Depends(get_db),
 
 
 @router.get("/runs/{series_id}")
-def list_runs(series_id: str, db: Session = Depends(get_db)):
+def list_runs(series_id: str, db: Session = Depends(get_db),
+              _ = Depends(verify_admin_token)):
     runs = db.query(PipelineRun).filter(
         PipelineRun.series_id == series_id
     ).order_by(PipelineRun.created_at.desc()).all()
@@ -432,7 +454,8 @@ def list_runs(series_id: str, db: Session = Depends(get_db)):
 
 
 @router.get("/runs/{series_id}/{run_id}")
-def get_run(series_id: str, run_id: str, db: Session = Depends(get_db)):
+def get_run(series_id: str, run_id: str, db: Session = Depends(get_db),
+            _ = Depends(verify_admin_token)):
     run = db.query(PipelineRun).filter(
         PipelineRun.id == run_id, PipelineRun.series_id == series_id
     ).first()

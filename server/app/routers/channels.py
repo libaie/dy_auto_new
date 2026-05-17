@@ -297,6 +297,7 @@ async def edit_channel(
         raise HTTPException(status_code=400, detail=str(e))
 
     await pair_ws_manager.broadcast_to_admins({"event": "channels_changed"})
+    await pair_ws_manager.broadcast_to_devices({"event": "new_task_available"})
     group = db.query(AccountGroup).filter(AccountGroup.id == ch.group_id).first()
     stats = channel_service.get_channel_stats(db, ch.id)
     return _channel_to_response(ch, stats, group.name if group else "")

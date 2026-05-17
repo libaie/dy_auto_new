@@ -209,6 +209,17 @@ function startMainLoop(serverUrl, secret) {
     _idleTicks = 0;
     var task = _taskQueue.shift();
 
+    // Watchdog: 10min 超时强制释放 busy 锁，防止任务线程卡死导致永久阻塞
+    var TASK_TIMEOUT_MS = 600000;
+    var _completed = false;
+    var _watchdog = setTimeout(function () {
+      if (!_completed) {
+        logger.error(TAG, "任务超时 (" + (TASK_TIMEOUT_MS / 60000) + "min): " + task.id + "，强制释放 busy 锁");
+        _taskBusy = false;
+        _completed = true;
+      }
+    }, TASK_TIMEOUT_MS);
+
     threads.start(function () {
       try {
         logger.info(TAG, "执行任务: " + task.id + " (" + task.type + ")");
@@ -236,13 +247,17 @@ function startMainLoop(serverUrl, secret) {
       } catch (e) {
         logger.error(TAG, "任务执行异常: " + e.message);
       } finally {
-        _taskBusy = false;
-        processTaskQueue();
+        if (_watchdog) clearTimeout(_watchdog);
+        if (!_completed) {
+          _completed = true;
+          _taskBusy = false;
+          processTaskQueue();
 
-        // 队列空 → poll 检查是否有下一个通道任务（但不关抖音，由空闲定时器统一处理）
-        if (_taskQueue.length === 0 && !_taskBusy) {
-          catchUpPoll();
+          if (_taskQueue.length === 0 && !_taskBusy) {
+            catchUpPoll();
+          }
         }
+        // 如果 _completed 已被 watchdog 设为 true，跳过重复的 unlock
       }
     });
   }

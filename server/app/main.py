@@ -86,6 +86,27 @@ async def _offline_checker():
                         "device_id": device_id,
                         "status": "offline",
                     })
+
+            # 3. Stuck task detection: tasks running >10 min → reset
+            #    Device can be online (heartbeat active) but task thread stuck/dead
+            stuck_cutoff = now - timedelta(seconds=600)
+            from app.db_models import Task as DBTask, ChannelItem as DBChannelItem
+            stuck_tasks = db.query(DBTask).filter(
+                DBTask.status == "running",
+                DBTask.started_at.isnot(None),
+                DBTask.started_at < stuck_cutoff,
+            ).all()
+            if stuck_tasks:
+                for t in stuck_tasks:
+                    t.status = "pending"
+                    t.device_id = None
+                    t.started_at = None
+                    # Reset linked channel item
+                    db.query(DBChannelItem).filter(
+                        DBChannelItem.task_id == t.id,
+                        DBChannelItem.status == "assigned",
+                    ).update({"status": "pending", "assigned_device_id": None, "assigned_at": None, "task_id": None}, synchronize_session=False)
+                db.commit()
         except Exception:
             import logging
             logging.getLogger("app.offline_checker").warning("checker cycle failed", exc_info=True)

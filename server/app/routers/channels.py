@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.deps import verify_admin_token
+from app.deps import verify_admin_token, require_role
 from app.models import (
     ChannelCreate, ChannelUpdate, ChannelAppendItems,
     ChannelItemUpdate,
@@ -58,9 +58,10 @@ def _item_to_response(item, account_nickname: str = "", device_name: str = "") -
 async def create_channel(
     request: ChannelCreate,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(require_role("admin")),
 ):
     try:
+        user_id, _ = user
         ch = channel_service.create_channel(
             db,
             group_id=request.group_id,
@@ -71,6 +72,7 @@ async def create_channel(
             account_id=request.account_id,
             cooldown_seconds=request.cooldown_seconds,
             delay_range=request.delay_range,
+            user_id=user_id,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -84,9 +86,11 @@ async def create_channel(
 @router.get("")
 def list_channels(
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
-    channels = channel_service.list_channels(db)
+    user_id, role = user
+    scope_user_id = None if role == "admin" else user_id
+    channels = channel_service.list_channels(db, user_id=scope_user_id)
     group_ids = list(set(ch.group_id for ch in channels))
     groups = {
         g.id: g.name
@@ -107,9 +111,11 @@ def list_channels(
 def get_channel(
     channel_id: str,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
-    ch = channel_service.get_channel(db, channel_id)
+    user_id, role = user
+    scope_user_id = None if role == "admin" else user_id
+    ch = channel_service.get_channel(db, channel_id, user_id=scope_user_id)
     if not ch:
         raise HTTPException(status_code=404, detail="通道不存在")
 
@@ -135,12 +141,14 @@ async def update_channel(
     channel_id: str,
     request: ChannelUpdate,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     if not request.status:
         raise HTTPException(status_code=400, detail="需要提供 status 字段")
+    user_id, role = user
+    scope_user_id = None if role == "admin" else user_id
     try:
-        channel_service.update_channel_status(db, channel_id, request.status)
+        channel_service.update_channel_status(db, channel_id, request.status, user_id=scope_user_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -156,10 +164,12 @@ async def update_channel(
 async def delete_channel(
     channel_id: str,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
+    user_id, role = user
+    scope_user_id = None if role == "admin" else user_id
     try:
-        channel_service.soft_delete_channel(db, channel_id)
+        channel_service.soft_delete_channel(db, channel_id, user_id=scope_user_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     await pair_ws_manager.broadcast_to_admins({"event": "channels_changed"})
@@ -171,10 +181,12 @@ async def append_items(
     channel_id: str,
     request: ChannelAppendItems,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
+    user_id, role = user
+    scope_user_id = None if role == "admin" else user_id
     try:
-        channel_service.append_items(db, channel_id, request.keywords)
+        channel_service.append_items(db, channel_id, request.keywords, user_id=scope_user_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     await pair_ws_manager.broadcast_to_admins({"event": "channels_changed"})
@@ -187,12 +199,14 @@ async def update_item(
     item_id: str,
     request: ChannelItemUpdate,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     if not request.status:
         raise HTTPException(status_code=400, detail="需要提供 status 字段")
+    user_id, role = user
+    scope_user_id = None if role == "admin" else user_id
     try:
-        channel_service.update_item_status(db, item_id, request.status)
+        channel_service.update_item_status(db, item_id, request.status, user_id=scope_user_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     await pair_ws_manager.broadcast_to_admins({"event": "channels_changed"})

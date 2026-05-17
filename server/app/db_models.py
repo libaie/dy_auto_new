@@ -31,6 +31,7 @@ class Account(Base):
         "likes": 50, "comments": 20, "follows": 20, "dms": 10, "replies": 15, "nurture_likes": 200,
     })
     created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=True)
     updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
 
     tasks = relationship("Task", back_populates="account")
@@ -45,6 +46,7 @@ class Device(Base):
     status = Column(String(20), nullable=False, default="offline")  # online, offline, maintenance
     device_secret = Column(String(64), nullable=True, unique=True)  # per-device secret from pairing
     bound_account_id = Column(String(36), ForeignKey("accounts.id"), nullable=True)
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=True)
     proxy_config = Column(JSON, nullable=True)  # {"type":"http","host":"...","port":8080,"username":"...","password":"..."}
     os_version = Column(String(50), nullable=True)
     app_version = Column(String(20), nullable=True)
@@ -93,6 +95,7 @@ class Task(Base):
     type = Column(String(30), nullable=False)  # nurture, search_comment, search_like, search_dm, reply_comment
     account_id = Column(String(36), ForeignKey("accounts.id"), nullable=False)
     device_id = Column(String(36), ForeignKey("devices.id"), nullable=True)
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=True)
     params = Column(JSON, nullable=False, default=dict)
     status = Column(String(20), nullable=False, default="pending")  # pending, running, completed, failed, cancelled
     result = Column(JSON, nullable=True)
@@ -176,6 +179,7 @@ class AccountGroup(Base):
     id = Column(String(36), primary_key=True, default=_uuid)
     name = Column(String(100), nullable=False, unique=True)
     description = Column(String(500), nullable=True, default="")
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
     updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
 
@@ -203,6 +207,7 @@ class ChainTemplate(Base):
     id = Column(String(36), primary_key=True, default=_uuid)
     name = Column(String(100), nullable=False)
     description = Column(String(500), nullable=True, default="")
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=True)
     steps = Column(JSON, nullable=False)  # [{step_order, type, label, params}, ...]
     created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
     updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
@@ -217,6 +222,7 @@ class ChainInstance(Base):
     template_id = Column(String(36), ForeignKey("chain_templates.id", ondelete="RESTRICT"), nullable=False)
     account_id = Column(String(36), ForeignKey("accounts.id", ondelete="RESTRICT"), nullable=False)
     device_id = Column(String(36), ForeignKey("devices.id"), nullable=True)
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=True)
     current_step = Column(Integer, nullable=False, default=1)
     total_steps = Column(Integer, nullable=False)
     status = Column(String(20), nullable=False, default="pending")  # pending, running, completed, failed, cancelled
@@ -263,6 +269,7 @@ class Channel(Base):
     delay_range = Column(JSON, nullable=False, default=lambda: [3000, 8000])
     max_keywords = Column(Integer, nullable=False, default=500)
     current_account_index = Column(Integer, nullable=False, default=0)
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
     completed_at = Column(DateTime, nullable=True)
     deleted_at = Column(DateTime, nullable=True)
@@ -330,6 +337,9 @@ class CollectedComment(Base):
     data_source_type = Column(Integer, nullable=False, default=0)  # 0=普通视频, 1=带货视频
     ai_reply = Column(Text, nullable=True)              # AI 生成的回复内容
     ai_replied_at = Column(DateTime, nullable=True)     # AI 回复时间
+    intended_province = Column(String(50), nullable=True)  # 意向省份
+    intended_city = Column(String(100), nullable=True)      # 意向城市
+    intended_attraction = Column(String(200), nullable=True)  # 意向景点
     created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
 
 
@@ -353,7 +363,23 @@ class CollectedUser(Base):
     is_private = Column(String(10), nullable=True)      # 是否私密账号
     data_source_type = Column(Integer, nullable=False, default=0)  # 0=普通视频, 1=带货视频
     avatar_url = Column(Text, nullable=True)             # 头像本地路径
+    intended_province = Column(String(50), nullable=True)  # 意向省份
+    intended_city = Column(String(100), nullable=True)     # 意向城市
+    intended_attraction = Column(String(200), nullable=True)  # 意向景点
     created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    username = Column(String(50), unique=True, nullable=False, index=True)
+    password_hash = Column(String(128), nullable=False)
+    role = Column(String(20), nullable=False, default="operator")  # admin | operator
+    nickname = Column(String(100), nullable=True)
+    status = Column(String(20), nullable=False, default="active")  # active | disabled
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
+    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
 
 
 class Conversation(Base):
@@ -518,6 +544,7 @@ class PipelineRun(Base):
     series_id = Column(String(36), ForeignKey("series.id", ondelete="CASCADE"), nullable=False)
     episode_id = Column(String(36), ForeignKey("episodes.id", ondelete="SET NULL"), nullable=True)
     mode = Column(String(20), nullable=False, default="step_by_step")
+    model_ids = Column(JSON, nullable=True, default=dict)
     layers_json = Column(JSON, nullable=True, default=dict)
     current_layer = Column(Integer, nullable=False, default=0)
     status = Column(String(20), nullable=False, default="pending")
@@ -570,3 +597,24 @@ class ReferenceCategory(Base):
     label = Column(String(100), nullable=False)
     sort_order = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
+
+
+class AIModel(Base):
+    """AI model config — independent management of API connection parameters per model type."""
+    __tablename__ = "ai_models"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    name = Column(String(100), nullable=False)
+    model_type = Column(String(20), nullable=False, index=True)
+    provider = Column(String(30), nullable=False)
+    base_url = Column(String(300), nullable=True)
+    api_key = Column(String(500), nullable=True)   # encrypted
+    api_secret = Column(String(500), nullable=True) # encrypted
+    model_name = Column(String(100), nullable=True)
+    config_json = Column(JSON, nullable=True)
+    enabled = Column(Boolean, nullable=False, default=True)
+    sort_order = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
+
+    __table_args__ = (UniqueConstraint("model_type", "provider", "model_name",
+                                        name="uq_ai_models_type_provider_name"),)

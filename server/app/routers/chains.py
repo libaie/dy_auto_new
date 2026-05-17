@@ -7,7 +7,7 @@ from app.config import bj_now
 
 from app.database import get_db
 from app.db_models import ChainTemplate, ChainInstance, Task as DBTask, Account, Device, AccountGroupMember
-from app.deps import verify_admin_token
+from app.deps import verify_admin_token, require_role
 from app.models import ChainTemplateCreate, ChainTemplateUpdate, ChainInstanceCreateRequest
 from app.ws_manager import pair_ws_manager
 
@@ -49,14 +49,15 @@ def _instance_to_dict(inst: ChainInstance, template_name: str = "", account_nick
 async def create_template(
     request: ChainTemplateCreate,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(require_role("admin")),
 ):
+    user_id, _ = user
     orders = sorted(s.step_order for s in request.steps)
     if orders != list(range(1, len(request.steps) + 1)):
         raise HTTPException(status_code=422, detail="步骤序号必须从 1 连续递增")
 
     steps_data = [s.model_dump() for s in request.steps]
-    tpl = ChainTemplate(name=request.name, description=request.description, steps=steps_data)
+    tpl = ChainTemplate(name=request.name, description=request.description, steps=steps_data, user_id=user_id)
     db.add(tpl)
     db.commit()
     db.refresh(tpl)
@@ -69,11 +70,15 @@ def list_templates(
     skip: int = 0,
     limit: int = 50,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     limit = min(limit, 100)
-    total = db.query(ChainTemplate).count()
-    templates = db.query(ChainTemplate).order_by(ChainTemplate.created_at.desc()).offset(skip).limit(limit).all()
+    user_id, role = user
+    query = db.query(ChainTemplate)
+    if role != "admin":
+        query = query.filter(ChainTemplate.user_id == user_id)
+    total = query.count()
+    templates = query.order_by(ChainTemplate.created_at.desc()).offset(skip).limit(limit).all()
     return {"templates": [_template_to_dict(t) for t in templates], "total": total}
 
 
@@ -81,9 +86,13 @@ def list_templates(
 def get_template(
     template_id: str,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
-    tpl = db.query(ChainTemplate).filter(ChainTemplate.id == template_id).first()
+    user_id, role = user
+    query = db.query(ChainTemplate).filter(ChainTemplate.id == template_id)
+    if role != "admin":
+        query = query.filter(ChainTemplate.user_id == user_id)
+    tpl = query.first()
     if not tpl:
         raise HTTPException(status_code=404, detail="模板不存在")
     return _template_to_dict(tpl)
@@ -94,9 +103,13 @@ async def update_template(
     template_id: str,
     request: ChainTemplateUpdate,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
-    tpl = db.query(ChainTemplate).filter(ChainTemplate.id == template_id).first()
+    user_id, role = user
+    query = db.query(ChainTemplate).filter(ChainTemplate.id == template_id)
+    if role != "admin":
+        query = query.filter(ChainTemplate.user_id == user_id)
+    tpl = query.first()
     if not tpl:
         raise HTTPException(status_code=404, detail="模板不存在")
     if request.name is not None:
@@ -128,9 +141,13 @@ async def update_template(
 async def delete_template(
     template_id: str,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
-    tpl = db.query(ChainTemplate).filter(ChainTemplate.id == template_id).first()
+    user_id, role = user
+    query = db.query(ChainTemplate).filter(ChainTemplate.id == template_id)
+    if role != "admin":
+        query = query.filter(ChainTemplate.user_id == user_id)
+    tpl = query.first()
     if not tpl:
         raise HTTPException(status_code=404, detail="模板不存在")
     active = db.query(ChainInstance).filter(
@@ -151,20 +168,21 @@ async def delete_template(
 async def create_instances(
     request: ChainInstanceCreateRequest,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     from app.services.chain_service import chain_service
 
+    user_id, role = user
     account_ids = list(request.account_ids or [])
     if request.group_ids:
-        group_accounts = chain_service.resolve_accounts_from_groups(db, request.group_ids)
+        group_accounts = chain_service.resolve_accounts_from_groups(db, request.group_ids, user_id=None if role == "admin" else user_id)
         account_ids = list(set(account_ids + group_accounts))
 
     if not account_ids:
         raise HTTPException(status_code=422, detail="未指定任何账号")
 
     try:
-        results = chain_service.create_chain_instances(db, request.template_id, account_ids, device_id=request.device_id)
+        results = chain_service.create_chain_instances(db, request.template_id, account_ids, device_id=request.device_id, user_id=user_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -187,7 +205,7 @@ def list_instances(
     skip: int = 0,
     limit: int = 50,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     limit = min(limit, 100)
     query = db.query(ChainInstance)
@@ -197,6 +215,9 @@ def list_instances(
         query = query.filter(ChainInstance.account_id == account_id)
     if status:
         query = query.filter(ChainInstance.status == status)
+    user_id, role = user
+    if role != "admin":
+        query = query.filter(ChainInstance.user_id == user_id)
     total = query.count()
     instances = query.order_by(ChainInstance.created_at.desc()).offset(skip).limit(limit).all()
 
@@ -220,9 +241,13 @@ def list_instances(
 def get_instance(
     instance_id: str,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
-    inst = db.query(ChainInstance).filter(ChainInstance.id == instance_id).first()
+    user_id, role = user
+    query = db.query(ChainInstance).filter(ChainInstance.id == instance_id)
+    if role != "admin":
+        query = query.filter(ChainInstance.user_id == user_id)
+    inst = query.first()
     if not inst:
         raise HTTPException(status_code=404, detail="链实例不存在")
     template = db.query(ChainTemplate).filter(ChainTemplate.id == inst.template_id).first()
@@ -257,9 +282,13 @@ def get_instance(
 async def cancel_instance(
     instance_id: str,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
-    inst = db.query(ChainInstance).filter(ChainInstance.id == instance_id).first()
+    user_id, role = user
+    query = db.query(ChainInstance).filter(ChainInstance.id == instance_id)
+    if role != "admin":
+        query = query.filter(ChainInstance.user_id == user_id)
+    inst = query.first()
     if not inst:
         raise HTTPException(status_code=404, detail="链实例不存在")
     if inst.status in ("completed", "cancelled"):
@@ -296,11 +325,15 @@ async def cancel_instance(
 async def retry_instance(
     instance_id: str,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     from app.services.chain_service import chain_service
 
-    inst = db.query(ChainInstance).filter(ChainInstance.id == instance_id).first()
+    user_id, role = user
+    query = db.query(ChainInstance).filter(ChainInstance.id == instance_id)
+    if role != "admin":
+        query = query.filter(ChainInstance.user_id == user_id)
+    inst = query.first()
     if not inst:
         raise HTTPException(status_code=404, detail="链实例不存在")
     if inst.status != "failed":

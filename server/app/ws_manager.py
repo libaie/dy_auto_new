@@ -9,8 +9,8 @@ class PairWSManager:
     def __init__(self):
         # Device connections: pairing_token → WebSocket
         self._device_connections: dict[str, WebSocket] = {}
-        # Admin connections: set of WebSockets
-        self._admin_connections: set[WebSocket] = set()
+        # Admin connections: user_id → set of WebSockets
+        self._admin_connections: dict[str, set[WebSocket]] = {}
         # Device status connections: device_id → WebSocket
         self._device_status_connections: dict[str, WebSocket] = {}
 
@@ -35,23 +35,34 @@ class PairWSManager:
 
     # --- Admin side (subscribing to events) ---
 
-    async def register_admin(self, ws: WebSocket):
+    async def register_admin(self, ws: WebSocket, user_id: str = ""):
         await ws.accept()
-        self._admin_connections.add(ws)
+        self._admin_connections.setdefault(user_id, set()).add(ws)
 
     def unregister_admin(self, ws: WebSocket):
-        self._admin_connections.discard(ws)
+        for user_id, wss in list(self._admin_connections.items()):
+            wss.discard(ws)
+            if not wss:
+                del self._admin_connections[user_id]
 
-    async def broadcast_to_admins(self, data: dict):
-        """Broadcast event to all connected admin clients."""
+    async def broadcast_to_admins(self, data: dict, user_ids: list[str] = None):
+        """Broadcast event to admin clients. If user_ids given, only to those users."""
         dead = []
-        for ws in self._admin_connections:
-            try:
-                await ws.send_json(data)
-            except Exception:
-                dead.append(ws)
-        for ws in dead:
-            self._admin_connections.discard(ws)
+        items = self._admin_connections.items()
+        for user_id, wss in items:
+            if user_ids is not None and user_id not in user_ids:
+                continue
+            for ws in list(wss):
+                try:
+                    await ws.send_json(data)
+                except Exception:
+                    dead.append((user_id, ws))
+        for user_id, ws in dead:
+            wss = self._admin_connections.get(user_id)
+            if wss:
+                wss.discard(ws)
+                if not wss:
+                    del self._admin_connections[user_id]
 
     async def broadcast_channel_progress(self, channel_id: str, stats: dict):
         """Push channel progress event to admin WS connections."""

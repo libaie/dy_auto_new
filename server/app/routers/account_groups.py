@@ -5,7 +5,7 @@ from sqlalchemy import func
 
 from app.database import get_db
 from app.db_models import AccountGroup, AccountGroupMember, Account
-from app.deps import verify_admin_token
+from app.deps import verify_admin_token, require_role
 from app.models import AccountGroupCreate, AccountGroupUpdate, AccountGroupMemberRequest
 from app.ws_manager import pair_ws_manager
 
@@ -27,12 +27,13 @@ def _group_to_dict(group: AccountGroup, member_count: int = 0) -> dict:
 async def create_group(
     request: AccountGroupCreate,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(require_role("admin")),
 ):
-    existing = db.query(AccountGroup).filter(AccountGroup.name == request.name).first()
+    user_id, _ = user
+    existing = db.query(AccountGroup).filter(AccountGroup.name == request.name, AccountGroup.user_id == user_id).first()
     if existing:
         raise HTTPException(status_code=409, detail="分组名称已存在")
-    group = AccountGroup(name=request.name, description=request.description)
+    group = AccountGroup(name=request.name, description=request.description, user_id=user_id)
     db.add(group)
     db.commit()
     db.refresh(group)
@@ -45,9 +46,10 @@ def list_groups(
     skip: int = 0,
     limit: int = 50,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     limit = min(limit, 100)
+    user_id, role = user
     member_counts = (
         db.query(
             AccountGroupMember.group_id,
@@ -56,15 +58,18 @@ def list_groups(
         .group_by(AccountGroupMember.group_id)
         .subquery()
     )
+    base = db.query(AccountGroup)
+    if role != "admin":
+        base = base.filter(AccountGroup.user_id == user_id)
     query = (
-        db.query(AccountGroup, func.coalesce(member_counts.c.cnt, 0).label("member_count"))
-        .outerjoin(member_counts, AccountGroup.id == member_counts.c.group_id)
+        base.outerjoin(member_counts, AccountGroup.id == member_counts.c.group_id)
+        .add_columns(func.coalesce(member_counts.c.cnt, 0).label("member_count"))
         .order_by(AccountGroup.created_at.desc())
         .offset(skip)
         .limit(limit)
     )
     results = query.all()
-    total = db.query(AccountGroup).count()
+    total = base.count()
     return {
         "groups": [_group_to_dict(g, mc) for g, mc in results],
         "total": total,
@@ -75,9 +80,13 @@ def list_groups(
 def get_group(
     group_id: str,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
-    group = db.query(AccountGroup).filter(AccountGroup.id == group_id).first()
+    user_id, role = user
+    query = db.query(AccountGroup).filter(AccountGroup.id == group_id)
+    if role != "admin":
+        query = query.filter(AccountGroup.user_id == user_id)
+    group = query.first()
     if not group:
         raise HTTPException(status_code=404, detail="分组不存在")
     member_count = db.query(AccountGroupMember).filter(AccountGroupMember.group_id == group_id).count()
@@ -89,13 +98,17 @@ async def update_group(
     group_id: str,
     request: AccountGroupUpdate,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
-    group = db.query(AccountGroup).filter(AccountGroup.id == group_id).first()
+    user_id, role = user
+    query = db.query(AccountGroup).filter(AccountGroup.id == group_id)
+    if role != "admin":
+        query = query.filter(AccountGroup.user_id == user_id)
+    group = query.first()
     if not group:
         raise HTTPException(status_code=404, detail="分组不存在")
     if request.name is not None:
-        dup = db.query(AccountGroup).filter(AccountGroup.name == request.name, AccountGroup.id != group_id).first()
+        dup = db.query(AccountGroup).filter(AccountGroup.name == request.name, AccountGroup.id != group_id, AccountGroup.user_id == group.user_id).first()
         if dup:
             raise HTTPException(status_code=409, detail="分组名称已存在")
         group.name = request.name
@@ -112,9 +125,13 @@ async def update_group(
 async def delete_group(
     group_id: str,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
-    group = db.query(AccountGroup).filter(AccountGroup.id == group_id).first()
+    user_id, role = user
+    query = db.query(AccountGroup).filter(AccountGroup.id == group_id)
+    if role != "admin":
+        query = query.filter(AccountGroup.user_id == user_id)
+    group = query.first()
     if not group:
         raise HTTPException(status_code=404, detail="分组不存在")
     db.delete(group)
@@ -128,9 +145,13 @@ def list_members(
     group_id: str,
     status: str = Query(None),
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
-    group = db.query(AccountGroup).filter(AccountGroup.id == group_id).first()
+    user_id, role = user
+    group_query = db.query(AccountGroup).filter(AccountGroup.id == group_id)
+    if role != "admin":
+        group_query = group_query.filter(AccountGroup.user_id == user_id)
+    group = group_query.first()
     if not group:
         raise HTTPException(status_code=404, detail="分组不存在")
     query = (
@@ -138,6 +159,8 @@ def list_members(
         .join(AccountGroupMember, AccountGroupMember.account_id == Account.id)
         .filter(AccountGroupMember.group_id == group_id)
     )
+    if role != "admin":
+        query = query.filter(Account.user_id == user_id)
     if status:
         query = query.filter(Account.status == status)
     accounts = query.order_by(Account.created_at.desc()).all()
@@ -160,15 +183,20 @@ async def add_members(
     group_id: str,
     request: AccountGroupMemberRequest,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
-    group = db.query(AccountGroup).filter(AccountGroup.id == group_id).first()
+    user_id, role = user
+    group_query = db.query(AccountGroup).filter(AccountGroup.id == group_id)
+    if role != "admin":
+        group_query = group_query.filter(AccountGroup.user_id == user_id)
+    group = group_query.first()
     if not group:
         raise HTTPException(status_code=404, detail="分组不存在")
-    # Validate all account_ids exist before adding
-    existing_accounts = {
-        a.id for a in db.query(Account.id).filter(Account.id.in_(request.account_ids)).all()
-    }
+    # Validate all account_ids exist and belong to the user
+    acc_query = db.query(Account.id).filter(Account.id.in_(request.account_ids))
+    if role != "admin":
+        acc_query = acc_query.filter(Account.user_id == user_id)
+    existing_accounts = {a.id for a in acc_query.all()}
     invalid_ids = [aid for aid in request.account_ids if aid not in existing_accounts]
     if invalid_ids:
         raise HTTPException(status_code=400, detail=f"以下账号不存在: {', '.join(invalid_ids)}")
@@ -191,9 +219,13 @@ async def remove_members(
     group_id: str,
     request: AccountGroupMemberRequest,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
-    group = db.query(AccountGroup).filter(AccountGroup.id == group_id).first()
+    user_id, role = user
+    group_query = db.query(AccountGroup).filter(AccountGroup.id == group_id)
+    if role != "admin":
+        group_query = group_query.filter(AccountGroup.user_id == user_id)
+    group = group_query.first()
     if not group:
         raise HTTPException(status_code=404, detail="分组不存在")
     count = (

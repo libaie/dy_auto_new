@@ -1,14 +1,15 @@
-"""Admin authentication — login endpoint with brute-force protection."""
-import hmac
+"""Authentication — login, device-login, user registration with brute-force protection."""
 import time
 from collections import defaultdict
 from threading import Lock
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Depends
+from sqlalchemy.orm import Session
 
-from app.models import LoginRequest, LoginResponse
-from app.config import ADMIN_USERNAME, ADMIN_PASSWORD, JWT_EXPIRE_HOURS
-from app.deps import create_admin_token
+from app.models import LoginRequest, RegisterRequest
+from app.config import JWT_EXPIRE_HOURS
+from app.deps import create_access_token, require_role
+from app.database import get_db
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -82,19 +83,94 @@ def _clear_failures(client_ip: str) -> None:
         _failed_attempts.pop(client_ip, None)
 
 
-@router.post("/login", response_model=LoginResponse)
-def login(request: LoginRequest, http_request: Request):
-    """Admin login — returns JWT token."""
+@router.post("/login")
+def login(request: LoginRequest, http_request: Request, db: Session = Depends(get_db)):
+    """User login — queries DB, verifies bcrypt hash, returns JWT with user_id + role."""
     client_ip = _get_client_ip(http_request)
     _check_rate_limit(client_ip)
 
-    # 常量时间比较，防止时序攻击
-    username_ok = hmac.compare_digest(request.username, ADMIN_USERNAME)
-    password_ok = hmac.compare_digest(request.password, ADMIN_PASSWORD)
-    if not username_ok or not password_ok:
+    from app.db_models import User
+    import bcrypt
+
+    user = db.query(User).filter(User.username == request.username, User.status == "active").first()
+    if not user:
         _record_failure(client_ip)
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+        raise HTTPException(status_code=401, detail="用户名或密码错误")
+
+    try:
+        pw_ok = bcrypt.checkpw(request.password.encode(), user.password_hash.encode())
+    except Exception:
+        pw_ok = False
+    if not pw_ok:
+        _record_failure(client_ip)
+        raise HTTPException(status_code=401, detail="用户名或密码错误")
 
     _clear_failures(client_ip)
-    token = create_admin_token(request.username)
-    return LoginResponse(token=token, expires_in=JWT_EXPIRE_HOURS * 3600)
+    token = create_access_token(user.id, user.username, user.role)
+    return {"token": token, "expires_in": JWT_EXPIRE_HOURS * 3600, "role": user.role, "user_id": user.id}
+
+
+@router.post("/device-login")
+def device_login(request: LoginRequest, http_request: Request, db: Session = Depends(get_db)):
+    """Device login with account credentials — returns device_secret for binding."""
+    client_ip = _get_client_ip(http_request)
+    _check_rate_limit(client_ip)
+
+    from app.db_models import User, Device
+    import bcrypt, uuid as _uuid
+
+    user = db.query(User).filter(User.username == request.username, User.status == "active").first()
+    if not user:
+        _record_failure(client_ip)
+        raise HTTPException(status_code=401, detail="用户名或密码错误")
+    try:
+        pw_ok = bcrypt.checkpw(request.password.encode(), user.password_hash.encode())
+    except Exception:
+        pw_ok = False
+    if not pw_ok:
+        _record_failure(client_ip)
+        raise HTTPException(status_code=401, detail="用户名或密码错误")
+
+    _clear_failures(client_ip)
+
+    device = db.query(Device).filter(Device.name == request.username, Device.user_id == user.id).first()
+    if device:
+        if not device.device_secret:
+            device.device_secret = _uuid.uuid4().hex
+    else:
+        device = Device(id=str(_uuid.uuid4()), name=request.username, user_id=user.id,
+                        device_secret=_uuid.uuid4().hex, status="online")
+        db.add(device)
+    db.commit()
+    return {"device_secret": device.device_secret, "user_id": user.id, "device_id": device.id}
+
+
+@router.post("/register")
+def register_user(request: RegisterRequest, user=Depends(require_role("admin")), db: Session = Depends(get_db)):
+    """Create a new user (admin only)."""
+    from app.db_models import User
+    import bcrypt
+
+    existing = db.query(User).filter(User.username == request.username).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="用户名已存在")
+    pw_hash = bcrypt.hashpw(request.password.encode(), bcrypt.gensalt()).decode()
+    new_user = User(
+        username=request.username,
+        password_hash=pw_hash,
+        role=request.role or "operator",
+        nickname=request.nickname or request.username,
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return {"id": new_user.id, "username": new_user.username, "role": new_user.role}
+
+
+@router.get("/users")
+def list_users(user=Depends(require_role("admin")), db: Session = Depends(get_db)):
+    """List all users (admin only)."""
+    from app.db_models import User
+    users = db.query(User).order_by(User.created_at.desc()).all()
+    return {"users": [{"id": u.id, "username": u.username, "nickname": u.nickname,
+                       "role": u.role, "status": u.status, "created_at": str(u.created_at)} for u in users]}

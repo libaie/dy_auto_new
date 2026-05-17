@@ -63,6 +63,22 @@ def _migrate_add_columns():
                     conn.execute(text(sql))
 
 
+def _seed_admin_user():
+    """Create default admin user from env vars if users table is empty (idempotent)."""
+    import os as _os
+    import bcrypt as _bcrypt
+    from app.db_models import User
+
+    with SessionLocal() as db:
+        if db.query(User).count() == 0:
+            username = _os.getenv("ADMIN_USERNAME", "admin")
+            password = _os.getenv("ADMIN_PASSWORD", "admin123")
+            pw_hash = _bcrypt.hashpw(password.encode(), _bcrypt.gensalt()).decode()
+            db.add(User(username=username, password_hash=pw_hash, role="admin", nickname="管理员"))
+            db.commit()
+            logger.info("Seeded default admin user: %s", username)
+
+
 def _seed_selector_descriptions():
     """Populate empty description fields for known action names (idempotent)."""
     from app.db_models import UISelector
@@ -143,6 +159,7 @@ def init_db():
     # Safety net: create_all for any tables not in migrations
     Base.metadata.create_all(bind=engine)
     _migrate_add_columns()
+    _seed_admin_user()
     _seed_selector_descriptions()
 
 

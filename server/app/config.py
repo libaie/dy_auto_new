@@ -143,11 +143,11 @@ AI_THINKING = os.getenv("AI_THINKING", "max")  # disabled / low / medium / high 
 # Thinking level → budget_tokens mapping
 AI_THINKING_LEVELS = {
     "disabled": 0,
-    "low": 1024,
-    "medium": 2048,
-    "high": 4096,
-    "xhigh": 8192,
-    "max": 16384,
+    "low": 2048,
+    "medium": 4096,
+    "high": 8192,
+    "xhigh": 16384,
+    "max": 49152,
 }
 
 

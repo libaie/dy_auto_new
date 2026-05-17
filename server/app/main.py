@@ -87,6 +87,8 @@ async def lifespan(app: FastAPI):
         try:
             from app.routers.reference_data import seed_reference_data
             seed_reference_data(db)
+            from app.routers.ai_config import seed_ai_models
+            seed_ai_models(db)
         finally:
             db.close()
     task = asyncio.create_task(_offline_checker())

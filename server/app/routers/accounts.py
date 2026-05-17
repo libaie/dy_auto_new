@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.db_models import Account
-from app.deps import verify_admin_token
+from app.deps import verify_admin_token, require_role
 from app.ws_manager import pair_ws_manager
 
 router = APIRouter(prefix="/api/accounts", tags=["accounts"])
@@ -46,14 +46,16 @@ def _account_to_dict(acc: Account) -> dict:
 async def create_account(
     request: AccountCreateRequest,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(require_role("admin")),
 ):
+    user_id, _ = user
     acc = Account(
         nickname=request.nickname,
         douyin_id=request.douyin_id,
         group=request.group,
         status=request.status,
         daily_limits=request.daily_limits,
+        user_id=user_id,
     )
     db.add(acc)
     db.commit()
@@ -67,11 +69,15 @@ def list_accounts(
     skip: int = 0,
     limit: int = 50,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     limit = min(limit, 100)
-    total = db.query(Account).count()
-    accounts = db.query(Account).order_by(Account.created_at.desc()).offset(skip).limit(limit).all()
+    user_id, role = user
+    query = db.query(Account)
+    if role != "admin":
+        query = query.filter(Account.user_id == user_id)
+    total = query.count()
+    accounts = query.order_by(Account.created_at.desc()).offset(skip).limit(limit).all()
     return {"accounts": [_account_to_dict(a) for a in accounts], "total": total}
 
 
@@ -79,9 +85,13 @@ def list_accounts(
 def get_account(
     account_id: str,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
-    acc = db.query(Account).filter(Account.id == account_id).first()
+    user_id, role = user
+    query = db.query(Account).filter(Account.id == account_id)
+    if role != "admin":
+        query = query.filter(Account.user_id == user_id)
+    acc = query.first()
     if not acc:
         raise HTTPException(status_code=404, detail="Account not found")
     return _account_to_dict(acc)
@@ -92,9 +102,13 @@ async def update_account(
     account_id: str,
     request: AccountUpdateRequest,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
-    acc = db.query(Account).filter(Account.id == account_id).first()
+    user_id, role = user
+    query = db.query(Account).filter(Account.id == account_id)
+    if role != "admin":
+        query = query.filter(Account.user_id == user_id)
+    acc = query.first()
     if not acc:
         raise HTTPException(status_code=404, detail="Account not found")
 
@@ -121,9 +135,13 @@ async def update_account(
 async def delete_account(
     account_id: str,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
-    acc = db.query(Account).filter(Account.id == account_id).first()
+    user_id, role = user
+    query = db.query(Account).filter(Account.id == account_id)
+    if role != "admin":
+        query = query.filter(Account.user_id == user_id)
+    acc = query.first()
     if not acc:
         raise HTTPException(status_code=404, detail="Account not found")
 

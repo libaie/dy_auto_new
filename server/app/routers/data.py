@@ -2,15 +2,16 @@
 import io
 from fastapi import APIRouter, Query, Depends, HTTPException
 from fastapi.responses import StreamingResponse
+from datetime import datetime
 from typing import Optional
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
+from sqlalchemy import or_, cast, Integer, desc, asc, func
 from openpyxl import Workbook
 
 from app.database import get_db
 from app.deps import verify_admin_token
 from app.config import bj_now
-from app.db_models import CollectedComment, CollectedUser, Conversation, Device
+from app.db_models import CollectedComment, CollectedUser, Conversation, Device, Task
 
 router = APIRouter(prefix="/api/data", tags=["data"])
 
@@ -50,7 +51,7 @@ def list_comments(
     skip: int = 0,
     limit: int = 50,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     limit = min(limit, 100)
     query = db.query(CollectedComment)
@@ -67,6 +68,9 @@ def list_comments(
         ))
     if task_id:
         query = query.filter(CollectedComment.task_id == task_id)
+    user_id, role = user
+    if role != 'admin':
+        query = query.join(Task, CollectedComment.task_id == Task.id).filter(Task.user_id == user_id)
     query = query.order_by(CollectedComment.created_at.desc())
     return _paginate(query, skip, limit)
 
@@ -77,27 +81,69 @@ def list_users(
     account_id: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
     task_id: Optional[str] = Query(None),
+    is_private: Optional[str] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    sort_by: Optional[str] = Query(None),
+    sort_order: Optional[str] = Query("desc"),
     skip: int = 0,
     limit: int = 50,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     limit = min(limit, 100)
     query = db.query(CollectedUser)
     if keyword:
-        query = query.filter(CollectedUser.keyword == keyword)
+        pattern = _build_like(keyword)
+        query = query.filter(CollectedUser.keyword.like(pattern))
     if account_id:
         device_ids = db.query(Device.id).filter(Device.bound_account_id == account_id).subquery()
         query = query.filter(CollectedUser.device_id.in_(device_ids))
     if search:
-        pattern = f"%{search}%"
+        pattern = _build_like(search)
         query = query.filter(or_(
             CollectedUser.nickname.like(pattern),
             CollectedUser.douyin_id.like(pattern),
+            CollectedUser.ip_location.like(pattern),
         ))
     if task_id:
         query = query.filter(CollectedUser.task_id == task_id)
-    query = query.order_by(CollectedUser.created_at.desc())
+    user_id, role = user
+    if role != 'admin':
+        query = query.join(Task, CollectedUser.task_id == Task.id).filter(Task.user_id == user_id)
+    if is_private == "yes":
+        query = query.filter(CollectedUser.is_private == "是")
+    elif is_private == "no":
+        query = query.filter(or_(
+            CollectedUser.is_private.is_(None),
+            CollectedUser.is_private == "否",
+        ))
+    if date_from:
+        try:
+            d = datetime.strptime(date_from, "%Y-%m-%d")
+            query = query.filter(CollectedUser.created_at >= d)
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            d = datetime.strptime(date_to, "%Y-%m-%d")
+            d = d.replace(hour=23, minute=59, second=59)
+            query = query.filter(CollectedUser.created_at <= d)
+        except ValueError:
+            pass
+
+    # Sort: numeric fields cast to Integer, COALESCE NULL→0 for stable ordering
+    numeric_sort_fields = {
+        "fans_count": func.coalesce(cast(CollectedUser.fans_count, Integer), 0),
+        "likes_count": func.coalesce(cast(CollectedUser.likes_count, Integer), 0),
+        "follow_count": func.coalesce(cast(CollectedUser.follow_count, Integer), 0),
+        "works_count": func.coalesce(cast(CollectedUser.works_count, Integer), 0),
+        "created_at": CollectedUser.created_at,
+    }
+    order_col = numeric_sort_fields.get(sort_by, CollectedUser.created_at)
+    order_fn = desc if sort_order == "desc" else asc
+    query = query.order_by(order_fn(order_col))
+
     return _paginate(query, skip, limit)
 
 
@@ -111,7 +157,7 @@ def list_conversations(
     skip: int = 0,
     limit: int = 50,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     limit = min(limit, 100)
     query = db.query(Conversation)
@@ -130,6 +176,9 @@ def list_conversations(
         ))
     if task_id:
         query = query.filter(Conversation.task_id == task_id)
+    user_id, role = user
+    if role != 'admin':
+        query = query.join(Task, Conversation.task_id == Task.id).filter(Task.user_id == user_id)
     query = query.order_by(Conversation.updated_at.desc())
     return _paginate(query, skip, limit)
 
@@ -154,10 +203,12 @@ def export_comments(
     account_id: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
     task_id: Optional[str] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     skip: Optional[int] = Query(None),
     limit: Optional[int] = Query(None),
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     query = db.query(CollectedComment)
     if keyword:
@@ -173,6 +224,23 @@ def export_comments(
         ))
     if task_id:
         query = query.filter(CollectedComment.task_id == task_id)
+    if date_from:
+        try:
+            d = datetime.strptime(date_from, "%Y-%m-%d")
+            query = query.filter(CollectedComment.created_at >= d)
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            d = datetime.strptime(date_to, "%Y-%m-%d")
+            d = d.replace(hour=23, minute=59, second=59)
+            query = query.filter(CollectedComment.created_at <= d)
+        except ValueError:
+            pass
+
+    user_id, role = user
+    if role != 'admin':
+        query = query.join(Task, CollectedComment.task_id == Task.id).filter(Task.user_id == user_id)
 
     query = query.order_by(CollectedComment.created_at.desc())
     is_paged = limit is not None
@@ -185,10 +253,11 @@ def export_comments(
             raise HTTPException(400, f"导出数据量 ({count} 条) 超过上限 ({MAX_EXPORT_ROWS} 条)，请缩小筛选范围")
     rows = query.all()
 
-    headers = ["昵称", "内容", "AI回复", "关键词", "点赞数", "回复数", "IP属地", "是否作者", "评论时间", "采集时间"]
+    headers = ["昵称", "内容", "AI回复", "关键词", "点赞数", "回复数", "IP属地", "意向省份", "意向城市", "意向景点", "是否作者", "评论时间", "采集时间"]
     data = [[
         r.nickname or "", r.content or "", r.ai_reply or "", r.keyword or "",
         r.like_count or "", r.reply_count or "", r.location or "",
+        r.intended_province or "", r.intended_city or "", r.intended_attraction or "",
         "是" if r.is_author else "否", r.time_str or "", str(r.created_at or "")
     ] for r in rows]
 
@@ -202,14 +271,17 @@ def export_users(
     account_id: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
     task_id: Optional[str] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     skip: Optional[int] = Query(None),
     limit: Optional[int] = Query(None),
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     query = db.query(CollectedUser)
     if keyword:
-        query = query.filter(CollectedUser.keyword == keyword)
+        pattern = _build_like(keyword)
+        query = query.filter(CollectedUser.keyword.like(pattern))
     if account_id:
         device_ids = db.query(Device.id).filter(Device.bound_account_id == account_id).subquery()
         query = query.filter(CollectedUser.device_id.in_(device_ids))
@@ -221,6 +293,23 @@ def export_users(
         ))
     if task_id:
         query = query.filter(CollectedUser.task_id == task_id)
+    if date_from:
+        try:
+            d = datetime.strptime(date_from, "%Y-%m-%d")
+            query = query.filter(CollectedUser.created_at >= d)
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            d = datetime.strptime(date_to, "%Y-%m-%d")
+            d = d.replace(hour=23, minute=59, second=59)
+            query = query.filter(CollectedUser.created_at <= d)
+        except ValueError:
+            pass
+
+    user_id, role = user
+    if role != 'admin':
+        query = query.join(Task, CollectedUser.task_id == Task.id).filter(Task.user_id == user_id)
 
     query = query.order_by(CollectedUser.created_at.desc())
     is_paged = limit is not None
@@ -233,9 +322,10 @@ def export_users(
             raise HTTPException(400, f"导出数据量 ({count} 条) 超过上限 ({MAX_EXPORT_ROWS} 条)，请缩小筛选范围")
     rows = query.all()
 
-    headers = ["昵称", "抖音号", "关键词", "获赞", "关注", "粉丝", "作品", "性别", "年龄", "IP属地", "私密账号", "采集时间"]
+    headers = ["昵称", "抖音号", "关键词", "意向省份", "意向城市", "意向景点", "获赞", "关注", "粉丝", "作品", "性别", "年龄", "IP属地", "私密账号", "采集时间"]
     data = [[
         r.nickname or "", r.douyin_id or "", r.keyword or "",
+        r.intended_province or "", r.intended_city or "", r.intended_attraction or "",
         r.likes_count or "", r.follow_count or "", r.fans_count or "", r.works_count or "",
         r.gender or "", r.age or "", r.ip_location or "", r.is_private or "",
         str(r.created_at or "")
@@ -252,10 +342,12 @@ def export_conversations(
     status: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
     task_id: Optional[str] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     skip: Optional[int] = Query(None),
     limit: Optional[int] = Query(None),
     db: Session = Depends(get_db),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     query = db.query(Conversation)
     if account_id:
@@ -273,6 +365,23 @@ def export_conversations(
         ))
     if task_id:
         query = query.filter(Conversation.task_id == task_id)
+    if date_from:
+        try:
+            d = datetime.strptime(date_from, "%Y-%m-%d")
+            query = query.filter(Conversation.created_at >= d)
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            d = datetime.strptime(date_to, "%Y-%m-%d")
+            d = d.replace(hour=23, minute=59, second=59)
+            query = query.filter(Conversation.created_at <= d)
+        except ValueError:
+            pass
+
+    user_id, role = user
+    if role != 'admin':
+        query = query.join(Task, Conversation.task_id == Task.id).filter(Task.user_id == user_id)
 
     query = query.order_by(Conversation.last_dm_at.desc().nullslast())
     is_paged = limit is not None

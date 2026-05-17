@@ -79,6 +79,7 @@ const toast = useToastStore()
 // --- Table columns ---
 const columns = [
   { key: 'name', label: '设备名称' },
+  { key: 'id', label: '设备ID' },
   { key: 'ip', label: 'IP 地址' },
   { key: 'status', label: '状态' },
   { key: 'bound_account_id', label: '绑定账号' },

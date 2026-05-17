@@ -31,11 +31,14 @@ async def _offline_checker():
         try:
             now = bj_now()
 
-            # 1. Devices online in DB but with no active WS connection → offline immediately
+            # 1. Devices online in DB but with no active WS connection
+            #    Only mark offline if last_seen_at > 90s ago (grace period for reconnect)
             online_devices = db.query(Device).filter(Device.status == "online").all()
+            ws_grace_cutoff = now - timedelta(seconds=90)
             no_ws_ids = [
                 d.id for d in online_devices
                 if not pair_ws_manager.is_device_online(d.id)
+                and (d.last_seen_at is None or d.last_seen_at < ws_grace_cutoff)
             ]
 
             # 2. Devices with stale heartbeat (>5 min) → offline

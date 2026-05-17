@@ -271,7 +271,7 @@ const editableDevices = computed(() => {
 })
 
 function isItemEditable(item) {
-  return item.status === 'pending' || item.status === 'assigned'
+  return item.status === 'pending'
 }
 
 function toggleItem(id) {
@@ -307,9 +307,17 @@ async function saveChannel() {
     for (const [k, v] of Object.entries(channelForm.value)) {
       if (v !== '' && v !== null && v !== undefined) payload[k] = v
     }
-    const resp = await editChannelMeta(props.channel.id, payload)
-    detail.value = { ...detail.value, ...resp.data }
+    await editChannelMeta(props.channel.id, payload)
     editingChannel.value = false
+    await loadDetail()
+    // Reload group members in case group changed
+    const gid = detail.value.group_id
+    if (gid) {
+      const resp = await listMembers(gid)
+      const members = resp.data.members || []
+      groupMemberIds.value = new Set(members.map(m => m.id))
+    }
+    emit('refresh')
   } catch (e) {
     alert('保存失败: ' + (e.response?.data?.detail || e.message))
   } finally {

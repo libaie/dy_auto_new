@@ -22,10 +22,32 @@ var uiOperator = {
     // 键盘覆盖兜底：输入法弹出时 currentPackage() 返回键盘包名, 先关键盘
     if (pkg && (pkg.indexOf("inputmethod") !== -1 || pkg.indexOf("keyboard") !== -1)) {
       logger.info(TAG, "输入法覆盖(" + pkg + "), 关闭键盘后重试");
+      // 多策略关闭键盘：back → home → 暴力杀键盘
       try { back(); sleep(800); } catch (e) {}
       if (currentPackage() === TARGET_PKG) {
         logger.info(TAG, "关闭键盘后抖音已在前台");
         return true;
+      }
+      // back() 不够，尝试 home() 退回桌面再启动
+      try { home(); sleep(1000); } catch (e) {}
+      pkg = currentPackage();
+      if (pkg === TARGET_PKG) {
+        logger.info(TAG, "home 后抖音已在前台");
+        return true;
+      }
+      // 键盘仍然在前台，直接用包名启动抖音（绕过键盘拦截）
+      if (pkg && (pkg.indexOf("inputmethod") !== -1 || pkg.indexOf("keyboard") !== -1)) {
+        logger.info(TAG, "键盘顽固残留(" + pkg + ")，尝试强行启动抖音");
+        try {
+          app.startActivity({ packageName: TARGET_PKG, className: "com.ss.android.ugc.aweme.splash.SplashActivity" });
+        } catch (e2) {
+          app.launchPackage(TARGET_PKG);
+        }
+        sleep(2000);
+        if (currentPackage() === TARGET_PKG) {
+          logger.info(TAG, "强制启动抖音成功");
+          return true;
+        }
       }
     }
 

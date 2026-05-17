@@ -25,7 +25,9 @@ SearchCollectHandler._interactWithVideo = function (content, stats, params) {
   var commentCount = -1;
   if (commentBtn && !commentBtn.isImage && !commentBtn.isCoordinate) {
     try {
-      var numMatch = (commentBtn.desc() || "").match(/(\d+)/);
+      var rawDesc = commentBtn.desc() || "";
+      logger.info(TAG, "[耗时] 评论按钮 desc: '" + rawDesc + "'");
+      var numMatch = rawDesc.match(/(\d+)/);
       if (numMatch) commentCount = parseInt(numMatch[1]);
     } catch (e) {}
   }

@@ -50,7 +50,9 @@ SearchCommentHandler._interactWithVideo = function (content, stats) {
   var commentCount = -1;
   if (!commentBtn.isImage && !commentBtn.isCoordinate) {
     try {
-      var numMatch = (commentBtn.desc() || "").match(/(\d+)/);
+      var rawDesc = commentBtn.desc() || "";
+      logger.info(TAG, "评论按钮 desc: '" + rawDesc + "'");
+      var numMatch = rawDesc.match(/(\d+)/);
       if (numMatch) commentCount = parseInt(numMatch[1]);
     } catch (e) {}
   }

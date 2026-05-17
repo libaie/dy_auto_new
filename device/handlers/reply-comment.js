@@ -105,7 +105,9 @@ ReplyCommentHandler.execute = function (params) {
     }
     try {
       if (!commentBtn.isImage && !commentBtn.isCoordinate) {
-        var numMatch = (commentBtn.desc() || "").match(/(\d+)/);
+        var rawDesc = commentBtn.desc() || "";
+        logger.info(TAG, "视频 " + (v + 1) + " 评论按钮 desc: '" + rawDesc + "'");
+        var numMatch = rawDesc.match(/(\d+)/);
         if (numMatch) commentCount = parseInt(numMatch[1]);
       }
     } catch (e) { /* ignore */ }

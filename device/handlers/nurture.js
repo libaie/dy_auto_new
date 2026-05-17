@@ -422,7 +422,9 @@ NurtureHandler._commentOnVideo = function (templateId) {
   var commentCount = -1;
   if (commentBtn && !commentBtn.isImage && !commentBtn.isCoordinate) {
     try {
-      var cmNumMatch = (commentBtn.desc() || "").match(/(\d+)/);
+      var rawDesc = commentBtn.desc() || "";
+      logger.info(TAG, "评论按钮 desc: '" + rawDesc + "'");
+      var cmNumMatch = rawDesc.match(/(\d+)/);
       if (cmNumMatch) commentCount = parseInt(cmNumMatch[1]);
     } catch (e) {}
   }

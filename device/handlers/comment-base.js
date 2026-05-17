@@ -22,6 +22,8 @@ var CommentBaseHandler = Object.create(SearchBaseHandler);
 CommentBaseHandler._config = {
   videoTimeoutMs: 120000,   // 单视频超时 ms，0=不限
   interVideoDelay: 2000,    // 视频间等待 ms
+  maxVideoCount: Infinity,  // video_count=-1 时的上限
+  defaultVideoCount: 5,     // 未指定 video_count 时的默认值
 };
 
 /**
@@ -30,7 +32,7 @@ CommentBaseHandler._config = {
  */
 CommentBaseHandler.execute = function (params) {
   var keyword = params.keyword;
-  var videoCount = (params.video_count === -1) ? Infinity : (params.video_count || params.count || 5);
+  var videoCount = (params.video_count === -1) ? this._config.maxVideoCount : (params.video_count || this._config.defaultVideoCount);
   var sortBy = params.sort_by || "";
 
   aiAnalyzer.useTemplate(params.prompt_template_id);

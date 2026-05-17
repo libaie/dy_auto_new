@@ -12,7 +12,7 @@ var flowContext = require("../core/flow-context");
 
 var ReplyCommentHandler = Object.create(CommentBaseHandler);
 
-ReplyCommentHandler._config = { videoTimeoutMs: 120000, interVideoDelay: 2500 };
+ReplyCommentHandler._config = { videoTimeoutMs: 120000, interVideoDelay: 2500, defaultVideoCount: 3 };
 
 ReplyCommentHandler._beforeSearch = function (params) {
   this._dest = aiAnalyzer.resolveDestination(params.keyword);

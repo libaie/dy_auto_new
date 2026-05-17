@@ -10,7 +10,7 @@ var TAG = "采集";
 
 var SearchCollectHandler = Object.create(CommentBaseHandler);
 
-SearchCollectHandler._config = { videoTimeoutMs: 0, interVideoDelay: 1500 };
+SearchCollectHandler._config = { videoTimeoutMs: 0, interVideoDelay: 1500, maxVideoCount: 200 };
 
 SearchCollectHandler.execute = function (params) {
   if (params.share_links && params.share_links.length > 0) {

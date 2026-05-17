@@ -17,6 +17,13 @@ SearchCollectHandler._interactWithVideo = function (content, stats, params) {
   this._currentDest = aiAnalyzer.resolveDestination(keyword);
   var t0 = Date.now();
 
+  // 防止上个视频评论区残留：若已在评论页，先退回到视频页
+  if (uiOperator.isOnPage("is_comment_view")) {
+    logger.info(TAG, "[耗时] 检测到评论面板残留，back 回到视频页");
+    back();
+    sleep(800);
+  }
+
   var dataSourceType = uiOperator.findElement("is_shopping_cart", 500) ? 1 : 0;
   logger.info(TAG, "[耗时] 数据来源类型: " + (dataSourceType === 1 ? "带货视频" : "普通视频"));
 
@@ -343,8 +350,14 @@ SearchCollectHandler.execute = function (params) {
       sleep(1500);
     }
     if (!this._interactWithVideo("", stats, params)) stats.fail_count++;
+    // 确保评论区关闭，防止残留到下一个视频
     this.safeClick("comment_off_btn", 2);
     sleep(400);
+    if (uiOperator.isOnPage("is_comment_view")) {
+      logger.info(TAG, "评论区未关闭，back 兜底");
+      back();
+      sleep(500);
+    }
   }
   shell("am start -a android.intent.action.VIEW -d 'snssdk1128://search/result'", true);
   sleep(2000);

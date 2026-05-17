@@ -393,7 +393,20 @@ async def ws_device_status(websocket: WebSocket):
                 try:
                     msg = await asyncio.wait_for(websocket.receive_text(), timeout=120)
                     if msg == '{"event":"device_disconnect"}':
-                        _ws_log.info("device %s disconnected (explicit)", device_id)
+                        _ws_log.info("device %s disconnected (explicit), marking offline", device_id)
+                        try:
+                            dev = db.query(Device).filter(Device.id == device_id).first()
+                            if dev:
+                                dev.status = "offline"
+                                dev.last_seen_at = bj_now()
+                                db.commit()
+                        except Exception:
+                            _ws_log.warning("device %s offline mark failed", device_id, exc_info=True)
+                        await pair_ws_manager.broadcast_to_admins({
+                            "event": "device_status_changed",
+                            "device_id": device_id,
+                            "status": "offline",
+                        })
                         break
                     if msg == "ping":
                         await websocket.send_text("pong")

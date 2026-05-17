@@ -397,11 +397,8 @@ async def ws_device_status(websocket: WebSocket):
                         break
                     if msg == "ping":
                         await websocket.send_text("pong")
-                        # WS ping 即心跳 — 直接更新 last_seen_at
-                        try:
-                            device_service.update_heartbeat(db, device_id)
-                        except Exception:
-                            pass
+                        # Record heartbeat in memory — _offline_checker flushes to DB
+                        pair_ws_manager.record_heartbeat(device_id, bj_now())
                 except asyncio.TimeoutError:
                     try:
                         await websocket.send_text("ping")
@@ -434,6 +431,10 @@ async def poll_tasks(
         raise HTTPException(status_code=403, detail="Device ID mismatch")
     if authed_device_id:
         device_id = authed_device_id
+
+    # HTTP poll itself is a heartbeat — update last_seen_at
+    from app.services.device_service import device_service
+    device_service.update_heartbeat(db, device_id)
 
     task = task_service.get_pending_task(db, device_id)
     version = selector_service.get_version(db)

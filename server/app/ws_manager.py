@@ -13,6 +13,8 @@ class PairWSManager:
         self._admin_connections: dict[str, set[WebSocket]] = {}
         # Device status connections: device_id → WebSocket
         self._device_status_connections: dict[str, WebSocket] = {}
+        # Heartbeat memory cache: device_id → datetime
+        self._device_last_seen: dict[str, object] = {}
 
     # --- Device side (waiting for approval) ---
 
@@ -78,6 +80,22 @@ class PairWSManager:
             "event": "channel_completed",
             "channel_id": channel_id,
         })
+
+    # --- Heartbeat memory cache (avoids DB write on every ping) ---
+
+    def record_heartbeat(self, device_id: str, seen_at):
+        """Record heartbeat in memory. Caller flushes to DB periodically."""
+        self._device_last_seen[device_id] = seen_at
+
+    def get_last_seen(self, device_id: str):
+        """Get the in-memory last seen time, or None."""
+        return self._device_last_seen.get(device_id)
+
+    def drain_heartbeats(self) -> dict[str, object]:
+        """Atomically swap out all in-memory heartbeats for DB flush."""
+        heartbeats = self._device_last_seen
+        self._device_last_seen = {}
+        return heartbeats
 
     # --- Device status connections (persistent WS for online/offline) ---
 

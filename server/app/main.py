@@ -21,9 +21,8 @@ from app.services.ai_generator import ai_generator
 
 async def _offline_checker():
     """Background task: mark devices offline based on heartbeat staleness only.
-    WS connection is a push optimization, not a liveness signal — devices
-    fall back to HTTP polling when WS drops, and are still online as long
-    as their heartbeat (last_seen_at) is current.
+    Uses in-memory cache from WS pings + DB from HTTP polls. Flushes
+    in-memory heartbeats to DB each cycle so both sources are current.
     """
     from app.db_models import Device
     from app.ws_manager import pair_ws_manager
@@ -35,9 +34,19 @@ async def _offline_checker():
         try:
             now = bj_now()
 
-            online_devices = db.query(Device).filter(Device.status == "online").all()
+            # 1. Flush in-memory heartbeats to DB
+            mem_heartbeats = pair_ws_manager.drain_heartbeats()
+            for device_id, seen_at in mem_heartbeats.items():
+                dev = db.query(Device).filter(Device.id == device_id).first()
+                if dev:
+                    dev.last_seen_at = seen_at
+                    dev.status = "online"
+            if mem_heartbeats:
+                db.commit()
 
-            # Stale heartbeat (>2 min) → device is truly offline
+            # 2. Check liveness: both in-memory (already drained, checked above)
+            #    and DB last_seen_at. Stale if >2 min without heartbeat.
+            online_devices = db.query(Device).filter(Device.status == "online").all()
             cutoff_dt = now - timedelta(seconds=120)
             stale_ids = [
                 d.id for d in online_devices

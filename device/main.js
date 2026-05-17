@@ -424,24 +424,33 @@ function startMainLoop(serverUrl, secret) {
     }
   }
 
-  // 空闲时定时 poll — 即使 WS 通知丢失也能发现待执行任务。找不到任务就关抖音
-  var IDLE_POLL_INTERVAL = 30000;
+  // 空闲时定时 poll — 即使 WS 通知丢失也能发现待执行任务
+  // 轮询间隔使用服务端配置，首次默认 30s
   var _idleTicks = 0;
-  setInterval(function () {
-    if (!_taskBusy && _taskQueue.length === 0) {
-      catchUpPoll();
+  var _idlePollTimer = null;
+
+  function _startIdlePoll() {
+    if (_idlePollTimer) clearInterval(_idlePollTimer);
+    _idlePollTimer = setInterval(function () {
       if (!_taskBusy && _taskQueue.length === 0) {
-        _idleTicks++;
-        if (_idleTicks >= 1) {
-          logger.info(TAG, "空闲超过一轮，关闭抖音");
-          try { require("./core/ui-operator").closeApp(); } catch (e) {}
+        catchUpPoll();
+        if (!_taskBusy && _taskQueue.length === 0) {
+          _idleTicks++;
+          // 连续 6 轮空闲才关抖音（避免短暂空闲反复开关）
+          if (_idleTicks >= 6) {
+            logger.info(TAG, "空闲超过 " + _idleTicks + " 轮，关闭抖音");
+            try { require("./core/ui-operator").closeApp(); } catch (e) {}
+            _idleTicks = 0;
+          }
+        } else {
           _idleTicks = 0;
         }
       }
-    }
-  }, IDLE_POLL_INTERVAL);
+    }, config.pollInterval || 30000);
+  }
 
   logger.info(TAG, "等待任务推送...");
+  _startIdlePoll();
 }
 
 /**
@@ -451,7 +460,11 @@ function startMainLoop(serverUrl, secret) {
 function applyServerConfig(serverConfig) {
   if (!serverConfig) return;
 
-  if (serverConfig.poll_interval !== undefined) config.pollInterval = serverConfig.poll_interval;
+  if (serverConfig.poll_interval !== undefined) {
+    var changed = config.pollInterval !== serverConfig.poll_interval;
+    config.pollInterval = serverConfig.poll_interval;
+    if (changed) _startIdlePoll();  // 重启空闲轮询以使用新间隔
+  }
   if (serverConfig.heartbeat_interval !== undefined) config.heartbeatInterval = serverConfig.heartbeat_interval;
   if (serverConfig.log_level !== undefined) config.logLevel = serverConfig.log_level;
 

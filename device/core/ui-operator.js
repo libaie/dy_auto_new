@@ -542,31 +542,58 @@ var uiOperator = {
    * @returns {Object|null} { isImage: true, x, y } 或 null
    */
   _findByImage: function (templateFile, threshold) {
-    var templatePath = "/sdcard/dy_auto/templates/" + templateFile;
-    var tpl = images.read(templatePath);
-    if (!tpl) {
-      logger.warn(TAG, "模板图片未找到: " + templatePath);
-      return null;
-    }
+    var res = device.width + "x" + device.height;
+    threshold = threshold || 0.8;
+
+    // Try resolution-specific template first, then "default" fallback
+    var candidates = [
+      "/sdcard/dy_auto/templates/" + res + "/" + templateFile,
+      "/sdcard/dy_auto/templates/default/" + templateFile,
+    ];
 
     var screen = images.captureScreen();
-    if (!screen) {
+    if (!screen) return null;
+
+    for (var ci = 0; ci < candidates.length; ci++) {
+      var tpl = images.read(candidates[ci]);
+      if (!tpl) continue;
+
+      // If template is from a different resolution, scale before matching
+      // Template filename format: name@1080x2400.png — extract original res
+      var scaleMatch = templateFile.match(/@(\d+x\d+)/);
+      if (scaleMatch) {
+        var origRes = scaleMatch[1];
+        if (origRes !== res) {
+          var origParts = origRes.split("x");
+          var origW = parseInt(origParts[0]) || 1;
+          var scaleX = device.width / origW;
+          // Scale within reasonable bounds
+          if (Math.abs(1 - scaleX) > 0.05) {
+            var newW = Math.round(tpl.getWidth() * scaleX);
+            var newH = Math.round(tpl.getHeight() * scaleX);
+            try {
+              var scaled = images.scale(tpl, newW, newH);
+              if (scaled) { tpl.recycle(); tpl = scaled; }
+            } catch (e) {
+              logger.warn(TAG, "模板缩放失败: " + e.message);
+            }
+          }
+        }
+      }
+
+      var p = images.findImage(screen, tpl, { threshold: threshold });
+      if (p) {
+        var cx = Math.round(p.x + tpl.getWidth() / 2);
+        var cy = Math.round(p.y + tpl.getHeight() / 2);
+        tpl.recycle();
+        screen.recycle();
+        logger.debug(TAG, "图片匹配: (" + p.x + "," + p.y + ") 中心: (" + cx + "," + cy + ")");
+        return { isImage: true, x: cx, y: cy };
+      }
+
       tpl.recycle();
-      return null;
     }
 
-    var p = images.findImage(screen, tpl, { threshold: threshold });
-
-    if (p) {
-      var cx = Math.round(p.x + tpl.getWidth() / 2);
-      var cy = Math.round(p.y + tpl.getHeight() / 2);
-      tpl.recycle();
-      screen.recycle();
-      logger.debug(TAG, "图片匹配: (" + p.x + "," + p.y + ") 中心: (" + cx + "," + cy + ")");
-      return { isImage: true, x: cx, y: cy };
-    }
-
-    tpl.recycle();
     screen.recycle();
     return null;
   },

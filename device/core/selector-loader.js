@@ -10,6 +10,7 @@ var selectorLoader = global.__selectorLoader || {
   _retriedActions: {},  // action_name -> bool, 每个 action 独立重试
   _version: 0,      // 本地缓存版本号
   _initialized: false,
+  _resolution: "",  // 当前设备分辨率，init 时捕获
 
   /**
    * 初始化 — 从后端拉取全量选择器（带重试）
@@ -43,6 +44,10 @@ var selectorLoader = global.__selectorLoader || {
       if (attempt < maxRetries) sleep(2000);
     }
     logger.error(TAG, "选择器加载全部失败，任务可能无法执行");
+    // 如果选择器数量异常少（< 10），可能是新分辨率设备无匹配 profile
+    if (Object.keys(this._cache).length < 10) {
+      logger.warn(TAG, "选择器数量异常 (" + Object.keys(this._cache).length + ")，可能需要标定");
+    }
     this._initialized = true;
   },
 
@@ -112,6 +117,14 @@ var selectorLoader = global.__selectorLoader || {
       this._douyinVersion = douyinVersion;
     }
 
+    // Capture device resolution
+    var devRes = this._resolution;
+    if (!devRes) {
+      devRes = device.width + "x" + device.height;
+      this._resolution = devRes;
+    }
+    var devAR = _aspectTag(devRes);
+
     function _priority(platformVer) {
       // exact match: 3, specific version (e.g. "38.6.0"): 2, default/empty: 1
       if (platformVer === douyinVersion) return 3;
@@ -119,7 +132,14 @@ var selectorLoader = global.__selectorLoader || {
       return 2;
     }
 
-    // Semantic version distance (lower = closer)
+    function _resProfileScore(sel) {
+      var rp = sel.resolution_profile || "default";
+      if (!rp || rp === "default") return 1;
+      if (rp === devRes) return 3;
+      if (_aspectTag(rp) === devAR) return 2;
+      return 0;
+    }
+
     function _versionDist(v1, v2) {
       if (!v1 || !v2 || v1 === "default" || v2 === "default") return 9999;
       var p1 = String(v1).split("."), p2 = String(v2).split(".");
@@ -131,22 +151,39 @@ var selectorLoader = global.__selectorLoader || {
       return dist;
     }
 
+    function _aspectTag(resolution) {
+      if (!resolution) return "unknown";
+      var parts = resolution.split("x");
+      var w = parseInt(parts[0]) || 0;
+      var h = parseInt(parts[1]) || 0;
+      if (w === 0 || h === 0) return "unknown";
+      var a = w, b = h;
+      while (b) { var t = b; b = a % b; a = t; }
+      return (w / a) + ":" + (h / a);
+    }
+
+    function _isBetter(s, existing) {
+      var p = _priority(s.platform_version);
+      var ep = _priority(existing.platform_version);
+      if (p !== ep) return p > ep;
+      // Same platform priority: resolution_profile breaks tie
+      var rs = _resProfileScore(s);
+      var ers = _resProfileScore(existing);
+      if (rs !== ers) return rs > ers;
+      // Same resolution profile: version distance breaks tie
+      var sVer = s.platform_version || "";
+      var exVer = existing.platform_version || "";
+      return _versionDist(sVer, douyinVersion) < _versionDist(exVer, douyinVersion);
+    }
+
     for (var i = 0; i < selectors.length; i++) {
       var s = selectors[i];
       var existing = this._cache[s.action_name];
-      var p = _priority(s.platform_version);
-      if (!existing || p > _priority(existing.platform_version)) {
+      if (!existing || _isBetter(s, existing)) {
         this._cache[s.action_name] = s;
-      } else if (existing && p === _priority(existing.platform_version)) {
-        // Same priority → pick closest version to device
-        var sVer = s.platform_version || "";
-        var exVer = existing.platform_version || "";
-        if (_versionDist(sVer, douyinVersion) < _versionDist(exVer, douyinVersion)) {
-          this._cache[s.action_name] = s;
-        }
       }
     }
-    logger.info(TAG, "已应用选择器配置，_cache " + Object.keys(this._cache).length + " 个选择器 (抖音 " + douyinVersion + ")");
+    logger.info(TAG, "已应用选择器配置，_cache " + Object.keys(this._cache).length + " 个选择器 (抖音 " + douyinVersion + ", 分辨率 " + devRes + ")");
   },
 
   /**
@@ -161,44 +198,56 @@ var selectorLoader = global.__selectorLoader || {
       }
 
       var remoteList = response.templates;
-      var localDir = "/sdcard/dy_auto/templates/";
-      files.ensureDir(localDir);
+      var baseDir = "/sdcard/dy_auto/templates/";
+      files.ensureDir(baseDir);
 
-      // 构建远程文件名集合
-      var remoteNames = {};
+      // Group remote templates by resolution
+      var byResolution = {};
       for (var i = 0; i < remoteList.length; i++) {
-        remoteNames[remoteList[i].filename] = remoteList[i];
+        var t = remoteList[i];
+        var res = t.resolution || "default";
+        if (!byResolution[res]) byResolution[res] = {};
+        byResolution[res][t.filename] = t;
       }
 
-      // 下载缺失的模板
+      // Sync each resolution group
       var downloaded = 0;
-      for (var j = 0; j < remoteList.length; j++) {
-        var t = remoteList[j];
-        var localPath = localDir + t.filename;
-        if (!files.exists(localPath)) {
-          var data = apiClient.downloadTemplate(t.filename);
-          if (data) {
-            files.writeBytes(localPath, data);
-            downloaded++;
-            logger.info(TAG, "模板已下载: " + t.filename + " (" + data.length + " bytes)");
-          } else {
-            logger.warn(TAG, "模板下载失败: " + t.filename);
+      var cleaned = 0;
+      for (var res in byResolution) {
+        if (!byResolution.hasOwnProperty(res)) continue;
+        var resDir = baseDir + res + "/";
+        files.ensureDir(resDir);
+        var resFiles = byResolution[res];
+
+        // Download missing templates for this resolution
+        for (var fn in resFiles) {
+          if (!resFiles.hasOwnProperty(fn)) continue;
+          var tpl = resFiles[fn];
+          var localPath = resDir + fn;
+          if (!files.exists(localPath)) {
+            var data = apiClient.downloadTemplate(fn);
+            if (data) {
+              files.writeBytes(localPath, data);
+              downloaded++;
+              logger.info(TAG, "模板已下载: " + res + "/" + fn + " (" + data.length + " bytes)");
+            } else {
+              logger.warn(TAG, "模板下载失败: " + fn);
+            }
           }
         }
-      }
 
-      // 清理本地多余模板
-      var cleaned = 0;
-      if (files.isDir(localDir)) {
-        var localFiles = files.listDir(localDir);
-        for (var k = 0; k < localFiles.length; k++) {
-          if (!remoteNames[localFiles[k]]) {
-            try {
-              files.remove(localDir + localFiles[k]);
-              cleaned++;
-              logger.info(TAG, "清理过期模板: " + localFiles[k]);
-            } catch (e) {
-              logger.warn(TAG, "清理模板失败: " + localFiles[k] + " - " + e.message);
+        // Clean stale local templates for this resolution
+        if (files.isDir(resDir)) {
+          var localFiles = files.listDir(resDir);
+          for (var k = 0; k < localFiles.length; k++) {
+            if (!resFiles[localFiles[k]]) {
+              try {
+                files.remove(resDir + localFiles[k]);
+                cleaned++;
+                logger.info(TAG, "清理过期模板: " + res + "/" + localFiles[k]);
+              } catch (e) {
+                logger.warn(TAG, "清理模板失败: " + localFiles[k] + " - " + e.message);
+              }
             }
           }
         }

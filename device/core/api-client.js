@@ -266,6 +266,21 @@ var apiClient = {
     return this.get("/api/device/templates");
   },
 
+  uploadCalibration: function (templates, resolution) {
+    var body = {
+      templates: templates.map(function (t) {
+        return {
+          action_name: t.action_name,
+          filename: t.filename,
+          data: android.util.Base64.encodeToString(t.data, 0),  // base64 for JSON
+          resolution: resolution,
+        };
+      }),
+      resolution: resolution,
+    };
+    return this.post("/api/device/calibrate", body);
+  },
+
   downloadTemplate: function (filename) {
     var url = config.serverUrl + "/api/device/templates/" + encodeURIComponent(filename);
     return this._downloadWithRetry(url);

@@ -833,6 +833,89 @@ def device_download_template(
     return FileResponse(str(filepath), media_type="image/png", filename=filename)
 
 
+class CalibrationItem(BaseModel):
+    action_name: str
+    filename: str
+    data: str  # base64-encoded PNG
+
+
+class CalibrationRequest(BaseModel):
+    templates: list[CalibrationItem]
+    resolution: str = ""
+
+
+@router.post("/calibrate")
+async def device_calibrate(
+    request: CalibrationRequest,
+    db: Session = Depends(get_db),
+    device_id: str = Depends(verify_device_secret),
+):
+    """Device uploads auto-calibrated image templates.
+    Saves templates and upserts UISelector rows for this resolution profile."""
+    import base64
+    from app.services.template_service import template_service
+    from app.db_models import UISelector, Device
+
+    resolution = request.resolution
+    if not resolution:
+        device = db.query(Device).filter(Device.id == device_id).first()
+        if device and device.screen_resolution:
+            resolution = device.screen_resolution
+    if not resolution:
+        raise HTTPException(status_code=400, detail="无法确定设备分辨率")
+
+    uploaded = 0
+    for item in request.templates:
+        # Decode and save template
+        try:
+            content = base64.b64decode(item.data)
+        except Exception:
+            continue
+        template_service.save_template(item.filename, content, resolution=resolution)
+
+        # Upsert selector: clone existing "default" profile selector for this resolution
+        existing = db.query(UISelector).filter(
+            UISelector.action_name == item.action_name,
+            UISelector.resolution_profile == resolution,
+        ).first()
+        if not existing:
+            # Clone from default profile if it exists
+            default_sel = db.query(UISelector).filter(
+                UISelector.action_name == item.action_name,
+                UISelector.resolution_profile == "default",
+            ).first()
+            if default_sel:
+                new_sel = UISelector(
+                    action_name=item.action_name,
+                    description=default_sel.description,
+                    platform_version=default_sel.platform_version,
+                    resolution_profile=resolution,
+                    strategies=default_sel.strategies,
+                    version=1,
+                    category=default_sel.category,
+                    purpose=default_sel.purpose,
+                    strategy_logic=default_sel.strategy_logic,
+                    extract_field=default_sel.extract_field,
+                    clean_mode=default_sel.clean_mode,
+                    clean_pattern=default_sel.clean_pattern,
+                    clean_prompt=default_sel.clean_prompt,
+                )
+                db.add(new_sel)
+        uploaded += 1
+
+    db.commit()
+
+    # Broadcast version bump
+    version = selector_service.get_version(db)
+    await pair_ws_manager.broadcast_to_devices({
+        "event": "selectors_updated",
+        "version": version,
+    })
+    await pair_ws_manager.broadcast_to_admins({"event": "selectors_changed"})
+
+    return {"uploaded": uploaded, "resolution": resolution}
+
+
 @router.post("/ai-proxy", response_model=DeviceAIProxyResponse)
 async def ai_proxy(
     request: DeviceAIProxyRequest,

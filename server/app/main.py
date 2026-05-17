@@ -36,13 +36,22 @@ async def _offline_checker():
 
             # 1. Flush in-memory heartbeats to DB
             mem_heartbeats = pair_ws_manager.drain_heartbeats()
-            for device_id, seen_at in mem_heartbeats.items():
-                dev = db.query(Device).filter(Device.id == device_id).first()
-                if dev:
-                    dev.last_seen_at = seen_at
-                    dev.status = "online"
             if mem_heartbeats:
-                db.commit()
+                try:
+                    for device_id, seen_at in mem_heartbeats.items():
+                        dev = db.query(Device).filter(Device.id == device_id).first()
+                        if dev:
+                            dev.last_seen_at = seen_at
+                            dev.status = "online"
+                    db.commit()
+                except Exception:
+                    # Re-merge on failure so next cycle retries
+                    import logging
+                    _hb_log = logging.getLogger("app.heartbeat")
+                    _hb_log.warning("heartbeat flush failed, re-queuing %d", len(mem_heartbeats), exc_info=True)
+                    for device_id, seen_at in mem_heartbeats.items():
+                        if device_id not in pair_ws_manager._device_last_seen:
+                            pair_ws_manager._device_last_seen[device_id] = seen_at
 
             # 2. Check liveness: both in-memory (already drained, checked above)
             #    and DB last_seen_at. Stale if >2 min without heartbeat.
@@ -78,7 +87,8 @@ async def _offline_checker():
                         "status": "offline",
                     })
         except Exception:
-            pass
+            import logging
+            logging.getLogger("app.offline_checker").warning("checker cycle failed", exc_info=True)
         finally:
             db.close()
 

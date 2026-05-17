@@ -487,23 +487,31 @@ var uiOperator = {
    * @param {number} timeout - 每个 strategy 的超时 ms，默认 300
    * @returns {boolean}
    */
-  isOnPage: function (actionName) {
+  isOnPage: function (actionName, timeout) {
+    timeout = timeout || 300;
     var config = selectorLoader.get(actionName);
     if (!config || config.purpose !== "page_detect") return false;
     var strategies = config.strategies;
     if (!strategies || strategies.length === 0) return false;
     var logic = config.strategy_logic || "and";
-    if (logic === "or") {
-      for (var i = 0; i < strategies.length; i++) {
-        if (this._findByStrategy(strategies[i])) return true;
+    var useOr = logic === "or";
+    var startTime = Date.now();
+    while (Date.now() - startTime < timeout) {
+      if (useOr) {
+        for (var i = 0; i < strategies.length; i++) {
+          if (this._findByStrategy(strategies[i])) return true;
+        }
+      } else {
+        // AND — all strategies must match
+        var allMatch = true;
+        for (var j = 0; j < strategies.length; j++) {
+          if (!this._findByStrategy(strategies[j])) { allMatch = false; break; }
+        }
+        if (allMatch) return true;
       }
-      return false;
+      sleep(100);
     }
-    // default: AND — all strategies must match
-    for (var j = 0; j < strategies.length; j++) {
-      if (!this._findByStrategy(strategies[j])) return false;
-    }
-    return true;
+    return false;
   },
 
   /**

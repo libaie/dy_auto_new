@@ -5,6 +5,7 @@ var antiDetect = require("../core/anti-detect");
 var aiAnalyzer = require("../core/ai-analyzer");
 var logger = require("../utils/logger");
 var flowContext = require("../core/flow-context");
+var taskExecutor = require("../core/task-executor");
 
 var TAG = "养号";
 
@@ -60,6 +61,10 @@ NurtureHandler._executeV2 = function (params) {
   });
 
   while (Date.now() - startTime < maxDuration) {
+    if (taskExecutor.isCancelled()) {
+      logger.info(TAG, "任务已取消，停止养号");
+      break;
+    }
     // Find incomplete sub-tasks
     var pending = progress.filter(function (p) { return p.done < p.target; });
     if (pending.length === 0) {

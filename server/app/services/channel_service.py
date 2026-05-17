@@ -134,7 +134,10 @@ class ChannelService:
 
         now = bj_now()
 
-        # Stale recovery: reset items assigned > 3 min ago (matches task_service stale threshold)
+        # Stale recovery: reset items assigned > 3 min ago
+        # Also reset the associated RUNNING task to PENDING to prevent
+        # duplicate execution when the item is re-claimed before the
+        # task_service stale recovery (10 min) kicks in.
         from datetime import timedelta
         stale_threshold = now - timedelta(seconds=180)
         stale_items = db.query(ChannelItem).filter(
@@ -143,7 +146,10 @@ class ChannelService:
             ChannelItem.assigned_at < stale_threshold,
         ).all()
         stale_channel_ids = set()
+        stale_task_ids = []
         for si in stale_items:
+            if si.task_id:
+                stale_task_ids.append(si.task_id)
             si.status = "pending"
             si.assigned_device_id = None
             si.assigned_at = None
@@ -151,6 +157,16 @@ class ChannelService:
             stale_channel_ids.add(si.channel_id)
         if stale_items:
             db.flush()
+            # Reset orphaned RUNNING tasks so they don't linger for 10 min
+            if stale_task_ids:
+                from app.models import TaskStatus as TS
+                db.query(DBTask).filter(
+                    DBTask.id.in_(stale_task_ids),
+                    DBTask.status == TS.RUNNING.value,
+                ).update(
+                    {"status": TS.PENDING.value, "device_id": None, "started_at": None},
+                    synchronize_session=False,
+                )
             for cid in stale_channel_ids:
                 self._reactivate_channel(db, cid)
         db.expire_all()

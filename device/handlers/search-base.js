@@ -5,6 +5,7 @@ var antiDetect = require("../core/anti-detect");
 var logger = require("../utils/logger");
 var aiAnalyzer = require("../core/ai-analyzer");
 var flowContext = require("../core/flow-context");
+var taskExecutor = require("../core/task-executor");
 
 var TAG = "搜索";
 
@@ -86,6 +87,11 @@ SearchBaseHandler.execute = function (params) {
   var stats = { success_count: 0, fail_count: 0, details: [] };
 
   for (var i = 0; i < videoCount; i++) {
+    if (taskExecutor.isCancelled()) {
+      logger.info(TAG, "任务已取消，停止处理视频");
+      stats.details.push("cancelled at video " + (i + 1) + "/" + videoCount);
+      break;
+    }
     logger.info(TAG, "处理第 " + (i + 1) + "/" + videoCount + " 个结果");
 
     if (i === 0) {

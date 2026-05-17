@@ -45,6 +45,7 @@ async def _notify_pending_tasks(db: Session, device_id: str):
         return
 
     now = bj_now()
+    device_user_id = device.user_id
 
     # Build routing filter (same logic as task_service.get_pending_task)
     if device.bound_account_id:
@@ -63,19 +64,29 @@ async def _notify_pending_tasks(db: Session, device_id: str):
         )
         logger.info(f"[notify] 设备 {device_id} 未绑定账号，查询孤儿任务...")
 
-    pending_tasks = db.query(DBTask).filter(
+    pending_task_query = db.query(DBTask).filter(
         DBTask.status == TaskStatus.PENDING.value,
         route_filter,
         or_(DBTask.scheduled_at.is_(None), DBTask.scheduled_at <= now),
-    ).all()
+    )
+    if device_user_id:
+        pending_task_query = pending_task_query.filter(
+            or_(DBTask.user_id == device_user_id, DBTask.user_id.is_(None))
+        )
+    pending_tasks = pending_task_query.all()
 
     # Also check pending channel items for this device
     from app.db_models import ChannelItem, Channel
+    channel_subquery = db.query(Channel.id).filter(
+        Channel.status == "active", Channel.deleted_at.is_(None)
+    )
+    if device_user_id:
+        channel_subquery = channel_subquery.filter(
+            or_(Channel.user_id == device_user_id, Channel.user_id.is_(None))
+        )
     channel_item_query = db.query(ChannelItem).filter(
         ChannelItem.status == "pending",
-        ChannelItem.channel_id.in_(
-            db.query(Channel.id).filter(Channel.status == "active", Channel.deleted_at.is_(None))
-        ),
+        ChannelItem.channel_id.in_(channel_subquery),
     )
     if device.bound_account_id:
         channel_item_query = channel_item_query.filter(ChannelItem.account_id == device.bound_account_id)
@@ -674,7 +685,7 @@ def script_download(
 @router.post("/script-upload")
 async def script_upload(
     file: UploadFile = FastAPIFile(...),
-    _: str = Depends(verify_admin_token),
+    user = Depends(verify_admin_token),
 ):
     from app.services.script_service import script_service
     if not file.filename.endswith(".zip"):
@@ -825,14 +836,19 @@ async def ai_proxy(
 
     try:
         async with httpx.AsyncClient(timeout=60) as client:
+            model = ai_cfg.get("model", "deepseek-chat")
             json_body = {
-                "model": ai_cfg.get("model", "deepseek-chat"),
+                "model": model,
                 "max_tokens": request.max_tokens,
                 "temperature": request.temperature,
                 "messages": [{"role": "user", "content": request.prompt}],
             }
-            if ai_cfg.get("thinking_enabled"):
+            # thinking 参数仅在 deepseek-reasoner 或明确支持 thinking 的模型上发送
+            if ai_cfg.get("thinking_enabled") and ("reasoner" in model.lower() or "r1" in model.lower()):
                 json_body["thinking"] = {"type": "enabled"}
+            logger.debug("AI proxy request: model=%s max_tokens=%s temp=%s prompt_len=%s thinking=%s",
+                          model, request.max_tokens, request.temperature, len(request.prompt),
+                          "thinking" in json_body)
             resp = await client.post(
                 ai_cfg["api_url"],
                 headers={
@@ -842,16 +858,47 @@ async def ai_proxy(
                 json=json_body,
             )
         if resp.status_code != 200:
+            logger.error("AI API error: status=%s body=%s", resp.status_code, resp.text[:500])
             raise HTTPException(status_code=502, detail=f"AI API error: {resp.status_code}")
         result = resp.json()
-        content = result["choices"][0]["message"]["content"].strip()
+        logger.debug("AI API response: %s", {k: str(v)[:200] for k, v in result.items() if k != "choices"})
+        content = (result.get("choices", [{}])[0].get("message", {}).get("content") or "").strip()
+        if not content:
+            logger.error("AI API returned empty content. Full response: %s", str(result)[:1000])
         return DeviceAIProxyResponse(content=content)
     except httpx.TimeoutException:
         raise HTTPException(status_code=504, detail="AI API timeout")
     except (KeyError, IndexError) as e:
+        logger.error("Invalid AI response structure: %s", e)
         raise HTTPException(status_code=502, detail=f"Invalid AI response: {e}")
 
 # --- 采集数据上报 ---
+
+
+_dest_cache: dict[str, dict] = {}
+
+async def _resolve_destination(keyword: str, db) -> dict | None:
+    """服务端解析旅游关键词→省份/城市/景点，按 keyword 缓存。"""
+    if not keyword or keyword in _dest_cache:
+        return _dest_cache.get(keyword)
+    from app.services.ai_generator import ai_generator
+    try:
+        raw = await ai_generator.generate_custom(
+            db,
+            "只输出 JSON，不要其他文本。",
+            "将以下旅游关键词解析为目的地信息。\n关键词：" + keyword + "\n输出格式：{\"province\":\"省份\",\"city\":\"城市\",\"attraction\":\"景点\"}\n如果关键词本身是省份或城市，对应字段填空字符串。",
+            max_tokens=200, temperature=0.1,
+        )
+        import json
+        m = __import__("re").search(r'\{[\s\S]*\}', raw)
+        if m:
+            data = json.loads(m.group(0))
+            _dest_cache[keyword] = data
+            return data
+    except Exception:
+        pass
+    _dest_cache[keyword] = None
+    return None
 
 
 @router.post("/collect-report")
@@ -863,7 +910,29 @@ async def collect_report(
     from app.db_models import CollectedComment, CollectedUser
     from sqlalchemy.exc import IntegrityError
 
-    # 1. 保存评论（独立提交，用户去重失败不影响评论落库）
+    # 1. 解析目的地（设备端未传时服务端兜底，仅旅游行业任务触发）
+    _is_travel = False
+    has_dest = (request.comment.intended_province or request.comment.intended_city or request.comment.intended_attraction)
+    if not has_dest and request.keyword and request.task_id:
+        from app.db_models import Task
+        task = db.query(Task).filter(Task.id == request.task_id).first()
+        if task and task.params:
+            tid = task.params.get("prompt_template_id")
+            if tid:
+                from app.db_models import PromptTemplate
+                pt = db.query(PromptTemplate).filter(PromptTemplate.id == tid).first()
+                _is_travel = pt and pt.industry == "travel"
+    if _is_travel and not has_dest and request.keyword:
+        dest = await _resolve_destination(request.keyword, db)
+        if dest:
+            if not request.comment.intended_province:
+                request.comment.intended_province = dest.get("province")
+            if not request.comment.intended_city:
+                request.comment.intended_city = dest.get("city")
+            if not request.comment.intended_attraction:
+                request.comment.intended_attraction = dest.get("attraction")
+
+    # 2. 保存评论（独立提交，用户去重失败不影响评论落库）
     comment = CollectedComment(
         task_id=request.task_id,
         device_id=device_id,
@@ -876,17 +945,42 @@ async def collect_report(
         dislike_count=request.comment.dislike_count,
         location=request.comment.location,
         is_author=request.comment.is_author,
+        data_source_type=request.data_source_type,
+        intended_province=request.comment.intended_province or None,
+        intended_city=request.comment.intended_city or None,
+        intended_attraction=request.comment.intended_attraction or None,
     )
     db.add(comment)
     db.commit()  # 评论独立提交
 
-    # 2. 保存用户（独立事务，失败不影响已提交的评论）
+    # 2. 保存用户（存在则更新，不存在则新建）
     user_new = False
     if request.user and request.user.douyin_id:
         existing = db.query(CollectedUser).filter(
             CollectedUser.douyin_id == request.user.douyin_id
         ).first()
-        if not existing:
+        if existing:
+            existing.nickname = request.user.nickname
+            existing.likes_count = request.user.likes_count
+            existing.follow_count = request.user.follow_count
+            existing.fans_count = request.user.fans_count
+            existing.works_count = request.user.works_count
+            existing.gender = request.user.gender
+            existing.age = request.user.age
+            existing.ip_location = request.user.ip_location
+            existing.is_private = request.user.is_private
+            existing.data_source_type = request.data_source_type
+            existing.keyword = request.keyword
+            existing.task_id = request.task_id
+            existing.device_id = device_id
+            if request.comment.intended_province:
+                existing.intended_province = request.comment.intended_province
+            if request.comment.intended_city:
+                existing.intended_city = request.comment.intended_city
+            if request.comment.intended_attraction:
+                existing.intended_attraction = request.comment.intended_attraction
+            db.commit()
+        else:
             db.add(CollectedUser(
                 task_id=request.task_id,
                 device_id=device_id,
@@ -901,13 +995,34 @@ async def collect_report(
                 age=request.user.age,
                 ip_location=request.user.ip_location,
                 is_private=request.user.is_private,
+                data_source_type=request.data_source_type,
+                intended_province=request.comment.intended_province or None,
+                intended_city=request.comment.intended_city or None,
+                intended_attraction=request.comment.intended_attraction or None,
             ))
             try:
                 db.commit()
                 user_new = True
             except IntegrityError:
                 db.rollback()
-                user_new = False
+                existing2 = db.query(CollectedUser).filter(
+                    CollectedUser.douyin_id == request.user.douyin_id
+                ).first()
+                if existing2:
+                    existing2.nickname = request.user.nickname
+                    existing2.likes_count = request.user.likes_count
+                    existing2.follow_count = request.user.follow_count
+                    existing2.fans_count = request.user.fans_count
+                    existing2.works_count = request.user.works_count
+                    existing2.gender = request.user.gender
+                    existing2.age = request.user.age
+                    existing2.ip_location = request.user.ip_location
+                    existing2.is_private = request.user.is_private
+                    existing2.data_source_type = request.data_source_type
+                    existing2.keyword = request.keyword
+                    existing2.task_id = request.task_id
+                    existing2.device_id = device_id
+                    db.commit()
 
     # WS 实时推送
     await pair_ws_manager.broadcast_to_admins({"event": "data_changed", "type": "comment", "id": comment.id})
@@ -1026,6 +1141,9 @@ class CommentAIReplyRequest(BaseModel):
     text: str
     ai_reply: str
     task_id: str | None = None
+    intended_province: str | None = None
+    intended_city: str | None = None
+    intended_attraction: str | None = None
 
 
 @router.post("/comment-ai-reply")
@@ -1047,6 +1165,12 @@ def save_comment_ai_reply(
     if comment:
         comment.ai_reply = request.ai_reply
         comment.ai_replied_at = bj_now()
+        if request.intended_province is not None:
+            comment.intended_province = request.intended_province
+        if request.intended_city is not None:
+            comment.intended_city = request.intended_city
+        if request.intended_attraction is not None:
+            comment.intended_attraction = request.intended_attraction
         db.commit()
         return {"updated": True}
     return {"updated": False}
@@ -1065,6 +1189,9 @@ class UserProfileRequest(BaseModel):
     is_private: str = ""
     keyword: str = ""
     task_id: str = ""
+    intended_province: str | None = None
+    intended_city: str | None = None
+    intended_attraction: str | None = None
 
 
 @router.post("/user-profile")
@@ -1092,6 +1219,11 @@ def save_user_profile(
             if getattr(existing, field, None) != val:
                 setattr(existing, field, val)
                 changed = True
+        for field in ("intended_province", "intended_city", "intended_attraction"):
+            val = getattr(request, field, None)
+            if val and getattr(existing, field, None) != val:
+                setattr(existing, field, val)
+                changed = True
         if changed:
             db.commit()
         return {"saved": True, "updated": changed, "user_id": existing.id}
@@ -1111,6 +1243,9 @@ def save_user_profile(
             ip_location=request.ip_location or "",
             is_private=request.is_private or "",
             device_id=authed_device_id,
+            intended_province=request.intended_province or None,
+            intended_city=request.intended_city or None,
+            intended_attraction=request.intended_attraction or None,
         )
         db.add(user)
         db.commit()

@@ -178,7 +178,7 @@
               <label class="text-xs text-slate-400 block mb-1">设备</label>
               <select v-model="editDialog.assigned_device_id" class="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white text-sm">
                 <option value="">不变更</option>
-                <option v-for="d in devices" :key="d.id" :value="d.id">{{ d.name }}</option>
+                <option v-for="d in editableDevices" :key="d.id" :value="d.id">{{ d.name }}</option>
               </select>
             </div>
           </div>
@@ -193,7 +193,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { getChannel, editChannelMeta, editChannelItem, batchEditItems } from '../api/channels.js'
 import { listAccounts } from '../api/accounts.js'
 import { listDevices } from '../api/devices.js'
@@ -249,6 +249,25 @@ const groupMemberIds = ref(new Set())
 const editableAccounts = computed(() => {
   if (groupMemberIds.value.size === 0) return accounts.value
   return accounts.value.filter(a => groupMemberIds.value.has(a.id))
+})
+
+// Watch group selector changes → re-fetch members
+watch(() => channelForm.value.group_id, async (gid) => {
+  if (!gid || !editingChannel.value) return
+  try {
+    const resp = await listMembers(gid)
+    const members = resp.data.members || []
+    groupMemberIds.value = new Set(members.map(m => m.id))
+  } catch (e) {
+    console.error('Failed to load members for group:', gid, e)
+  }
+})
+
+// Device filtering by bound account
+const editableDevices = computed(() => {
+  const aid = editDialog.value.account_id
+  if (!aid) return devices.value
+  return devices.value.filter(d => !d.bound_account_id || d.bound_account_id === aid)
 })
 
 function isItemEditable(item) {

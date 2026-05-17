@@ -57,11 +57,6 @@ SearchCollectHandler._interactWithVideo = function (content, stats, params) {
   var reopenFailed = false;
 
   while (true) {
-    if (uiOperator.findElement("is_comment_end", 500)) {
-      logger.info(TAG, "[耗时] 评论已到底(is_comment_end), 停止 (第 " + scroll + " 次滚动)");
-      break;
-    }
-
     if (consecutiveEmpty >= 5) {
       logger.info(TAG, "[耗时] 连续 " + consecutiveEmpty + " 轮无有效评论, 停止");
       break;
@@ -182,6 +177,11 @@ SearchCollectHandler._interactWithVideo = function (content, stats, params) {
     scroll++;
     uiOperator.swipeUp();
     sleep(500);
+
+    if (uiOperator.findElement("is_comment_end", 500)) {
+      logger.info(TAG, "[耗时] 评论已到底(is_comment_end), 停止 (第 " + scroll + " 次滚动)");
+      break;
+    }
   }
 
   logger.info(TAG, "[耗时] 视频采集完成: " + collected + " 条 (总耗时 " + (Date.now() - t0) + "ms)");

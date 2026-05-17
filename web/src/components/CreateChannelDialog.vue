@@ -75,33 +75,30 @@
             <input
               v-model.number="formParams.count"
               type="number"
-              min="1"
-              max="50"
+              min="-1"
               class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
             />
           </div>
           <div v-if="['reply_comment', 'search_comment', 'collect'].includes(form.task_type)">
-            <label class="block text-sm font-medium text-slate-300 mb-1">处理视频数</label>
+            <label class="block text-sm font-medium text-slate-300 mb-1">处理视频数 <span class="text-slate-500 text-xs">-1=全量</span></label>
             <input
               v-model.number="formParams.video_count"
               type="number"
-              min="1"
-              max="30"
+              min="-1"
               class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
             />
           </div>
         </div>
 
-        <!-- Reply comment specific -->
-        <template v-if="form.task_type === 'reply_comment'">
+        <!-- 评论最大天数（reply_comment / search_comment / collect 共用） -->
+        <template v-if="['reply_comment', 'search_comment', 'collect'].includes(form.task_type)">
           <div class="grid grid-cols-2 gap-3 mb-4">
             <div>
-              <label class="block text-sm font-medium text-slate-300 mb-1">评论最大天数</label>
+              <label class="block text-sm font-medium text-slate-300 mb-1">评论最大天数 <span class="text-slate-500 text-xs">-1=不限</span></label>
               <input
                 v-model.number="formParams.max_age_days"
                 type="number"
-                min="1"
-                max="30"
+                min="-1"
                 class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
               />
             </div>
@@ -259,7 +256,7 @@ async function submit() {
   if (['reply_comment', 'search_comment', 'collect'].includes(form.value.task_type)) {
     merged.video_count = params.video_count !== undefined ? params.video_count : fp.video_count
   }
-  if (form.value.task_type === 'reply_comment') {
+  if (['reply_comment', 'search_comment', 'collect'].includes(form.value.task_type)) {
     merged.max_age_days = params.max_age_days !== undefined ? params.max_age_days : fp.max_age_days
     if (fp.sort_by) merged.sort_by = params.sort_by || fp.sort_by
   }

@@ -28,6 +28,7 @@ const selectedTemplateId = ref('')
 const selectedPromptTemplateId = ref('')
 const keywordExpandCount = ref(8)
 const keywordGenerating = ref(false)
+const shareLinksText = ref('')  // 分享链接输入（collect 类型专用）
 
 const form = reactive({ ...NURTURE_DEFAULT_FORM })
 
@@ -91,6 +92,9 @@ function buildParams() {
   }
 
   const params = { keyword: form.keyword, count: form.count }
+  if (form.type === 'collect' && shareLinksText.value.trim()) {
+    params.share_links = (shareLinksText.value.match(/https?:\/\/v\.douyin\.com\/[A-Za-z0-9_?=&%]+\/?/g) || [])
+  }
   if (form.sort_by) params.sort_by = form.sort_by
 
   if (['search_comment', 'search_dm', 'reply_comment', 'collect'].includes(form.type)) {
@@ -114,7 +118,7 @@ async function handleCreate() {
   if (!form.type) { createError.value = '请选择任务类型'; return }
   if (selectionMode.value === 'single' && !form.account_id) { createError.value = '请选择账号'; return }
   if (selectionMode.value === 'group' && selectedGroupIds.value.length === 0) { createError.value = '请至少选择一个分组'; return }
-  if (isSearchType.value && !form.keyword) { createError.value = '请输入搜索关键词'; return }
+  if (isSearchType.value && !form.keyword && !shareLinksText.value.trim()) { createError.value = '请输入搜索关键词或分享链接'; return }
 
   creating.value = true
   createError.value = null
@@ -349,6 +353,12 @@ watch(() => props.open, (val) => {
                     </div>
                   </div>
 
+                  <!-- 分享链接（collect 专用） -->
+                  <div v-if="form.type === 'collect'">
+                    <label class="block text-sm font-medium text-slate-300">分享链接 <TipIcon text="粘贴抖音分享链接，每行一个。通过链接直接打开视频进行数据采集，无需关键词搜索" width="w-72" /></label>
+                    <textarea v-model="shareLinksText" rows="3" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 placeholder-slate-500" placeholder="直接粘贴抖音分享口令，自动提取链接"></textarea>
+                  </div>
+
                   <div>
                     <label class="block text-sm font-medium text-slate-300">排序方式 <TipIcon text="控制搜索结果排序，影响目标视频选择优先级" /></label>
                     <select v-model="form.sort_by" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200">
@@ -359,21 +369,21 @@ watch(() => props.open, (val) => {
                   </div>
 
                   <div>
-                    <label class="block text-sm font-medium text-slate-300">{{ form.type === 'reply_comment' ? '每视频评论数' : form.type === 'collect' ? '每视频采集数' : form.type === 'search_like' ? '点赞数' : '处理数量' }} <TipIcon :text="form.type === 'search_like' ? '要处理的点赞总数' : '每个视频中要处理的数量'" /></label>
-                    <input v-model.number="form.count" type="number" min="1" :max="50" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200" />
+                    <label class="block text-sm font-medium text-slate-300">{{ form.type === 'reply_comment' ? '每视频评论数' : form.type === 'collect' ? '每视频采集数' : form.type === 'search_like' ? '点赞数' : '处理数量' }} <TipIcon text="每个视频中要处理的数量，-1=全量" /></label>
+                    <input v-model.number="form.count" type="number" min="-1" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200" />
                   </div>
 
                   <!-- 视频数（reply_comment / search_comment / collect 共用） -->
                   <div v-if="['reply_comment', 'search_comment', 'collect'].includes(form.type)">
-                    <label class="block text-sm font-medium text-slate-300">处理视频数 <TipIcon text="每个关键词要处理的视频数量" /></label>
-                    <input v-model.number="form.video_count" type="number" min="1" max="50" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200" />
+                    <label class="block text-sm font-medium text-slate-300">处理视频数 <TipIcon text="每个关键词要处理的视频数量，-1=全量" /></label>
+                    <input v-model.number="form.video_count" type="number" min="-1" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200" />
                   </div>
                 </template>
 
-                <!-- 评论最大天数（reply_comment / collect 共用） -->
-                <div v-if="['reply_comment', 'collect'].includes(form.type)">
-                  <label class="block text-sm font-medium text-slate-300">评论最大天数 <TipIcon text="只处理在此天数内发布的评论，超过的将被忽略" /></label>
-                  <input v-model.number="form.max_age_days" type="number" min="1" max="90" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200" />
+                <!-- 评论最大天数（reply_comment / search_comment / collect 共用） -->
+                <div v-if="['reply_comment', 'search_comment', 'collect'].includes(form.type)">
+                  <label class="block text-sm font-medium text-slate-300">评论最大天数 <TipIcon text="只处理在此天数内发布的评论，-1=不限天数" /></label>
+                  <input v-model.number="form.max_age_days" type="number" min="-1" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200" />
                 </div>
 
                 <!-- Content template + text -->

@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import { listItems } from '../../api/referenceData.js'
+import { getModelOptions } from '../../api/aiConfig.js'
 
 const props = defineProps({
   modelValue: { type: Object, required: true },
@@ -13,15 +13,15 @@ function setLayer(layer, value) {
 }
 
 const layers = [
-  { key: 'scriptLLM', label: '脚本生成', category: 'llm_script_models', color: 'sky',
+  { key: 'scriptLLM', label: '脚本生成', modelType: 'llm', color: 'sky',
     icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
-  { key: 'imageModel', label: '画面生成', category: 'image_models', color: 'emerald',
+  { key: 'imageModel', label: '画面生成', modelType: 'image', color: 'emerald',
     icon: 'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z' },
-  { key: 'videoModel', label: '视频渲染', category: 'video_models', color: 'purple',
+  { key: 'videoModel', label: '视频渲染', modelType: 'video', color: 'purple',
     icon: 'M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
-  { key: 'ttsModel', label: '语音合成', category: 'tts_models', color: 'amber',
+  { key: 'ttsModel', label: '语音合成', modelType: 'tts', color: 'amber',
     icon: 'M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z' },
-  { key: 'auditModel', label: '质量审计', category: 'audit_models', color: 'rose',
+  { key: 'auditModel', label: '质量审计', modelType: 'audit', color: 'rose',
     icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' },
 ]
 
@@ -39,11 +39,11 @@ const loading = ref(true)
 onMounted(async () => {
   try {
     const results = await Promise.all(
-      layers.map(l => listItems(l.category).catch(() => ({ data: { ok: false, items: [] } })))
+      layers.map(l => getModelOptions(l.modelType).catch(() => ({ data: { ok: false, options: [] } })))
     )
     layers.forEach((l, i) => {
       const data = results[i].data
-      modelOptions.value[l.key] = data.ok ? data.items : []
+      modelOptions.value[l.key] = data.ok ? data.options : []
     })
   } finally {
     loading.value = false
@@ -79,11 +79,11 @@ onMounted(async () => {
           class="layer-select w-full rounded-lg px-2.5 py-2 text-xs bg-gray-800/80 border border-gray-600 text-slate-100 cursor-pointer focus:outline-none focus:ring-2 transition appearance-none"
           :class="`focus:ring-${layer.color}-500/50`"
         >
-          <option v-for="opt in (modelOptions[layer.key] || [])" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+          <option v-for="opt in (modelOptions[layer.key] || [])" :key="opt.id" :value="opt.id">{{ opt.name }}</option>
         </select>
 
         <p class="text-[10px] text-slate-500 mt-1 leading-tight truncate">
-          {{ ((modelOptions[layer.key] || []).find(o => o.value === modelValue[layer.key]) || {}).description || '' }}
+          {{ ((modelOptions[layer.key] || []).find(o => o.id === modelValue[layer.key]) || {}).provider || '' }}
         </p>
       </div>
     </div>

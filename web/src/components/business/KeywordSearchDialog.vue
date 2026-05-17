@@ -37,6 +37,7 @@ const keywordMaxAgeDays = ref(5)
 const keywordGenerateCount = ref(10)
 const keywordProcessingCount = ref(5)
 const keywordVideoCount = ref(3)
+const keywordShareLinks = ref('')  // 分享链接（collect 类型专用）
 const creating = ref(false)
 
 function resetForm() {
@@ -97,12 +98,15 @@ async function handleBatchCreateKeywordTasks() {
 
     const params = { keyword: kwList[0] || '', keywords: kwList, count: keywordProcessingCount.value }
     if (keywordSortBy.value) params.sort_by = keywordSortBy.value
-    if (keywordMaxAgeDays.value) params.max_age_days = keywordMaxAgeDays.value
+    params.max_age_days = keywordMaxAgeDays.value || 30
     if (keywordTemplateId.value) { params.content_template_id = keywordTemplateId.value }
     else if (keywordContent.value) { params.content = keywordContent.value }
     if (keywordPromptTemplateId.value) params.prompt_template_id = keywordPromptTemplateId.value
     if (['reply_comment', 'search_comment', 'collect'].includes(keywordActionType.value)) {
       params.video_count = keywordVideoCount.value
+    }
+    if (keywordActionType.value === 'collect' && keywordShareLinks.value.trim()) {
+      params.share_links = (keywordShareLinks.value.match(/https?:\/\/v\.douyin\.com\/[A-Za-z0-9_?=&%]+\/?/g) || [])
     }
 
     const payload = {
@@ -173,6 +177,12 @@ async function handleBatchCreateKeywordTasks() {
                   </div>
                 </div>
 
+                <!-- 分享链接（collect 专用） -->
+                <div v-if="keywordActionType === 'collect'">
+                  <label class="block text-sm font-medium text-slate-300 mb-1">分享链接 <TipIcon text="粘贴抖音分享链接，每行一个。通过链接直接打开视频采集，无需关键词" width="w-72" /></label>
+                  <textarea v-model="keywordShareLinks" rows="3" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 placeholder-slate-500" placeholder="直接粘贴抖音分享口令，自动提取链接"></textarea>
+                </div>
+
                 <!-- Action type + count + video_count -->
                 <div class="grid grid-cols-3 gap-3">
                   <div>
@@ -182,12 +192,12 @@ async function handleBatchCreateKeywordTasks() {
                     </select>
                   </div>
                   <div v-if="['reply_comment', 'search_comment', 'collect'].includes(keywordActionType)">
-                    <label class="block text-sm font-medium text-slate-300">处理视频数 <TipIcon text="每个关键词要处理的视频数量" /></label>
-                    <input v-model.number="keywordVideoCount" type="number" min="1" max="30" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200" />
+                    <label class="block text-sm font-medium text-slate-300">处理视频数 <TipIcon text="每个关键词要处理的视频数量，-1=全量" /></label>
+                    <input v-model.number="keywordVideoCount" type="number" min="-1" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200" />
                   </div>
                   <div>
-                    <label class="block text-sm font-medium text-slate-300">每视频评论数 <TipIcon text="每个视频要处理的评论数量" /></label>
-                    <input v-model.number="keywordProcessingCount" type="number" min="1" max="50" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200" />
+                    <label class="block text-sm font-medium text-slate-300">每视频评论数 <TipIcon text="每个视频要处理的评论数量，-1=全量" /></label>
+                    <input v-model.number="keywordProcessingCount" type="number" min="-1" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200" />
                   </div>
                 </div>
 
@@ -227,9 +237,9 @@ async function handleBatchCreateKeywordTasks() {
                   </select>
                 </div>
 
-                <div v-if="['search_comment', 'reply_comment'].includes(keywordActionType)">
-                  <label class="block text-sm font-medium text-slate-300">评论最大天数 <TipIcon text="只回复在此天数内发布的评论，超过的将被忽略" /></label>
-                  <input v-model.number="keywordMaxAgeDays" type="number" min="1" max="30" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200" />
+                <div v-if="['search_comment', 'reply_comment', 'collect'].includes(keywordActionType)">
+                  <label class="block text-sm font-medium text-slate-300">评论最大天数 <TipIcon text="只处理在此天数内发布的评论，-1=不限天数" /></label>
+                  <input v-model.number="keywordMaxAgeDays" type="number" min="-1" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200" />
                 </div>
 
                 <template v-if="['search_comment', 'search_dm', 'reply_comment'].includes(keywordActionType)">

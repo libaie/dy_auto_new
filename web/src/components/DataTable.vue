@@ -68,7 +68,7 @@ const goToPage = (p) => {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="(row, rowIndex) in data" :key="rowIndex">
+            <tr v-for="(row, rowIndex) in data" :key="rowIndex" class="hover:bg-white/[0.03] transition-colors">
               <td
                 v-for="col in columns"
                 :key="col.key"
@@ -96,14 +96,14 @@ const goToPage = (p) => {
         <div class="flex gap-1">
           <button
             :disabled="page <= 1"
-            class="rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-sm text-slate-300 hover:bg-white/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+            class="rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-sm text-slate-300 hover:bg-white/10 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
             @click="goToPage(page - 1)"
           >
             上一页
           </button>
           <button
             :disabled="page >= totalPages()"
-            class="rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-sm text-slate-300 hover:bg-white/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+            class="rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-sm text-slate-300 hover:bg-white/10 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
             @click="goToPage(page + 1)"
           >
             下一页

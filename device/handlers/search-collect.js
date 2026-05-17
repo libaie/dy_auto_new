@@ -29,22 +29,10 @@ SearchCollectHandler._interactWithVideo = function (content, stats, params) {
 
   // 预检评论数：零评论视频点评论按钮会直接唤起键盘，提前跳过
   var commentBtn = uiOperator.findElement("video_comment_btn", 2000);
-  var commentCount = -1;
-  if (commentBtn && !commentBtn.isImage && !commentBtn.isCoordinate) {
-    try {
-      var rawDesc = commentBtn.desc() || "";
-      logger.info(TAG, "[耗时] 评论按钮 desc: '" + rawDesc + "'");
-      var numMatch = rawDesc.match(/(\d+)/);
-      if (numMatch) {
-        commentCount = parseInt(numMatch[1]);
-      } else if (rawDesc.length > 0) {
-        // desc 有文本但无数字 → 零评论
-        commentCount = 0;
-      }
-    } catch (e) {}
-  }
-  logger.info(TAG, "[耗时] 评论数: " + (commentCount >= 0 ? commentCount : "未知"));
-  if (commentCount === 0) {
+  var cc = commentUtils.preCheckCommentCount(commentBtn);
+  logger.info(TAG, "[耗时] 评论按钮 desc: '" + cc.rawDesc + "'");
+  logger.info(TAG, "[耗时] 评论数: " + (cc.count >= 0 ? cc.count : "未知"));
+  if (cc.count === 0) {
     logger.info(TAG, "[耗时] 该视频无评论，跳过 (耗时 " + (Date.now() - t0) + "ms)");
     return false;
   }

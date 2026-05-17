@@ -103,14 +103,9 @@ ReplyCommentHandler.execute = function (params) {
       logger.warn(TAG, "未进入视频详情页，跳过");
       continue;
     }
-    try {
-      if (!commentBtn.isImage && !commentBtn.isCoordinate) {
-        var rawDesc = commentBtn.desc() || "";
-        logger.info(TAG, "视频 " + (v + 1) + " 评论按钮 desc: '" + rawDesc + "'");
-        var numMatch = rawDesc.match(/(\d+)/);
-        if (numMatch) commentCount = parseInt(numMatch[1]);
-      }
-    } catch (e) { /* ignore */ }
+    var cc = commentUtils.preCheckCommentCount(commentBtn);
+    commentCount = cc.count > 0 ? cc.count : 0;
+    logger.info(TAG, "视频 " + (v + 1) + " 评论按钮 desc: '" + cc.rawDesc + "'");
     logger.info(TAG, "视频 " + (v + 1) + " 评论数: " + (commentCount || "未知"));
 
     if (commentCount === 0) {

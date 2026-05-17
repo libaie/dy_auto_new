@@ -3,6 +3,7 @@ var BaseHandler = require("./base-handler");
 var uiOperator = require("../core/ui-operator");
 var antiDetect = require("../core/anti-detect");
 var aiAnalyzer = require("../core/ai-analyzer");
+var commentUtils = require("./comment-utils");
 var logger = require("../utils/logger");
 var flowContext = require("../core/flow-context");
 var taskExecutor = require("../core/task-executor");
@@ -419,21 +420,10 @@ NurtureHandler._commentOnVideo = function (templateId) {
 
   // 预检评论数：零评论视频点评论按钮会直接唤起键盘，跳过
   var commentBtn = uiOperator.findElement("video_comment_btn", 2000);
-  var commentCount = -1;
-  if (commentBtn && !commentBtn.isImage && !commentBtn.isCoordinate) {
-    try {
-      var rawDesc = commentBtn.desc() || "";
-      logger.info(TAG, "评论按钮 desc: '" + rawDesc + "'");
-      var cmNumMatch = rawDesc.match(/(\d+)/);
-      if (cmNumMatch) {
-        commentCount = parseInt(cmNumMatch[1]);
-      } else if (rawDesc.length > 0) {
-        commentCount = 0;
-      }
-    } catch (e) {}
-  }
-  logger.info(TAG, "评论数: " + (commentCount >= 0 ? commentCount : "未知"));
-  if (commentCount === 0) {
+  var cc = commentUtils.preCheckCommentCount(commentBtn);
+  logger.info(TAG, "评论按钮 desc: '" + cc.rawDesc + "'");
+  logger.info(TAG, "评论数: " + (cc.count >= 0 ? cc.count : "未知"));
+  if (cc.count === 0) {
     logger.info(TAG, "该视频无评论，跳过评论");
     return;
   }

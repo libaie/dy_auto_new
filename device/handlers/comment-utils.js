@@ -53,6 +53,26 @@ var commentUtils = {
   },
 
   /**
+   * 预检评论数 — 从评论按钮 desc 解析数字，零评论提前跳过
+   * @param {UiObject} commentBtn
+   * @returns {{count: number, rawDesc: string}} count=-1 表示未知
+   */
+  preCheckCommentCount: function (commentBtn) {
+    var result = { count: -1, rawDesc: "" };
+    if (!commentBtn || commentBtn.isImage || commentBtn.isCoordinate) return result;
+    try {
+      result.rawDesc = commentBtn.desc() || "";
+      var numMatch = result.rawDesc.match(/(\d+)/);
+      if (numMatch) {
+        result.count = parseInt(numMatch[1]);
+      } else if (result.rawDesc.length > 0) {
+        result.count = 0;
+      }
+    } catch (e) {}
+    return result;
+  },
+
+  /**
    * 解析单条评论
    * @param {UiObject} item - 评论项元素
    * @param {Object} [handler] - 可选，BaseHandler 实例

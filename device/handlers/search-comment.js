@@ -1,6 +1,8 @@
 // device/handlers/search-comment.js
 var SearchBaseHandler = require("./search-base");
 var aiAnalyzer = require("../core/ai-analyzer");
+var uiOperator = require("../core/ui-operator");
+var commentUtils = require("./comment-utils");
 var logger = require("../utils/logger");
 
 var TAG = "搜索评论";
@@ -47,21 +49,10 @@ SearchCommentHandler._interactWithVideo = function (content, stats) {
   }
 
   // 预检评论数：零评论视频点评论按钮会直接唤起键盘，跳过
-  var commentCount = -1;
-  if (!commentBtn.isImage && !commentBtn.isCoordinate) {
-    try {
-      var rawDesc = commentBtn.desc() || "";
-      logger.info(TAG, "评论按钮 desc: '" + rawDesc + "'");
-      var numMatch = rawDesc.match(/(\d+)/);
-      if (numMatch) {
-        commentCount = parseInt(numMatch[1]);
-      } else if (rawDesc.length > 0) {
-        commentCount = 0;
-      }
-    } catch (e) {}
-  }
-  logger.info(TAG, "评论数: " + (commentCount >= 0 ? commentCount : "未知"));
-  if (commentCount === 0) {
+  var cc = commentUtils.preCheckCommentCount(commentBtn);
+  logger.info(TAG, "评论按钮 desc: '" + cc.rawDesc + "'");
+  logger.info(TAG, "评论数: " + (cc.count >= 0 ? cc.count : "未知"));
+  if (cc.count === 0) {
     logger.info(TAG, "该视频无评论，跳过");
     return false;
   }

@@ -37,10 +37,11 @@ var commentUtils = {
       if (retry < 2) sleep(1000 * Math.pow(2, retry));  // 2s, 4s
     }
 
-    // 3. 兜底：点 comment_input
-    var inputBtn = uiOperator.findElement("comment_input", 2000);
-    if (inputBtn) {
-      uiOperator.clickElement(inputBtn);
+    // 3. 兜底：back() 关闭可能误触的弹窗后重试 comment_btn
+    back(); sleep(800);
+    commentBtn = uiOperator.findElement("video_comment_btn", 2000);
+    if (commentBtn) {
+      uiOperator.clickElement(commentBtn);
       sleep(1500);
       items = uiOperator.findElements("comment_list", 1000);
       if (items && items.length > 0) return true;

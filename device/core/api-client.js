@@ -288,6 +288,15 @@ var apiClient = {
     return this._downloadWithRetry(url);
   },
 
+  _pushToOfflineQueue: function (path, body, label) {
+    if (offlineQueue.length >= netConfig.offlineQueueMax) {
+      logger.warn(TAG, "离线队列已满，丢弃最旧项");
+      offlineQueue.shift();
+    }
+    logger.info(TAG, label + "加入离线队列");
+    offlineQueue.push({ path: path, body: body, retries: 0 });
+  },
+
   report: function (taskId, status, result, uiSnapshot) {
     var body = {
       task_id: taskId,
@@ -296,27 +305,13 @@ var apiClient = {
       ui_snapshot: uiSnapshot || null,
     };
     var response = this.post("/api/device/report", body);
-    if (!response && !isOnline) {
-      if (offlineQueue.length >= netConfig.offlineQueueMax) {
-        logger.warn(TAG, "离线队列已满，丢弃最旧项");
-        offlineQueue.shift();
-      }
-      logger.info(TAG, "任务结果加入离线队列: " + taskId);
-      offlineQueue.push({ path: "/api/device/report", body: body, retries: 0 });
-    }
+    if (!response && !isOnline) this._pushToOfflineQueue("/api/device/report", body, "任务结果");
     return response;
   },
 
   collectReport: function (payload) {
     var response = this.post("/api/device/collect-report", payload);
-    if (!response && !isOnline) {
-      if (offlineQueue.length >= netConfig.offlineQueueMax) {
-        logger.warn(TAG, "离线队列已满，丢弃最旧项");
-        offlineQueue.shift();
-      }
-      logger.info(TAG, "采集数据加入离线队列");
-      offlineQueue.push({ path: "/api/device/collect-report", body: payload, retries: 0 });
-    }
+    if (!response && !isOnline) this._pushToOfflineQueue("/api/device/collect-report", payload, "采集数据");
     return response;
   },
 

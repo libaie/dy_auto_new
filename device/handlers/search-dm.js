@@ -1,6 +1,7 @@
 // device/handlers/search-dm.js
 var SearchBaseHandler = require("./search-base");
 var aiAnalyzer = require("../core/ai-analyzer");
+var apiClient = require("../core/api-client");
 var logger = require("../utils/logger");
 
 var TAG = "搜索私信";
@@ -44,6 +45,7 @@ SearchDMHandler._interactWithVideo = function (content, stats) {
 
   // 3. 发送消息序列
   this._sendMessageSequence(messages, stats, params.keyword);
+  try { apiClient.incrementStats(params.account_id, "search_dm", 1); } catch (e) {}
   return true;
 };
 

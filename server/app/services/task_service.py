@@ -125,9 +125,14 @@ class TaskService:
             ~DBTask.device_id.in_(online_device_ids),  # skip tasks on online devices
         ).all()
         for stale in stale_running:
-            stale.status = TaskStatus.PENDING.value
-            stale.device_id = None
-            stale.started_at = None
+            stale.retry_count += 1
+            if stale.retry_count >= MAX_RETRIES:
+                stale.status = TaskStatus.FAILED.value
+                stale.completed_at = bj_now()
+            else:
+                stale.status = TaskStatus.PENDING.value
+                stale.device_id = None
+                stale.started_at = None
         if stale_running:
             # Reset associated channel items so keywords can be re-dispatched
             from app.db_models import ChannelItem
@@ -221,15 +226,8 @@ class TaskService:
             db_task.status = TaskStatus.COMPLETED.value
             db_task.result = result
             db_task.completed_at = bj_now()
-            r = result or {}
-            success_count = r.get("success_count", 0)
-            stats_service.increment(db, db_task.account_id, db_task.type, count=success_count)
-            follow_count = r.get("follow_count", 0)
-            if follow_count > 0:
-                stats_service.increment(db, db_task.account_id, "follow", count=follow_count)
-            dm_count = r.get("dm_count", 0)
-            if dm_count > 0:
-                    stats_service.increment(db, db_task.account_id, "search_dm", count=dm_count)
+            # 统计由设备端增量上报 (POST /api/device/stats/increment)
+            # 每个子操作完成后实时上报，避免中途崩溃丢失数据 + 防止双重计数
         elif status == TaskStatus.FAILED:
             db_task.retry_count += 1
             if db_task.retry_count >= MAX_RETRIES:

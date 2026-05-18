@@ -15,9 +15,11 @@ var netConfig = config.network || {
 // 离线队列 — 网络失败时缓存待上报数据
 var offlineQueue = [];
 var isOnline = true;
+var _lastRequestWas4xx = false;  // 4xx = 客户端错误，不应重试
 
 var apiClient = {
   _onAuthFailure: null,
+  _lastRequestWas4xx: function () { return _lastRequestWas4xx; },
 
   /**
    * 设置认证失败回调（401 时触发）
@@ -148,6 +150,7 @@ var apiClient = {
         }
 
         if (response.statusCode >= 400 && response.statusCode < 500) {
+          _lastRequestWas4xx = true;
           var respBody = "";
           try { respBody = this._readBody(response); } catch (e2) {}
           logger.error(TAG, label + " 客户端错误: " + response.statusCode +
@@ -301,6 +304,7 @@ var apiClient = {
   },
 
   report: function (taskId, status, result, uiSnapshot) {
+    _lastRequestWas4xx = false;
     var body = {
       task_id: taskId,
       status: status,
@@ -308,7 +312,7 @@ var apiClient = {
       ui_snapshot: uiSnapshot || null,
     };
     var response = this.post("/api/device/report", body);
-    if (!response) {
+    if (!response && !_lastRequestWas4xx) {
       logger.warn(TAG, "任务结果上报失败(status=" + status + ")，加入离线队列重试");
       this._pushToOfflineQueue("/api/device/report", body, "任务结果");
     }
@@ -316,8 +320,9 @@ var apiClient = {
   },
 
   collectReport: function (payload) {
+    _lastRequestWas4xx = false;
     var response = this.post("/api/device/collect-report", payload);
-    if (!response) this._pushToOfflineQueue("/api/device/collect-report", payload, "采集数据");
+    if (!response && !_lastRequestWas4xx) this._pushToOfflineQueue("/api/device/collect-report", payload, "采集数据");
     return response;
   },
 
@@ -456,6 +461,22 @@ var apiClient = {
 
   uploadUserAvatar: function (douyinId, imageBase64) {
     return this.post("/api/device/user-avatar", { douyin_id: douyinId, image_base64: imageBase64 });
+  },
+
+  /**
+   * 增量统计上报——每完成一个子操作（回复/关注/私信）调用一次
+   * 保证任务中途崩溃时已完成操作的统计数据不丢失
+   * @param {string} accountId
+   * @param {string} taskType — "reply_comment" | "follow" | "search_dm" | ...
+   * @param {number} count — 操作次数，默认 1
+   */
+  incrementStats: function (accountId, taskType, count) {
+    var body = { account_id: accountId, task_type: taskType, count: count || 1 };
+    var resp = this.post("/api/device/stats/increment", body);
+    if (!resp) {
+      logger.debug(TAG, "增量统计上报失败: " + taskType + " x" + (count || 1));
+    }
+    return resp;
   },
 };
 

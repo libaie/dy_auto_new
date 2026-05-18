@@ -79,20 +79,13 @@ class StatsService:
             used = counts.get("nurture_likes", 0)
             return used < limit
 
-        # reply_comment 除 replies 外还需检查 follow/dm 配额
+        # reply_comment 不阻塞 follow/DM，handler 内部优雅降级
         if task_type == "reply_comment":
             col = _TASK_TYPE_TO_COLUMN.get(task_type)
             if col:
                 limit = limits.get(col, 999)
                 used = counts.get(col, 0)
-                if used >= limit:
-                    return False
-            follow_limit = limits.get("follows", 999)
-            if counts.get("follows", 0) >= follow_limit:
-                return False
-            dm_limit = limits.get("dms", 999)
-            if counts.get("dms", 0) >= dm_limit:
-                return False
+                return used < limit
             return True
 
         column = _TASK_TYPE_TO_COLUMN.get(task_type)

@@ -4,6 +4,7 @@ import { Dialog, DialogPanel, DialogTitle, TransitionRoot, TransitionChild } fro
 import TipIcon from '../TipIcon.vue'
 import { createTask, batchCreateTasks } from '../../api/tasks.js'
 import { generateKeywords } from '../../api/content.js'
+import { listDMSequences } from '../../api/dmSequences.js'
 import { useToastStore } from '../../stores/toast.js'
 import { TASK_TYPE_OPTIONS, SUB_TASK_TYPE_OPTIONS, NURTURE_DEFAULT_FORM } from '../../constants/tasks.js'
 
@@ -26,6 +27,8 @@ const selectionMode = ref('single')
 const selectedGroupIds = ref([])
 const selectedTemplateId = ref('')
 const selectedPromptTemplateId = ref('')
+const keywordDMSequenceId = ref('')
+const dmSequences = ref([])
 const keywordExpandCount = ref(8)
 const keywordGenerating = ref(false)
 const shareLinksText = ref('')  // 分享链接输入（collect 类型专用）
@@ -97,9 +100,12 @@ function buildParams() {
   }
   if (form.sort_by) params.sort_by = form.sort_by
 
-  if (['search_comment', 'search_dm', 'reply_comment', 'collect'].includes(form.type)) {
-    if (form.content) params.content = form.content
-    if (selectedTemplateId.value) params.content_template_id = selectedTemplateId.value
+  if (['search_dm', 'reply_comment'].includes(form.type) && keywordDMSequenceId.value) {
+    params.dm_sequence_id = keywordDMSequenceId.value
+  }
+  if (['search_comment', 'search_dm', 'reply_comment', 'collect'].includes(form.type) && !keywordDMSequenceId.value) {
+    if (selectedTemplateId.value) { params.content_template_id = selectedTemplateId.value }
+    else if (form.content) { params.content = form.content }
   }
 
   if (['search_comment', 'search_dm', 'reply_comment', 'nurture'].includes(form.type)) {
@@ -189,6 +195,8 @@ function openDialog() {
   Object.assign(form, NURTURE_DEFAULT_FORM)
   selectedTemplateId.value = ''
   selectedPromptTemplateId.value = ''
+  keywordDMSequenceId.value = ''
+  dmSequences.value = []
   selectionMode.value = 'single'
   selectedGroupIds.value = []
   createError.value = null
@@ -197,8 +205,11 @@ function openDialog() {
   nurtureKeywordExpandCount.value = 8
 }
 
-watch(() => props.open, (val) => {
-  if (val) openDialog()
+watch(() => props.open, async (val) => {
+  if (val) {
+    openDialog()
+    try { const res = await listDMSequences(); dmSequences.value = res.data.sequences || [] } catch (e) {}
+  }
 })
 </script>
 
@@ -386,16 +397,23 @@ watch(() => props.open, (val) => {
                   <input v-model.number="form.max_age_days" type="number" min="-1" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200" />
                 </div>
 
-                <!-- Content template + text -->
+                <!-- Content template + DM sequence + text -->
                 <template v-if="['search_comment', 'search_dm', 'reply_comment', 'collect'].includes(form.type)">
-                  <div v-if="filteredTemplates.length > 0">
+                  <div v-if="dmSequences.length > 0 && ['search_dm', 'reply_comment'].includes(form.type)">
+                    <label class="block text-sm font-medium text-slate-300">DM 序列模板</label>
+                    <select v-model="keywordDMSequenceId" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200">
+                      <option value="">不使用序列</option>
+                      <option v-for="seq in dmSequences" :key="seq.id" :value="seq.id">{{ seq.name }} ({{ seq.message_count }}条)</option>
+                    </select>
+                  </div>
+                  <div v-if="!keywordDMSequenceId && filteredTemplates.length > 0">
                     <label class="block text-sm font-medium text-slate-300">内容模板 <TipIcon text="选择预设的评论/私信模板，模板中的变量会自动替换为实际值" /></label>
                     <select v-model="selectedTemplateId" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200">
                       <option value="">不使用模板</option>
                       <option v-for="tpl in filteredTemplates" :key="tpl.id" :value="tpl.id">{{ tpl.name }} ({{ tpl.category }})</option>
                     </select>
                   </div>
-                  <div>
+                  <div v-if="!keywordDMSequenceId">
                     <label class="block text-sm font-medium text-slate-300">{{ form.type === 'search_dm' ? '私信内容' : '评论/私信内容' }} <TipIcon text="发送的内容文本。支持 {keyword}、{username}、{video_title} 变量。留空则使用模板或 AI 生成" width="w-80" /></label>
                     <textarea v-model="form.content" rows="3" maxlength="500" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 placeholder-slate-500" :placeholder="form.type === 'reply_comment' ? '留空则使用 AI 生成招呼语' : '输入内容...'" />
                   </div>

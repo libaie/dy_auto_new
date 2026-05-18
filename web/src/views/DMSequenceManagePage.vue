@@ -180,7 +180,7 @@ onMounted(fetchData)
                   <button @click="moveDown(idx)" :disabled="idx >= form.messages.length - 1" class="hover:text-white disabled:opacity-30 disabled:cursor-default cursor-pointer">&#9660;</button>
                 </div>
                 <div class="flex-1">
-                  <textarea v-model="msg.content" rows="2" maxlength="500" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-sky-500" placeholder="私信内容，支持 {{keyword}} 变量" /></textarea>
+                  <textarea v-model="msg.content" rows="2" maxlength="500" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-sky-500" placeholder="私信内容，支持 {{keyword}} 变量"></textarea>
                 </div>
                 <div class="flex flex-col gap-1 items-end">
                   <input v-model.number="msg.delay_ms" type="number" min="0" max="60000" step="500" class="w-20 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-white text-xs text-center focus:outline-none focus:border-sky-500" title="本条发送后额外等待（毫秒）" />

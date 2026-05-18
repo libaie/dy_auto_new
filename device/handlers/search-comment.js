@@ -3,6 +3,7 @@ var SearchBaseHandler = require("./search-base");
 var aiAnalyzer = require("../core/ai-analyzer");
 var uiOperator = require("../core/ui-operator");
 var commentUtils = require("./comment-utils");
+var apiClient = require("../core/api-client");
 var logger = require("../utils/logger");
 
 var TAG = "搜索评论";
@@ -94,6 +95,7 @@ SearchCommentHandler._interactWithVideo = function (content, stats) {
 
   logger.info(TAG, "评论成功: '" + content.substring(0, 20) + "'");
   stats.details.push("commented: " + content.substring(0, 30));
+  try { apiClient.incrementStats((this._params || {}).account_id, "search_comment", 1); } catch (e) {}
   return true;
 };
 

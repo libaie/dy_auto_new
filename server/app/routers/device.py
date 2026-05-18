@@ -17,6 +17,7 @@ from app.models import (
     CollectReportRequest, CollectCommentData, CollectUserData,
     DMClaimRecipientRequest, DMClaimRecipientResponse,
     DMSendReportRequest, DMReleaseRecipientRequest, DMReleaseRecipientResponse,
+    StatsIncrementRequest,
 )
 from app.database import get_db
 from app.deps import verify_device_secret, verify_admin_token
@@ -585,6 +586,21 @@ async def report_result(
         return JSONResponse(content=jsonable_encoder(task), background=bg)
 
     return task
+
+
+@router.post("/stats/increment")
+def stats_increment(
+    body: StatsIncrementRequest,
+    db: Session = Depends(get_db),
+    _: str = Depends(verify_device_secret),
+):
+    """设备端增量统计上报——每完成一个子操作（回复/关注/私信）调用一次。
+    保证任务中途崩溃时，已完成操作的统计数据不丢失。
+    """
+    from app.services.stats_service import stats_service
+    stats_service.increment(db, body.account_id, body.task_type, count=body.count)
+    db.commit()
+    return {"ok": True}
 
 
 @router.post("/heartbeat")

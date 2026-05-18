@@ -117,6 +117,7 @@ class SearchCommentParams(BaseModel):
     share_links: Optional[list[str]] = Field(None, description="分享链接列表，每个链接对应一个视频")
     content: Optional[str] = Field(None, max_length=200, description="评论内容")
     content_template_id: Optional[str] = Field(None, description="内容模板ID")
+    prompt_template_id: Optional[str] = Field(None, description="提示词模板ID")
     count: int = Field(default=5, ge=-1, description="每视频处理数量, -1=全量")
     video_count: int = Field(default=5, ge=-1, description="处理视频数, -1=全量")
     sort_by: Optional[str] = Field(None, pattern="^(latest|most_liked)$")
@@ -126,6 +127,7 @@ class SearchCommentParams(BaseModel):
 class SearchLikeParams(BaseModel):
     keyword: str = Field(..., min_length=1, max_length=50, description="搜索关键词")
     keywords: Optional[list[str]] = Field(None, description="批量关键词（通道模式）")
+    prompt_template_id: Optional[str] = Field(None, description="提示词模板ID")
     count: int = Field(default=5, ge=1, le=30, description="点赞数量")
     sort_by: Optional[str] = Field(None, pattern="^(latest|most_liked)$")
 
@@ -135,6 +137,8 @@ class SearchDMParams(BaseModel):
     keywords: Optional[list[str]] = Field(None, description="批量关键词（通道模式）")
     content: Optional[str] = Field(None, max_length=500, description="私信内容")
     content_template_id: Optional[str] = Field(None, description="内容模板ID")
+    dm_sequence_id: Optional[str] = Field(None, description="DM序列模板ID")
+    prompt_template_id: Optional[str] = Field(None, description="提示词模板ID")
     count: int = Field(default=5, ge=1, le=50, description="私信数量")
     sort_by: Optional[str] = Field(None, pattern="^(latest|most_liked)$")
 
@@ -144,6 +148,8 @@ class ReplyCommentParams(BaseModel):
     keywords: Optional[list[str]] = Field(None, description="批量关键词（通道模式）")
     content: Optional[str] = Field(None, max_length=500, description="私信内容")
     content_template_id: Optional[str] = Field(None, description="内容模板ID")
+    dm_sequence_id: Optional[str] = Field(None, description="DM序列模板ID")
+    prompt_template_id: Optional[str] = Field(None, description="提示词模板ID")
     count: int = Field(default=5, ge=-1, description="每个视频处理评论数, -1=全量")
     video_count: int = Field(default=3, ge=-1, description="处理视频数, -1=全量")
     sort_by: Optional[str] = Field(None, pattern="^(latest|most_liked)$")
@@ -597,6 +603,13 @@ class CollectReportRequest(BaseModel):
     comment: CollectCommentData
     user: CollectUserData | None = None
     data_source_type: int = 0  # 0=普通视频, 1=带货视频
+
+
+class StatsIncrementRequest(BaseModel):
+    """设备端增量统计上报——每个子操作完成后调用，保证中途崩溃不丢数据"""
+    account_id: str
+    task_type: str                          # search_like / search_comment / reply_comment / follow / search_dm / nurture / collect
+    count: int = 1                          # 操作次数（通常 1）
 
 
 # --- DM / Conversation models ---

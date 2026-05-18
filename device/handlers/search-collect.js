@@ -263,6 +263,7 @@ SearchCollectHandler._reportCollection = function (taskId, keyword, commentData,
   if (userData) payload.user = userData;
   var result = apiClient.collectReport(payload);
   if (result && result.comment_saved) logger.debug(TAG, "已上报: " + commentData.nickname);
+  try { apiClient.incrementStats((this._params || {}).account_id, "collect", 1); } catch (e) {}
 };
 
 SearchCollectHandler.execute = function (params) {

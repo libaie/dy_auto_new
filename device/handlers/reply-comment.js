@@ -173,6 +173,7 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
       logger.info(TAG, "开始输入回复...");
       if (this._replyToComment(analysis.reply, comment.nickname)) {
         stats.success_count++;
+        try { apiClient.incrementStats(params.account_id, "reply_comment", 1); } catch (e) {}
         try { apiClient.saveCommentAIReply(comment.nickname, comment.text, analysis.reply, taskId, dest ? dest.province : null, dest ? dest.city : null, dest ? dest.attraction : null); } catch (e) {}
         try {
           var commentReport = {
@@ -237,6 +238,7 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
             }
             if (Date.now() - profileStart < PROFILE_TIMEOUT && canFollow && this._followUser()) {
               stats.follow_count++;
+              try { apiClient.incrementStats(params.account_id, "follow", 1); } catch (e) {}
             }
             sleep(Math.floor(Math.random() * 500 + 800));
 
@@ -266,16 +268,14 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
                     // DM 序列模板 vs 单条私信
                     if (params.dm_sequence_id) {
                       var seqMsgs = this.resolveMessages(params);
+                      if (!(seqMsgs instanceof Array)) { seqMsgs = []; }
                       var dmBtnOk = this.safeClick("dm_entry_btn", 3);
                       if (dmBtnOk) { sleep(1500); }
                       if (dmBtnOk && seqMsgs.length > 0) {
                         this._sendMessageSequence(seqMsgs, stats, keyword);
                         sent = true;
-                        // stats.dm_count already incremented by seqMsgs.length in _sendMessageSequence
-                        // (via stats.details.push), but the stats.dm_count++ below adds 1.
-                        // For sequences, we want total N, not N+1, so pre-subtract 1.
-                        stats.dm_count += seqMsgs.length - 1;
                         reportedContent = seqMsgs.map(function(m){return m.content;}).join(" | ");
+                        try { apiClient.incrementStats(params.account_id, "search_dm", 1); } catch (e) {}
                       } else {
                         sent = false;
                         reportedContent = dmContent;
@@ -290,6 +290,7 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
                         stage: dmIntent, intent: dmIntent, keyword: keyword, content: reportedContent,
                       });
                       stats.dm_count++;
+                      if (!params.dm_sequence_id) { try { apiClient.incrementStats(params.account_id, "search_dm", 1); } catch (e) {} }
                     } else {
                       apiClient.releaseDMRecipient({ conversation_id: dmClaimResult.conversation_id });
                     }
@@ -312,13 +313,14 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
                     var sent2, reportedContent2;
                     if (params.dm_sequence_id) {
                       var seqMsgs2 = this.resolveMessages(params);
+                      if (!(seqMsgs2 instanceof Array)) { seqMsgs2 = []; }
                       var dmBtnOk2 = this.safeClick("dm_entry_btn", 3);
                       if (dmBtnOk2) { sleep(1500); }
                       if (dmBtnOk2 && seqMsgs2.length > 0) {
                         this._sendMessageSequence(seqMsgs2, stats, keyword);
                         sent2 = true;
-                        stats.dm_count += seqMsgs2.length - 1;
                         reportedContent2 = seqMsgs2.map(function(m){return m.content;}).join(" | ");
+                        try { apiClient.incrementStats(params.account_id, "search_dm", 1); } catch (e) {}
                       } else {
                         sent2 = false;
                         reportedContent2 = dmContent;
@@ -333,6 +335,7 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
                         stage: dmIntent, intent: dmIntent, keyword: keyword, content: reportedContent2,
                       });
                       stats.dm_count++;
+                      if (!params.dm_sequence_id) { try { apiClient.incrementStats(params.account_id, "search_dm", 1); } catch (e) {} }
                     } else {
                       apiClient.releaseDMRecipient({ conversation_id: dmClaimResult.conversation_id });
                     }

@@ -229,7 +229,11 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
                 userData._intended_attraction = dest.attraction || "";
               }
               try { apiClient.saveUserProfile(userData); } catch (e) {}
-              try { apiClient.collectReport({ task_id: taskId, keyword: keyword, user: userData, data_source_type: 0 }); } catch (e) {}
+              try { apiClient.collectReport({
+                task_id: taskId, keyword: keyword,
+                comment: { nickname: comment.nickname, content: comment.text, time_str: comment.time || "", is_author: comment.isAuthor || false },
+                user: userData, data_source_type: 0,
+              }); } catch (e) {}
             }
             if (Date.now() - profileStart < PROFILE_TIMEOUT && canFollow && this._followUser()) {
               stats.follow_count++;

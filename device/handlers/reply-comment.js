@@ -268,7 +268,7 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
                     // DM 序列模板 vs 单条私信
                     if (params.dm_sequence_id) {
                       var seqMsgs = this.resolveMessages(params);
-                      if (!(seqMsgs instanceof Array)) { seqMsgs = []; }
+                      if (!seqMsgs || !seqMsgs.map) { seqMsgs = []; }
                       var dmBtnOk = this.safeClick("dm_entry_btn", 3);
                       if (dmBtnOk) { sleep(1500); }
                       if (dmBtnOk && seqMsgs.length > 0) {
@@ -313,7 +313,7 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
                     var sent2, reportedContent2;
                     if (params.dm_sequence_id) {
                       var seqMsgs2 = this.resolveMessages(params);
-                      if (!(seqMsgs2 instanceof Array)) { seqMsgs2 = []; }
+                      if (!seqMsgs2 || !seqMsgs2.map) { seqMsgs2 = []; }
                       var dmBtnOk2 = this.safeClick("dm_entry_btn", 3);
                       if (dmBtnOk2) { sleep(1500); }
                       if (dmBtnOk2 && seqMsgs2.length > 0) {

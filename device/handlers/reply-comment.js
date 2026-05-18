@@ -2,6 +2,7 @@
 var CommentBaseHandler = require("./comment-base");
 var aiAnalyzer = require("../core/ai-analyzer");
 var uiOperator = require("../core/ui-operator");
+var selectorLoader = require("../core/selector-loader");
 var antiDetect = require("../core/anti-detect");
 var apiClient = require("../core/api-client");
 var logger = require("../utils/logger");
@@ -60,15 +61,31 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
   }
 
   var videoStartTime = Date.now();
-  var commentCount = 0;  // 0 = unknown, will be set by comment loop bottom detection
   var processed = 0;
   var totalRead = 0;
-  var prevItemCount = 0;
   var emptyStreak = 0;
+  var noNewStreak = 0;
+  var seenComments = {};
+
+  function _commentKey(comment) {
+    var nick = comment && comment.nickname ? comment.nickname : "";
+    var text = comment && comment.text ? comment.text : "";
+    var time = comment && comment.time ? comment.time : "";
+    return nick + "|" + text + "|" + time;
+  }
+
+  function _hasCommentEndMarker() {
+    try {
+      if (!selectorLoader._cache || !selectorLoader._cache.is_comment_end) return false;
+      return !!uiOperator.findElement("is_comment_end", 500);
+    } catch (e) {
+      return false;
+    }
+  }
 
   var items = uiOperator.findElements("comment_list", 3000);
 
-  while (processed < count && (commentCount === 0 || totalRead < commentCount)) {
+  while (processed < count) {
     if (items.length === 0) {
       emptyStreak++;
       if (emptyStreak >= 2) {
@@ -83,13 +100,9 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
         Math.round((Date.now() - videoStartTime) / 1000) + "s)，强制跳过");
       break;
     }
-    if (items.length <= prevItemCount && totalRead >= items.length && prevItemCount > 0) {
-      logger.info(TAG, "评论已到底（可见" + items.length + "条/已读" + totalRead + "条），停止");
-      break;
-    }
-    prevItemCount = items.length;
 
-    for (var i = totalRead; i < items.length && processed < count; i++) {
+    var newThisRound = 0;
+    for (var i = 0; i < items.length && processed < count; i++) {
       if (Date.now() - videoStartTime > VIDEO_TIMEOUT) {
         logger.warn(TAG, "评论处理超时，跳出内循环");
         break;
@@ -97,6 +110,11 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
       try {
       var comment = this._parseCommentItem(items[i]);
       if (!comment) { stats.skipped++; totalRead++; continue; }
+
+      var commentKey = _commentKey(comment);
+      if (seenComments[commentKey]) continue;
+      seenComments[commentKey] = true;
+      newThisRound++;
 
       if (comment.nickname === "unknown" || !comment.text ||
           comment.text.indexOf("发条评论") !== -1) {
@@ -245,17 +263,20 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
             if (Date.now() - profileStart < PROFILE_TIMEOUT && canDM) {
               var dmContent = "";
               var dmIntent = "other";
+              var hasDMSequence = !!(params.dm_sequence_id || (params.dm_messages && params.dm_messages.length > 0));
               try {
                 dmIntent = (analysis.dimensions && analysis.dimensions.intent) || "other";
-                var aiDM = aiAnalyzer.generateDM({
-                  searchKeyword: keyword, nickname: comment.nickname,
-                  commentText: comment.text, tier: dmIntent,
-                  intendedCity: (dest && (dest.city || dest.attraction || dest.province)) || "",
-                });
-                if (aiDM) dmContent = aiDM;
+                if (!hasDMSequence) {
+                  var aiDM = aiAnalyzer.generateDM({
+                    searchKeyword: keyword, nickname: comment.nickname,
+                    commentText: comment.text, tier: dmIntent,
+                    intendedCity: (dest && (dest.city || dest.attraction || dest.province)) || "",
+                  });
+                  if (aiDM) dmContent = aiDM;
+                }
               } catch (e) {}
-              if (!dmContent && content) dmContent = content;
-              if (dmContent || params.dm_sequence_id) {
+              if (!hasDMSequence && !dmContent && content) dmContent = content;
+              if (hasDMSequence || dmContent) {
                 var recipientId = (userData && userData.douyin_id) || "";
                 if (recipientId) {
                   var dmClaimResult = apiClient.claimDMRecipient({
@@ -266,16 +287,16 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
                   if (dmClaimResult && dmClaimResult.claimed) {
                     var sent, reportedContent;
                     // DM 序列模板 vs 单条私信
-                    if (params.dm_sequence_id || (params.dm_messages && params.dm_messages.length > 0)) {
+                    if (hasDMSequence) {
                       var seqMsgs = this.resolveMessages(params);
                       if (!seqMsgs || !seqMsgs.map) { seqMsgs = []; }
                       var dmBtnOk = this.safeClick("dm_entry_btn", 3);
                       if (dmBtnOk) { sleep(1500); }
                       if (dmBtnOk && seqMsgs.length > 0) {
-                        this._sendMessageSequence(seqMsgs, stats, keyword);
-                        sent = true;
+                        var seqSent = this._sendMessageSequence(seqMsgs, stats, keyword);
+                        sent = seqSent > 0;
                         reportedContent = seqMsgs.map(function(m){return m.content;}).join(" | ");
-                        try { apiClient.incrementStats(params.account_id, "search_dm", 1); } catch (e) {}
+                        if (sent) { try { apiClient.incrementStats(params.account_id, "search_dm", 1); } catch (e) {} }
                       } else {
                         sent = false;
                         reportedContent = dmContent;
@@ -290,7 +311,7 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
                         stage: dmIntent, intent: dmIntent, keyword: keyword, content: reportedContent,
                       });
                       stats.dm_count++;
-                      if (!params.dm_sequence_id && !(params.dm_messages && params.dm_messages.length > 0)) { try { apiClient.incrementStats(params.account_id, "search_dm", 1); } catch (e) {} }
+                      if (!hasDMSequence) { try { apiClient.incrementStats(params.account_id, "search_dm", 1); } catch (e) {} }
                     } else {
                       apiClient.releaseDMRecipient({ conversation_id: dmClaimResult.conversation_id });
                     }
@@ -311,16 +332,16 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
                   });
                   if (dmClaimResult && dmClaimResult.claimed) {
                     var sent2, reportedContent2;
-                    if (params.dm_sequence_id || (params.dm_messages && params.dm_messages.length > 0)) {
+                    if (hasDMSequence) {
                       var seqMsgs2 = this.resolveMessages(params);
                       if (!seqMsgs2 || !seqMsgs2.map) { seqMsgs2 = []; }
                       var dmBtnOk2 = this.safeClick("dm_entry_btn", 3);
                       if (dmBtnOk2) { sleep(1500); }
                       if (dmBtnOk2 && seqMsgs2.length > 0) {
-                        this._sendMessageSequence(seqMsgs2, stats, keyword);
-                        sent2 = true;
+                        var seqSent2 = this._sendMessageSequence(seqMsgs2, stats, keyword);
+                        sent2 = seqSent2 > 0;
                         reportedContent2 = seqMsgs2.map(function(m){return m.content;}).join(" | ");
-                        try { apiClient.incrementStats(params.account_id, "search_dm", 1); } catch (e) {}
+                        if (sent2) { try { apiClient.incrementStats(params.account_id, "search_dm", 1); } catch (e) {} }
                       } else {
                         sent2 = false;
                         reportedContent2 = dmContent;
@@ -335,7 +356,7 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
                         stage: dmIntent, intent: dmIntent, keyword: keyword, content: reportedContent2,
                       });
                       stats.dm_count++;
-                      if (!params.dm_sequence_id && !(params.dm_messages && params.dm_messages.length > 0)) { try { apiClient.incrementStats(params.account_id, "search_dm", 1); } catch (e) {} }
+                      if (!hasDMSequence) { try { apiClient.incrementStats(params.account_id, "search_dm", 1); } catch (e) {} }
                     } else {
                       apiClient.releaseDMRecipient({ conversation_id: dmClaimResult.conversation_id });
                     }
@@ -366,8 +387,8 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
           uiOperator.swipeUp();
           sleep(800);
           items = uiOperator.findElements("comment_list", 3000);
-          prevItemCount = items.length;
           videoStartTime = Date.now();
+          i = -1;
         } else {
           logger.warn(TAG, "进入主页失败，跳过关注+私信");
           this._dismissKeyboard();
@@ -388,7 +409,25 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
       }
     }
 
-    if (processed < count && (commentCount === 0 || totalRead < commentCount)) {
+    if (newThisRound === 0) {
+      noNewStreak++;
+      if (_hasCommentEndMarker()) {
+        logger.info(TAG, "评论已到底(is_comment_end)，停止（可见" + items.length + "条/已读" + totalRead + "条）");
+        break;
+      }
+      if (noNewStreak >= 3) {
+        logger.info(TAG, "连续" + noNewStreak + "轮未发现新评论，停止（可见" + items.length + "条/已读" + totalRead + "条）");
+        break;
+      }
+    } else {
+      noNewStreak = 0;
+    }
+
+    if (processed < count) {
+      if (_hasCommentEndMarker()) {
+        logger.info(TAG, "评论已到底(is_comment_end)，停止（已读" + totalRead + "条）");
+        break;
+      }
       uiOperator.swipeUp();
       sleep(1500);
       items = uiOperator.findElements("comment_list", 3000);
@@ -838,9 +877,8 @@ ReplyCommentHandler._sendDM = function (content) {
     uiOperator.clickElement(sent);
     sleep(800);
   } else {
-    // 兜底：回车发送
-    try { shell("input keyevent 66", false); } catch (e) {}
-    sleep(500);
+    logger.warn(TAG, "私信发送按钮未找到，取消发送");
+    return false;
   }
 
   logger.info(TAG, "私信已发送: '" + content.substring(0, 20) + "'");

@@ -44,7 +44,11 @@ SearchDMHandler._interactWithVideo = function (content, stats) {
   sleep(1500);
 
   // 3. 发送消息序列
-  this._sendMessageSequence(messages, stats, params.keyword);
+  var sentCount = this._sendMessageSequence(messages, stats, params.keyword);
+  if (sentCount <= 0) {
+    logger.warn(TAG, "私信序列没有成功发送任何消息");
+    return false;
+  }
   try { apiClient.incrementStats(params.account_id, "search_dm", 1); } catch (e) {}
   return true;
 };

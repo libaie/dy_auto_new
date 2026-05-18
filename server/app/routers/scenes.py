@@ -38,7 +38,8 @@ SCENE_GEN_SYSTEM = """你是一位资深的电影导演和场景设计师。根�
 
 
 @router.get("")
-def list_scenes(db: Session = Depends(get_db)):
+def list_scenes(db: Session = Depends(get_db),
+                _: str = Depends(verify_admin_token)):
     return {"ok": True, "scenes": [_to_dict(s) for s in db.query(Scene).all()]}
 
 

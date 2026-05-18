@@ -506,8 +506,12 @@ SearchBaseHandler.resolveMessages = function (params) {
   if (params.dm_messages && params.dm_messages.length > 0) {
     return params.dm_messages;
   }
-  if (params.dm_sequence_id && this._dmSeqCache && this._dmSeqCache[params.dm_sequence_id]) {
-    return this._dmSeqCache[params.dm_sequence_id].messages;
+  if (params.dm_sequence_id) {
+    if (this._dmSeqCache && this._dmSeqCache[params.dm_sequence_id]) {
+      return this._dmSeqCache[params.dm_sequence_id].messages;
+    }
+    logger.warn(TAG, "DM序列模板未命中，停止私信发送: " + params.dm_sequence_id);
+    return [];
   }
   if (params.content) {
     return [{order: 1, content: params.content, delay_ms: 0}];
@@ -536,6 +540,7 @@ SearchBaseHandler.applyVariables = function (template, vars) {
  * 发送消息序列通用循环（拟人输入 + 延迟）
  */
 SearchBaseHandler._sendMessageSequence = function (messages, stats, keyword) {
+  var sentCount = 0;
   for (var i = 0; i < messages.length; i++) {
     var msg = messages[i];
     var content = this.applyVariables(msg.content, {keyword: keyword || ""});
@@ -545,13 +550,20 @@ SearchBaseHandler._sendMessageSequence = function (messages, stats, keyword) {
       continue;
     }
     sleep(500);
-    this.submitViaKeyboard("dm_send");
+    var sendBtn = uiOperator.findElement("dm_send", 3000);
+    if (!sendBtn) {
+      logger.warn(TAG, "DM序列[" + (i + 1) + "/" + messages.length + "]发送按钮未找到，本条未发送");
+      continue;
+    }
+    uiOperator.clickElement(sendBtn);
     sleep(1000);
+    sentCount++;
     var extraDelay = msg.delay_ms != null ? msg.delay_ms : (Math.floor(Math.random() * 3000) + 2000);
     sleep(extraDelay);
     stats.details.push("dm_sent[" + (i + 1) + "/" + messages.length + "]: "
       + content.substring(0, 30));
   }
+  return sentCount;
 };
 
 module.exports = SearchBaseHandler;

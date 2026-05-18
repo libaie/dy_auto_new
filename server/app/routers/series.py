@@ -202,7 +202,8 @@ def _episode_dict(e: Episode) -> dict:
 # === Series CRUD ===
 
 @router.get("")
-def list_series(db: Session = Depends(get_db)):
+def list_series(db: Session = Depends(get_db),
+                _: str = Depends(verify_admin_token)):
     all_series = db.query(Series).order_by(Series.updated_at.desc()).all()
     return {"ok": True, "series": [_series_dict(s) for s in all_series]}
 

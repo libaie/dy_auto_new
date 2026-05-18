@@ -64,19 +64,113 @@ def test_update_account():
     assert resp.json()["status"] == "risk_controlled"
 
 
-def test_delete_account():
+def test_delete_account_soft():
+    """DELETE sets status='deleted' (soft delete), does not hard-delete."""
     create_resp = client.post("/api/accounts", json={
-        "nickname": "删除测试",
-        "douyin_id": "test_delete",
+        "nickname": "软删除测试",
+        "douyin_id": "test_soft_delete",
     }, headers=HEADERS)
     account_id = create_resp.json()["id"]
 
     resp = client.delete(f"/api/accounts/{account_id}", headers=HEADERS)
     assert resp.status_code == 200
+    data = resp.json()
+    assert data.get("deleted") is True
 
-    # Verify deleted
-    resp = client.get(f"/api/accounts/{account_id}", headers=HEADERS)
-    assert resp.status_code == 404
+    # Verify still exists but with status='deleted' (requires include_deleted=true)
+    get_resp = client.get(f"/api/accounts/{account_id}?include_deleted=true", headers=HEADERS)
+    assert get_resp.status_code == 200
+    assert get_resp.json()["status"] == "deleted"
+
+    # Default (include_deleted=false) returns 404 for deleted accounts
+    get_resp2 = client.get(f"/api/accounts/{account_id}", headers=HEADERS)
+    assert get_resp2.status_code == 404
+
+
+def test_list_accounts_excludes_deleted():
+    """LIST should exclude deleted accounts by default."""
+    # Create and soft-delete one account
+    create_resp = client.post("/api/accounts", json={
+        "nickname": "要删除的", "douyin_id": "del_list_test",
+    }, headers=HEADERS)
+    deleted_id = create_resp.json()["id"]
+    client.delete(f"/api/accounts/{deleted_id}", headers=HEADERS)
+
+    # List accounts
+    resp = client.get("/api/accounts", headers=HEADERS)
+    assert resp.status_code == 200
+    accounts = resp.json()["accounts"]
+    deleted_ids = [a["id"] for a in accounts if a["id"] == deleted_id]
+    assert len(deleted_ids) == 0  # deleted account not in list
+
+
+def test_delete_account_cancels_pending_tasks():
+    """Soft-deleting an account cancels its pending/running tasks."""
+    from app.db_models import Task as DBTask
+
+    # Create account
+    create_resp = client.post("/api/accounts", json={
+        "nickname": "任务取消测试", "douyin_id": "cancel_test",
+    }, headers=HEADERS)
+    account_id = create_resp.json()["id"]
+
+    # Create some tasks for this account via the service
+    from app.services.task_service import task_service
+    from app.models import TaskType
+    from app.database import get_db as _get_db
+    db_gen = app.dependency_overrides[_get_db]()
+    db_session = next(db_gen)
+    task_service.create_task(db_session, TaskType.SEARCH_LIKE, account_id, {"keyword": "test"})
+    task_service.create_task(db_session, TaskType.SEARCH_LIKE, account_id, {"keyword": "test2"})
+    db_session.close()
+
+    resp = client.delete(f"/api/accounts/{account_id}", headers=HEADERS)
+    assert resp.status_code == 200
+
+    # Verify tasks were cancelled
+    db_session2 = next(app.dependency_overrides[_get_db]())
+    pending = db_session2.query(DBTask).filter(
+        DBTask.account_id == account_id,
+        DBTask.status.in_(["pending", "running"]),
+    ).all()
+    assert len(pending) == 0
+    # Tasks should be in terminal state
+    cancelled = db_session2.query(DBTask).filter(
+        DBTask.account_id == account_id,
+        DBTask.status == "cancelled",
+    ).all()
+    assert len(cancelled) >= 2
+    db_session2.close()
+
+
+def test_delete_account_unbinds_devices():
+    """Soft-deleting an account unbinds associated devices."""
+    from app.db_models import Device as DBDevice
+    from app.database import get_db as _get_db
+
+    # Create account
+    create_resp = client.post("/api/accounts", json={
+        "nickname": "解绑设备测试", "douyin_id": "unbind_test",
+    }, headers=HEADERS)
+    account_id = create_resp.json()["id"]
+
+    # Bind a device to this account
+    db_gen = app.dependency_overrides[_get_db]()
+    db_session = next(db_gen)
+    device = DBDevice(id="dev-unbind-test", name="test-device", bound_account_id=account_id)
+    db_session.add(device)
+    db_session.commit()
+    db_session.close()
+
+    resp = client.delete(f"/api/accounts/{account_id}", headers=HEADERS)
+    assert resp.status_code == 200
+
+    # Verify device unbound
+    db_session2 = next(app.dependency_overrides[_get_db]())
+    dev = db_session2.query(DBDevice).filter(DBDevice.id == "dev-unbind-test").first()
+    assert dev is not None
+    assert dev.bound_account_id is None
+    db_session2.close()
 
 
 def test_auth_required():

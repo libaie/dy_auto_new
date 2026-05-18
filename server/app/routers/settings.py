@@ -13,6 +13,10 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
+# Keys whose values are masked in GET responses (never sent to client)
+_SENSITIVE_KEYS = {"ai_api_key", "llm_api_key"}
+_MASKED_VALUE = "****"
+
 
 @router.get("")
 def get_settings(
@@ -21,7 +25,13 @@ def get_settings(
 ):
     try:
         rows = db.query(SystemSetting).all()
-        return {s.key: s.value for s in rows}
+        result = {}
+        for s in rows:
+            if s.key in _SENSITIVE_KEYS:
+                result[s.key] = _MASKED_VALUE
+            else:
+                result[s.key] = s.value
+        return result
     except OperationalError:
         logger.warning("system_settings table missing, returning empty settings")
         return {}
@@ -34,6 +44,9 @@ def update_settings(
     user = Depends(require_role("admin")),
 ):
     for key, value in request.settings.items():
+        # Skip masked values — client sent placeholder, don't overwrite real secret
+        if value == _MASKED_VALUE and key in _SENSITIVE_KEYS:
+            continue
         try:
             existing = db.query(SystemSetting).filter(SystemSetting.key == key).first()
         except OperationalError:

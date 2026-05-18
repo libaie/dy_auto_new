@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.db_models import Account
 from app.deps import verify_admin_token, require_role
+from app.config import bj_now
 from app.ws_manager import pair_ws_manager
 
 router = APIRouter(prefix="/api/accounts", tags=["accounts"])
@@ -68,12 +69,15 @@ async def create_account(
 def list_accounts(
     skip: int = 0,
     limit: int = 50,
+    include_deleted: bool = False,
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
     limit = min(limit, 100)
     user_id, role = user
     query = db.query(Account)
+    if not include_deleted:
+        query = query.filter(Account.status != "deleted")
     if role != "admin":
         query = query.filter(Account.user_id == user_id)
     total = query.count()
@@ -84,11 +88,14 @@ def list_accounts(
 @router.get("/{account_id}")
 def get_account(
     account_id: str,
+    include_deleted: bool = False,
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
     user_id, role = user
     query = db.query(Account).filter(Account.id == account_id)
+    if not include_deleted:
+        query = query.filter(Account.status != "deleted")
     if role != "admin":
         query = query.filter(Account.user_id == user_id)
     acc = query.first()
@@ -150,13 +157,16 @@ async def delete_account(
     db.query(Device).filter(Device.bound_account_id == account_id).update(
         {"bound_account_id": None}, synchronize_session=False
     )
-    # 2. 取消该账号的 pending/running 任务
+    # 2. 取消该账号的 pending/running 任务（标记为 cancelled 而非 failed）
     db.query(DBTask).filter(
         DBTask.account_id == account_id,
         DBTask.status.in_(["pending", "running"]),
-    ).update({"status": "failed", "result": '{"error": "account deleted"}'}, synchronize_session=False)
+    ).update({"status": "cancelled", "result": {"error": "account deleted"}, "completed_at": bj_now()},
+             synchronize_session=False)
 
-    db.delete(acc)
+    # 3. 软删除 — 保留数据可审计，可恢复
+    acc.status = "deleted"
+
     db.commit()
     await pair_ws_manager.broadcast_to_admins({"event": "accounts_changed"})
     return {"deleted": True, "id": account_id}

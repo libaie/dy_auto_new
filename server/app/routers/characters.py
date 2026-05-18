@@ -41,7 +41,8 @@ CHARACTER_GEN_SYSTEM = """你是一位资深的编剧和角色设计师。根据
 
 
 @router.get("")
-def list_characters(db: Session = Depends(get_db)):
+def list_characters(db: Session = Depends(get_db),
+                    _: str = Depends(verify_admin_token)):
     return {"ok": True, "characters": [_to_dict(c) for c in db.query(Character).all()]}
 
 

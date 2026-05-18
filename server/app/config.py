@@ -152,21 +152,25 @@ AI_THINKING_LEVELS = {
 
 
 def _resolve_ai_config(db=None):
-    """从 DB 读取 AI 配置，fallback 到环境变量。内部使用，含 API Key。"""
-    api_key = AI_API_KEY
-    base_url = AI_BASE_URL
-    model = AI_MODEL
-
-    thinking = AI_THINKING
+    """从 DB 读取 AI 配置，fallback 到环境变量。内部使用，含 API Key。
+    Key 命名：llm_* 优先（新），ai_* 作为 fallback（旧，兼容期保留）。
+    """
+    api_key = os.getenv("AI_API_KEY", "")
+    base_url = os.getenv("AI_BASE_URL", "https://api.deepseek.com")
+    model = os.getenv("AI_MODEL", "deepseek-chat")
+    thinking = os.getenv("AI_THINKING", "max")
 
     if db:
         try:
             from app.db_models import SystemSetting
             settings = {s.key: s.value for s in db.query(SystemSetting).all()}
-            api_key = settings.get("ai_api_key") or api_key
-            base_url = settings.get("ai_base_url") or base_url
-            model = settings.get("ai_model") or model
-            thinking = settings.get("ai_thinking", thinking)
+            # llm_* keys take priority (new naming), ai_* fallback (legacy)
+            api_key = settings.get("llm_api_key") or settings.get("ai_api_key") or api_key
+            base_url = settings.get("llm_base_url") or settings.get("ai_base_url") or base_url
+            model = settings.get("llm_model") or settings.get("ai_model") or model
+            db_thinking = settings.get("llm_thinking") or settings.get("ai_thinking")
+            if db_thinking:
+                thinking = db_thinking
         except Exception:
             pass
 

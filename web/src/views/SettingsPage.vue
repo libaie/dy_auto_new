@@ -26,7 +26,8 @@ async function fetchSettings() {
   try {
     const res = await getSettings()
     const data = res.data
-    form.ai_api_key = data.ai_api_key || ''
+    // 服务端返回 "****" 表示该字段已配置但不暴露，前端显示空输入框
+    form.ai_api_key = (data.ai_api_key && data.ai_api_key !== '****') ? data.ai_api_key : ''
     form.ai_base_url = data.ai_base_url || 'https://api.deepseek.com'
     form.ai_model = data.ai_model || 'deepseek-chat'
     form.ai_thinking = data.ai_thinking || 'max'
@@ -42,14 +43,15 @@ async function fetchSettings() {
 async function handleSave() {
   saving.value = true
   try {
-    await updateSettings({
-      ai_api_key: form.ai_api_key,
-      ai_base_url: form.ai_base_url,
-      ai_model: form.ai_model,
-      ai_thinking: form.ai_thinking,
-      pixelle_video_url: form.pixelle_video_url,
-      pixelle_video_timeout: String(form.pixelle_video_timeout),
-    })
+    const payload = {}
+    // 仅提交用户真实输入的值（空=不更新，后端保留现有值）
+    if (form.ai_api_key) payload.ai_api_key = form.ai_api_key
+    if (form.ai_base_url) payload.ai_base_url = form.ai_base_url
+    if (form.ai_model) payload.ai_model = form.ai_model
+    if (form.ai_thinking) payload.ai_thinking = form.ai_thinking
+    if (form.pixelle_video_url) payload.pixelle_video_url = form.pixelle_video_url
+    if (form.pixelle_video_timeout) payload.pixelle_video_timeout = String(form.pixelle_video_timeout)
+    await updateSettings(payload)
     toast.success('设置已保存')
   } catch {
     toast.error('保存失败')

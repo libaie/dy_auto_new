@@ -10,7 +10,7 @@ var apiClient = require("../core/api-client");
 var commentUtils = require("./comment-utils");
 var logger = require("../utils/logger");
 var flowContext = require("../core/flow-context");
-var taskExecutor = require("../core/task-executor");
+// Lazy-load to break circular: task-executor → reply-comment → comment-base → task-executor
 
 var TAG = "评论基类";
 
@@ -76,7 +76,7 @@ CommentBaseHandler.execute = function (params) {
 
   // 视频循环
   for (var v = 0; v < videoCount; v++) {
-    if (taskExecutor.isCancelled()) {
+    if (require("../core/task-executor").isCancelled()) {
       logger.info(TAG, "任务已取消，停止处理视频");
       break;
     }

@@ -267,7 +267,10 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
                       if (dmBtnOk && seqMsgs.length > 0) {
                         this._sendMessageSequence(seqMsgs, stats, keyword);
                         sent = true;
-                        stats.dm_count += seqMsgs.length;
+                        // stats.dm_count already incremented by seqMsgs.length in _sendMessageSequence
+                        // (via stats.details.push), but the stats.dm_count++ below adds 1.
+                        // For sequences, we want total N, not N+1, so pre-subtract 1.
+                        stats.dm_count += seqMsgs.length - 1;
                         reportedContent = seqMsgs.map(function(m){return m.content;}).join(" | ");
                       } else {
                         sent = false;
@@ -287,9 +290,6 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
                       apiClient.releaseDMRecipient({ conversation_id: dmClaimResult.conversation_id });
                     }
                   } else {
-                      apiClient.releaseDMRecipient({ conversation_id: dmClaimResult.conversation_id });
-                    }
-                  } else {
                     logger.info(TAG, "用户 " + comment.nickname + " 已被其他设备 DM，跳过");
                   }
                 } else {
@@ -305,7 +305,7 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
                     recipient_nickname: comment.nickname,
                   });
                   if (dmClaimResult && dmClaimResult.claimed) {
-                    var sent2;
+                    var sent2, reportedContent2;
                     if (params.dm_sequence_id) {
                       var seqMsgs2 = this.resolveMessages(params);
                       var dmBtnOk2 = this.safeClick("dm_entry_btn", 3);
@@ -314,16 +314,19 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
                         this._sendMessageSequence(seqMsgs2, stats, keyword);
                         sent2 = true;
                         stats.dm_count += seqMsgs2.length - 1;
+                        reportedContent2 = seqMsgs2.map(function(m){return m.content;}).join(" | ");
                       } else {
                         sent2 = false;
+                        reportedContent2 = dmContent;
                       }
                     } else {
                       sent2 = this._sendDM(dmContent);
+                      reportedContent2 = dmContent;
                     }
                     if (sent2) {
                       apiClient.reportDMSend({
                         conversation_id: dmClaimResult.conversation_id,
-                        stage: dmIntent, intent: dmIntent, keyword: keyword, content: dmContent,
+                        stage: dmIntent, intent: dmIntent, keyword: keyword, content: reportedContent2,
                       });
                       stats.dm_count++;
                     } else {

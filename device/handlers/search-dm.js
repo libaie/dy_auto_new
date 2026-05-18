@@ -47,11 +47,4 @@ SearchDMHandler._interactWithVideo = function (content, stats) {
   return true;
 };
 
-/**
- * 设置 DM 序列缓存（服务端 poll 下发）
- */
-SearchDMHandler.setDMSequenceCache = function (cache) {
-  this._dmSeqCache = cache || {};
-};
-
 module.exports = SearchDMHandler;

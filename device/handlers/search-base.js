@@ -544,7 +544,7 @@ SearchBaseHandler._sendMessageSequence = function (messages, stats, keyword) {
     sleep(500);
     this.submitViaKeyboard("dm_send");
     sleep(1000);
-    var extraDelay = msg.delay_ms || Math.floor(Math.random() * 3000) + 2000;
+    var extraDelay = msg.delay_ms != null ? msg.delay_ms : (Math.floor(Math.random() * 3000) + 2000);
     sleep(extraDelay);
     stats.details.push("dm_sent[" + (i + 1) + "/" + messages.length + "]: "
       + content.substring(0, 30));

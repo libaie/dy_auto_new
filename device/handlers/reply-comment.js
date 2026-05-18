@@ -249,7 +249,7 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
                 if (aiDM) dmContent = aiDM;
               } catch (e) {}
               if (!dmContent && content) dmContent = content;
-              if (dmContent) {
+              if (dmContent || params.dm_sequence_id) {
                 var recipientId = (userData && userData.douyin_id) || "";
                 if (recipientId) {
                   var dmClaimResult = apiClient.claimDMRecipient({
@@ -258,7 +258,7 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
                     recipient_nickname: comment.nickname,
                   });
                   if (dmClaimResult && dmClaimResult.claimed) {
-                    var sent;
+                    var sent, reportedContent;
                     // DM 序列模板 vs 单条私信
                     if (params.dm_sequence_id) {
                       var seqMsgs = this.resolveMessages(params);
@@ -267,20 +267,26 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
                       if (dmBtnOk && seqMsgs.length > 0) {
                         this._sendMessageSequence(seqMsgs, stats, keyword);
                         sent = true;
-                        stats.dm_count += seqMsgs.length - 1;
+                        stats.dm_count += seqMsgs.length;
+                        reportedContent = seqMsgs.map(function(m){return m.content;}).join(" | ");
                       } else {
                         sent = false;
+                        reportedContent = dmContent;
                       }
                     } else {
                       sent = this._sendDM(dmContent);
+                      reportedContent = dmContent;
                     }
                     if (sent) {
                       apiClient.reportDMSend({
                         conversation_id: dmClaimResult.conversation_id,
-                        stage: dmIntent, intent: dmIntent, keyword: keyword, content: dmContent,
+                        stage: dmIntent, intent: dmIntent, keyword: keyword, content: reportedContent,
                       });
                       stats.dm_count++;
                     } else {
+                      apiClient.releaseDMRecipient({ conversation_id: dmClaimResult.conversation_id });
+                    }
+                  } else {
                       apiClient.releaseDMRecipient({ conversation_id: dmClaimResult.conversation_id });
                     }
                   } else {

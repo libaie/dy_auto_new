@@ -71,10 +71,12 @@ def create_sequence(
          for i, m in enumerate(sorted(body.messages, key=lambda x: x.order))],
         key=lambda x: x["order"],
     )
+    user_id, _ = user
     seq = DMSequence(
         name=body.name,
         messages=sorted_msgs,
         industry=body.industry or None,
+        user_id=user_id,
     )
     db.add(seq)
     db.commit()

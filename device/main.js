@@ -11,6 +11,7 @@ var antiDetect = require("./core/anti-detect");
 var floatingWindow = require("./core/floating-window");
 var pairing = require("./core/pairing");
 var deviceWs = require("./core/device-ws");
+var SearchBaseHandler = require("./handlers/search-base");
 
 var TAG = "主程序";
 
@@ -428,6 +429,14 @@ function startMainLoop(serverUrl, secret) {
       if (response.anti_detect_config) antiDetect.updateFromServer(response.anti_detect_config);
       if (response.selectors_version) selectorLoader.checkAndUpdate(response.selectors_version);
       if (response.prompt_templates_version) promptTemplateLoader.checkAndUpdate(response.prompt_templates_version);
+      if (response.dm_sequences) {
+        var dmCache = {};
+        for (var dsi = 0; dsi < response.dm_sequences.length; dsi++) {
+          var ds = response.dm_sequences[dsi];
+          dmCache[ds.id] = ds;
+        }
+        SearchBaseHandler._dmSeqCache = dmCache;
+      }
 
       if (response.cancelled_task_id) {
         logger.info(TAG, "catch-up: 服务端取消任务: " + response.cancelled_task_id);

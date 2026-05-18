@@ -254,8 +254,7 @@ localPreFilter: function (text) {
     var filtered = [];
     for (var i = 0; i < comments.length; i++) {
       var commentDate = commentUtils.parseTime(comments[i].time);
-      // commentDate=null means unparseable time — skip to respect max_age_days
-      if (commentDate && commentDate >= cutoff) {
+      if (!commentDate || commentDate >= cutoff) {
         filtered.push(comments[i]);
       }
     }

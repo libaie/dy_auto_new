@@ -278,12 +278,21 @@ var aiAnalyzer = {
     var dw = promptsConfig.get().disabledWords;
     // DM 专用身份优先，回退顶层身份
     var dmId = dm.identity || promptsConfig.get().identity;
+    // dmOpener.identity 兼容两种格式: {role, constraints} 对象 或 字符串列表
+    var dmRole, dmConstraints;
+    if (dmId instanceof Array) {
+      dmRole = dmId[0] || "";
+      dmConstraints = dmId.slice(1);
+    } else {
+      dmRole = dmId.role || "";
+      dmConstraints = dmId.constraints || [];
+    }
 
     var prompt = dm.context + "\n\n" +
       "## 绝对禁用词（任何情况下不得出现）\n" + dw + "\n\n" +
       "## 身份设定\n" +
-      "- 你是" + dmId.role + "\n" +
-      "- " + dmId.constraints.join("\n- ") + "\n" +
+      "- 你是" + dmRole + "\n" +
+      "- " + dmConstraints.join("\n- ") + "\n" +
       "- **严禁自我代入**：不要用\"我都是…\"、\"我自己…\"、\"我家…\"等第一人称经验分享。\n" +
       "- 使用建议/指南风格：用\"可以尝试\"、\"建议\"、\"若想…\"等客观建议句式。\n\n" +
       "## 这一条是破冰，唯一目标\n" + dm.goal + "\n\n" +
@@ -328,8 +337,9 @@ var aiAnalyzer = {
 
     var dw = promptsConfig.get().disabledWords;
     var dmId = promptsConfig.get().dmOpener.identity || promptsConfig.get().identity;
+    var dmRole2 = dmId instanceof Array ? (dmId[0] || "") : (dmId.role || "");
 
-    var prompt = "你是" + dmId.role + "，与对方私信已有互动。当前阶段：" + cfg.name + "。\n\n" +
+    var prompt = "你是" + dmRole2 + "，与对方私信已有互动。当前阶段：" + cfg.name + "。\n\n" +
       "## 禁用词（强制）\n" + dw + "\n\n" +
       "## 阶段目标\n" + cfg.goal + "\n\n" +
       "## 风格\n" + cfg.style + "\n\n" +

@@ -28,6 +28,9 @@ from app.ws_manager import pair_ws_manager
 
 router = APIRouter(prefix="/api/device", tags=["device"])
 
+# In-memory rate limiter for unauthenticated endpoints (pair-request)
+_pair_rate_limits: dict[str, list] = {}  # IP → [timestamps]
+
 
 async def _notify_pending_tasks(db: Session, device_id: str):
     """Check if there are pending tasks for this device and notify it via WS."""
@@ -119,6 +122,18 @@ async def create_pair_request(
     client_ip = raw_request.headers.get("x-forwarded-for", "").split(",")[0].strip()
     if not client_ip:
         client_ip = raw_request.client.host if raw_request.client else ""
+
+    # Rate limit: max 5 pair requests per hour per IP
+    import time as _time
+    now_ts = _time.time()
+    window = now_ts - 3600
+    _pair_rate_limits.setdefault(client_ip, [])
+    _pair_rate_limits[client_ip] = [t for t in _pair_rate_limits[client_ip] if t > window]
+    if not _pair_rate_limits[client_ip]:
+        _pair_rate_limits.pop(client_ip, None)  # prevent memory leak: clean empty entries
+    elif len(_pair_rate_limits[client_ip]) >= 5:
+        raise HTTPException(status_code=429, detail="请求过于频繁，请稍后再试")
+    _pair_rate_limits.setdefault(client_ip, []).append(now_ts)
 
     # 1. Already paired — Device exists with a valid secret
     # SECURITY: Do NOT auto-return secret. If the device lost its local config,
@@ -474,6 +489,11 @@ async def poll_tasks(
 
     cancelled_task = task_service.check_cancelled_running(db, device_id)
 
+    # DM sequence templates for device sync
+    from app.db_models import DMSequence
+    dm_seqs = db.query(DMSequence).all()
+    dm_sequences_list = [{"id": s.id, "messages": s.messages} for s in dm_seqs] if dm_seqs else None
+
     from app.config import get_ai_config
 
     return PollResponse(
@@ -486,15 +506,24 @@ async def poll_tasks(
         anti_detect_config_version=ANTI_DETECT_CONFIG_VERSION,
         ai_config=get_ai_config(db),
         device_config=DEVICE_CONFIG,
+        dm_sequences=dm_sequences_list,
     )
 
 
 @router.post("/progress")
 async def report_progress(
     report: TaskProgressReport,
-    _: None = Depends(verify_device_secret),
+    db: Session = Depends(get_db),
+    authed_device_id: str = Depends(verify_device_secret),
 ):
     """Device reports task execution progress. Broadcast to admin WS for real-time UI."""
+    from app.db_models import Task as DBTask
+    db_task = db.query(DBTask).filter(DBTask.id == report.task_id).first()
+    if not db_task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if db_task.device_id != authed_device_id:
+        raise HTTPException(status_code=403, detail="Task does not belong to this device")
+
     await pair_ws_manager.broadcast_to_admins({
         "event": "task_progress",
         "task_id": report.task_id,
@@ -745,23 +774,23 @@ def claim_comment_reply(
 ):
     """原子操作：检查+标记。返回 claimed=true 表示该设备可以回复，false 表示已被其他设备占用"""
     import hashlib
+    from sqlalchemy.exc import IntegrityError
     content_hash = hashlib.sha256(
         (request.author + "|" + request.text).encode("utf-8")
     ).hexdigest()
     from app.db_models import RepliedComment
-    existing = db.query(RepliedComment).filter(
-        RepliedComment.content_hash == content_hash
-    ).first()
-    if existing:
-        return {"claimed": False, "hash": content_hash}
-
+    # INSERT first — PK collision triggers IntegrityError, no SELECT+INSERT race window
     db.add(RepliedComment(
         content_hash=content_hash,
         author=request.author,
         text=request.text,
         replied_by_device=authed_device_id,
     ))
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        return {"claimed": False, "hash": content_hash}
     return {"claimed": True, "hash": content_hash}
 
 
@@ -1210,6 +1239,8 @@ async def dm_send_report(
     conv = db.query(Conversation).filter(Conversation.id == request.conversation_id).first()
     if not conv:
         raise HTTPException(status_code=404, detail="会话不存在")
+    if conv.device_id != authed_device_id:
+        raise HTTPException(status_code=403, detail="会话不属于此设备")
 
     conv.current_stage = request.stage
     conv.intent = request.intent

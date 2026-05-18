@@ -107,6 +107,11 @@ const routes = [
         component: () => import('../views/DictManagePage.vue'),
       },
       {
+        path: 'dm-sequences',
+        name: 'DMSequences',
+        component: () => import('../views/DMSequenceManagePage.vue'),
+      },
+      {
         path: 'director/:seriesId/:episodeId',
         name: 'Director',
         component: () => import('../views/DirectorPage.vue'),

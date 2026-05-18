@@ -15,7 +15,7 @@ from contextlib import asynccontextmanager
 from app.config import bj_now
 from app.database import get_db, init_db, SessionLocal
 from app.seed import seed_all
-from app.routers import device, tasks, accounts, devices, auth, selectors, stats, content, account_groups, chains, settings, channels, prompt_templates, data, videos, pixelle, seedance, ai_config, characters, scenes, series, pipeline, audit, director, reference_data
+from app.routers import device, tasks, accounts, devices, auth, selectors, stats, content, account_groups, chains, settings, channels, prompt_templates, data, videos, pixelle, seedance, ai_config, characters, scenes, series, pipeline, audit, director, reference_data, dm_sequences
 from app.services.ai_generator import ai_generator
 
 
@@ -90,10 +90,16 @@ async def _offline_checker():
                 DBTask.device_id.in_(online_ids),  # only online devices — offline handled by get_pending_task
             ).all()
             if stuck_tasks:
+                from app.services.task_service import MAX_RETRIES
                 for t in stuck_tasks:
-                    t.status = "pending"
-                    t.device_id = None
-                    t.started_at = None
+                    t.retry_count += 1
+                    if t.retry_count >= MAX_RETRIES:
+                        t.status = "failed"
+                        t.completed_at = now
+                    else:
+                        t.status = "pending"
+                        t.device_id = None
+                        t.started_at = None
                     # Reset linked channel item (any non-terminal status)
                     db.query(DBChannelItem).filter(
                         DBChannelItem.task_id == t.id,
@@ -186,6 +192,7 @@ app.include_router(pipeline.router)
 app.include_router(audit.router)
 app.include_router(director.router)
 app.include_router(reference_data.router)
+app.include_router(dm_sequences.router)
 
 
 @app.get("/health")

@@ -258,7 +258,22 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
                     recipient_nickname: comment.nickname,
                   });
                   if (dmClaimResult && dmClaimResult.claimed) {
-                    var sent = this._sendDM(dmContent);
+                    var sent;
+                    // DM 序列模板 vs 单条私信
+                    if (params.dm_sequence_id) {
+                      var seqMsgs = this.resolveMessages(params);
+                      var dmBtnOk = this.safeClick("dm_entry_btn", 3);
+                      if (dmBtnOk) { sleep(1500); }
+                      if (dmBtnOk && seqMsgs.length > 0) {
+                        this._sendMessageSequence(seqMsgs, stats, keyword);
+                        sent = true;
+                        stats.dm_count += seqMsgs.length - 1;
+                      } else {
+                        sent = false;
+                      }
+                    } else {
+                      sent = this._sendDM(dmContent);
+                    }
                     if (sent) {
                       apiClient.reportDMSend({
                         conversation_id: dmClaimResult.conversation_id,
@@ -284,7 +299,21 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
                     recipient_nickname: comment.nickname,
                   });
                   if (dmClaimResult && dmClaimResult.claimed) {
-                    var sent2 = this._sendDM(dmContent);
+                    var sent2;
+                    if (params.dm_sequence_id) {
+                      var seqMsgs2 = this.resolveMessages(params);
+                      var dmBtnOk2 = this.safeClick("dm_entry_btn", 3);
+                      if (dmBtnOk2) { sleep(1500); }
+                      if (dmBtnOk2 && seqMsgs2.length > 0) {
+                        this._sendMessageSequence(seqMsgs2, stats, keyword);
+                        sent2 = true;
+                        stats.dm_count += seqMsgs2.length - 1;
+                      } else {
+                        sent2 = false;
+                      }
+                    } else {
+                      sent2 = this._sendDM(dmContent);
+                    }
                     if (sent2) {
                       apiClient.reportDMSend({
                         conversation_id: dmClaimResult.conversation_id,

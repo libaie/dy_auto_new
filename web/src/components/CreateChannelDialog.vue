@@ -113,6 +113,15 @@
           </div>
         </template>
 
+        <!-- DM sequence -->
+        <div v-if="['search_dm', 'reply_comment'].includes(form.task_type) && dmSequences.length > 0" class="mb-4">
+          <label class="block text-sm font-medium text-slate-300 mb-1">DM 序列模板（可选）</label>
+          <select v-model="dmSequenceId" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500">
+            <option value="">不使用序列</option>
+            <option v-for="seq in dmSequences" :key="seq.id" :value="seq.id">{{ seq.name }} ({{ seq.message_count }}条)</option>
+          </select>
+        </div>
+
         <!-- DM / comment content -->
         <div v-if="['search_comment', 'search_dm', 'reply_comment'].includes(form.task_type)" class="mb-4">
           <label class="block text-sm font-medium text-slate-300 mb-1">
@@ -122,8 +131,9 @@
             v-model="formParams.content"
             rows="2"
             maxlength="500"
-            class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-blue-500"
-            :placeholder="form.task_type === 'reply_comment' ? '留空则 AI 生成回复和私信' : '留空则 AI 自动生成'"
+            :disabled="!!dmSequenceId"
+            class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-blue-500 disabled:opacity-50"
+            :placeholder="dmSequenceId ? '已选择DM序列模板，此处内容将被忽略' : (form.task_type === 'reply_comment' ? '留空则 AI 生成回复和私信' : '留空则 AI 自动生成')"
           />
         </div>
 
@@ -158,6 +168,7 @@ import { ref, watch, onMounted } from 'vue'
 import { createChannel } from '../api/channels.js'
 import { listGroups, listMembers } from '../api/accountGroups.js'
 import { generateKeywords } from '../api/content.js'
+import { listDMSequences } from '../api/dmSequences.js'
 
 const emit = defineEmits(['close', 'created'])
 
@@ -180,6 +191,8 @@ const formParams = ref({
   sort_by: '',
   content: '',
 })
+const dmSequenceId = ref('')
+const dmSequences = ref([])
 const error = ref('')
 const submitting = ref(false)
 
@@ -190,6 +203,7 @@ onMounted(async () => {
   } catch (e) {
     console.error('Failed to load groups:', e)
   }
+  try { var sr = await listDMSequences(); dmSequences.value = sr.data.sequences || [] } catch (e) {}
 })
 
 // Load group members when group changes
@@ -252,6 +266,7 @@ async function submit() {
   var merged = {
     count: params.count !== undefined ? params.count : fp.count,
     content: params.content !== undefined ? params.content : (fp.content || undefined),
+    dm_sequence_id: dmSequenceId.value || undefined,
   }
   if (['reply_comment', 'search_comment', 'collect'].includes(form.value.task_type)) {
     merged.video_count = params.video_count !== undefined ? params.video_count : fp.video_count

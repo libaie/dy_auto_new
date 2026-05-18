@@ -496,4 +496,59 @@ SearchBaseHandler._interactWithVideo = function (content, stats) {
   throw new Error("_interactWithVideo() not implemented");
 };
 
+// ==== DM 序列发送方法 (search-dm / reply-comment 共用) ====
+
+/**
+ * 解析消息序列，返回 [{order, content, delay_ms}]
+ * 优先级: dm_sequence_id > params.content > AI 生成
+ */
+SearchBaseHandler.resolveMessages = function (params) {
+  if (params.dm_sequence_id && this._dmSeqCache && this._dmSeqCache[params.dm_sequence_id]) {
+    return this._dmSeqCache[params.dm_sequence_id].messages;
+  }
+  if (params.content) {
+    return [{order: 1, content: params.content, delay_ms: 0}];
+  }
+  var count = params.count || 1;
+  var videoText = "";
+  try { videoText = this._extractVideoText ? this._extractVideoText() : ""; } catch (e) {}
+  if (count > 1 && videoText) {
+    var seq = aiAnalyzer.generateVideoDMSequence(videoText, count);
+    if (seq && seq.length > 0) return seq;
+  }
+  var single = videoText ? aiAnalyzer.generateVideoDM(videoText) : "";
+  return single ? [{order: 1, content: single, delay_ms: 0}] : [];
+};
+
+/**
+ * 变量替换 — 不存在的 key → 空字符串
+ */
+SearchBaseHandler.applyVariables = function (template, vars) {
+  return template.replace(/\{\{(\w+)\}\}/g, function (_, key) {
+    return vars[key] || "";
+  });
+};
+
+/**
+ * 发送消息序列通用循环（拟人输入 + 延迟）
+ */
+SearchBaseHandler._sendMessageSequence = function (messages, stats, keyword) {
+  for (var i = 0; i < messages.length; i++) {
+    var msg = messages[i];
+    var content = this.applyVariables(msg.content, {keyword: keyword || ""});
+    var inputOk = this.safeInput("dm_input", content);
+    if (!inputOk) {
+      logger.warn(TAG, "DM序列[" + (i + 1) + "/" + messages.length + "]输入失败，跳过本条");
+      continue;
+    }
+    sleep(500);
+    this.submitViaKeyboard("dm_send");
+    sleep(1000);
+    var extraDelay = msg.delay_ms || Math.floor(Math.random() * 3000) + 2000;
+    sleep(extraDelay);
+    stats.details.push("dm_sent[" + (i + 1) + "/" + messages.length + "]: "
+      + content.substring(0, 30));
+  }
+};
+
 module.exports = SearchBaseHandler;

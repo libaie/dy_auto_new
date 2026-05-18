@@ -197,6 +197,7 @@ class PollResponse(BaseModel):
     anti_detect_config_version: int = 1
     ai_config: Optional[dict[str, Any]] = None
     device_config: Optional[dict[str, Any]] = None
+    dm_sequences: Optional[list[dict[str, Any]]] = None
 
 
 class DeviceRegisterRequest(BaseModel):

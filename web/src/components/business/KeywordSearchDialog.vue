@@ -4,6 +4,7 @@ import { Dialog, DialogPanel, DialogTitle, TransitionRoot, TransitionChild } fro
 import TipIcon from '../TipIcon.vue'
 import { batchCreateTasks } from '../../api/tasks.js'
 import { generateKeywords } from '../../api/content.js'
+import { listDMSequences } from '../../api/dmSequences.js'
 import { useToastStore } from '../../stores/toast.js'
 import { KEYWORD_ACTION_TYPE_OPTIONS, SORT_BY_OPTIONS } from '../../constants/tasks.js'
 
@@ -33,6 +34,8 @@ const keywordSortBy = ref('')
 const keywordTemplateId = ref('')
 const keywordPromptTemplateId = ref('')
 const keywordContent = ref('')
+const keywordDMSequenceId = ref('')
+const dmSequences = ref([])
 const keywordMaxAgeDays = ref(5)
 const keywordGenerateCount = ref(10)
 const keywordProcessingCount = ref(5)
@@ -60,8 +63,11 @@ function resetForm() {
   keywordVideoCount.value = 3
 }
 
-watch(() => props.open, (val) => {
-  if (val) resetForm()
+watch(() => props.open, async (val) => {
+  if (val) {
+    resetForm()
+    try { const res = await listDMSequences(); dmSequences.value = res.data.sequences || [] } catch (e) {}
+  }
 })
 
 async function handleGenerateKeywords() {
@@ -99,7 +105,8 @@ async function handleBatchCreateKeywordTasks() {
     const params = { keyword: kwList[0] || '', keywords: kwList, count: keywordProcessingCount.value }
     if (keywordSortBy.value) params.sort_by = keywordSortBy.value
     params.max_age_days = keywordMaxAgeDays.value || 30
-    if (keywordTemplateId.value) { params.content_template_id = keywordTemplateId.value }
+    if (keywordDMSequenceId.value) { params.dm_sequence_id = keywordDMSequenceId.value }
+    else if (keywordTemplateId.value) { params.content_template_id = keywordTemplateId.value }
     else if (keywordContent.value) { params.content = keywordContent.value }
     if (keywordPromptTemplateId.value) params.prompt_template_id = keywordPromptTemplateId.value
     if (['reply_comment', 'search_comment', 'collect'].includes(keywordActionType.value)) {
@@ -243,14 +250,21 @@ async function handleBatchCreateKeywordTasks() {
                 </div>
 
                 <template v-if="['search_comment', 'search_dm', 'reply_comment'].includes(keywordActionType)">
-                  <div v-if="templates.length > 0">
+                  <div v-if="dmSequences.length > 0 && ['search_dm', 'reply_comment'].includes(keywordActionType)">
+                    <label class="block text-sm font-medium text-slate-300">DM 序列模板</label>
+                    <select v-model="keywordDMSequenceId" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200">
+                      <option value="">不使用序列</option>
+                      <option v-for="seq in dmSequences" :key="seq.id" :value="seq.id">{{ seq.name }} ({{ seq.message_count }}条)</option>
+                    </select>
+                  </div>
+                  <div v-if="!keywordDMSequenceId && templates.length > 0">
                     <label class="block text-sm font-medium text-slate-300">内容模板</label>
                     <select v-model="keywordTemplateId" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200">
                       <option value="">不使用模板</option>
                       <option v-for="tpl in templates" :key="tpl.id" :value="tpl.id">{{ tpl.name }} ({{ tpl.category }})</option>
                     </select>
                   </div>
-                  <div>
+                  <div v-if="!keywordDMSequenceId">
                     <label class="block text-sm font-medium text-slate-300">评论/私信内容 <TipIcon text="留空则使用模板或 AI 生成" /></label>
                     <textarea v-model="keywordContent" rows="2" maxlength="500" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 placeholder-slate-500" placeholder="输入内容...（留空用模板）" />
                   </div>

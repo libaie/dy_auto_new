@@ -322,6 +322,19 @@ class PromptTemplate(Base):
     updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
 
 
+class DMSequence(Base):
+    """DM 私信序列模板 — 预设有序多条私信内容，前端全量自定义传入"""
+    __tablename__ = "dm_sequences"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    name = Column(String(100), nullable=False)
+    messages = Column(JSON, nullable=False)             # [{order, content, delay_ms}, ...]
+    industry = Column(String(50), nullable=True, index=True)
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
+    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
+
+
 class CollectedComment(Base):
     """采集的评论数据"""
     __tablename__ = "collected_comments"

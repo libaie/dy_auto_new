@@ -266,7 +266,7 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
                   if (dmClaimResult && dmClaimResult.claimed) {
                     var sent, reportedContent;
                     // DM 序列模板 vs 单条私信
-                    if (params.dm_sequence_id) {
+                    if (params.dm_sequence_id || (params.dm_messages && params.dm_messages.length > 0)) {
                       var seqMsgs = this.resolveMessages(params);
                       if (!seqMsgs || !seqMsgs.map) { seqMsgs = []; }
                       var dmBtnOk = this.safeClick("dm_entry_btn", 3);
@@ -290,7 +290,7 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
                         stage: dmIntent, intent: dmIntent, keyword: keyword, content: reportedContent,
                       });
                       stats.dm_count++;
-                      if (!params.dm_sequence_id) { try { apiClient.incrementStats(params.account_id, "search_dm", 1); } catch (e) {} }
+                      if (!params.dm_sequence_id && !(params.dm_messages && params.dm_messages.length > 0)) { try { apiClient.incrementStats(params.account_id, "search_dm", 1); } catch (e) {} }
                     } else {
                       apiClient.releaseDMRecipient({ conversation_id: dmClaimResult.conversation_id });
                     }
@@ -311,7 +311,7 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
                   });
                   if (dmClaimResult && dmClaimResult.claimed) {
                     var sent2, reportedContent2;
-                    if (params.dm_sequence_id) {
+                    if (params.dm_sequence_id || (params.dm_messages && params.dm_messages.length > 0)) {
                       var seqMsgs2 = this.resolveMessages(params);
                       if (!seqMsgs2 || !seqMsgs2.map) { seqMsgs2 = []; }
                       var dmBtnOk2 = this.safeClick("dm_entry_btn", 3);
@@ -335,7 +335,7 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
                         stage: dmIntent, intent: dmIntent, keyword: keyword, content: reportedContent2,
                       });
                       stats.dm_count++;
-                      if (!params.dm_sequence_id) { try { apiClient.incrementStats(params.account_id, "search_dm", 1); } catch (e) {} }
+                      if (!params.dm_sequence_id && !(params.dm_messages && params.dm_messages.length > 0)) { try { apiClient.incrementStats(params.account_id, "search_dm", 1); } catch (e) {} }
                     } else {
                       apiClient.releaseDMRecipient({ conversation_id: dmClaimResult.conversation_id });
                     }

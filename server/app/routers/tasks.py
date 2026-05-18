@@ -49,6 +49,33 @@ async def _maybe_resolve_content_template(params: dict, task_type: str, db=None)
     return params
 
 
+async def _maybe_resolve_dm_sequence(params: dict, db=None) -> dict:
+    """If params has dm_sequence_id, resolve into inline dm_messages + content.
+    Removes dm_sequence_id so old device code (without duck-type guard)
+    takes the safe single-DM path instead of crashing on .join()."""
+    seq_id = params.get("dm_sequence_id")
+    if not seq_id or not db:
+        return params
+    try:
+        from app.db_models import DMSequence
+        seq = db.query(DMSequence).filter(DMSequence.id == seq_id).first()
+        if seq and seq.messages:
+            params["dm_messages"] = seq.messages
+            # Fallback: first message content for old devices
+            first = seq.messages[0]
+            if isinstance(first, dict):
+                params["content"] = first.get("content", "")
+            params.pop("dm_sequence_id", None)
+            logger.info("Resolved dm_sequence_id=%s into %d inline messages", seq_id, len(seq.messages))
+        else:
+            logger.warning("dm_sequence_id=%s not found in DB, removing from params", seq_id)
+            params.pop("dm_sequence_id", None)
+    except Exception as e:
+        logger.warning("Failed to resolve dm_sequence_id=%s: %s", seq_id, e)
+        params.pop("dm_sequence_id", None)
+    return params
+
+
 async def _maybe_expand_keywords(params: dict, task_type: str, db=None) -> dict:
     """If nurture task has keywords (seed), expand them into keyword_matrix via AI."""
     if task_type != "nurture" or "keywords" not in params:
@@ -109,6 +136,7 @@ async def create_task(
     except Exception as e:
         raise HTTPException(status_code=422, detail=f"Invalid params for {request.type.value}: {str(e)}")
     params = await _maybe_resolve_content_template(params, request.type.value, db=db)
+    params = await _maybe_resolve_dm_sequence(params, db=db)
     params = await _maybe_expand_keywords(params, request.type.value, db=db)
 
     try:
@@ -154,6 +182,7 @@ async def batch_create_tasks(
     from app.models import TaskType as TT, TASK_PARAMS_VALIDATORS
 
     params = await _maybe_resolve_content_template(params, ttype, db=db)
+    params = await _maybe_resolve_dm_sequence(params, db=db)
     params = await _maybe_expand_keywords(params, ttype, db=db)
     raw_keywords = params.get("keywords", []) or ([params.get("keyword")] if params.get("keyword") else [])
     keywords = [k.strip() for k in raw_keywords if k and k.strip()]

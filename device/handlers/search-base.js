@@ -503,6 +503,9 @@ SearchBaseHandler._interactWithVideo = function (content, stats) {
  * 优先级: dm_sequence_id > params.content > AI 生成
  */
 SearchBaseHandler.resolveMessages = function (params) {
+  if (params.dm_messages && params.dm_messages.length > 0) {
+    return params.dm_messages;
+  }
   if (params.dm_sequence_id && this._dmSeqCache && this._dmSeqCache[params.dm_sequence_id]) {
     return this._dmSeqCache[params.dm_sequence_id].messages;
   }

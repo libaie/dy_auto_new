@@ -53,7 +53,11 @@ var updateChecker = {
     }
 
     try {
-      var updateDir = files.cwd() + "/update";
+      // 优先用 app 私有目录（与 downloadScript 一致）
+      var baseDir = null;
+      try { baseDir = context.getExternalFilesDir(null).getAbsolutePath(); } catch (e) {}
+      if (!baseDir) { baseDir = files.cwd(); }
+      var updateDir = baseDir + "/update";
       var zipPath = updateDir + "/device-script.zip";
       var tempDir = updateDir + "/temp";
 

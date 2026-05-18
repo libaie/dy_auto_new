@@ -355,21 +355,34 @@ var apiClient = {
   downloadScript: function () {
     var url = config.serverUrl + "/api/device/script-download";
     var body = this._downloadWithRetry(url);
-    if (body) {
-      var scriptDir = files.cwd() + "/update";
-      files.ensureDir(scriptDir);
-      var zipPath = scriptDir + "/device-script.zip";
-      files.writeBytes(zipPath, body);
-      // 验证文件确实写入成功
-      if (!files.exists(zipPath)) {
-        logger.error(TAG, "下载完成但文件不存在: " + zipPath);
-        return false;
-      }
-      logger.info(TAG, "脚本已下载: " + zipPath + " (" + body.length + " bytes)");
-      return true;
+    if (!body) {
+      logger.error(TAG, "脚本下载所有重试均失败");
+      return false;
     }
-    logger.error(TAG, "脚本下载所有重试均失败");
-    return false;
+    // Android 10+ 外部存储写入受限 — 优先用 app 私有目录
+    var baseDir = null;
+    try { baseDir = context.getExternalFilesDir(null).getAbsolutePath(); } catch (e) {}
+    if (!baseDir) { baseDir = files.cwd(); }
+    var updateDir = baseDir + "/update";
+    var zipPath = updateDir + "/device-script.zip";
+    var wrote = false;
+    for (var attempt = 0; attempt < 3; attempt++) {
+      try {
+        files.ensureDir(updateDir);
+        if (!files.isDir(updateDir)) { sleep(300); continue; }
+        files.writeBytes(zipPath, body);
+        if (files.exists(zipPath)) { wrote = true; break; }
+      } catch (e) {
+        logger.warn(TAG, "写入更新包失败(尝试" + (attempt + 1) + "/3): " + e.message);
+        sleep(500);
+      }
+    }
+    if (!wrote) {
+      logger.error(TAG, "无法写入更新包到: " + zipPath);
+      return false;
+    }
+    logger.info(TAG, "脚本已下载: " + zipPath + " (" + body.length + " bytes)");
+    return true;
   },
 
   register: function (deviceInfo) {

@@ -1,0 +1,147 @@
+<h2>模型配置中心 — 完整设计方案</h2>
+<p class="subtitle">独立数据模型 + CRUD 页面 + PipelineLayerConfig 联动</p>
+
+<div class="section">
+<h3>1. 数据模型：AIModel 表</h3>
+<p style="font-size:12px;color:var(--text-muted);">一张表 + type-specific JSON config 字段，不拆多表。provider 切换时前端动态显隐字段。</p>
+
+<pre style="font-size:11px;line-height:1.6;background:rgba(10,15,30,0.4);padding:12px;border-radius:8px;color:#cbd5e1;">
+class AIModel(Base):
+    __tablename__ = "ai_models"
+
+    id              = UUID PK
+    name            = String(100)    # 显示名, 如 "DeepSeek V3"
+    model_type      = String(20)     # llm | image | video | tts | audit
+    provider        = String(30)     # deepseek | openai | seedance | kling | ...
+    base_url        = String(300)    # API 端点
+    api_key         = String(500)    # 加密存储
+    api_secret      = String(500)    # 加密存储 (Kling 双钥等)
+    model_name      = String(100)    # deepseek-chat / doubao-seedance-2.0 / ...
+    config_json     = JSON            # 各类型专属字段
+    enabled         = Boolean         # 是否启用
+    sort_order      = Integer
+    created_at      = DateTime
+
+# config_json 内容示例:
+# llm:    {"thinking_enabled":true, "thinking_budget":8192, "max_tokens":4096, "temperature":0.7}
+# image:  {"default_size":"1024x1024", "default_quality":"hd"}
+# video:  {"default_resolution":"1080p", "default_duration":5, "default_aspect_ratio":"9:16"}
+# tts:    {"default_voice":"zh-CN-XiaoxiaoNeural", "default_language":"zh-CN", "default_speed":1.0}
+# audit:  {"audit_mode":"single"}</pre>
+</div>
+
+<div class="section">
+<h3>2. 页面布局 — 替换现有 AIConfigPage</h3>
+
+<div class="split">
+  <div class="mockup" style="flex:1;">
+    <div class="mockup-header">左栏：模型列表</div>
+    <div class="mockup-body" style="font-size:11px;line-height:2.2;padding:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <span style="font-weight:700;font-size:13px;color:#f1f5f9;">模型配置</span>
+        <span style="font-size:11px;padding:2px 8px;border-radius:4px;background:var(--accent-600);color:#fff;cursor:pointer;">+ 新增</span>
+      </div>
+      <div style="color:var(--accent-400);margin-bottom:4px;font-size:10px;letter-spacing:1px;">脚本生成</div>
+      <div style="display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:6px;background:rgba(14,165,233,0.08);margin-bottom:2px;">
+        <span style="width:6px;height:6px;border-radius:50%;background:#38bdf8;"></span>
+        <span>DeepSeek V3</span> <span style="color:#64748b;font-size:10px;">deepseek-chat</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:6px;margin-bottom:2px;">
+        <span style="width:6px;height:6px;border-radius:50%;background:#a78bfa;"></span>
+        <span>GPT-4o</span> <span style="color:#64748b;font-size:10px;">gpt-4o</span>
+      </div>
+      <div style="color:var(--accent-400);margin:10px 0 4px;font-size:10px;letter-spacing:1px;">画面生成</div>
+      <div style="display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:6px;background:rgba(14,165,233,0.08);margin-bottom:2px;">
+        <span style="width:6px;height:6px;border-radius:50%;background:#34d399;"></span>
+        <span>Seedance Image</span>
+      </div>
+      <div style="color:var(--accent-400);margin:10px 0 4px;font-size:10px;letter-spacing:1px;">视频渲染</div>
+      <div style="display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:6px;margin-bottom:2px;">
+        <span style="width:6px;height:6px;border-radius:50%;background:#c084fc;"></span>
+        <span>Seedance 2.0</span>
+      </div>
+    </div>
+  </div>
+  <div class="mockup" style="flex:2;">
+    <div class="mockup-header">右栏：模型编辑</div>
+    <div class="mockup-body" style="font-size:11px;line-height:2.2;padding:10px;">
+      <div style="font-weight:700;color:#f1f5f9;margin-bottom:8px;">编辑：DeepSeek V3</div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+        <div><span style="color:#94a3b8;">类型</span><br><span style="color:#38bdf8;border:1px solid rgba(14,165,233,0.3);padding:2px 8px;border-radius:4px;">LLM</span></div>
+        <div><span style="color:#94a3b8;">Provider</span><br><span style="color:#cbd5e1;">deepseek</span></div>
+        <div><span style="color:#94a3b8;">模型名</span><br><span style="color:#cbd5e1;">deepseek-chat</span></div>
+        <div><span style="color:#94a3b8;">Base URL</span><br><span style="color:#cbd5e1;">https://api.deepseek.com/v1</span></div>
+        <div><span style="color:#94a3b8;">API Key</span><br><span style="color:#cbd5e1;">sk-****abcd</span></div>
+      </div>
+
+      <div style="margin-top:8px;padding:8px;border-radius:6px;border:1px solid var(--border-subtle);">
+        <div style="font-weight:600;color:#f1f5f9;margin-bottom:4px;">LLM 专属配置</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">
+          <div><span style="color:#94a3b8;">深度思考</span> <span style="color:#34d399;">ON</span></div>
+          <div><span style="color:#94a3b8;">思考预算</span> <span style="color:#cbd5e1;">8192 tokens</span></div>
+          <div><span style="color:#94a3b8;">Max Tokens</span> <span style="color:#cbd5e1;">4096</span></div>
+          <div><span style="color:#94a3b8;">Temperature</span> <span style="color:#cbd5e1;">0.7</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="section">
+<h3>3. 与 PipelineLayerConfig 联动</h3>
+<p style="font-size:12px;color:var(--text-muted);">PipelineLayerConfig 每层的模型下拉选项从 AIModel 表动态拉取，不再从 reference_data 查。</p>
+<pre style="font-size:11px;line-height:1.6;background:rgba(10,15,30,0.4);padding:10px;border-radius:8px;color:#cbd5e1;">
+GET /api/ai-models?model_type=llm&enabled=true
+→ [{ id, name, provider, model_name, ... }]
+
+PipelineLayerConfig 直接展示返回的模型列表，用户选的模型 ID
+随 pipeline start 请求下发 → backend 根据 model_id 查 config 调用对应 API
+</pre>
+</div>
+
+<div class="section">
+<h3>4. API 设计</h3>
+<pre style="font-size:11px;line-height:1.6;background:rgba(10,15,30,0.4);padding:10px;border-radius:8px;color:#cbd5e1;">
+GET    /api/ai-models                    # 列表, ?model_type=llm 过滤
+GET    /api/ai-models/{id}               # 详情 (含解密 api_key)
+POST   /api/ai-models                    # 新增
+PUT    /api/ai-models/{id}               # 更新
+DELETE /api/ai-models/{id}               # 删除
+GET    /api/ai-models/options            # 供 PipelineLayerConfig 拉取
+                                          # → [{id, name, model_type, provider}]
+</pre>
+<p style="font-size:11px;color:var(--text-muted);">替代现有 ai_config.py 的 SystemSetting 键值对方案。旧 /api/ai-config/models 保留兼容。</p>
+</div>
+
+<div class="section">
+<h3>5. 默认数据 (seed)</h3>
+<pre style="font-size:10px;line-height:1.6;background:rgba(10,15,30,0.4);padding:10px;border-radius:8px;color:#94a3b8;">
+LLM:    DeepSeek V3   | GPT-4o       | Qwen Max        | Claude Opus
+Image:  Seedance Img  | OpenAI DALL-E 3 | FLUX (ComfyUI)
+Video:  Seedance 2.0  | Kling 3.0     | Wan 2.7
+TTS:    Edge-TTS       | Index-TTS     | Spark-TTS
+Audit:  GPT-4o Audit   | Gemini Audit  | Skip (none)
+→ 共 18 个默认模型配置，api_key 留空待用户配置
+</pre>
+</div>
+
+<h3 style="margin-top:20px;">这个完整方案可以吗？</h3>
+
+<div class="options">
+  <div class="option" data-choice="approve" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>方案 OK，写 spec 文档 (Recommended)</h3>
+      <p>AIModel 表 + 左右分栏编辑页 + PipelineLayerConfig 联动。5 类型 18 默认模型。</p>
+    </div>
+  </div>
+  <div class="option" data-choice="tweak" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>需要调整</h3>
+      <p>某部分设计需要修改。请在终端说明。</p>
+    </div>
+  </div>
+</div>

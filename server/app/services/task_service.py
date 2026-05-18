@@ -206,6 +206,10 @@ class TaskService:
 
         # Task already in terminal state — ignore late reports
         if db_task.status in (TaskStatus.CANCELLED.value, TaskStatus.COMPLETED.value, TaskStatus.FAILED.value):
+            import logging
+            _logger = logging.getLogger("task_service")
+            _logger.warning("Late report discarded: task %s already in terminal state %s (reported status=%s)",
+                            task_id, db_task.status, status.value if hasattr(status, 'value') else status)
             return _db_task_to_pydantic(db_task), None
 
         # Check channel association early (affects retry logic)
@@ -301,7 +305,7 @@ class TaskService:
         task = db.query(DBTask).filter(DBTask.id == task_id).first()
         if not task:
             raise ValueError(f"Task {task_id} not found")
-        if task.status in (TaskStatus.COMPLETED.value, TaskStatus.CANCELLED.value):
+        if task.status in (TaskStatus.COMPLETED.value, TaskStatus.CANCELLED.value, TaskStatus.FAILED.value):
             raise ValueError(f"Cannot cancel task in status: {task.status}")
         task.status = TaskStatus.CANCELLED.value
         task.completed_at = bj_now()

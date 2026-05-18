@@ -1056,6 +1056,8 @@ async def collect_report(
         location=request.comment.location,
         is_author=request.comment.is_author,
         data_source_type=request.data_source_type,
+        ai_reply=request.comment.ai_reply,
+        ai_replied_at=bj_now() if request.comment.ai_reply else None,
         intended_province=request.comment.intended_province or None,
         intended_city=request.comment.intended_city or None,
         intended_attraction=request.comment.intended_attraction or None,

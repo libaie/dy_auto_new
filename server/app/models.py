@@ -571,6 +571,7 @@ class CollectCommentData(BaseModel):
     dislike_count: str = ""
     location: str = ""
     is_author: bool = False
+    ai_reply: str | None = None
     intended_province: str | None = None
     intended_city: str | None = None
     intended_attraction: str | None = None

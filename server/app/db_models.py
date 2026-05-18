@@ -144,10 +144,12 @@ class DailyStats(Base):
     account_id = Column(String(36), ForeignKey("accounts.id"), nullable=False, index=True)
     date = Column(String(10), nullable=False, index=True)  # YYYY-MM-DD
     likes = Column(Integer, nullable=False, default=0)
+    nurture_likes = Column(Integer, nullable=False, default=0)
     comments = Column(Integer, nullable=False, default=0)
     follows = Column(Integer, nullable=False, default=0)
     dms = Column(Integer, nullable=False, default=0)
     replies = Column(Integer, nullable=False, default=0)
+    collected = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
     updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
 

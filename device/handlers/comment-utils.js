@@ -113,8 +113,11 @@ var commentUtils = {
       if (!text) return null;
 
       // 时间
+      // selector 可能误匹配父级元素导致 text() 返回拼接后的全文本
+      // 如 "昵称,评论文本,3小时前, · 广东,回复 按钮,"，需从中提取时间片段
       var timeEl = findChild(item, "comment_time");
-      var timeStr = timeEl ? extractVal(timeEl, "comment_time", "") : "";
+      var rawTime = timeEl ? extractVal(timeEl, "comment_time", "") : "";
+      var timeStr = commentUtils._cleanTimeStr(rawTime);
 
       // 是否作者
       var isAuthor = false;
@@ -207,6 +210,27 @@ var commentUtils = {
 	    logger.warn(TAG, '无法解析时间: ' + timeStr);
 	    return null;
 	  },
+
+	/**
+	 * 从被污染的 time_str 中提取真正的时间片段
+	 * 当 comment_time selector 误匹配父元素时，text() 返回拼接全文本
+	 * 如 "昵称,评论文本,3小时前, · 广东,回复 按钮," → "3小时前"
+	 */
+	_cleanTimeStr: function (raw) {
+	  if (!raw) return "";
+	  if (raw.length <= 15 && raw.indexOf(",") === -1) return raw;
+	  var patterns = [
+	    /\d+年前/, /\d+个月前/, /\d+周前/, /\d+天前/, /\d+小时前/, /\d+分钟前/, /\d+秒前/,
+	    /刚刚/, /昨天\s*\d{1,2}:\d{2}/, /前天\s*\d{1,2}:\d{2}/,
+	    /\d{4}-\d{1,2}-\d{1,2}\s+\d{1,2}:\d{2}/, /\d{4}-\d{1,2}-\d{1,2}/,
+	    /\d{1,2}-\d{1,2}\s+\d{1,2}:\d{2}/, /\d{1,2}-\d{1,2}/,
+	  ];
+	  for (var i = 0; i < patterns.length; i++) {
+	    var m = raw.match(patterns[i]);
+	    if (m) return m[0];
+	  }
+	  return raw;
+	},
 
 localPreFilter: function (text) {
     if (!text) return false;

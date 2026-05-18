@@ -148,7 +148,10 @@ var apiClient = {
         }
 
         if (response.statusCode >= 400 && response.statusCode < 500) {
-          logger.error(TAG, label + " 客户端错误: " + response.statusCode);
+          var respBody = "";
+          try { respBody = this._readBody(response); } catch (e2) {}
+          logger.error(TAG, label + " 客户端错误: " + response.statusCode +
+            (respBody ? " body=" + respBody.substring(0, 200) : ""));
           return null;
         }
 
@@ -305,13 +308,16 @@ var apiClient = {
       ui_snapshot: uiSnapshot || null,
     };
     var response = this.post("/api/device/report", body);
-    if (!response && !isOnline) this._pushToOfflineQueue("/api/device/report", body, "任务结果");
+    if (!response) {
+      logger.warn(TAG, "任务结果上报失败(status=" + status + ")，加入离线队列重试");
+      this._pushToOfflineQueue("/api/device/report", body, "任务结果");
+    }
     return response;
   },
 
   collectReport: function (payload) {
     var response = this.post("/api/device/collect-report", payload);
-    if (!response && !isOnline) this._pushToOfflineQueue("/api/device/collect-report", payload, "采集数据");
+    if (!response) this._pushToOfflineQueue("/api/device/collect-report", payload, "采集数据");
     return response;
   },
 

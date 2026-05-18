@@ -66,18 +66,6 @@ async def _offline_checker():
                 db.query(Device).filter(Device.id.in_(stale_ids)).update(
                     {"status": "offline"}, synchronize_session=False
                 )
-
-                # Mark RUNNING tasks on offline devices as FAILED
-                from app.db_models import Task as DBTask
-                orphaned = db.query(DBTask).filter(
-                    DBTask.device_id.in_(stale_ids),
-                    DBTask.status == "running",
-                ).all()
-                for t in orphaned:
-                    t.status = "failed"
-                    t.result = {"error": "设备离线，任务中断"}
-                    t.completed_at = now
-
                 db.commit()
 
                 for device_id in stale_ids:
@@ -87,24 +75,29 @@ async def _offline_checker():
                         "status": "offline",
                     })
 
-            # 3. Stuck task detection: tasks running >10 min → reset
-            #    Device can be online (heartbeat active) but task thread stuck/dead
-            stuck_cutoff = now - timedelta(seconds=600)
+            # 3. Stuck task detection: tasks running >10 min on ONLINE devices → reset
+            #    Device is online (heartbeat active) but task thread stuck/dead.
+            #    Offline-device tasks are handled by get_pending_task() stale recovery.
+            import os
+            stuck_minutes = int(os.getenv("TASK_STALE_MINUTES", "10"))
+            stuck_cutoff = now - timedelta(seconds=stuck_minutes * 60)
             from app.db_models import Task as DBTask, ChannelItem as DBChannelItem
+            online_ids = [d.id for d in online_devices]  # reuse from liveness check above
             stuck_tasks = db.query(DBTask).filter(
                 DBTask.status == "running",
                 DBTask.started_at.isnot(None),
                 DBTask.started_at < stuck_cutoff,
+                DBTask.device_id.in_(online_ids),  # only online devices — offline handled by get_pending_task
             ).all()
             if stuck_tasks:
                 for t in stuck_tasks:
                     t.status = "pending"
                     t.device_id = None
                     t.started_at = None
-                    # Reset linked channel item
+                    # Reset linked channel item (any non-terminal status)
                     db.query(DBChannelItem).filter(
                         DBChannelItem.task_id == t.id,
-                        DBChannelItem.status == "assigned",
+                        DBChannelItem.status.in_(["assigned", "completed", "failed"]),
                     ).update({"status": "pending", "assigned_device_id": None, "assigned_at": None, "task_id": None}, synchronize_session=False)
                 db.commit()
         except Exception:

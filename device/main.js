@@ -241,8 +241,12 @@ function startMainLoop(serverUrl, secret) {
           }
         }
 
-        apiClient.report(task.id, result.status, result.result, uiSnapshot);
-        logger.info(TAG, "任务结果已上报: " + result.status);
+        var reportResult = apiClient.report(task.id, result.status, result.result, uiSnapshot);
+        if (reportResult) {
+          logger.info(TAG, "任务结果已上报: " + result.status);
+        } else {
+          logger.warn(TAG, "任务结果上报失败，已加入离线队列重试: " + result.status);
+        }
         floatingWindow.setStatus(result.status === "completed" ? "success" : "error");
       } catch (e) {
         logger.error(TAG, "任务执行异常: " + e.message);

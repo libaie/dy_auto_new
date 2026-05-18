@@ -494,8 +494,24 @@ async def poll_tasks(
     from app.db_models import DMSequence
     dm_seqs = db.query(DMSequence).all()
     dm_sequences_list = [{"id": s.id, "messages": s.messages} for s in dm_seqs] if dm_seqs else None
+    logger.info("[poll] device=%s dm_sequences count=%s ids=%s",
+        device_id,
+        len(dm_sequences_list) if dm_sequences_list else 0,
+        [s["id"][:8] for s in dm_sequences_list] if dm_sequences_list else [])
+    if dm_sequences_list:
+        for ds in dm_sequences_list:
+            msgs = ds.get("messages", [])
+            logger.info("[poll] dm_seq id=%s msg_count=%s msg_preview=%s",
+                ds["id"][:8], len(msgs),
+                [m.get("content","")[:30] for m in msgs[:2]] if msgs else [])
 
     from app.config import get_ai_config
+
+    if task:
+        logger.info("[poll] device=%s dispatching task_id=%s type=%s dm_seq_id=%s dm_messages=%s",
+            device_id, task.id[:8], task.type,
+            (task.params or {}).get("dm_sequence_id", "NONE"),
+            "PRESENT" if (task.params or {}).get("dm_messages") else "NONE")
 
     return PollResponse(
         task=task,

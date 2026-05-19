@@ -301,7 +301,7 @@ class ChannelService:
             # Task is created as RUNNING to prevent get_pending_task from stealing it
             params = dict(ch.params_template or {})
             params["keyword"] = item.keyword
-            # Resolve dm_sequence_id into inline dm_messages + content
+            # Resolve dm_sequence_id into inline dm_messages (keep id for device cache/variants)
             seq_id = params.get("dm_sequence_id")
             if seq_id:
                 try:
@@ -312,7 +312,8 @@ class ChannelService:
                         first = seq.messages[0]
                         if isinstance(first, dict):
                             params["content"] = first.get("content", "")
-                    params.pop("dm_sequence_id", None)
+                    else:
+                        params.pop("dm_sequence_id", None)
                 except Exception:
                     params.pop("dm_sequence_id", None)
 

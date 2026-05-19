@@ -51,8 +51,8 @@ async def _maybe_resolve_content_template(params: dict, task_type: str, db=None)
 
 async def _maybe_resolve_dm_sequence(params: dict, db=None) -> dict:
     """If params has dm_sequence_id, resolve into inline dm_messages + content.
-    Removes dm_sequence_id so old device code (without duck-type guard)
-    takes the safe single-DM path instead of crashing on .join()."""
+    Keeps dm_sequence_id so device can look up poll cache for variants.
+    Inline dm_messages serves as fallback for old devices or cache miss."""
     seq_id = params.get("dm_sequence_id")
     if not seq_id or not db:
         return params
@@ -65,8 +65,7 @@ async def _maybe_resolve_dm_sequence(params: dict, db=None) -> dict:
             first = seq.messages[0]
             if isinstance(first, dict):
                 params["content"] = first.get("content", "")
-            params.pop("dm_sequence_id", None)
-            logger.info("Resolved dm_sequence_id=%s into %d inline messages", seq_id, len(seq.messages))
+            logger.info("Resolved dm_sequence_id=%s into %d inline messages (id preserved for variants)", seq_id, len(seq.messages))
         else:
             logger.warning("dm_sequence_id=%s not found in DB, removing from params", seq_id)
             params.pop("dm_sequence_id", None)

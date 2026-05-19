@@ -539,13 +539,11 @@ SearchBaseHandler._storageSet = function (key, val) {
 
 /**
  * 解析消息序列，返回 [{order, content, delay_ms}]
- * 优先级: dm_sequence_id > params.content > AI 生成
+ * 优先级: dm_sequence_id(缓存+变体) > dm_messages(内联回退) > content > AI 生成
  * 支持变体轮替: cached.variants 存在时轮替选取，设备重启后从 KV 恢复索引
  */
 SearchBaseHandler.resolveMessages = function (params) {
-  if (params.dm_messages && params.dm_messages.length > 0) {
-    return params.dm_messages;
-  }
+  // 1. dm_sequence_id — 查 poll 缓存 (含 variants, 优先于内联 dm_messages)
   if (params.dm_sequence_id) {
     var cached = this._dmSeqCache && this._dmSeqCache[params.dm_sequence_id];
     if (cached) {
@@ -557,12 +555,17 @@ SearchBaseHandler.resolveMessages = function (params) {
         this._storageSet(storageKey, (idx + 1) % cached.variants.length);
         return picked;
       }
-      // 无变体 → 原逻辑
+      // 无变体 → 返回缓存消息
       return cached.messages;
     }
-    logger.warn(TAG, "DM序列模板未命中: " + params.dm_sequence_id);
-    return [];
+    logger.warn(TAG, "DM序列模板缓存未命中: " + params.dm_sequence_id + "，回退到内联消息");
+    // 缓存未命中时继续往下走，用 dm_messages 作为回退
   }
+  // 2. dm_messages — 内联消息 (服务端展开的回退，或手动指定)
+  if (params.dm_messages && params.dm_messages.length > 0) {
+    return params.dm_messages;
+  }
+  // 3. content — 单条消息
   if (params.content) {
     return [{order: 1, content: params.content, delay_ms: 0}];
   }

@@ -210,14 +210,25 @@ function startMainLoop(serverUrl, secret) {
     _idleTicks = 0;
     var task = _taskQueue.shift();
 
-    // Watchdog: 10min 超时强制释放 busy 锁，防止任务线程卡死导致永久阻塞
+    // Watchdog: 10min 超时 → 取消任务，不释放 busy 锁
+    // 旧线程检查 isCancelled() 后退出 → finally 块释放锁 → 防止并发执行
     var TASK_TIMEOUT_MS = 600000;
+    var GRACE_PERIOD_MS = 120000;  // 2min 兜底——线程完全无响应时强制释放
     var _completed = false;
+    var _watchdogFired = false;
     var _watchdog = setTimeout(function () {
       if (!_completed) {
-        logger.error(TAG, "任务超时 (" + (TASK_TIMEOUT_MS / 60000) + "min): " + task.id + "，强制释放 busy 锁");
-        _taskBusy = false;
-        _completed = true;
+        logger.error(TAG, "任务超时 (" + (TASK_TIMEOUT_MS / 60000) + "min): " + task.id + "，取消任务");
+        _watchdogFired = true;
+        taskExecutor.cancel(task.id);
+        // 2min 兜底: 如果线程仍不退出，强制释放锁（避免设备永久不可用）
+        setTimeout(function () {
+          if (!_completed) {
+            logger.error(TAG, "任务 " + task.id + " 取消后2min仍未退出，强制释放 busy 锁(需重启设备)");
+            _taskBusy = false;
+            _completed = true;
+          }
+        }, GRACE_PERIOD_MS);
       }
     }, TASK_TIMEOUT_MS);
 

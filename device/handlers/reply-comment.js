@@ -280,7 +280,9 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
       if (canFollow || canDM) {
         if (this._enterCommenterProfile(comment.commentAuthorAvatarEl, comment.nickname)) {
           var profileStart = Date.now();
-          var PROFILE_TIMEOUT = 30000;
+          var PROFILE_TIMEOUT = hasDMSequence
+            ? Math.max(30000, (dmCooldownMs || 0) + 15000)
+            : 30000;
 
           var isPrivate = !!uiOperator.findElement("user_is_private", 2000);
           if (isPrivate) {
@@ -309,6 +311,15 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
               try { apiClient.incrementStats(params.account_id, "follow", 1); } catch (e) {}
             }
             sleep(Math.floor(Math.random() * 500 + 800));
+
+            // DM cooldown: 发送前等待冷却时间，序列和单条共用
+            if (canDM && this._lastDMSendTime) {
+              var cooldownRemaining = (dmCooldownMs || 0) - (Date.now() - this._lastDMSendTime);
+              if (cooldownRemaining > 0) {
+                logger.info(TAG, "DM冷却等待 " + Math.round(cooldownRemaining / 1000) + "s");
+                sleep(cooldownRemaining);
+              }
+            }
 
             if (Date.now() - profileStart < PROFILE_TIMEOUT && canDM) {
               var dmContent = "";

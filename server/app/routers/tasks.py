@@ -187,9 +187,11 @@ async def batch_create_tasks(
     keywords = [k.strip() for k in raw_keywords if k and k.strip()]
 
     # Only require keywords for keyword-based task types (those with a params validator)
+    # collect 允许只用 share_links (分享链接采集)，不需要 keyword
     _needs_keywords = ttype in TASK_PARAMS_VALIDATORS
-    if _needs_keywords and not keywords and not request.params.get("keyword"):
-        raise HTTPException(status_code=400, detail="关键词不能为空")
+    _has_share_links = bool(params.get("share_links"))
+    if _needs_keywords and not keywords and not request.params.get("keyword") and not _has_share_links:
+        raise HTTPException(status_code=400, detail="关键词不能为空（采集任务可使用分享链接代替）")
 
     # 关键词数量上限
     MAX_KEYWORDS = 500

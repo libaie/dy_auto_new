@@ -328,7 +328,7 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
               try { apiClient.saveUserProfile(userData); } catch (e) {}
               try { apiClient.collectReport({
                 task_id: taskId, keyword: keyword,
-                comment: { nickname: comment.nickname, content: comment.text,  time_str: commentUtils.toBeijingTime(comment.time), is_author: comment.isAuthor || false,
+                comment: { nickname: comment.nickname, content: comment.text, time_str: commentUtils.toBeijingTime(comment.time), is_author: comment.isAuthor || false },
                 user: userData, data_source_type: 0,
               }); } catch (e) {}
             }

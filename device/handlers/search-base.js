@@ -496,21 +496,70 @@ SearchBaseHandler._interactWithVideo = function (content, stats) {
   throw new Error("_interactWithVideo() not implemented");
 };
 
+// ==== KV 持久化（设备重启恢复状态）====
+
+/**
+ * 获取缓存目录 — 兼容 Android 10+ scoped storage
+ * 复用 api-client.js 的路径策略: 优先 getExternalFilesDir, 回退 /sdcard/
+ */
+SearchBaseHandler._getCacheDir = function () {
+  try {
+    var extDir = context.getExternalFilesDir(null);
+    if (extDir) {
+      var cacheDir = extDir.getAbsolutePath() + "/dy_auto_cache";
+      files.ensureDir(cacheDir);
+      return cacheDir;
+    }
+  } catch (e) {}
+  var fallback = "/sdcard/dy_auto/cache";
+  try { files.ensureDir(fallback); } catch (e2) {}
+  return fallback;
+};
+
+SearchBaseHandler._storageGet = function (key, defaultVal) {
+  try {
+    var path = this._getCacheDir() + "/" + key + ".txt";
+    if (files.exists(path)) {
+      return parseInt(files.read(path).trim()) || defaultVal;
+    }
+  } catch (e) {}
+  return defaultVal;
+};
+
+SearchBaseHandler._storageSet = function (key, val) {
+  try {
+    var path = this._getCacheDir() + "/" + key + ".txt";
+    files.write(path, String(val));
+  } catch (e) {}
+};
+
+
 // ==== DM 序列发送方法 (search-dm / reply-comment 共用) ====
 
 /**
  * 解析消息序列，返回 [{order, content, delay_ms}]
  * 优先级: dm_sequence_id > params.content > AI 生成
+ * 支持变体轮替: cached.variants 存在时轮替选取，设备重启后从 KV 恢复索引
  */
 SearchBaseHandler.resolveMessages = function (params) {
   if (params.dm_messages && params.dm_messages.length > 0) {
     return params.dm_messages;
   }
   if (params.dm_sequence_id) {
-    if (this._dmSeqCache && this._dmSeqCache[params.dm_sequence_id]) {
-      return this._dmSeqCache[params.dm_sequence_id].messages;
+    var cached = this._dmSeqCache && this._dmSeqCache[params.dm_sequence_id];
+    if (cached) {
+      // 有变体 → 轮替选取
+      if (cached.variants && cached.variants.length > 0) {
+        var storageKey = "dm_variant_idx_" + params.dm_sequence_id;
+        var idx = this._storageGet(storageKey, 0);
+        var picked = cached.variants[idx % cached.variants.length];
+        this._storageSet(storageKey, (idx + 1) % cached.variants.length);
+        return picked;
+      }
+      // 无变体 → 原逻辑
+      return cached.messages;
     }
-    logger.warn(TAG, "DM序列模板未命中，停止私信发送: " + params.dm_sequence_id);
+    logger.warn(TAG, "DM序列模板未命中: " + params.dm_sequence_id);
     return [];
   }
   if (params.content) {

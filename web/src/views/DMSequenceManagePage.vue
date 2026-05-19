@@ -1,6 +1,6 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { listDMSequences, createDMSequence, updateDMSequence, deleteDMSequence } from '../api/dmSequences.js'
+import { listDMSequences, createDMSequence, updateDMSequence, deleteDMSequence, getDMSequence } from '../api/dmSequences.js'
 import { useToastStore } from '../stores/toast.js'
 
 const toast = useToastStore()
@@ -9,17 +9,37 @@ const sequences = ref([])
 const showEditor = ref(false)
 const editingId = ref(null)
 
+// AI generation
+const aiDescription = ref('')
+const aiLinkUrl = ref('')
+const generating = ref(false)
+const generateStatus = ref('')
+const generatingVariants = ref(false)
+
+let _savedFocusEl = null
+
 const form = reactive({
   name: '',
   industry: '',
   messages: [{ order: 1, content: '', delay_ms: 3000 }],
 })
 
+function closeEditor() {
+  showEditor.value = false
+  if (_savedFocusEl && typeof _savedFocusEl.focus === 'function') {
+    _savedFocusEl.focus()
+  }
+  _savedFocusEl = null
+}
+
 function resetForm() {
   form.name = ''
   form.industry = ''
   form.messages = [{ order: 1, content: '', delay_ms: 3000 }]
   editingId.value = null
+  aiDescription.value = ''
+  aiLinkUrl.value = ''
+  generateStatus.value = ''
 }
 
 function addMessage() {
@@ -51,11 +71,13 @@ function moveDown(idx) {
 }
 
 function openCreate() {
+  _savedFocusEl = document.activeElement
   resetForm()
   showEditor.value = true
 }
 
 function openEdit(seq) {
+  _savedFocusEl = document.activeElement
   form.name = seq.name
   form.industry = seq.industry || ''
   form.messages = JSON.parse(JSON.stringify(seq.messages))
@@ -79,7 +101,7 @@ async function handleSave() {
       })
       toast.success('已创建')
     }
-    showEditor.value = false
+    closeEditor()
     fetchData()
   } catch (e) {
     toast.error(e?.response?.data?.detail || '保存失败')
@@ -107,6 +129,106 @@ async function fetchData() {
   } finally {
     loading.value = false
   }
+}
+
+
+async function generateSequence() {
+  if (!aiDescription.value || !aiLinkUrl.value) return
+  generating.value = true
+  generateStatus.value = '正在连接...';
+  var token = localStorage.getItem('token') || '';
+
+  try {
+    var response = await fetch('/api/dm-sequences/generate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': token ? 'Bearer ' + token : '',
+      },
+      body: JSON.stringify({
+        industry: form.industry || 'general',
+        description: aiDescription.value,
+        link_url: aiLinkUrl.value,
+      }),
+    })
+
+    if (!response.ok) {
+      var errData = null
+      try { errData = await response.json() } catch (_) { /* ignore */ }
+      generateStatus.value = '错误: ' + (errData?.detail || 'HTTP ' + response.status)
+      generating.value = false
+      return
+    }
+
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (!line.trim()) continue
+        const jsonStr = line.startsWith('data: ') ? line.slice(6) : line
+        try {
+          const data = JSON.parse(jsonStr)
+          if (data.type === 'status') {
+            generateStatus.value = data.text || data.content || '';
+          } else if (data.type === 'done') {
+            const messages = data.messages
+            if (messages && Array.isArray(messages)) {
+              form.messages = messages
+            }
+            generateStatus.value = '生成完成！请检查并调整消息内容';
+            generating.value = false
+            return
+          } else if (data.type === 'error') {
+            generateStatus.value = '错误: ' + (data.message || '未知错误')
+            generating.value = false
+            return
+          }
+        } catch (_) { /* 跳过非 JSON 行 */ }
+      }
+    }
+  } catch (e) {
+    generateStatus.value = '连接失败';
+  }
+  generating.value = false
+}
+
+async function generateVariants() {
+  if (!editingId.value) return
+  generatingVariants.value = true
+  var token = localStorage.getItem('token') || '';
+
+  try {
+    var res = await fetch('/api/dm-sequences/' + editingId.value + '/variants', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': token ? 'Bearer ' + token : '',
+      },
+      body: JSON.stringify({ count: 3 }),
+    })
+    var data = await res.json()
+    if (data.ok) {
+      alert('已生成 ' + data.variants_count + ' 套变体')
+      var updated = await getDMSequence(editingId.value)
+      if (updated.data && updated.data.messages) {
+        form.messages = JSON.parse(JSON.stringify(updated.data.messages))
+      }
+      fetchData()
+    } else {
+      alert('变体生成失败: ' + (data.detail || '未知错误'))
+    }
+  } catch (e) {
+    alert('变体生成失败: ' + (e.message || ''))
+  }
+  generatingVariants.value = false
 }
 
 onMounted(fetchData)
@@ -154,7 +276,7 @@ onMounted(fetchData)
     </div>
 
     <!-- Editor Dialog -->
-    <div v-if="showEditor" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="showEditor = false">
+    <div v-if="showEditor" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="closeEditor()">
       <div class="bg-slate-800 rounded-xl shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto p-6 border border-slate-700">
         <h2 class="text-lg font-bold text-white mb-4">{{ editingId ? '编辑模板' : '新建模板' }}</h2>
         <div class="space-y-4">
@@ -164,7 +286,35 @@ onMounted(fetchData)
           </div>
           <div>
             <label class="block text-sm font-medium text-slate-300 mb-1">行业标签（可选）</label>
-            <input v-model="form.industry" maxlength="50" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-sky-500" placeholder="如：健康" />
+            <select v-model="form.industry"
+              class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:border-sky-500 focus:outline-none">
+              <option value="">不选择</option>
+              <option value="health">大健康</option>
+              <option value="beauty">医美</option>
+              <option value="education">教育</option>
+              <option value="travel">旅游</option>
+              <option value="secondhand">二手买卖</option>
+              <option value="general">通用</option>
+            </select>
+          </div>
+
+          <!-- AI 智能生成 -->
+          <div v-if="!editingId" class="p-4 bg-slate-800/50 rounded-lg border border-slate-700">
+            <h4 class="text-sm font-medium text-slate-300 mb-2">AI 智能生成序列</h4>
+            <div class="mb-2">
+              <input v-model="aiDescription" type="text" placeholder="大白话描述，如：推饮食指南软文，语气亲和可信"
+                class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:border-sky-500 focus:outline-none" />
+            </div>
+            <div class="mb-3">
+              <input v-model="aiLinkUrl" type="text" placeholder="短链URL（作为消息2）"
+                class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:border-sky-500 focus:outline-none" />
+            </div>
+            <button @click="generateSequence" :disabled="!aiDescription || !aiLinkUrl || generating"
+              class="px-4 py-2 bg-gradient-to-r from-sky-600 to-purple-600 text-white rounded-lg text-sm font-medium disabled:opacity-50 hover:from-sky-500 hover:to-purple-500 transition-colors cursor-pointer">
+              <span v-if="generating">AI 正在生成...</span>
+              <span v-else>AI 生成序列</span>
+            </button>
+            <div v-if="generating" class="mt-2 text-xs text-slate-400">{{ generateStatus }}</div>
           </div>
 
           <div>
@@ -192,9 +342,19 @@ onMounted(fetchData)
           </div>
         </div>
 
-        <div class="flex justify-end gap-3 mt-6">
-          <button @click="showEditor = false" class="px-4 py-2 text-slate-400 hover:text-white transition cursor-pointer">取消</button>
-          <button @click="handleSave" class="px-4 py-2 bg-sky-500 text-white rounded-lg hover:bg-sky-400 transition cursor-pointer">保存</button>
+        <div class="flex justify-between gap-3 mt-6">
+          <div>
+            <button v-if="editingId && form.messages && form.messages.length >= 3"
+              @click="generateVariants" :disabled="generatingVariants"
+              class="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg text-sm font-medium disabled:opacity-50 hover:from-emerald-500 hover:to-teal-500 transition-colors cursor-pointer">
+              <span v-if="generatingVariants">正在生成变体...</span>
+              <span v-else>生成 3 套变体</span>
+            </button>
+          </div>
+          <div class="flex gap-3">
+            <button @click="closeEditor()" class="px-4 py-2 text-slate-400 hover:text-white transition cursor-pointer">取消</button>
+            <button @click="handleSave" class="px-4 py-2 bg-sky-500 text-white rounded-lg hover:bg-sky-400 transition cursor-pointer">保存</button>
+          </div>
         </div>
       </div>
     </div>

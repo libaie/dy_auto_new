@@ -72,7 +72,7 @@ var selectorLoader = global.__selectorLoader || {
             logger.warn(TAG, "触发自动标定: " + reason);
             try {
               var calibrator = require("./calibrator");
-              calibrator.run();
+              calibrator.run({ unattended: true });
             } catch (e) {
               logger.warn(TAG, "自动标定失败: " + e.message);
             }

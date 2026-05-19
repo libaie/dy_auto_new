@@ -7,6 +7,9 @@
  * 3. 批量上传到服务端，自动创建对应 resolution_profile 的选择器行
  *
  * 调用时机：selectorLoader.init() 完成后，若 _cache 中缺少 action（无匹配 profile）
+ *
+ * 页面验证：每页采集前通过 uiOperator.detectPage() 验证当前页面指纹，
+ * 避免无人值守时将错误页面截图上传为模板。
  */
 
 var selectorLoader = require("./selector-loader");
@@ -22,22 +25,24 @@ var calibrator = {
    * @param {Object} options
    *   - pageKey: string (可选) — 只标定指定页面的 actions
    *     "search" | "video" | "comment" | "profile" | "dm"
+   *   - unattended: boolean (内部) — 自动触发时跳过 toast 导航提示
    * @returns {{ captured: number, uploaded: number, errors: string[] }}
    */
   run: function (options) {
     options = options || {};
     var resolution = device.width + "x" + device.height;
-    logger.info(TAG, "开始标定, 分辨率=" + resolution);
+    var unattended = !!options.unattended;
+    logger.info(TAG, "开始标定, 分辨率=" + resolution + (unattended ? " (自动)" : " (手动)"));
 
     var results = { captured: 0, uploaded: 0, errors: [] };
 
     // 五个页面分组，按顺序引导用户导航
     var pages = [
-      { key: "search",  label: "请打开抖音搜索页（点击搜索图标进入搜索）" },
-      { key: "video",   label: "请打开一个视频（进入视频详情页）" },
-      { key: "comment", label: "请打开视频评论区（点击评论按钮进入评论区）" },
-      { key: "profile", label: "请进入一个用户主页（点击头像进入个人主页）" },
-      { key: "dm",      label: "请打开私信聊天页（点击私信按钮进入私信）" },
+      { key: "search",  label: "请打开抖音搜索页（点击搜索图标进入搜索）", detectKey: "search" },
+      { key: "video",   label: "请打开一个视频（进入视频详情页）",        detectKey: "video" },
+      { key: "comment", label: "请打开视频评论区（点击评论按钮进入评论区）", detectKey: "comment" },
+      { key: "profile", label: "请进入一个用户主页（点击头像进入个人主页）", detectKey: "profile" },
+      { key: "dm",      label: "请打开私信聊天页（点击私信按钮进入私信）",   detectKey: "dm" },
     ];
 
     for (var pi = 0; pi < pages.length; pi++) {
@@ -48,10 +53,22 @@ var calibrator = {
         continue;
       }
 
-      // 悬浮窗提示 + 等待用户导航
-      toast(page.label + " (" + (pi + 1) + "/" + pages.length + ")");
-      logger.info(TAG, "等待导航到: " + page.key + " (" + targets.length + " 个元素)");
-      sleep(5000);
+      // 页面指纹验证——无人值守时不依赖用户手动导航
+      if (unattended) {
+        if (!this._verifyPage(page.detectKey)) {
+          logger.warn(TAG, "自动标定: 页面[" + page.key + "] 指纹不匹配，跳过");
+          continue;
+        }
+        logger.info(TAG, "自动标定: 页面[" + page.key + "] 指纹验证通过");
+      } else {
+        toast(page.label + " (" + (pi + 1) + "/" + pages.length + ")");
+        logger.info(TAG, "等待导航到: " + page.key + " (" + targets.length + " 个元素)");
+        sleep(5000);
+        if (!this._verifyPage(page.detectKey)) {
+          logger.warn(TAG, "手动标定: 页面[" + page.key + "] 指纹不匹配，跳过");
+          continue;
+        }
+      }
 
       // 采集当前页面元素
       var uploads = [];
@@ -88,6 +105,21 @@ var calibrator = {
     toast("标定完成！采集=" + results.captured + " 上传=" + results.uploaded);
     logger.info(TAG, "标定完成: 采集=" + results.captured + ", 上传=" + results.uploaded + ", 错误=" + results.errors.length);
     return results;
+  },
+
+  /**
+   * 验证当前页面指纹匹配目标页面
+   * 通过 uiOperator.detectPage() 返回的 page_detect 名称模糊匹配
+   */
+  _verifyPage: function (detectKey) {
+    try {
+      var detected = uiOperator.detectPage();
+      if (!detected) return false;
+      return detected.indexOf(detectKey) !== -1;
+    } catch (e) {
+      logger.warn(TAG, "页面验证异常: " + e.message);
+      return false;
+    }
   },
 
   /**

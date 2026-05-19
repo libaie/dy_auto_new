@@ -467,33 +467,34 @@ function startMainLoop(serverUrl, secret) {
     }
   }
 
-  // 空闲时定时 poll — 即使 WS 通知丢失也能发现待执行任务
-  // 轮询间隔使用服务端配置，首次默认 30s
-  var _idleTicks = 0;
-  var _idlePollTimer = null;
-
-  function _startIdlePoll() {
-    if (_idlePollTimer) clearInterval(_idlePollTimer);
-    _idlePollTimer = setInterval(function () {
-      if (!_taskBusy && _taskQueue.length === 0) {
-        catchUpPoll();
-        if (!_taskBusy && _taskQueue.length === 0) {
-          _idleTicks++;
-          // 连续 6 轮空闲才关抖音（避免短暂空闲反复开关）
-          if (_idleTicks >= 6) {
-            logger.info(TAG, "空闲超过 " + _idleTicks + " 轮，关闭抖音");
-            try { require("./core/ui-operator").closeApp(); } catch (e) {}
-            _idleTicks = 0;
-          }
-        } else {
-          _idleTicks = 0;
-        }
-      }
-    }, config.pollInterval || 30000);
-  }
-
   logger.info(TAG, "等待任务推送...");
   _startIdlePoll();
+}
+
+// 空闲时定时 poll — 即使 WS 通知丢失也能发现待执行任务
+// 轮询间隔使用服务端配置，首次默认 30s
+// 放在全局作用域，applyServerConfig 可调 _startIdlePoll() 重启轮询
+var _idleTicks = 0;
+var _idlePollTimer = null;
+
+function _startIdlePoll() {
+  if (_idlePollTimer) clearInterval(_idlePollTimer);
+  _idlePollTimer = setInterval(function () {
+    if (!_taskBusy && _taskQueue.length === 0) {
+      catchUpPoll();
+      if (!_taskBusy && _taskQueue.length === 0) {
+        _idleTicks++;
+        // 连续 6 轮空闲才关抖音（避免短暂空闲反复开关）
+        if (_idleTicks >= 6) {
+          logger.info(TAG, "空闲超过 " + _idleTicks + " 轮，关闭抖音");
+          try { require("./core/ui-operator").closeApp(); } catch (e) {}
+          _idleTicks = 0;
+        }
+      } else {
+        _idleTicks = 0;
+      }
+    }
+  }, config.pollInterval || 30000);
 }
 
 /**

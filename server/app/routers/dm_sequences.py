@@ -53,14 +53,15 @@ def _to_dict(s: DMSequence) -> dict:
         "messages": s.messages,
         "message_count": len(s.messages),
         "industry": s.industry or "",
+        "variants_count": len(s.variants) if s.variants else 0,
         "created_at": str(s.created_at) if s.created_at else None,
         "updated_at": str(s.updated_at) if s.updated_at else None,
     }
 
 
 def _to_device_dict(s: DMSequence) -> dict:
-    """Device-facing: only id + messages, minimal payload."""
-    return {"id": s.id, "messages": s.messages}
+    """Device-facing: id + messages + variants for poll/sync."""
+    return {"id": s.id, "messages": s.messages, "variants": s.variants}
 
 
 @router.get("")
@@ -141,8 +142,10 @@ def update_sequence(
             {"order": i + 1, "content": m.content, "delay_ms": m.delay_ms}
             for i, m in enumerate(sorted(body.messages, key=lambda x: x.order))
         ]
+        seq.variants = None  # 消息变了，旧变体失效
     if body.industry is not None:
         seq.industry = body.industry or None
+        seq.variants = None  # 行业变了，合规约束不同，旧变体失效
 
     db.commit()
     db.refresh(seq)

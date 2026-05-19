@@ -25,6 +25,7 @@ var SearchBaseHandler = Object.create(BaseHandler);
  * @returns {Object} { success, result, error }
  */
 SearchBaseHandler.execute = function (params) {
+  this._params = params;
   var keyword = params.keyword;
   var videoCount = params.video_count || params.count || 5;
   var content = params.content || "";

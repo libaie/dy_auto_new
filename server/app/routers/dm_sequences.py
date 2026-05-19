@@ -244,6 +244,10 @@ async def generate_dm_sequence(
                     if word in content_text:
                         yield f"data: {json.dumps({'type': 'error', 'message': f'生成内容含敏感词: {word}'})}\n\n"
                         return
+                for word in profile["extreme_words"]:
+                    if word in content_text:
+                        yield f"data: {json.dumps({'type': 'error', 'message': f'生成内容含极限词: {word}'})}\n\n"
+                        return
 
             yield f"data: {json.dumps({'type': 'done', 'messages': messages})}\n\n"
 
@@ -347,6 +351,11 @@ async def generate_variants(
                 if word in rewritten_msg1 or word in rewritten_msg3:
                     ok = False
                     break
+            if ok:
+                for word in profile["extreme_words"]:
+                    if word in rewritten_msg1 or word in rewritten_msg3:
+                        ok = False
+                        break
             if not ok:
                 continue
 

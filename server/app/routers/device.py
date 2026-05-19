@@ -490,9 +490,13 @@ async def poll_tasks(
 
     cancelled_task = task_service.check_cancelled_running(db, device_id)
 
-    # DM sequence templates for device sync
-    from app.db_models import DMSequence
-    dm_seqs = db.query(DMSequence).all()
+    # DM sequence templates for device sync — scoped by device owner
+    from app.db_models import DMSequence, Device
+    device = db.query(Device).filter(Device.id == device_id).first()
+    device_user_id = device.user_id if device else None
+    dm_seqs = db.query(DMSequence).filter(
+        (DMSequence.user_id == device_user_id) | (DMSequence.user_id == None)
+    ).all()
     dm_sequences_list = [
         {
             "id": s.id,

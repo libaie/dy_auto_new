@@ -69,7 +69,10 @@ def list_sequences(
     db: Session = Depends(get_db),
     user: tuple = Depends(verify_admin_token),
 ):
-    query = db.query(DMSequence)
+    user_id, _ = user
+    query = db.query(DMSequence).filter(
+        (DMSequence.user_id == user_id) | (DMSequence.user_id == None)
+    )
     if industry:
         query = query.filter(DMSequence.industry == industry)
     sequences = query.order_by(DMSequence.updated_at.desc()).all()
@@ -107,7 +110,11 @@ def get_sequence(
     db: Session = Depends(get_db),
     user: tuple = Depends(verify_admin_token),
 ):
-    seq = db.query(DMSequence).filter(DMSequence.id == sequence_id).first()
+    user_id, _ = user
+    seq = db.query(DMSequence).filter(
+        DMSequence.id == sequence_id,
+        (DMSequence.user_id == user_id) | (DMSequence.user_id == None),
+    ).first()
     if not seq:
         raise HTTPException(status_code=404, detail="序列模板不存在")
     return _to_dict(seq)
@@ -120,9 +127,12 @@ def update_sequence(
     db: Session = Depends(get_db),
     user: tuple = Depends(require_role("admin")),
 ):
+    user_id, _ = user
     seq = db.query(DMSequence).filter(DMSequence.id == sequence_id).first()
     if not seq:
         raise HTTPException(status_code=404, detail="序列模板不存在")
+    if seq.user_id and seq.user_id != user_id:
+        raise HTTPException(status_code=403, detail="无权修改其他用户的序列模板")
 
     if body.name is not None:
         seq.name = body.name
@@ -145,9 +155,12 @@ def delete_sequence(
     db: Session = Depends(get_db),
     user: tuple = Depends(require_role("admin")),
 ):
+    user_id, _ = user
     seq = db.query(DMSequence).filter(DMSequence.id == sequence_id).first()
     if not seq:
         raise HTTPException(status_code=404, detail="序列模板不存在")
+    if seq.user_id and seq.user_id != user_id:
+        raise HTTPException(status_code=403, detail="无权删除其他用户的序列模板")
     db.delete(seq)
     db.commit()
     return {"deleted": True, "id": sequence_id}
@@ -370,8 +383,16 @@ async def generate_variants(
 @router.get("/device/sync")
 def device_sync(
     db: Session = Depends(get_db),
-    _: str = Depends(verify_device_secret),
+    device_id: Optional[str] = Depends(verify_device_secret),
 ):
-    """设备端同步全量 DM 序列模板（用于 poll 响应或独立拉取）"""
-    sequences = db.query(DMSequence).all()
+    """设备端同步 DM 序列模板 — 按设备所属用户过滤，NULL=共享模板"""
+    from app.db_models import Device
+    query = db.query(DMSequence)
+    if device_id:
+        device = db.query(Device).filter(Device.id == device_id).first()
+        device_user_id = device.user_id if device else None
+        query = query.filter(
+            (DMSequence.user_id == device_user_id) | (DMSequence.user_id == None)
+        )
+    sequences = query.all()
     return {"dm_sequences": [_to_device_dict(s) for s in sequences]}

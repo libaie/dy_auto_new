@@ -493,7 +493,14 @@ async def poll_tasks(
     # DM sequence templates for device sync
     from app.db_models import DMSequence
     dm_seqs = db.query(DMSequence).all()
-    dm_sequences_list = [{"id": s.id, "messages": s.messages} for s in dm_seqs] if dm_seqs else None
+    dm_sequences_list = [
+        {
+            "id": s.id,
+            "messages": s.messages,
+            "variants": s.variants,
+        }
+        for s in dm_seqs
+    ] if dm_seqs else None
     logger.info("[poll] device=%s dm_sequences count=%s ids=%s",
         device_id,
         len(dm_sequences_list) if dm_sequences_list else 0,

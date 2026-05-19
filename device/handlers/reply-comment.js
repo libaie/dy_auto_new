@@ -58,7 +58,7 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
 
   // 当有 DM 序列时，扩展视频超时以容纳 cooldown
   var hasDMSequence = !!(params.dm_sequence_id || (params.dm_messages && params.dm_messages.length > 0));
-  var dmCooldownMs = params.inter_user_cooldown_ms || 7 * 60 * 1000;
+  var dmCooldownMs = params.inter_user_cooldown_ms || (Math.floor(Math.random() * 120000) + 180000);
   if (hasDMSequence && dmCooldownMs > 0) {
     var maxDMsThisTask = params.max_dms || 10;
     VIDEO_TIMEOUT = Math.max(VIDEO_TIMEOUT, maxDMsThisTask * dmCooldownMs + 60000);
@@ -103,6 +103,30 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
     return current + 1;
   }
 
+
+  function _getDailyReplyCount() {
+    var dateKey = _getServerDate();
+    return SearchBaseHandler._storageGet("reply_daily_" + dateKey, 0);
+  }
+
+  function _incrementDailyReplyCount() {
+    var dateKey = _getServerDate();
+    var current = SearchBaseHandler._storageGet("reply_daily_" + dateKey, 0);
+    SearchBaseHandler._storageSet("reply_daily_" + dateKey, current + 1);
+    return current + 1;
+  }
+
+  function _getDailyFollowCount() {
+    var dateKey = _getServerDate();
+    return SearchBaseHandler._storageGet("follow_daily_" + dateKey, 0);
+  }
+
+  function _incrementDailyFollowCount() {
+    var dateKey = _getServerDate();
+    var current = SearchBaseHandler._storageGet("follow_daily_" + dateKey, 0);
+    SearchBaseHandler._storageSet("follow_daily_" + dateKey, current + 1);
+    return current + 1;
+  }
   var videoStartTime = Date.now();
   var processed = 0;
   var totalRead = 0;
@@ -174,7 +198,7 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
       }
 
       if (!commentUtils.localPreFilter(comment.text)) {
-        logger.info(TAG, "跳过无意义评论（纯表情/短文本）: " + comment.text.substring(0, 20));
+        logger.debug(TAG, "跳过无意义评论（纯表情/短文本）: " + comment.text.substring(0, 20));
         stats.skipped++; totalRead++;
         continue;
       }
@@ -223,7 +247,7 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
       }
 
       // 回复
-      logger.info(TAG, "回复: '" + analysis.reply.substring(0, 30) + "...'");
+      logger.debug(TAG, "回复: '" + analysis.reply.substring(0, 30) + "...'");
       if (comment.replyBtn) {
         logger.info(TAG, "点击回复按钮...");
         comment.replyBtn.click();
@@ -235,11 +259,13 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
       if (this._replyToComment(analysis.reply, comment.nickname)) {
         stats.success_count++;
         try { apiClient.incrementStats(params.account_id, "reply_comment", 1); } catch (e) {}
+        var dailyReply = _incrementDailyReplyCount();
+        logger.info(TAG, "当日回复: " + dailyReply + "/" + (params.max_daily_reply || 200));
         try { apiClient.saveCommentAIReply(comment.nickname, comment.text, analysis.reply, taskId, dest ? dest.province : null, dest ? dest.city : null, dest ? dest.attraction : null); } catch (e) {}
         try {
           var commentReport = {
             nickname: comment.nickname, content: comment.text,
-            time_str: comment.time || "", is_author: comment.isAuthor || false,
+             time_str: commentUtils.toBeijingTime(comment.time), is_author: comment.isAuthor || false,
             reply_count: "", like_count: "", ai_reply: analysis.reply,
           };
           if (dest) {
@@ -302,13 +328,15 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
               try { apiClient.saveUserProfile(userData); } catch (e) {}
               try { apiClient.collectReport({
                 task_id: taskId, keyword: keyword,
-                comment: { nickname: comment.nickname, content: comment.text, time_str: comment.time || "", is_author: comment.isAuthor || false },
+                comment: { nickname: comment.nickname, content: comment.text,  time_str: commentUtils.toBeijingTime(comment.time), is_author: comment.isAuthor || false,
                 user: userData, data_source_type: 0,
               }); } catch (e) {}
             }
             if (Date.now() - profileStart < PROFILE_TIMEOUT && canFollow && this._followUser()) {
               stats.follow_count++;
               try { apiClient.incrementStats(params.account_id, "follow", 1); } catch (e) {}
+              var dailyFollow = _incrementDailyFollowCount();
+              logger.info(TAG, "当日关注: " + dailyFollow + "/" + (params.max_daily_follow || 100));
             }
             sleep(Math.floor(Math.random() * 500 + 800));
 
@@ -317,7 +345,16 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
               var cooldownRemaining = (dmCooldownMs || 0) - (Date.now() - this._lastDMSendTime);
               if (cooldownRemaining > 0) {
                 logger.info(TAG, "DM冷却等待 " + Math.round(cooldownRemaining / 1000) + "s");
-                sleep(cooldownRemaining);
+              var chunkMs = 30000;
+              var waited = 0;
+              while (waited < cooldownRemaining) {
+                var step = Math.min(chunkMs, cooldownRemaining - waited);
+                sleep(step);
+                waited += step;
+                if (waited < cooldownRemaining) {
+                  try { device.wakeUpIfNeeded(); } catch(e) {}
+                }
+              }
               }
             }
 
@@ -643,7 +680,7 @@ ReplyCommentHandler._replyToComment = function (replyText, nickname) {
       sleep(Math.floor(Math.random() * 250 + 150));  // 150-400ms 块间停顿
     }
     pasted = true;
-    logger.info(TAG, "input 输入成功: '" + cleanText.substring(0, 20) + "'");
+    logger.debug(TAG, "input 输入成功: " + cleanText.substring(0, 20) + "'");
   } catch (e) {
     logger.warn(TAG, "input 异常: " + e.message);
   }
@@ -681,7 +718,7 @@ ReplyCommentHandler._replyToComment = function (replyText, nickname) {
     uiOperator.clickElement(sendBtn);
     sleep(1200);
     sent = true;
-    logger.info(TAG, "回复已发送(图找图): '" + replyText.substring(0, 20) + "'");
+    logger.debug(TAG, "回复已发送(图找图): " + replyText.substring(0, 20) + "'");
   }
 
   // 兜底：回车发送

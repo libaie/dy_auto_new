@@ -273,13 +273,14 @@ SearchBaseHandler._sortResults = function (sortBy) {
   }
   sleep(1500);
 
-  // 以图找图验证弹窗是否打开，没找到则重试一次
+  // 以图找图验证弹窗是否打开，没找到则关闭后重新打开再试
   var optionEl = uiOperator.findElement(actionName, 3000);
   if (!optionEl) {
-    logger.info(TAG, "排序弹窗未检测到 " + sortBy + "，关闭弹窗后重试");
-    // 第一次点击关闭可能残留的弹窗，第二次重新打开
+    logger.info(TAG, "排序弹窗未检测到 " + sortBy + "，关闭后重新打开弹窗重试");
     this.safeClick("sort_button", 1);
     sleep(800);
+    this.safeClick("sort_button", 1);
+    sleep(1500);
     optionEl = uiOperator.findElement(actionName, 3000);
   }
 
@@ -333,7 +334,9 @@ SearchBaseHandler.searchSortAndOpenFirstResult = function (keyword, sortBy) {
   this._clickVideoTab();
   sleep(2000);
   if (sortBy) {
-    this._sortResults(sortBy);
+    if (!this._sortResults(sortBy)) {
+      logger.warn(TAG, "排序失败，将以默认排序处理视频 (sortBy=" + sortBy + ")");
+    }
     sleep(1500);
   }
   if (!this._clickSearchResult(0)) return false;
@@ -505,15 +508,23 @@ SearchBaseHandler._interactWithVideo = function (content, stats) {
  */
 SearchBaseHandler._getCacheDir = function () {
   try {
-    var extDir = context.getExternalFilesDir(null);
-    if (extDir) {
-      var cacheDir = extDir.getAbsolutePath() + "/dy_auto_cache";
-      files.ensureDir(cacheDir);
-      return cacheDir;
+    var intDir = context.getFilesDir();
+    if (intDir) {
+      var intCache = intDir.getAbsolutePath() + "/dy_auto_cache";
+      files.ensureDir(intCache);
+      return intCache;
     }
   } catch (e) {}
+  try {
+    var extDir = context.getExternalFilesDir(null);
+    if (extDir) {
+      var extCache = extDir.getAbsolutePath() + "/dy_auto_cache";
+      files.ensureDir(extCache);
+      return extCache;
+    }
+  } catch (e2) {}
   var fallback = "/sdcard/dy_auto/cache";
-  try { files.ensureDir(fallback); } catch (e2) {}
+  try { files.ensureDir(fallback); } catch (e3) {}
   return fallback;
 };
 
@@ -594,7 +605,10 @@ SearchBaseHandler.applyVariables = function (template, vars) {
  */
 SearchBaseHandler._sendMessageSequence = function (messages, stats, keyword) {
   var sentCount = 0;
-  for (var i = 0; i < messages.length; i++) {
+  var antiDetect = require("../core/anti-detect");
+  antiDetect._skipDisabled = true;
+  try {
+    for (var i = 0; i < messages.length; i++) {
     var msg = messages[i];
     var content = this.applyVariables(msg.content, {keyword: keyword || ""});
     var inputOk = this.safeInput("dm_input", content);
@@ -610,11 +624,19 @@ SearchBaseHandler._sendMessageSequence = function (messages, stats, keyword) {
     }
     uiOperator.clickElement(sendBtn);
     sleep(1000);
+    var sendFailed = !!uiOperator.findElement("dm_send_failed", 2000, true);
+    if (sendFailed) {
+      logger.warn(TAG, "DM序列[" + (i + 1) + "/" + messages.length + "]发送失败，停止向该用户发送后续私信");
+      break;
+    }
     sentCount++;
     var extraDelay = msg.delay_ms != null ? msg.delay_ms : (Math.floor(Math.random() * 3000) + 2000);
     sleep(extraDelay);
     stats.details.push("dm_sent[" + (i + 1) + "/" + messages.length + "]: "
       + content.substring(0, 30));
+    }
+  } finally {
+    antiDetect._skipDisabled = false;
   }
   return sentCount;
 };

@@ -40,17 +40,22 @@ class TemplateService:
         self._md5_cache: dict[str, dict] = {}
 
     def _iter_templates(self, resolution: str = None):
-        """Iterate template files. If resolution given, only that subdirectory.
+        """Iterate template files. If resolution given, includes that subdirectory
+        plus 'default' as fallback (resolution-specific wins on duplicate names).
         Otherwise iterates all resolution subdirectories."""
-        dirs = [TEMPLATE_DIR / resolution] if resolution else [
-            d for d in TEMPLATE_DIR.iterdir() if d.is_dir()
-        ]
+        if resolution:
+            dirs = [TEMPLATE_DIR / resolution, TEMPLATE_DIR / "default"]
+        else:
+            dirs = [d for d in TEMPLATE_DIR.iterdir() if d.is_dir()]
+        seen = set()
         for subdir in dirs:
             if not subdir.is_dir():
                 continue
             for f in sorted(subdir.iterdir()):
                 if f.suffix.lower() in ALLOWED_EXTENSIONS and f.is_file():
-                    yield f, subdir.name
+                    if f.name not in seen:
+                        seen.add(f.name)
+                        yield f, subdir.name
 
     def list_templates(self, resolution: str = None) -> list[dict]:
         """List template images with metadata. Optionally filter by resolution."""

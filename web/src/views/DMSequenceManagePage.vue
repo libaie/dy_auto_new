@@ -15,6 +15,10 @@ const aiLinkUrl = ref('')
 const generating = ref(false)
 const generateStatus = ref('')
 const generatingVariants = ref(false)
+const loadedVariants = ref(null)
+const variantCount = ref(3)
+const targetVariantCount = ref(0)
+const partialGenMsg = ref('')
 
 let _savedFocusEl = null
 
@@ -40,6 +44,9 @@ function resetForm() {
   aiDescription.value = ''
   aiLinkUrl.value = ''
   generateStatus.value = ''
+  loadedVariants.value = null
+  targetVariantCount.value = 0
+  partialGenMsg.value = ''
 }
 
 function addMessage() {
@@ -81,6 +88,9 @@ function openEdit(seq) {
   form.name = seq.name
   form.industry = seq.industry || ''
   form.messages = JSON.parse(JSON.stringify(seq.messages))
+  loadedVariants.value = (seq.variants && seq.variants.length) ? seq.variants : null
+  targetVariantCount.value = 0
+  partialGenMsg.value = ''
   editingId.value = seq.id
   showEditor.value = true
 }
@@ -203,7 +213,25 @@ async function generateSequence() {
 async function generateVariants() {
   if (!editingId.value) return
   generatingVariants.value = true
+  partialGenMsg.value = ''
   var token = localStorage.getItem('token') || '';
+
+  // 首次点击记住目标总数，后续点击自动算剩余
+  var existingCount = loadedVariants.value ? loadedVariants.value.length : 0
+  var remaining;
+  if (targetVariantCount.value > 0) {
+    // 追量模式：上一次没生成完，这次生成剩余数
+    remaining = targetVariantCount.value - existingCount
+    if (remaining <= 0) {
+      targetVariantCount.value = 0
+      alert('已达到目标套数，无需继续生成')
+      generatingVariants.value = false
+      return
+    }
+  } else {
+    targetVariantCount.value = variantCount.value
+    remaining = variantCount.value
+  }
 
   try {
     var res = await fetch('/api/dm-sequences/' + editingId.value + '/variants', {
@@ -212,14 +240,17 @@ async function generateVariants() {
         'Content-Type': 'application/json',
         'Authorization': token ? 'Bearer ' + token : '',
       },
-      body: JSON.stringify({ count: 3 }),
+      body: JSON.stringify({ count: remaining }),
     })
     var data = await res.json()
     if (data.ok) {
-      alert('已生成 ' + data.variants_count + ' 套变体')
-      var updated = await getDMSequence(editingId.value)
-      if (updated.data && updated.data.messages) {
-        form.messages = JSON.parse(JSON.stringify(updated.data.messages))
+      loadedVariants.value = data.variants
+      var newTotal = loadedVariants.value.length
+      if (newTotal < targetVariantCount.value) {
+        partialGenMsg.value = '本次生成 ' + data.variants_count + ' 套，累计 ' + newTotal + '/' + targetVariantCount.value + ' 套，还差 ' + (targetVariantCount.value - newTotal) + ' 套，请再次点击生成'
+      } else {
+        partialGenMsg.value = '已生成 ' + newTotal + ' 套变体，目标完成'
+        targetVariantCount.value = 0
       }
       fetchData()
     } else {
@@ -258,6 +289,7 @@ onMounted(fetchData)
             <h3 class="text-lg font-semibold text-white">{{ s.name }}</h3>
             <p class="text-sm text-slate-400 mt-1">{{ s.message_count }} 条消息
               <span v-if="s.industry" class="ml-2 px-2 py-0.5 rounded text-xs bg-white/5 text-slate-300">{{ s.industry }}</span>
+              <span v-if="s.variants_count" class="ml-2 px-2 py-0.5 rounded text-xs bg-emerald-500/15 text-emerald-400">{{ s.variants_count }} 套变体</span>
             </p>
             <div class="mt-3 space-y-1">
               <div v-for="m in (s.messages || []).slice(0, 3)" :key="m.order" class="text-xs text-slate-400">
@@ -342,14 +374,43 @@ onMounted(fetchData)
           </div>
         </div>
 
+        <!-- 变体预览 -->
+        <div v-if="loadedVariants && loadedVariants.length" class="mt-4 p-4 bg-emerald-500/5 rounded-lg border border-emerald-500/20">
+          <h4 class="text-sm font-medium text-emerald-400 mb-3">{{ loadedVariants.length }} 套变体</h4>
+          <div class="space-y-3">
+            <div v-for="(variant, vi) in loadedVariants" :key="vi" class="p-3 rounded bg-slate-800/50 border border-white/5">
+              <div class="text-xs text-slate-500 mb-2">变体 {{ vi + 1 }}</div>
+              <div class="space-y-1">
+                <div v-for="vm in variant" :key="vm.order" class="text-xs text-slate-300 flex gap-2">
+                  <span class="text-slate-500 shrink-0">{{ vm.order }}.</span>
+                  <span>{{ vm.content }}</span>
+                  <span class="text-slate-600 shrink-0">({{ vm.delay_ms || 0 }}ms)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="flex justify-between gap-3 mt-6">
           <div>
-            <button v-if="editingId && form.messages && form.messages.length >= 3"
-              @click="generateVariants" :disabled="generatingVariants"
-              class="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg text-sm font-medium disabled:opacity-50 hover:from-emerald-500 hover:to-teal-500 transition-colors cursor-pointer">
-              <span v-if="generatingVariants">正在生成变体...</span>
-              <span v-else>生成 3 套变体</span>
-            </button>
+            <div class="flex flex-col gap-2">
+              <div class="flex items-center gap-2">
+                <button v-if="editingId && form.messages && form.messages.length >= 3"
+                  @click="generateVariants" :disabled="generatingVariants"
+                  class="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg text-sm font-medium disabled:opacity-50 hover:from-emerald-500 hover:to-teal-500 transition-colors cursor-pointer">
+                  <span v-if="generatingVariants">正在生成变体...</span>
+                  <span v-else>
+                    <template v-if="targetVariantCount > 0 && loadedVariants && loadedVariants.length < targetVariantCount">
+                      继续生成 {{ targetVariantCount - loadedVariants.length }} 套
+                    </template>
+                    <template v-else>生成 {{ variantCount }} 套变体</template>
+                  </span>
+                </button>
+                <input v-model.number="variantCount" type="number" min="1" max="10"
+                  class="w-14 bg-slate-700 border border-slate-600 rounded px-2 py-2 text-white text-sm text-center focus:outline-none focus:border-emerald-500" />
+              </div>
+              <p v-if="partialGenMsg" class="text-xs text-amber-400">{{ partialGenMsg }}</p>
+            </div>
           </div>
           <div class="flex gap-3">
             <button @click="closeEditor()" class="px-4 py-2 text-slate-400 hover:text-white transition cursor-pointer">取消</button>

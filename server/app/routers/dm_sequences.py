@@ -43,7 +43,7 @@ class DMSequenceGenerateRequest(BaseModel):
 
 
 class VariantsGenerateRequest(BaseModel):
-    count: int = Field(default=3, ge=1, le=5, description="生成变体套数")
+    count: int = Field(default=3, ge=1, le=10, description="生成变体套数")
 
 
 def _to_dict(s: DMSequence) -> dict:
@@ -54,6 +54,7 @@ def _to_dict(s: DMSequence) -> dict:
         "message_count": len(s.messages),
         "industry": s.industry or "",
         "variants_count": len(s.variants) if s.variants else 0,
+        "variants": s.variants,
         "created_at": str(s.created_at) if s.created_at else None,
         "updated_at": str(s.updated_at) if s.updated_at else None,
     }
@@ -386,10 +387,11 @@ async def generate_variants(
     if not variants:
         raise HTTPException(500, "无法生成合规变体，请调整原始话术后重试")
 
-    seq.variants = variants
+    seq.variants = (seq.variants or []) + variants
     db.commit()
 
-    return {"ok": True, "variants_count": len(variants), "variants": variants}
+    total = len(seq.variants)
+    return {"ok": True, "variants_count": len(variants), "total_variants": total, "variants": seq.variants}
 
 
 @router.get("/device/sync")

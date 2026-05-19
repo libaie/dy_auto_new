@@ -444,7 +444,7 @@ onMounted(async () => {
           <div class="flex items-center gap-2 text-[11px] text-slate-500 px-4 py-2.5 border-t" style="border-color: rgba(255,255,255,0.04);">
             <span v-if="user.gender || user.age" class="inline-flex items-center gap-1">
               <svg class="w-3 h-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-              {{ user.gender || '?' }} {{ user.age || '' }}
+              <template v-if="user.gender">{{ user.gender }} </template><template v-if="user.age">{{ user.age }}</template>
             </span>
             <span class="opacity-30" v-if="(user.gender || user.age) && user.ip_location">|</span>
             <span v-if="user.ip_location" class="inline-flex items-center gap-1 truncate">

@@ -146,6 +146,23 @@ var commentUtils = {
    * @param {string} timeStr
    * @returns {Date|null}
    */
+  /**
+   * 将评论原始时间字符串转为北京时间 ISO 格式 (YYYY-MM-DDTHH:mm:ss+08:00)
+   * 用于上报服务端，替换相对时间如 "19分钟前"
+   */
+  toBeijingTime: function (timeStr) {
+    if (!timeStr) return "";
+    var parsed = this.parseTime(timeStr);
+    if (!parsed) return timeStr;
+    var y = parsed.getFullYear();
+    var mo = ("0" + (parsed.getMonth() + 1)).slice(-2);
+    var d = ("0" + parsed.getDate()).slice(-2);
+    var h = ("0" + parsed.getHours()).slice(-2);
+    var mi = ("0" + parsed.getMinutes()).slice(-2);
+    var s = ("0" + parsed.getSeconds()).slice(-2);
+    return y + "-" + mo + "-" + d + "T" + h + ":" + mi + ":" + s + "+08:00";
+  },
+
   parseTime: function (timeStr) {
 	    if (!timeStr) return null;
 	    var now = new Date();

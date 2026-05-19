@@ -116,7 +116,7 @@ var uiOperator = {
    * @param {number} timeout - 超时时间（毫秒），默认 5000
    * @returns {UiObject|null} 找到的控件，或 null
    */
-  findElement: function (actionName, timeout) {
+  findElement: function (actionName, timeout, quiet) {
     timeout = timeout || 2000;
     var selector = selectorLoader.get(actionName);
     if (!selector) {
@@ -183,7 +183,7 @@ var uiOperator = {
       sleep(700);
     }
 
-    logger.warn(TAG, "未找到元素: " + actionName);
+    if (!quiet) { logger.warn(TAG, "未找到元素: " + actionName); }
     return null;
   },
 
@@ -566,14 +566,15 @@ var uiOperator = {
         if (origRes !== res) {
           var origParts = origRes.split("x");
           var origW = parseInt(origParts[0]) || 1;
+          var origH = parseInt(origParts[1]) || 1;
           var scaleX = device.width / origW;
-          // Scale within reasonable bounds
-          if (Math.abs(1 - scaleX) > 0.05) {
+          var scaleY = device.height / origH;
+          if (Math.abs(1 - scaleX) > 0.05 || Math.abs(1 - scaleY) > 0.05) {
             var newW = Math.round(tpl.getWidth() * scaleX);
-            var newH = Math.round(tpl.getHeight() * scaleX);
+            var newH = Math.round(tpl.getHeight() * scaleY);
             try {
               var scaled = images.scale(tpl, newW, newH);
-              if (scaled) { tpl.recycle(); tpl = scaled; threshold = (threshold || 0.8) - 0.05; }
+              if (scaled) { tpl.recycle(); tpl = scaled; threshold = threshold - 0.05; }
             } catch (e) {
               logger.warn(TAG, "模板缩放失败: " + e.message);
             }

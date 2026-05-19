@@ -7,6 +7,7 @@ var TAG = "反检测";
 var settings = config.antiDetect;
 
 var antiDetect = {
+  _skipDisabled: false,  // 序列发送期间禁用随机跳过
   /**
    * 操作前随机延迟
    * @param {string} actionName - 操作名称（用于日志）
@@ -203,7 +204,7 @@ var antiDetect = {
     this.randomDelay(actionName);
 
     // 概率跳过（低谷时段偶尔跳过操作，更像真人）
-    if (Math.random() < 0.01 * timeMultiplier) {
+    if (!this._skipDisabled && Math.random() < 0.01 * timeMultiplier) {
       logger.info(TAG, "跳过操作（节奏波动）");
       return false;
     }

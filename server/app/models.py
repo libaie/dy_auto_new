@@ -204,6 +204,7 @@ class PollResponse(BaseModel):
     ai_config: Optional[dict[str, Any]] = None
     device_config: Optional[dict[str, Any]] = None
     dm_sequences: Optional[list[dict[str, Any]]] = None
+    server_date: Optional[str] = None
 
 
 class DeviceRegisterRequest(BaseModel):

@@ -284,20 +284,22 @@ async def batch_create_tasks(
         db.add(ch)
         db.flush()
 
+        # 轮询分配：每个关键词只分配给一个账号，多账号交叉领取
+        from app.services.channel_service import channel_service as _ch_svc
+        assigned_ids = _ch_svc._round_robin_assign(db, keywords, all_accounts)
         qpos = 0
-        for kw in keywords:
-            for acc in all_accounts:
-                ci = DBChannelItem(
-                    channel_id=ch.id,
-                    keyword=kw.strip(),
-                    account_id=acc.id,
-                    status="pending",
-                    queue_position=qpos,
-                )
-                qpos += 1
-                db.add(ci)
-                created_tasks.append({"keyword": kw.strip(), "account_id": acc.id})
-        logger.info("通道 %s 已创建: %d 关键词 × %d 账号 = %d 项",
+        for idx, kw in enumerate(keywords):
+            ci = DBChannelItem(
+                channel_id=ch.id,
+                keyword=kw.strip(),
+                account_id=assigned_ids[idx],
+                status="pending",
+                queue_position=qpos,
+            )
+            qpos += 1
+            db.add(ci)
+            created_tasks.append({"keyword": kw.strip(), "account_id": assigned_ids[idx]})
+        logger.info("通道 %s 已创建: %d 关键词 × %d 账号 (轮询) = %d 项",
                      ch.id, len(keywords), len(all_accounts), len(created_tasks))
     else:
         for acc in all_accounts:

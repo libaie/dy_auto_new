@@ -19,7 +19,7 @@ defineProps({
     <span
       :class="[
         width,
-        'invisible group-hover:visible absolute z-50 left-6 top-0 p-3 text-xs font-normal text-slate-300 bg-slate-800/95 backdrop-blur-sm border border-white/10 rounded-lg shadow-xl leading-relaxed',
+        'invisible group-hover:visible absolute z-50 left-6 top-0 p-3 text-xs font-normal text-slate-300 bg-slate-800/95 backdrop-blur-sm border border-white/10 rounded-lg shadow-xl leading-relaxed whitespace-pre-line',
       ]"
     >
       <slot>{{ text }}</slot>

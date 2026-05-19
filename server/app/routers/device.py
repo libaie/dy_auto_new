@@ -531,6 +531,7 @@ async def poll_tasks(
         ai_config=get_ai_config(db),
         device_config=DEVICE_CONFIG,
         dm_sequences=dm_sequences_list,
+        server_date=bj_now().strftime("%Y-%m-%d"),
     )
 
 

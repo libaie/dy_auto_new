@@ -56,8 +56,51 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
   var dest = this._dest;
   var VIDEO_TIMEOUT = this._config.videoTimeoutMs;
 
+  // 当有 DM 序列时，扩展视频超时以容纳 cooldown
+  var hasDMSequence = !!(params.dm_sequence_id || (params.dm_messages && params.dm_messages.length > 0));
+  var dmCooldownMs = params.inter_user_cooldown_ms || 7 * 60 * 1000;
+  if (hasDMSequence && dmCooldownMs > 0) {
+    var maxDMsThisTask = params.max_dms || 10;
+    VIDEO_TIMEOUT = Math.max(VIDEO_TIMEOUT, maxDMsThisTask * dmCooldownMs + 60000);
+  }
+
   function _reportProgress(step, detail, prog) {
     if (taskId) { try { apiClient.reportProgress(taskId, step, detail, prog); } catch (e) {} }
+  }
+
+  // 日DM计数器
+  function _getServerDate() {
+    // 优先用服务端日期（main.js catchUpPoll 设置）
+    if (SearchBaseHandler._serverDate) return SearchBaseHandler._serverDate;
+    var d = new Date();
+    return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate();
+  }
+
+  function _getDailyDMCount() {
+    var dateKey = _getServerDate();
+    return SearchBaseHandler._storageGet("dm_daily_" + dateKey, 0);
+  }
+
+  function _incrementDailyDMCount() {
+    var dateKey = _getServerDate();
+    var current = SearchBaseHandler._storageGet("dm_daily_" + dateKey, 0);
+    SearchBaseHandler._storageSet("dm_daily_" + dateKey, current + 1);
+
+    // 清理3天前过期计数器
+    try {
+      var cacheDir = SearchBaseHandler._getCacheDir();
+      var flist = files.listDir(cacheDir);
+      var cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 3);
+      var cutoffKey = "dm_daily_" + cutoff.getFullYear() + "-" + (cutoff.getMonth() + 1) + "-" + cutoff.getDate();
+      for (var fi = 0; fi < flist.length; fi++) {
+        if (flist[fi].indexOf("dm_daily_") === 0 && flist[fi] < cutoffKey) {
+          try { files.remove(cacheDir + "/" + flist[fi]); } catch (e) {}
+        }
+      }
+    } catch (e) {}
+
+    return current + 1;
   }
 
   var videoStartTime = Date.now();
@@ -227,6 +270,13 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
       var shouldDM = analysis.tier === "high";
       var canFollow = shouldFollow && stats.follow_count < maxFollows;
       var canDM = shouldDM && stats.dm_count < maxDMs;
+      // 协调 per-task maxDMs 与日上限
+      var maxDaily = params.max_daily_dm || 75;
+      var todayRemaining = maxDaily - _getDailyDMCount();
+      if (canDM && todayRemaining <= 0) {
+        logger.warn(TAG, "当日DM已达上限(" + maxDaily + ")，跳过私信");
+        canDM = false;
+      }
       if (canFollow || canDM) {
         if (this._enterCommenterProfile(comment.commentAuthorAvatarEl, comment.nickname)) {
           var profileStart = Date.now();
@@ -263,7 +313,6 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
             if (Date.now() - profileStart < PROFILE_TIMEOUT && canDM) {
               var dmContent = "";
               var dmIntent = "other";
-              var hasDMSequence = !!(params.dm_sequence_id || (params.dm_messages && params.dm_messages.length > 0));
               try {
                 dmIntent = (analysis.dimensions && analysis.dimensions.intent) || "other";
                 if (!hasDMSequence) {
@@ -312,6 +361,11 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
                       });
                       stats.dm_count++;
                       if (!hasDMSequence) { try { apiClient.incrementStats(params.account_id, "search_dm", 1); } catch (e) {} }
+                      if (hasDMSequence) {
+                        this._lastDMSendTime = Date.now();
+                        var dailyCount = _incrementDailyDMCount();
+                        logger.info(TAG, "当日DM: " + dailyCount + "/" + (params.max_daily_dm || 75));
+                      }
                     } else {
                       apiClient.releaseDMRecipient({ conversation_id: dmClaimResult.conversation_id });
                     }
@@ -357,6 +411,11 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
                       });
                       stats.dm_count++;
                       if (!hasDMSequence) { try { apiClient.incrementStats(params.account_id, "search_dm", 1); } catch (e) {} }
+                      if (hasDMSequence) {
+                        this._lastDMSendTime = Date.now();
+                        var dailyCount = _incrementDailyDMCount();
+                        logger.info(TAG, "当日DM: " + dailyCount + "/" + (params.max_daily_dm || 75));
+                      }
                     } else {
                       apiClient.releaseDMRecipient({ conversation_id: dmClaimResult.conversation_id });
                     }

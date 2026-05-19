@@ -31,45 +31,62 @@ var calibrator = {
 
     var results = { captured: 0, uploaded: 0, errors: [] };
 
-    // 收集所有有 coordinate 策略的 action
-    var targets = this._collectCoordinateActions(options.pageKey);
-    if (targets.length === 0) {
-      logger.info(TAG, "未找到需要标定的 coordinate 策略");
-      return results;
-    }
-    logger.info(TAG, "找到 " + targets.length + " 个待标定 action");
+    // 五个页面分组，按顺序引导用户导航
+    var pages = [
+      { key: "search",  label: "请打开抖音搜索页（点击搜索图标进入搜索）" },
+      { key: "video",   label: "请打开一个视频（进入视频详情页）" },
+      { key: "comment", label: "请打开视频评论区（点击评论按钮进入评论区）" },
+      { key: "profile", label: "请进入一个用户主页（点击头像进入个人主页）" },
+      { key: "dm",      label: "请打开私信聊天页（点击私信按钮进入私信）" },
+    ];
 
-    // 逐个截图裁剪
-    var uploads = [];
-    for (var i = 0; i < targets.length; i++) {
-      var t = targets[i];
-      try {
-        var templateData = this._captureTemplate(t.action_name, t.x_percent, t.y_percent, resolution);
-        if (templateData) {
-          uploads.push(templateData);
-          results.captured++;
-          logger.info(TAG, "已采集: " + t.action_name + " (" + (i + 1) + "/" + targets.length + ")");
-        }
-      } catch (e) {
-        results.errors.push(t.action_name + ": " + e.message);
-        logger.warn(TAG, "采集失败: " + t.action_name + " - " + e.message);
+    for (var pi = 0; pi < pages.length; pi++) {
+      var page = pages[pi];
+      var targets = this._collectCoordinateActions(page.key);
+      if (targets.length === 0) {
+        logger.info(TAG, "页面[" + page.key + "] 无 coordinate 策略，跳过");
+        continue;
       }
-    }
 
-    // 批量上传
-    if (uploads.length > 0) {
-      try {
-        var uploadResult = apiClient.uploadCalibration(uploads, resolution);
-        if (uploadResult && uploadResult.uploaded) {
-          results.uploaded = uploadResult.uploaded;
+      // 悬浮窗提示 + 等待用户导航
+      toast(page.label + " (" + (pi + 1) + "/" + pages.length + ")");
+      logger.info(TAG, "等待导航到: " + page.key + " (" + targets.length + " 个元素)");
+      sleep(5000);
+
+      // 采集当前页面元素
+      var uploads = [];
+      for (var i = 0; i < targets.length; i++) {
+        var t = targets[i];
+        try {
+          var templateData = this._captureTemplate(t.action_name, t.x_percent, t.y_percent, resolution);
+          if (templateData) {
+            uploads.push(templateData);
+            results.captured++;
+            logger.info(TAG, "[" + page.key + "] " + t.action_name + " (" + (i + 1) + "/" + targets.length + ")");
+          }
+        } catch (e) {
+          results.errors.push(t.action_name + ": " + e.message);
+          logger.warn(TAG, "采集失败: " + t.action_name + " - " + e.message);
         }
-      } catch (e) {
-        results.errors.push("上传失败: " + e.message);
-        logger.warn(TAG, "标定上传失败: " + e.message);
       }
+
+      // 每页采集完立即上传
+      if (uploads.length > 0) {
+        try {
+          var uploadResult = apiClient.uploadCalibration(uploads, resolution);
+          if (uploadResult && uploadResult.uploaded) {
+            results.uploaded += uploadResult.uploaded;
+          }
+        } catch (e) {
+          results.errors.push("上传失败(" + page.key + "): " + e.message);
+        }
+      }
+
+      logger.info(TAG, "页面[" + page.key + "] 完成: " + uploads.length + " 个模板");
     }
 
-    logger.info(TAG, "标定完成: 采集=" + results.captured + ", 上传=" + results.uploaded);
+    toast("标定完成！采集=" + results.captured + " 上传=" + results.uploaded);
+    logger.info(TAG, "标定完成: 采集=" + results.captured + ", 上传=" + results.uploaded + ", 错误=" + results.errors.length);
     return results;
   },
 

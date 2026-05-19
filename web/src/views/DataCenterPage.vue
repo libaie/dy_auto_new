@@ -382,62 +382,73 @@ onMounted(async () => {
         <p class="text-sm text-slate-500">暂无用户数据</p>
       </div>
       <div v-else class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        <div v-for="user in items" :key="user.id" class="card px-4 py-4 group cursor-default transition-all duration-200" style="border-color: var(--border-subtle);">
+        <div v-for="user in items" :key="user.id"
+             class="group cursor-default transition-all duration-300 rounded-2xl overflow-hidden"
+             style="background: linear-gradient(145deg, rgba(15,23,42,0.9), rgba(30,41,59,0.6)); border: 1px solid rgba(148,163,184,0.06);">
+          <!-- Top accent bar -->
+          <div class="h-1 w-full" :style="{ background: avatarGradient(user.nickname) }"></div>
+
           <!-- Header: Avatar + Identity -->
-          <div class="flex items-start gap-3 mb-4">
+          <div class="flex items-start gap-3 px-4 pt-4 pb-3">
             <div class="relative shrink-0">
-              <img v-if="user.avatar_url" :src="user.avatar_url" class="w-11 h-11 rounded-full object-cover ring-2 ring-white/5" :alt="user.nickname" />
-              <div v-else class="w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold text-white ring-2 ring-white/5" :style="{ backgroundImage: avatarGradient(user.nickname) }">
+              <img v-if="user.avatar_url" :src="user.avatar_url" class="w-12 h-12 rounded-full object-cover ring-2 ring-white/10" :alt="user.nickname" />
+              <div v-else class="w-12 h-12 rounded-full flex items-center justify-center text-base font-bold text-white shadow-lg"
+                   :style="{ backgroundImage: avatarGradient(user.nickname) }">
                 {{ (user.nickname || '?')[0] }}
               </div>
-              <span v-if="user.is_private === '是'" class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-rose-500 flex items-center justify-center ring-2 ring-black" title="私密账号">
-                <svg class="w-2 h-2 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+              <span v-if="user.is_private === '是'" class="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-rose-500 flex items-center justify-center ring-2 ring-slate-900" title="私密账号">
+                <svg class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
               </span>
             </div>
-            <div class="min-w-0 flex-1 pt-0.5">
-              <div class="flex items-center gap-1.5">
-                <p class="text-sm font-semibold text-slate-100 truncate">{{ user.nickname || '未知' }}</p>
-                <span class="text-[9px] px-1 py-0.5 rounded font-medium shrink-0" :class="user.data_source_type === 1 ? 'bg-rose-500/15 text-rose-400' : 'bg-slate-500/10 text-slate-500'">{{ user.data_source_type === 1 ? '带货' : '普通' }}</span>
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-1.5 mb-0.5">
+                <p class="text-sm font-semibold text-white truncate">{{ user.nickname || '未知' }}</p>
+                <span class="text-[9px] px-1.5 py-0.5 rounded-full font-medium shrink-0 tracking-wide"
+                      :class="user.data_source_type === 1 ? 'bg-pink-500/15 text-pink-400 border border-pink-500/20' : 'bg-slate-500/10 text-slate-400 border border-slate-500/10'">
+                  {{ user.data_source_type === 1 ? '带货' : '普通' }}
+                </span>
               </div>
-              <p class="text-[11px] text-slate-500 font-mono mt-0.5 truncate">{{ user.douyin_id || '-' }}</p>
+              <p class="text-[11px] text-slate-500 font-mono truncate">抖音号 {{ user.douyin_id || '-' }}</p>
             </div>
           </div>
 
           <!-- Stats grid -->
-          <div class="grid grid-cols-4 gap-1 mb-3 p-2 rounded-lg" style="background: rgba(255,255,255,0.015);">
-            <div class="text-center">
-              <p class="text-sm font-bold tabular-nums" style="font-family: var(--font-mono); color: var(--accent-400);">{{ user.fans_count || '-' }}</p>
+          <div class="grid grid-cols-4 gap-px mx-4 mb-3 rounded-xl overflow-hidden" style="background: rgba(255,255,255,0.03);">
+            <div class="text-center py-2.5" style="background: rgba(15,23,42,0.6);">
+              <p class="text-base font-bold tabular-nums" style="background: linear-gradient(135deg, #818cf8, #6366f1); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">{{ user.fans_count || '-' }}</p>
               <p class="text-[10px] text-slate-500 mt-0.5">粉丝</p>
             </div>
-            <div class="text-center">
-              <p class="text-sm font-bold tabular-nums" style="font-family: var(--font-mono); color: var(--amber-400);">{{ user.likes_count || '-' }}</p>
+            <div class="text-center py-2.5" style="background: rgba(15,23,42,0.6);">
+              <p class="text-base font-bold tabular-nums" style="background: linear-gradient(135deg, #fbbf24, #f59e0b); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">{{ user.likes_count || '-' }}</p>
               <p class="text-[10px] text-slate-500 mt-0.5">获赞</p>
             </div>
-            <div class="text-center">
-              <p class="text-sm font-bold tabular-nums text-slate-300" style="font-family: var(--font-mono);">{{ user.follow_count || '-' }}</p>
+            <div class="text-center py-2.5" style="background: rgba(15,23,42,0.6);">
+              <p class="text-base font-bold tabular-nums text-slate-300">{{ user.follow_count || '-' }}</p>
               <p class="text-[10px] text-slate-500 mt-0.5">关注</p>
             </div>
-            <div class="text-center">
-              <p class="text-sm font-bold tabular-nums text-slate-300" style="font-family: var(--font-mono);">{{ user.works_count || '-' }}</p>
+            <div class="text-center py-2.5" style="background: rgba(15,23,42,0.6);">
+              <p class="text-base font-bold tabular-nums text-slate-300">{{ user.works_count || '-' }}</p>
               <p class="text-[10px] text-slate-500 mt-0.5">作品</p>
             </div>
           </div>
 
           <!-- Destination -->
-          <div v-if="user.intended_province || user.intended_city || user.intended_attraction" class="mb-3 px-2 py-1.5 rounded-lg flex items-center gap-2 text-xs" style="background: rgba(139,92,246,0.06); border: 1px solid rgba(139,92,246,0.12);">
+          <div v-if="user.intended_province || user.intended_city || user.intended_attraction"
+               class="mx-4 mb-3 px-3 py-2 rounded-xl flex items-center gap-2 text-xs"
+               style="background: rgba(139,92,246,0.06); border: 1px solid rgba(139,92,246,0.1);">
             <svg class="w-3.5 h-3.5 text-purple-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-            <span class="text-slate-400">{{ [user.intended_province, user.intended_city, user.intended_attraction].filter(Boolean).join(' · ') }}</span>
+            <span class="text-slate-400 truncate">{{ [user.intended_province, user.intended_city, user.intended_attraction].filter(Boolean).join(' · ') }}</span>
           </div>
 
           <!-- Footer: Meta -->
-          <div class="flex items-center gap-2 text-[11px] text-slate-500 pt-2 border-t" style="border-color: var(--border-subtle);">
+          <div class="flex items-center gap-2 text-[11px] text-slate-500 px-4 py-2.5 border-t" style="border-color: rgba(255,255,255,0.04);">
             <span v-if="user.gender || user.age" class="inline-flex items-center gap-1">
               <svg class="w-3 h-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
               {{ user.gender || '?' }} {{ user.age || '' }}
             </span>
             <span class="opacity-30" v-if="(user.gender || user.age) && user.ip_location">|</span>
-            <span v-if="user.ip_location" class="inline-flex items-center gap-1">
-              <svg class="w-3 h-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            <span v-if="user.ip_location" class="inline-flex items-center gap-1 truncate">
+              <svg class="w-3 h-3 opacity-50 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
               {{ user.ip_location }}
             </span>
           </div>

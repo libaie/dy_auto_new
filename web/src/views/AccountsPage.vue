@@ -25,7 +25,7 @@ const DAILY_LIMIT_FIELDS = [
   { key: 'likes', label: '点赞', max: 200 },
   { key: 'comments', label: '评论', max: 100 },
   { key: 'follows', label: '关注', max: 100 },
-  { key: 'dms', label: '私信', max: 50 },
+  { key: 'dms', label: '私信', max: 100 },
   { key: 'replies', label: '回复', max: 100 },
 ]
 
@@ -410,27 +410,51 @@ onMounted(fetchAccounts)
 
                   <!-- Daily Limits -->
                   <div>
-                    <div class="flex items-center justify-between mb-2">
-                      <label class="flex items-center gap-1.5 text-sm font-medium text-slate-300">
+                    <div class="flex items-center justify-between mb-4">
+                      <label class="flex items-center gap-1.5 text-sm font-semibold text-slate-200">
+                        <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
                         每日限额
-                        <TipIcon text="每种操作类型每日执行上限，超出后自动跳过该操作" width="w-80" />
+                        <TipIcon :text="'每种操作类型每日执行上限，超出后自动跳过该操作\n\n点赞 (search_like)\n  搜索结果页对视频点赞\n\n评论 (search_comment)\n  搜索结果页对视频发表评论\n\n关注 (follow)\n  评论回复流程中关注评论者\n\n私信 (search_dm)\n  搜索视频作者或评论者发送私信，一个用户计 1 次\n\n回复 (reply_comment)\n  对视频评论区留言进行 AI 回复'" width="w-72" />
                       </label>
-                      <label class="flex items-center gap-2 text-xs text-slate-400 cursor-pointer select-none">
+                      <label class="flex items-center gap-2 text-xs text-slate-400 cursor-pointer select-none hover:text-slate-300 transition-colors">
                         <input type="checkbox" v-model="form.unlimited" class="accent-indigo-600 rounded" />
                         不限制
                       </label>
                     </div>
-                    <div v-if="!form.unlimited" class="grid grid-cols-5 gap-2">
-                      <div v-for="f in DAILY_LIMIT_FIELDS" :key="f.key" class="text-center">
-                        <label :for="'limit-' + f.key" class="text-xs text-slate-400 block mb-1">{{ f.label }}</label>
+                    <div v-if="!form.unlimited" class="space-y-2">
+                      <div v-for="f in DAILY_LIMIT_FIELDS" :key="f.key"
+                           class="flex items-center gap-3 rounded-lg px-3 py-2"
+                           :style="{ background: 'rgba(255,255,255,0.02)' }">
+                        <span class="w-10 text-xs font-medium shrink-0"
+                          :class="[
+                            f.key === 'likes' ? 'text-pink-400' :
+                            f.key === 'comments' ? 'text-emerald-400' :
+                            f.key === 'follows' ? 'text-amber-400' :
+                            f.key === 'dms' ? 'text-sky-400' :
+                            'text-violet-400'
+                          ]">{{ f.label }}</span>
                         <input
                           :id="'limit-' + f.key"
                           v-model.number="form.limits[f.key]"
                           type="number"
                           min="0"
                           :max="f.max"
-                          class="w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-slate-200 text-center"
+                          class="w-16 rounded-lg border border-white/10 bg-white/[0.06] px-2 py-1.5 text-sm font-semibold text-white text-center focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-transparent transition-shadow shrink-0"
                         />
+                        <div class="flex-1 h-1.5 rounded-full bg-white/5 overflow-hidden">
+                          <div class="h-full rounded-full transition-all duration-300"
+                            :style="{ width: Math.min(100, (form.limits[f.key] || 0) / f.max * 100) + '%' }"
+                            :class="[
+                              f.key === 'likes' ? 'bg-gradient-to-r from-pink-500 to-pink-300' :
+                              f.key === 'comments' ? 'bg-gradient-to-r from-emerald-500 to-emerald-300' :
+                              f.key === 'follows' ? 'bg-gradient-to-r from-amber-500 to-amber-300' :
+                              f.key === 'dms' ? 'bg-gradient-to-r from-sky-500 to-sky-300' :
+                              'bg-gradient-to-r from-violet-500 to-violet-300'
+                            ]"></div>
+                        </div>
+                        <span class="text-[11px] text-slate-500 w-9 text-right shrink-0">/{{ f.max }}</span>
                       </div>
                     </div>
                   </div>

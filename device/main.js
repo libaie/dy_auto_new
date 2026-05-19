@@ -438,6 +438,10 @@ function startMainLoop(serverUrl, secret) {
         SearchBaseHandler._dmSeqCache = dmCache;
       }
 
+      if (response.server_date) {
+        SearchBaseHandler._serverDate = response.server_date;
+      }
+
       if (response.cancelled_task_id) {
         logger.info(TAG, "catch-up: 服务端取消任务: " + response.cancelled_task_id);
         taskExecutor.cancel(response.cancelled_task_id);

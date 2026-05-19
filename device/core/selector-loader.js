@@ -37,14 +37,39 @@ var selectorLoader = global.__selectorLoader || {
           this._initialized = true;
           logger.info(TAG, "已加载 " + Object.keys(this._cache).length + " 个选择器, 版本=" + this._version);
           this.syncTemplates();
-          // 检查关键选择器是否缺失 → 触发标定
+          // 检查是否需要为新分辨率设备标定 image 模板
+          var needCalibration = false;
+          var hasImageSelector = false;
+          var hasExactMatch = false;
+          for (var actionName in this._cache) {
+            var sel = this._cache[actionName];
+            if (!sel || !sel.strategies) continue;
+            for (var si = 0; si < sel.strategies.length; si++) {
+              if (sel.strategies[si].type === "image") {
+                hasImageSelector = true;
+                break;
+              }
+            }
+            var rp = sel.resolution_profile || "default";
+            if (rp === this._resolution) { hasExactMatch = true; }
+          }
+          // 已有本地模板文件则跳过（避免重复标定）
+          var localTplDir = "/sdcard/dy_auto/templates/" + this._resolution + "/";
+          var hasLocalTemplates = false;
+          try {
+            hasLocalTemplates = files.isDir(localTplDir) && files.listDir(localTplDir).length > 0;
+          } catch (e) {}
+          needCalibration = hasImageSelector && !hasExactMatch && !hasLocalTemplates;
+          // 检查关键选择器是否缺失
           var criticalActions = ["search_tab", "video_comment_btn", "comment_list", "follow_button"];
           var missing = [];
           for (var ci = 0; ci < criticalActions.length; ci++) {
             if (!this._cache[criticalActions[ci]]) missing.push(criticalActions[ci]);
           }
-          if (missing.length > 0) {
-            logger.warn(TAG, "缺少关键选择器 (" + missing.join(",") + ")，触发自动标定");
+          if (needCalibration || missing.length > 0) {
+            var reason = needCalibration ? "新分辨率 " + this._resolution + " 缺少 image 模板" : "";
+            if (missing.length > 0) reason += (reason ? "; " : "") + "缺少选择器: " + missing.join(",");
+            logger.warn(TAG, "触发自动标定: " + reason);
             try {
               var calibrator = require("./calibrator");
               calibrator.run();

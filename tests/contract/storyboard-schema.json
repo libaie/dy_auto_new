@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "StoryboardRequest",
+  "type": "object",
+  "required": ["mode", "title", "frames"],
+  "properties": {
+    "mode": { "const": "storyboard" },
+    "title": { "type": "string", "minLength": 1 },
+    "frames": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["narration", "image_prompt"],
+        "properties": {
+          "index": { "type": "integer", "minimum": 0 },
+          "narration": { "type": "string", "minLength": 1 },
+          "image_prompt": { "type": "string", "minLength": 1 },
+          "duration": { "type": "number", "minimum": 0 },
+          "audio_mode": { "enum": ["tts", "seedance_native", "bgm_only", "silent"] },
+          "voice_id": { "type": "string" },
+          "reference_urls": {
+            "type": "array",
+            "items": { "type": "string", "format": "uri" }
+          }
+        }
+      }
+    },
+    "config": {
+      "type": "object",
+      "properties": {
+        "frame_template": { "type": "string" },
+        "tts_inference_mode": { "enum": ["local", "comfyui"] },
+        "tts_speed": { "type": "number" },
+        "media_workflow": { "type": "string" },
+        "media_width": { "type": "integer" },
+        "media_height": { "type": "integer" },
+        "bgm_path": { "type": "string" },
+        "bgm_volume": { "type": "number" }
+      }
+    }
+  }
+}

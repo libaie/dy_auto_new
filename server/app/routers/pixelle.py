@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.config import _resolve_pixelle_config, PIXELLE_CONFIG_PATH, JWT_SECRET
+from app.config import _resolve_pixelle_config, PIXELLE_CONFIG_PATH, JWT_SECRET, PIXELLE_API_KEY
 from app.database import get_db
 from app.deps import verify_admin_token, verify_ws_admin_token
 
@@ -37,6 +37,14 @@ def _write_pixelle_config(data: dict):
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         yaml.safe_dump(data, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+
+
+def _pixelle_headers() -> dict:
+    """Headers for direct Pixelle-Video HTTP calls (includes API key if configured)."""
+    h = {}
+    if PIXELLE_API_KEY:
+        h["X-API-Key"] = PIXELLE_API_KEY
+    return h
 
 
 def _redact_api_key(key: str) -> str:
@@ -123,6 +131,7 @@ async def update_pixelle_config(
         async with httpx.AsyncClient(trust_env=False,
             base_url=cfg["url"],
             timeout=httpx.Timeout(5, connect=3),
+            headers=_pixelle_headers(),
         ) as client:
             resp = await client.post("/api/admin/reload")
             reload_ok = resp.is_success
@@ -187,6 +196,7 @@ async def test_connection(
         async with httpx.AsyncClient(trust_env=False,
             base_url=cfg["url"],
             timeout=httpx.Timeout(10, connect=5),
+            headers=_pixelle_headers(),
         ) as client:
             resp = await client.get("/openapi.json")
             data = resp.json()
@@ -234,6 +244,7 @@ def _get_proxy_client(db=None) -> httpx.AsyncClient:
         _proxy_client = httpx.AsyncClient(trust_env=False,
             base_url=url,
             timeout=httpx.Timeout(cfg["timeout"], connect=10),
+            headers=_pixelle_headers(),
         )
         _proxy_client_url = url
     return _proxy_client

@@ -220,6 +220,7 @@ def bj_now() -> datetime:
 # --- Pixelle-Video 集成 ---
 PIXELLE_VIDEO_URL = os.getenv("PIXELLE_VIDEO_URL", "http://localhost:8500")
 PIXELLE_VIDEO_TIMEOUT = 600       # 代理请求超时（秒）
+PIXELLE_API_KEY = os.getenv("PIXELLE_API_KEY", "")
 PIXELLE_CONFIG_PATH = os.getenv("PIXELLE_CONFIG_PATH", str(SERVER_DIR.parent.parent.parent / "Pixelle-Video" / "config.yaml"))
 
 # --- Seedance 2.0 (火山方舟 Ark API) ---

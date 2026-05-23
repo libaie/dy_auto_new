@@ -50,13 +50,18 @@ async def close_client():
 
 async def _pixelle_request(method: str, path: str, db: Session | None = None, **kwargs) -> dict:
     """统一的 Pixelle-Video HTTP 请求入口，带指数退避重试."""
+    from app.config import PIXELLE_API_KEY
     url = f"{_get_base_url(db)}{path}"
     client = _get_client()
     last_err = None
 
+    headers = kwargs.pop("headers", {})
+    if PIXELLE_API_KEY:
+        headers["X-API-Key"] = PIXELLE_API_KEY
+
     for attempt in range(MAX_RETRIES):
         try:
-            r = await client.request(method, url, **kwargs)
+            r = await client.request(method, url, headers=headers, **kwargs)
             r.raise_for_status()
             try:
                 return r.json()

@@ -15,7 +15,7 @@ from contextlib import asynccontextmanager
 from app.config import bj_now
 from app.database import get_db, init_db, SessionLocal
 from app.seed import seed_all
-from app.routers import device, tasks, accounts, devices, auth, selectors, stats, content, account_groups, chains, settings, channels, prompt_templates, data, videos, pixelle, seedance, ai_config, characters, scenes, series, pipeline, audit, director, reference_data, dm_sequences
+from app.routers import device, tasks, accounts, devices, auth, selectors, stats, content, account_groups, chains, settings, channels, prompt_templates, data, videos, pixelle, ai_config, characters, scenes, series, pipeline, audit, director, reference_data, dm_sequences
 from app.services.ai_generator import ai_generator
 
 
@@ -96,15 +96,24 @@ async def _offline_checker():
                     if t.retry_count >= MAX_RETRIES:
                         t.status = "failed"
                         t.completed_at = now
+                        # Task is terminal — channel item must also be terminal.
+                        # Only reset "assigned" items (not completed/failed).
+                        db.query(DBChannelItem).filter(
+                            DBChannelItem.task_id == t.id,
+                            DBChannelItem.status == "assigned",
+                        ).update({"status": "failed", "assigned_device_id": None, "assigned_at": None, "task_id": None}, synchronize_session=False)
                     else:
-                        t.status = "pending"
-                        t.device_id = None
-                        t.started_at = None
-                    # Reset linked channel item (any non-terminal status)
-                    db.query(DBChannelItem).filter(
-                        DBChannelItem.task_id == t.id,
-                        DBChannelItem.status.in_(["assigned", "completed", "failed"]),
-                    ).update({"status": "pending", "assigned_device_id": None, "assigned_at": None, "task_id": None}, synchronize_session=False)
+                        # Cancel task — channel item reset below creates fresh task on re-claim.
+                        # Must NOT set to PENDING (would create duplicate direct-queue retry).
+                        # Keep device_id so the online device can receive the cancel via poll.
+                        # _handleCancelledTask on the device will ack and clear device_id.
+                        t.status = "cancelled"
+                        t.completed_at = now
+                        # Only reset assigned items for re-dispatch; completed/failed are terminal
+                        db.query(DBChannelItem).filter(
+                            DBChannelItem.task_id == t.id,
+                            DBChannelItem.status == "assigned",
+                        ).update({"status": "pending", "assigned_device_id": None, "assigned_at": None, "task_id": None}, synchronize_session=False)
                 db.commit()
         except Exception:
             import logging
@@ -182,8 +191,7 @@ app.include_router(data.router)
 app.include_router(videos.router)
 app.include_router(pixelle.router)
 app.include_router(pixelle.proxy_router)
-app.include_router(seedance.api_router)
-app.include_router(seedance.proxy_router)
+
 app.include_router(ai_config.router)
 app.include_router(characters.router)
 app.include_router(scenes.router)

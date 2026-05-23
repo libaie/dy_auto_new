@@ -70,6 +70,32 @@ async def get_pixelle_config(
 
 
 @router.put("/config")
+def _serialize_ai_models(db: Session) -> dict:
+    """Read AIModel table and serialize to Pixelle-Video ai_models.scenes format."""
+    from app.db_models import AIModel
+    from app.services.crypto import decrypt
+
+    models = db.query(AIModel).filter(AIModel.enabled == True).all()
+    scenes: dict = {}
+    for m in models:
+        scene_key = (m.config_json or {}).get("scene_key")
+        if not scene_key:
+            continue
+        ak = ""
+        if m.api_key:
+            try:
+                ak = decrypt(m.api_key)
+            except Exception:
+                pass
+        scenes[scene_key] = {
+            "provider": m.provider,
+            "model": m.model_name or "",
+            "api_key": ak,
+            "base_url": m.base_url or "",
+        }
+    return {"scenes": scenes}
+
+
 async def update_pixelle_config(
     body: PixelleConfigUpdate,
     db: Session = Depends(get_db),
@@ -87,6 +113,7 @@ async def update_pixelle_config(
         return base
 
     merged = deep_merge(current, body.updates)
+    merged["ai_models"] = _serialize_ai_models(db)
     _write_pixelle_config(merged)
 
     # Trigger Pixelle-Video to reload config from disk

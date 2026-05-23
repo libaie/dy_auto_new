@@ -69,7 +69,6 @@ async def get_pixelle_config(
     return _redact_secrets(_read_pixelle_config())
 
 
-@router.put("/config")
 def _serialize_ai_models(db: Session) -> dict:
     """Read AIModel table and serialize to Pixelle-Video ai_models.scenes format."""
     from app.db_models import AIModel
@@ -96,6 +95,7 @@ def _serialize_ai_models(db: Session) -> dict:
     return {"scenes": scenes}
 
 
+@router.put("/config")
 async def update_pixelle_config(
     body: PixelleConfigUpdate,
     db: Session = Depends(get_db),

@@ -233,10 +233,10 @@ def _resolve_pixelle_config(db=None):
     timeout = PIXELLE_VIDEO_TIMEOUT
 
     if db:
+        import logging
+        _log = logging.getLogger(__name__)
         try:
             from app.db_models import SystemSetting
-            import logging
-            _log = logging.getLogger(__name__)
             settings = {s.key: s.value for s in db.query(SystemSetting).all()}
             url = settings.get("pixelle_video_url") or url
             try:

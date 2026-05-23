@@ -95,7 +95,7 @@ async def pipeline_start(
 
     try:
         result = await _submit_and_poll(payload, db)
-    except HTTPException:
+    except Exception:
         run.status = "failed"
         db.commit()
         raise

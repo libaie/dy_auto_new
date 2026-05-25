@@ -1,4 +1,6 @@
 """Staged video production orchestration owned by dy_auto."""
+import logging
+
 from sqlalchemy.orm import Session
 
 from app.config import bj_now
@@ -8,8 +10,11 @@ from app.db_models import (
     VideoProductionRun,
     VideoReviewRecord,
 )
+from app.services.audit_gate import classify_audit_gate
 from app.services.pixelle_stage_client import get_stage_task, submit_image_batch
 from app.services.runtime_model_config import redact_runtime_model_config, resolve_runtime_model_config
+
+logger = logging.getLogger(__name__)
 
 
 class VideoProductionError(ValueError):
@@ -110,6 +115,85 @@ def mark_image_stage_assets(db: Session, run: VideoProductionRun, assets: list[d
     return saved
 
 
+def run_ai_audit_for_assets(db: Session, run: VideoProductionRun, assets: list[VideoProductionAsset]) -> list[VideoProductionAsset]:
+    """Run AI audit on each asset and create review records. Assets that pass gate become approved."""
+    try:
+        from app.services.model_registry import get_model_for_scene, ModelResolutionError
+        audit_model = get_model_for_scene(db, "quality_audit")
+    except Exception:
+        audit_model = {}
+
+    for asset in assets:
+        if not asset.url:
+            _record_audit_fallback(db, asset, run.id, ["No asset URL for audit"])
+            continue
+
+        if not audit_model or not audit_model.get("api_key"):
+            _record_audit_fallback(db, asset, run.id, ["Audit model not configured or missing API key"])
+            continue
+
+        try:
+            from app.routers.audit import _do_audit
+            result = _do_audit(audit_model, asset.url, None)
+        except Exception as exc:
+            logger.warning("AI audit failed for asset %s: %s", asset.id, exc)
+            result = {"score": 0.0, "pass_fail": False, "issues": [str(exc)], "raw": ""}
+
+        gate = classify_audit_gate(result, error=False)
+        db.add(VideoReviewRecord(
+            asset_id=asset.id,
+            run_id=run.id,
+            review_type="ai",
+            status=gate["gate_status"],
+            score=gate["score"],
+            issues_json=gate.get("issues", []),
+            model_trace_json={"auditor_model": audit_model.get("provider", "unknown"), "auditor_model_name": audit_model.get("model_name", "")},
+        ))
+
+        if gate["gate_status"] == "approved":
+            asset.status = "approved"
+        else:
+            asset.status = "review_pending"
+
+    db.commit()
+    for asset in assets:
+        db.refresh(asset)
+    return assets
+
+
+def _record_audit_fallback(db: Session, asset: VideoProductionAsset, run_id: str, issues: list[str]) -> None:
+    db.add(VideoReviewRecord(
+        asset_id=asset.id,
+        run_id=run_id,
+        review_type="ai",
+        status="needs_human",
+        score=0.0,
+        issues_json=issues,
+        model_trace_json={},
+    ))
+
+
+def reject_asset(db: Session, asset_id: str, reviewer_user_id: str | None, comment: str = "") -> VideoProductionAsset:
+    asset = db.query(VideoProductionAsset).filter(VideoProductionAsset.id == asset_id).first()
+    if not asset:
+        raise VideoProductionError("Asset not found")
+    latest = latest_assets_by_frame(db, asset.run_id, asset.asset_type).get(asset.frame_id)
+    if latest and latest.id != asset.id:
+        raise VideoProductionError("A newer asset version exists. Reload before reviewing.")
+    asset.status = "rejected"
+    db.add(VideoReviewRecord(
+        asset_id=asset.id,
+        run_id=asset.run_id,
+        review_type="human",
+        status="rejected",
+        reviewer_user_id=reviewer_user_id,
+        comment=comment,
+    ))
+    db.commit()
+    db.refresh(asset)
+    return asset
+
+
 def latest_assets_by_frame(db: Session, run_id: str, asset_type: str = "image") -> dict[str, VideoProductionAsset]:
     rows = db.query(VideoProductionAsset).filter(
         VideoProductionAsset.run_id == run_id,
@@ -179,7 +263,9 @@ async def sync_image_stage_results(db: Session, run_id: str) -> list[VideoProduc
     status = await get_stage_task(db, run.pixelle_stage_task_id)
     if status.get("status") not in ("completed", "succeeded", "done"):
         raise VideoProductionError(f"Image stage is not complete: {status.get('status')}")
-    return mark_image_stage_assets(db, run, status.get("assets", []), pixelle_task_id=run.pixelle_stage_task_id)
+    assets = mark_image_stage_assets(db, run, status.get("assets", []), pixelle_task_id=run.pixelle_stage_task_id)
+    run_ai_audit_for_assets(db, run, assets)
+    return assets
 
 
 def create_regenerated_image_asset(db: Session, asset_id: str, generated: dict) -> VideoProductionAsset:

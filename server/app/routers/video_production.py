@@ -11,6 +11,7 @@ from app.services.video_production_service import (
     create_regenerated_image_asset,
     create_run_from_episode,
     latest_assets_by_frame,
+    reject_asset,
     start_image_stage,
     sync_image_stage_results,
 )
@@ -101,14 +102,35 @@ def get_run(
 def review_items(
     run_id: str | None = None,
     status: str = "review_pending",
+    series_id: str | None = None,
+    episode_id: str | None = None,
+    stage: str | None = None,
+    asset_type: str | None = None,
+    page: int = 1,
+    page_size: int = 50,
     db: Session = Depends(get_db),
     user=Depends(verify_admin_token),
 ):
-    query = db.query(VideoProductionAsset).filter(VideoProductionAsset.status == status)
+    query = db.query(VideoProductionAsset)
     if run_id:
         query = query.filter(VideoProductionAsset.run_id == run_id)
-    items = query.order_by(VideoProductionAsset.created_at.desc()).limit(100).all()
-    return {"ok": True, "items": [_asset_payload(item) for item in items]}
+    if status:
+        query = query.filter(VideoProductionAsset.status == status)
+    if series_id:
+        query = query.join(VideoProductionRun, VideoProductionAsset.run_id == VideoProductionRun.id).filter(
+            VideoProductionRun.series_id == series_id
+        )
+    if episode_id:
+        query = query.filter(VideoProductionAsset.episode_id == episode_id)
+    if stage:
+        query = query.filter(VideoProductionAsset.stage == stage)
+    if asset_type:
+        query = query.filter(VideoProductionAsset.asset_type == asset_type)
+
+    query = query.order_by(VideoProductionAsset.created_at.desc())
+    total = query.count()
+    items = query.offset((page - 1) * page_size).limit(page_size).all()
+    return {"ok": True, "items": [_asset_payload(item) for item in items], "total": total, "page": page, "page_size": page_size}
 
 
 @router.post("/assets/{asset_id}/review")
@@ -119,10 +141,13 @@ def review_asset(
     user=Depends(verify_admin_token),
 ):
     reviewer_id = user[0] if isinstance(user, tuple) else None
-    if body.action != "approve":
-        raise HTTPException(400, "Only approve is implemented in the image wedge")
     try:
-        asset = approve_asset(db, asset_id, reviewer_user_id=reviewer_id, comment=body.comment)
+        if body.action == "approve":
+            asset = approve_asset(db, asset_id, reviewer_user_id=reviewer_id, comment=body.comment)
+        elif body.action == "reject":
+            asset = reject_asset(db, asset_id, reviewer_user_id=reviewer_id, comment=body.comment)
+        else:
+            raise HTTPException(400, f"Unknown action: {body.action}")
     except VideoProductionError as exc:
         raise HTTPException(409, str(exc))
     return {"ok": True, "asset": _asset_payload(asset)}

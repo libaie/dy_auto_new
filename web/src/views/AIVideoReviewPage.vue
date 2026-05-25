@@ -5,9 +5,21 @@
         <h1 class="text-2xl font-bold text-slate-100">AI Video Review</h1>
         <p class="text-slate-500 text-sm mt-1">Human decisions for staged video production assets.</p>
       </div>
-      <button @click="load" class="bg-sky-500 hover:bg-sky-400 text-white px-4 py-2 rounded-lg text-sm transition cursor-pointer">
-        Refresh
-      </button>
+      <div class="flex gap-2">
+        <button v-if="runId && runStatus && (runStatus === 'image_batch_running' || runStatus === 'image_generation')"
+                @click="doSync" :disabled="syncing"
+                class="bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm transition cursor-pointer">
+          {{ syncing ? 'Syncing...' : 'Sync Pixelle Results' }}
+        </button>
+        <button @click="load" class="bg-sky-500 hover:bg-sky-400 text-white px-4 py-2 rounded-lg text-sm transition cursor-pointer">
+          Refresh
+        </button>
+      </div>
+    </div>
+
+    <div v-if="runId && runStatus" class="mb-4 px-4 py-2 rounded-lg text-sm"
+         :class="runStatus === 'image_review_pending' ? 'bg-amber-900/30 text-amber-300' : 'bg-slate-800/40 text-slate-400'">
+      Run status: {{ runStatus }}
     </div>
 
     <div v-if="loading" class="text-slate-400 text-center py-12">Loading review queue...</div>
@@ -67,8 +79,11 @@
           </dl>
 
           <div class="flex gap-2">
-            <button @click="approve" :disabled="acting" class="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm">
+            <button @click="approve" :disabled="acting" class="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm cursor-pointer">
               Approve latest
+            </button>
+            <button @click="reject" :disabled="acting" class="bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm cursor-pointer">
+              Reject
             </button>
           </div>
         </template>
@@ -83,14 +98,17 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { listReviewItems, reviewAsset } from '../api/videoProduction.js'
+import { listReviewItems, reviewAsset, syncImageStage, getVideoProductionRun } from '../api/videoProduction.js'
 
 const route = useRoute()
 const items = ref([])
 const selected = ref(null)
 const loading = ref(true)
 const acting = ref(false)
+const syncing = ref(false)
 const error = ref('')
+const runId = ref(route.query.run_id || null)
+const runStatus = ref(null)
 
 async function load() {
   loading.value = true
@@ -122,5 +140,46 @@ async function approve() {
   }
 }
 
-onMounted(load)
+async function reject() {
+  if (!selected.value) return
+  const reason = prompt('Rejection reason (optional):')
+  if (reason === null) return
+  acting.value = true
+  try {
+    await reviewAsset(selected.value.id, 'reject', reason || 'Rejected from review center')
+    await load()
+  } catch (e) {
+    error.value = e.response?.data?.detail || e.message || 'Failed to reject asset'
+  } finally {
+    acting.value = false
+  }
+}
+
+async function loadRunStatus() {
+  if (!runId.value) return
+  try {
+    const { data } = await getVideoProductionRun(runId.value)
+    if (data.ok) runStatus.value = data.run.status
+  } catch (e) { /* ignore */ }
+}
+
+async function doSync() {
+  if (!runId.value) return
+  syncing.value = true
+  error.value = ''
+  try {
+    await syncImageStage(runId.value)
+    await load()
+    await loadRunStatus()
+  } catch (e) {
+    error.value = e.response?.data?.detail || e.message || 'Failed to sync Pixelle results'
+  } finally {
+    syncing.value = false
+  }
+}
+
+onMounted(async () => {
+  await loadRunStatus()
+  await load()
+})
 </script>

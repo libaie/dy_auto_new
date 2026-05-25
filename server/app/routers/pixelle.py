@@ -53,20 +53,22 @@ def _redact_api_key(key: str) -> str:
     return key[:4] + "*" * (len(key) - 8) + key[-4:]
 
 
-def _redact_secrets(config: dict) -> dict:
-    """Return a copy with API keys redacted for safe display."""
-    result = config.copy()
-    if "llm" in result and isinstance(result["llm"], dict):
-        result["llm"] = {**result["llm"]}
-        if result["llm"].get("api_key"):
-            result["llm"]["api_key"] = _redact_api_key(result["llm"]["api_key"])
-    if "comfyui" in result and isinstance(result["comfyui"], dict):
-        result["comfyui"] = {**result["comfyui"]}
-        if result["comfyui"].get("runninghub_api_key"):
-            result["comfyui"]["runninghub_api_key"] = _redact_api_key(result["comfyui"]["runninghub_api_key"])
-        if result["comfyui"].get("comfyui_api_key"):
-            result["comfyui"]["comfyui_api_key"] = _redact_api_key(result["comfyui"]["comfyui_api_key"])
-    return result
+_SECRET_KEY_PARTS = ("api_key", "api_secret", "secret", "token", "authorization")
+
+
+def _redact_secrets(config):
+    """Return a deep copy with secret-looking values redacted for safe display."""
+    if isinstance(config, list):
+        return [_redact_secrets(item) for item in config]
+    if isinstance(config, dict):
+        safe = {}
+        for key, value in config.items():
+            if any(part in str(key).lower() for part in _SECRET_KEY_PARTS):
+                safe[key] = _redact_api_key(str(value or ""))
+            else:
+                safe[key] = _redact_secrets(value)
+        return safe
+    return config
 
 
 @router.get("/config")

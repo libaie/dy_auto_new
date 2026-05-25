@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import verify_admin_token
 from app.db_models import AuditReport, AIModel
+from app.services.audit_gate import classify_audit_gate
 from app.services.crypto import decrypt
 
 logger = logging.getLogger(__name__)
@@ -24,24 +25,12 @@ class AuditImageRequest(BaseModel):
 
 
 def _get_audit_model(db: Session, model_id: str | None) -> dict:
-    if model_id:
-        m = db.query(AIModel).filter(AIModel.id == model_id).first()
-    else:
-        m = db.query(AIModel).filter(
-            AIModel.model_type == "audit", AIModel.enabled == True
-        ).order_by(AIModel.sort_order).first()
-    if not m:
+    """Resolve audit model via registry with backward-compatible fallback."""
+    from app.services.model_registry import get_model_for_scene, ModelResolutionError
+    try:
+        return get_model_for_scene(db, "quality_audit", explicit_model_id=model_id)
+    except ModelResolutionError:
         return {}
-    ak = ""
-    if m.api_key:
-        try: ak = decrypt(m.api_key)
-        except Exception: logger.warning("decrypt api_key failed for audit model %s", m.id)
-    return {
-        "id": m.id, "name": m.name, "provider": m.provider,
-        "base_url": m.base_url or "", "api_key": ak,
-        "model_name": m.model_name or "",
-        "config_json": m.config_json or {},
-    }
 
 
 def _do_audit(model: dict, image_url: str, criteria: list[str] | None) -> dict:
@@ -135,9 +124,13 @@ def audit_image(
     model_config = _get_audit_model(db, body.audit_model_id)
     try:
         result = _do_audit(model_config, body.image_url, body.audit_criteria)
+        result = classify_audit_gate(result)
     except Exception as e:
         logger.exception("Audit API call failed")
-        result = {"score": 0.0, "pass_fail": False, "issues": [str(e)], "raw": ""}
+        result = classify_audit_gate(
+            {"score": 0.0, "pass_fail": False, "issues": [str(e)], "raw": ""},
+            error=True,
+        )
 
     report = AuditReport(
         target_type=body.target_type,
@@ -153,6 +146,7 @@ def audit_image(
     return {"ok": True, "report": {
         "id": report.id, "score": report.score, "pass_fail": report.pass_fail,
         "issues": report.issues_json, "auditor_model": report.auditor_model,
+        "gate_status": result["gate_status"],
     }}
 
 

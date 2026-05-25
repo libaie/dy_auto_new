@@ -4,16 +4,21 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.deps import verify_admin_token
-from app.db_models import VideoProductionAsset, VideoProductionRun
+from app.db_models import VideoProductionAsset, VideoProductionRun, VideoReviewRecord
 from app.services.video_production_service import (
     VideoProductionError,
     approve_asset,
     create_regenerated_image_asset,
     create_run_from_episode,
-    latest_assets_by_frame,
     reject_asset,
+    start_asset_regeneration,
+    start_compose_stage,
     start_image_stage,
+    start_video_stage,
+    sync_compose_stage_results,
     sync_image_stage_results,
+    sync_regenerated_asset,
+    sync_video_stage_results,
 )
 
 router = APIRouter(prefix="/api/video-production", tags=["video-production"])
@@ -37,6 +42,34 @@ class RegenerateAssetRequest(BaseModel):
     pixelle_task_id: str | None = None
 
 
+# -- Payload helpers --------------------------------------------------------
+
+def _storyboard_frame(run: VideoProductionRun, frame_id: str) -> dict:
+    for index, frame in enumerate((run.storyboard_json or {}).get("frames") or []):
+        candidate = str(frame.get("frame_id") or frame.get("id") or f"frame-{index + 1:03d}")
+        if candidate == frame_id:
+            return frame
+    return {}
+
+
+def _latest_ai_review(db: Session, asset_id: str) -> dict | None:
+    row = db.query(VideoReviewRecord).filter(
+        VideoReviewRecord.asset_id == asset_id,
+        VideoReviewRecord.review_type == "ai",
+    ).order_by(VideoReviewRecord.created_at.desc()).first()
+    if not row:
+        return None
+    return {
+        "id": row.id,
+        "status": row.status,
+        "score": row.score,
+        "criteria_json": row.criteria_json or [],
+        "issues_json": row.issues_json or [],
+        "model_trace_json": row.model_trace_json or {},
+        "created_at": row.created_at.isoformat() if row.created_at else None,
+    }
+
+
 def _run_payload(run: VideoProductionRun) -> dict:
     return {
         "id": run.id,
@@ -53,8 +86,8 @@ def _run_payload(run: VideoProductionRun) -> dict:
     }
 
 
-def _asset_payload(asset: VideoProductionAsset) -> dict:
-    return {
+def _asset_payload(asset: VideoProductionAsset, db: Session | None = None, run: VideoProductionRun | None = None) -> dict:
+    payload = {
         "id": asset.id,
         "run_id": asset.run_id,
         "episode_id": asset.episode_id,
@@ -70,7 +103,14 @@ def _asset_payload(asset: VideoProductionAsset) -> dict:
         "status": asset.status,
         "pixelle_task_id": asset.pixelle_task_id,
     }
+    if db and run:
+        payload["storyboard_frame"] = _storyboard_frame(run, asset.frame_id)
+        payload["latest_ai_review"] = _latest_ai_review(db, asset.id)
+        payload["model_trace_json"] = run.model_trace_json or {}
+    return payload
 
+
+# -- Run CRUD ---------------------------------------------------------------
 
 @router.post("/runs")
 def create_run(
@@ -97,6 +137,8 @@ def get_run(
     assets = db.query(VideoProductionAsset).filter(VideoProductionAsset.run_id == run.id).all()
     return {"ok": True, "run": _run_payload(run), "assets": [_asset_payload(a) for a in assets]}
 
+
+# -- Review items -----------------------------------------------------------
 
 @router.get("/review-items")
 def review_items(
@@ -130,8 +172,23 @@ def review_items(
     query = query.order_by(VideoProductionAsset.created_at.desc())
     total = query.count()
     items = query.offset((page - 1) * page_size).limit(page_size).all()
-    return {"ok": True, "items": [_asset_payload(item) for item in items], "total": total, "page": page, "page_size": page_size}
 
+    run_ids = {item.run_id for item in items}
+    runs_by_id = {
+        run.id: run
+        for run in db.query(VideoProductionRun).filter(VideoProductionRun.id.in_(run_ids)).all()
+    } if run_ids else {}
+
+    return {
+        "ok": True,
+        "items": [_asset_payload(item, db=db, run=runs_by_id.get(item.run_id)) for item in items],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    }
+
+
+# -- Human review actions ---------------------------------------------------
 
 @router.post("/assets/{asset_id}/review")
 def review_asset(
@@ -152,6 +209,8 @@ def review_asset(
         raise HTTPException(409, str(exc))
     return {"ok": True, "asset": _asset_payload(asset)}
 
+
+# -- Image stage ------------------------------------------------------------
 
 @router.post("/runs/{run_id}/start-images")
 async def start_images(
@@ -179,6 +238,64 @@ async def sync_images(
     return {"ok": True, "assets": [_asset_payload(asset) for asset in assets]}
 
 
+# -- Video segment stage ----------------------------------------------------
+
+@router.post("/runs/{run_id}/start-videos")
+async def start_videos(
+    run_id: str,
+    db: Session = Depends(get_db),
+    user=Depends(verify_admin_token),
+):
+    try:
+        run = await start_video_stage(db, run_id)
+    except VideoProductionError as exc:
+        raise HTTPException(400, str(exc))
+    return {"ok": True, "run": _run_payload(run)}
+
+
+@router.post("/runs/{run_id}/sync-video-results")
+async def sync_videos(
+    run_id: str,
+    db: Session = Depends(get_db),
+    user=Depends(verify_admin_token),
+):
+    try:
+        assets = await sync_video_stage_results(db, run_id)
+    except VideoProductionError as exc:
+        raise HTTPException(400, str(exc))
+    return {"ok": True, "assets": [_asset_payload(asset) for asset in assets]}
+
+
+# -- Compose stage ----------------------------------------------------------
+
+@router.post("/runs/{run_id}/compose")
+async def compose_run(
+    run_id: str,
+    db: Session = Depends(get_db),
+    user=Depends(verify_admin_token),
+):
+    try:
+        run = await start_compose_stage(db, run_id)
+    except VideoProductionError as exc:
+        raise HTTPException(400, str(exc))
+    return {"ok": True, "run": _run_payload(run)}
+
+
+@router.post("/runs/{run_id}/sync-compose-results")
+async def sync_compose(
+    run_id: str,
+    db: Session = Depends(get_db),
+    user=Depends(verify_admin_token),
+):
+    try:
+        asset = await sync_compose_stage_results(db, run_id)
+    except VideoProductionError as exc:
+        raise HTTPException(400, str(exc))
+    return {"ok": True, "asset": _asset_payload(asset)}
+
+
+# -- Regeneration -----------------------------------------------------------
+
 @router.post("/assets/{asset_id}/regenerate")
 def regenerate_asset(
     asset_id: str,
@@ -188,6 +305,32 @@ def regenerate_asset(
 ):
     try:
         asset = create_regenerated_image_asset(db, asset_id, body.model_dump())
+    except VideoProductionError as exc:
+        raise HTTPException(400, str(exc))
+    return {"ok": True, "asset": _asset_payload(asset)}
+
+
+@router.post("/assets/{asset_id}/start-regeneration")
+async def start_regeneration(
+    asset_id: str,
+    db: Session = Depends(get_db),
+    user=Depends(verify_admin_token),
+):
+    try:
+        asset = await start_asset_regeneration(db, asset_id)
+    except VideoProductionError as exc:
+        raise HTTPException(400, str(exc))
+    return {"ok": True, "asset": _asset_payload(asset)}
+
+
+@router.post("/assets/{asset_id}/sync-regeneration")
+async def sync_regeneration(
+    asset_id: str,
+    db: Session = Depends(get_db),
+    user=Depends(verify_admin_token),
+):
+    try:
+        asset = await sync_regenerated_asset(db, asset_id)
     except VideoProductionError as exc:
         raise HTTPException(400, str(exc))
     return {"ok": True, "asset": _asset_payload(asset)}

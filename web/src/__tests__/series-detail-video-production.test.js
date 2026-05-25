@@ -81,6 +81,6 @@ describe('SeriesDetailPage video production launch', () => {
     expect(mocks.autoPlanEpisode).toHaveBeenCalledWith('sid', 'ep1', 60)
     expect(mocks.createVideoProductionRun).toHaveBeenCalledWith('sid', 'ep1')
     expect(mocks.startImageStage).toHaveBeenCalledWith('run-1')
-    expect(mocks.push).toHaveBeenCalledWith('/ai-video-review?run_id=run-1')
+    expect(mocks.push).toHaveBeenCalledWith('/video-production/run-1')
   })
 })

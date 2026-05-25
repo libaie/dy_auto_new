@@ -142,6 +142,11 @@ const routes = [
         component: () => import('../views/AIVideoReviewPage.vue'),
       },
       {
+        path: 'video-production/:runId',
+        name: 'VideoProductionMonitor',
+        component: () => import('../views/VideoProductionMonitorPage.vue'),
+      },
+      {
         path: 'users',
         name: 'Users',
         component: () => import('../views/UsersPage.vue'),

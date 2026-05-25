@@ -30,3 +30,27 @@ export function reviewAsset(assetId, action, comment = '') {
 export function regenerateAsset(assetId, payload) {
   return client.post(`/video-production/assets/${assetId}/regenerate`, payload)
 }
+
+export function startVideoStage(runId) {
+  return client.post(`/video-production/runs/${runId}/start-videos`)
+}
+
+export function syncVideoStage(runId) {
+  return client.post(`/video-production/runs/${runId}/sync-video-results`)
+}
+
+export function startComposeStage(runId) {
+  return client.post(`/video-production/runs/${runId}/compose`)
+}
+
+export function syncComposeStage(runId) {
+  return client.post(`/video-production/runs/${runId}/sync-compose-results`)
+}
+
+export function startAssetRegeneration(assetId) {
+  return client.post(`/video-production/assets/${assetId}/start-regeneration`)
+}
+
+export function syncAssetRegeneration(assetId) {
+  return client.post(`/video-production/assets/${assetId}/sync-regeneration`)
+}

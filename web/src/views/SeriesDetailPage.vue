@@ -169,7 +169,7 @@ async function startPipelineRun() {
     const { data } = await createVideoProductionRun(route.params.id, ep.id)
     if (!data?.run?.id) throw new Error('Production run was not created')
     await startImageStage(data.run.id)
-    router.push(`/ai-video-review?run_id=${data.run.id}`)
+    router.push(`/video-production/${data.run.id}`)
   } catch (e) { error.value = e.response?.data?.detail || e.message || '启动失败' } finally { pipelineStarting.value = false }
 }
 async function autoGenerate() {

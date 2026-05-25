@@ -10,7 +10,18 @@
           <h1 class="text-2xl font-bold text-slate-100">流水线监控</h1>
           <p class="text-slate-500 text-sm font-mono mt-1">Run {{ run.id.slice(0, 8) }}</p>
         </div>
-        <span :class="runStatusClass(run.status)" class="px-3 py-1 rounded-lg text-sm font-medium">{{ run.status }}</span>
+        <div class="flex items-center gap-2">
+          <button v-if="run.series_id" @click="$router.push(`/series/${run.series_id}/agency-console`)"
+                  class="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-lg text-sm transition cursor-pointer">
+            专家团队控制台
+          </button>
+          <button v-if="run.status === 'image_review_pending' || run.status === 'image_human_review_required'"
+                  @click="$router.push(`/ai-video-review?run_id=${run.id}`)"
+                  class="bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded-lg text-sm transition cursor-pointer">
+            Review required
+          </button>
+          <span :class="runStatusClass(run.status)" class="px-3 py-1 rounded-lg text-sm font-medium">{{ run.status }}</span>
+        </div>
       </div>
 
       <div class="space-y-2 mb-6">
@@ -44,12 +55,12 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { getRun } from '../api/pipeline.js'
+import { getRunById } from '../api/pipeline.js'
 const route = useRoute(); const run = ref(null); const loading = ref(true); const error = ref(''); let timer = null
 const layerNames = ['资产生成', '资产工坊', '故事工坊', '导演工坊', '渲染引擎', '后期包装']
 const layers = computed(() => { if (!run.value) return []; const json = run.value.layers_json || {}; return Array.from({ length: 6 }, (_, i) => ({ status: json[String(i)]?.status || (i === run.value.current_layer ? 'running' : 'pending') })) })
 const stats = computed(() => { if (!run.value) return []; const diff = run.value.started_at ? Math.floor((Date.now() - new Date(run.value.started_at).getTime()) / 1000) : 0; return [{ label: '当前层', value: `${run.value.current_layer}/6` }, { label: '累计成本', value: `¥${(run.value.actual_cost_so_far || 0).toFixed(2)}` }, { label: '运行时间', value: `${Math.floor(diff/60)}m ${diff%60}s` }] })
-async function load() { try { const { data } = await getRun('_', route.params.runId); if (data.ok) { run.value = data.run; if (run.value?.status === 'completed' || run.value?.status === 'failed') { if (timer) { clearInterval(timer); timer = null } } } else throw new Error('Not found') } catch (e) { error.value = e.message || '加载失败'; if (timer) clearInterval(timer) } finally { loading.value = false } }
+async function load() { try { const { data } = await getRunById(route.params.runId); if (data.ok) { run.value = data.run; if (run.value?.status === 'completed' || run.value?.status === 'failed') { if (timer) { clearInterval(timer); timer = null } } } else throw new Error('Not found') } catch (e) { error.value = e.message || '加载失败'; if (timer) clearInterval(timer) } finally { loading.value = false } }
 function runStatusClass(s) { return { running: 'bg-sky-900/40 text-sky-400', completed: 'bg-emerald-900/40 text-emerald-400', failed: 'bg-red-900/40 text-red-400', pending: 'bg-gray-800 text-slate-400' }[s] || 'bg-gray-800 text-slate-400' }
 function layerBarClass(s) { return s === 'completed' ? 'bg-emerald-500' : s === 'running' ? 'bg-sky-500 animate-pulse' : '' }
 onMounted(() => { load(); timer = setInterval(load, 5000) })

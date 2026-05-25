@@ -127,9 +127,19 @@ const routes = [
         component: () => import('../views/SeriesDetailPage.vue'),
       },
       {
+        path: 'series/:seriesId/agency-console',
+        name: 'AgencyConsole',
+        component: () => import('../views/AgencyConsolePage.vue'),
+      },
+      {
         path: 'pipeline/:runId',
         name: 'PipelineMonitor',
         component: () => import('../views/PipelineMonitorPage.vue'),
+      },
+      {
+        path: 'ai-video-review',
+        name: 'AIVideoReview',
+        component: () => import('../views/AIVideoReviewPage.vue'),
       },
       {
         path: 'users',
@@ -157,7 +167,7 @@ const router = createRouter({
 const ADMIN_ONLY_PATHS = [
   '/accounts', '/account-groups', '/devices', '/chain-templates', '/chain-instances',
   '/selectors', '/settings', '/prompt-templates', '/ai-config', '/dict-manage',
-  '/characters', '/scenes', '/series', '/director', '/pipeline', '/stats',
+  '/characters', '/scenes', '/series', '/director', '/pipeline', '/ai-video-review', '/stats',
   '/users',
 ]
 

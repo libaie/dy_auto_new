@@ -47,6 +47,23 @@ describe('API Clients', () => {
       await linkCharacter('sid', 'cid')
       expect(mockPost).toHaveBeenCalledWith('/series/sid/characters/cid')
     })
+
+    it('getAgencyConsole calls the agency console endpoint', async () => {
+      const { getAgencyConsole } = await import('../api/series.js')
+      mockGet.mockResolvedValue({ data: { ok: true } })
+      await getAgencyConsole('sid')
+      expect(mockGet).toHaveBeenCalledWith('/series/sid/agency-console')
+    })
+
+    it('style lock helpers call the style-lock endpoints', async () => {
+      const { getStyleLock, lockSeriesStyle } = await import('../api/series.js')
+      mockGet.mockResolvedValue({ data: { ok: true } })
+      mockPost.mockResolvedValue({ data: { ok: true } })
+      await getStyleLock('sid')
+      await lockSeriesStyle('sid')
+      expect(mockGet).toHaveBeenCalledWith('/series/sid/style-lock')
+      expect(mockPost).toHaveBeenCalledWith('/series/sid/style-lock')
+    })
   })
 
   describe('characters API', () => {
@@ -82,6 +99,26 @@ describe('API Clients', () => {
       await getRun('sid', 'rid')
       expect(mockGet).toHaveBeenCalledWith('/pipeline/runs/sid/rid')
     })
+
+    it('getRunById calls GET run-id lookup path', async () => {
+      const { getRunById } = await import('../api/pipeline.js')
+      mockGet.mockResolvedValue({ data: { ok: true } })
+      await getRunById('rid')
+      expect(mockGet).toHaveBeenCalledWith('/pipeline/runs/by-id/rid')
+    })
+  })
+
+  describe('director API', () => {
+    it('autoPlanEpisode calls POST /director/auto-plan', async () => {
+      const { autoPlanEpisode } = await import('../api/director.js')
+      mockPost.mockResolvedValue({ data: { ok: true } })
+      await autoPlanEpisode('sid', 'eid', 60)
+      expect(mockPost).toHaveBeenCalledWith('/director/auto-plan', {
+        series_id: 'sid',
+        episode_id: 'eid',
+        target_duration: 60,
+      })
+    })
   })
 
   describe('aiConfig API', () => {
@@ -111,6 +148,37 @@ describe('API Clients', () => {
       mockPost.mockResolvedValue({ data: { ok: true } })
       await testModelConnection('uuid-123')
       expect(mockPost).toHaveBeenCalledWith('/ai-models/uuid-123/test')
+    })
+  })
+
+  describe('video production API', () => {
+    it('createVideoProductionRun calls POST /video-production/runs', async () => {
+      const { createVideoProductionRun } = await import('../api/videoProduction.js')
+      mockPost.mockResolvedValue({ data: { ok: true } })
+      await createVideoProductionRun('sid', 'eid')
+      expect(mockPost).toHaveBeenCalledWith('/video-production/runs', {
+        series_id: 'sid',
+        episode_id: 'eid',
+      })
+    })
+
+    it('listReviewItems calls GET with filters', async () => {
+      const { listReviewItems } = await import('../api/videoProduction.js')
+      mockGet.mockResolvedValue({ data: { ok: true, items: [] } })
+      await listReviewItems({ run_id: 'rid', status: 'review_pending' })
+      expect(mockGet).toHaveBeenCalledWith('/video-production/review-items', {
+        params: { run_id: 'rid', status: 'review_pending' },
+      })
+    })
+
+    it('reviewAsset calls POST asset review endpoint', async () => {
+      const { reviewAsset } = await import('../api/videoProduction.js')
+      mockPost.mockResolvedValue({ data: { ok: true } })
+      await reviewAsset('aid', 'approve', 'ok')
+      expect(mockPost).toHaveBeenCalledWith('/video-production/assets/aid/review', {
+        action: 'approve',
+        comment: 'ok',
+      })
     })
   })
 })

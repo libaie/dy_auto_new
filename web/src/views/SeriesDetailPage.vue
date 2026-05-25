@@ -11,18 +11,40 @@
           <div class="flex gap-3 mt-2 text-sm text-slate-500">
             <span>{{ series.total_episodes }} 集</span><span>{{ series.genre }}</span>
             <span>{{ series.mode === 'fully_automatic' ? '全自动' : '逐步确认' }}</span>
+            <span :class="styleLock?.locked ? 'text-emerald-400' : 'text-amber-400'">
+              {{ styleLock?.locked ? `风格已锁定 v${styleLock.version || 1}` : '风格未锁定' }}
+            </span>
           </div>
         </div>
         <div class="flex gap-2">
+          <button @click="lockStyle" :disabled="styleLocking"
+                  class="bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm transition cursor-pointer">
+            {{ styleLocking ? '锁定中...' : (styleLock?.locked ? '重新锁定风格' : '锁定风格') }}
+          </button>
+          <button @click="$router.push(`/series/${series.id}/agency-console`)"
+                  class="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-lg text-sm transition cursor-pointer">
+            专家团队控制台
+          </button>
           <button v-if="!series.character_count && !series.scene_count && series.logline" @click="autoGenerate"
                   :disabled="autoGenerating" class="bg-purple-500 hover:bg-purple-400 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm transition cursor-pointer"
                   title="根据故事概要，AI 自动生成角色和场景">
             {{ autoGenerating ? 'AI 生成中...' : 'AI 一键生成角色&场景' }}
           </button>
-          <button @click="startPipelineRun" :disabled="pipelineStarting"
+          <button @click="startPipelineRun" :disabled="pipelineStartDisabled"
                   class="bg-sky-500 hover:bg-sky-400 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm transition cursor-pointer">
-            {{ pipelineStarting ? '启动中...' : '▶ 启动流水线' }}
+            {{ pipelineButtonText }}
           </button>
+        </div>
+      </div>
+
+      <div v-if="styleLock" class="rounded-xl border border-gray-700/50 px-4 py-3 mb-6 text-sm text-slate-400" style="background: rgba(15, 23, 42, 0.5);">
+        <div class="flex flex-wrap gap-4">
+          <span>角色参考图 {{ styleLock.reference_status?.characters?.ready || 0 }}/{{ styleLock.reference_status?.characters?.total || 0 }}</span>
+          <span>场景参考图 {{ styleLock.reference_status?.scenes?.ready || 0 }}/{{ styleLock.reference_status?.scenes?.total || 0 }}</span>
+          <span v-if="styleLock.missing_assets?.length" class="text-amber-300">待补资产 {{ styleLock.missing_assets.length }}</span>
+          <span v-if="styleLock.agency_team_status?.enabled" class="text-cyan-300">
+            专家团队 {{ styleLock.agency_team_status.core_role_count || 0 }} 核心 / {{ styleLock.agency_team_status.support_role_count || 0 }} 支援
+          </span>
         </div>
       </div>
 
@@ -93,14 +115,63 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
-import { getSeries, autoGenerateAssets } from '../api/series.js'
-import { startPipeline, listRuns } from '../api/pipeline.js'
-const route = useRoute(); const series = ref(null); const episodes = ref([]); const runs = ref([]); const loading = ref(true); const pipelineStarting = ref(false); const error = ref('')
+import { ref, computed, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { getSeries, autoGenerateAssets, getStyleLock, lockSeriesStyle } from '../api/series.js'
+import { autoPlanEpisode } from '../api/director.js'
+import { listRuns } from '../api/pipeline.js'
+import { createVideoProductionRun, startImageStage } from '../api/videoProduction.js'
+const route = useRoute(); const router = useRouter(); const series = ref(null); const episodes = ref([]); const runs = ref([]); const styleLock = ref(null); const loading = ref(true); const pipelineStarting = ref(false); const styleLocking = ref(false); const error = ref('')
 const autoGenerating = ref(false); const autoGenStep = ref(''); const autoGenResult = ref(null)
-async function load() { loading.value = true; error.value = ''; try { const { data } = await getSeries(route.params.id); if (data.ok) { series.value = data.series; episodes.value = data.episodes || [] } else throw new Error('Series not found'); const r = await listRuns(route.params.id); runs.value = r.data.ok ? r.data.runs : [] } catch (e) { error.value = e.message || '加载失败' } finally { loading.value = false } }
-async function startPipelineRun() { pipelineStarting.value = true; try { await startPipeline(route.params.id, null, series.value.mode) } catch (e) { error.value = e.message || '启动失败' } finally { pipelineStarting.value = false }; await load() }
+const runnableEpisode = computed(() => episodes.value.find(ep => !['done', 'rendering'].includes(ep.status)) || null)
+const pipelineStartDisabled = computed(() => pipelineStarting.value || !runnableEpisode.value)
+const pipelineButtonText = computed(() => {
+  if (pipelineStarting.value) return '启动中...'
+  if (!episodes.value.length) return '没有可启动剧集'
+  if (!runnableEpisode.value) return '全部剧集已完成'
+  return '▶ 启动下一集流水线'
+})
+async function load() {
+  loading.value = true; error.value = ''
+  try {
+    const { data } = await getSeries(route.params.id)
+    if (data.ok) { series.value = data.series; episodes.value = data.episodes || [] } else throw new Error('Series not found')
+    const [runsResp, styleResp] = await Promise.all([
+      listRuns(route.params.id),
+      getStyleLock(route.params.id).catch(() => ({ data: null })),
+    ])
+    runs.value = runsResp.data.ok ? runsResp.data.runs : []
+    styleLock.value = styleResp.data
+  } catch (e) { error.value = e.message || '加载失败' } finally { loading.value = false }
+}
+function nextEpisode() {
+  return runnableEpisode.value
+}
+async function lockStyle(rethrow = false) {
+  const shouldRethrow = rethrow === true
+  styleLocking.value = true; error.value = ''
+  try {
+    const { data } = await lockSeriesStyle(route.params.id)
+    styleLock.value = { ...data, locked: true, version: data.story_bible?.style_lock?.version || 1 }
+    await load()
+  } catch (e) {
+    error.value = e.response?.data?.detail || e.message || '风格锁定失败'
+    if (shouldRethrow) throw e
+  } finally { styleLocking.value = false }
+}
+async function startPipelineRun() {
+  pipelineStarting.value = true; error.value = ''
+  try {
+    if (!styleLock.value?.locked) await lockStyle(true)
+    const ep = nextEpisode()
+    if (!ep) throw new Error('没有可启动的剧集')
+    await autoPlanEpisode(route.params.id, ep.id, series.value.target_duration)
+    const { data } = await createVideoProductionRun(route.params.id, ep.id)
+    if (!data?.run?.id) throw new Error('Production run was not created')
+    await startImageStage(data.run.id)
+    router.push(`/ai-video-review?run_id=${data.run.id}`)
+  } catch (e) { error.value = e.response?.data?.detail || e.message || '启动失败' } finally { pipelineStarting.value = false }
+}
 async function autoGenerate() {
   autoGenerating.value = true; autoGenResult.value = null; error.value = ''
   try {
@@ -109,6 +180,7 @@ async function autoGenerate() {
     if (data.ok) {
       autoGenResult.value = data
       autoGenStep.value = ''
+      await load()
     } else throw new Error('生成失败')
   } catch (e) {
     error.value = e.response?.data?.detail || e.message || 'AI 生成失败'

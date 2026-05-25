@@ -4,16 +4,18 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.db_models import Base, Task, ChainInstance, DailyStats, Account, AccountGroup, AccountGroupMember, Channel, ChannelItem, Character, Scene, Series, Episode, PipelineRun, AuditReport, ReferenceData, AIModel, series_characters, series_scenes
+from app.db_models import Base, Task, ChainInstance, DailyStats, Account, AccountGroup, AccountGroupMember, Channel, ChannelItem, Character, Scene, Series, Episode, PipelineRun, GeneratedVideo, AuditReport, ReferenceData, AIModel, User, VideoProductionRun, VideoProductionAsset, VideoReviewRecord, series_characters, series_scenes
 from app.database import get_db
 from app.main import app
+from app.config import ADMIN_USERNAME, ADMIN_PASSWORD
 from app.seed import seed_accounts, seed_selectors
 
 # Tables to clean between tests (order matters for FK constraints)
 _CLEANUP_TABLES = [
     Task, DailyStats, AccountGroupMember, AccountGroup, ChainInstance,
     ChannelItem, Channel, ReferenceData, AIModel,
-    AuditReport, PipelineRun, Episode,  # weak FK to Series/Episode
+    VideoReviewRecord, VideoProductionAsset, VideoProductionRun,
+    AuditReport, GeneratedVideo, PipelineRun, Episode,
 ]
 _CLEANUP_M2M = [series_characters, series_scenes, Series, Character, Scene]  # M2M first, then parent tables
 
@@ -32,6 +34,7 @@ def test_db():
 
     # Seed with test data
     db = TestSession()
+    _seed_test_identity(db)
     seed_accounts(db)
     seed_selectors(db)
     db.close()
@@ -110,3 +113,39 @@ def setup_group(db, group_id="grp-001", account_ids=None):
         db.add(AccountGroupMember(group_id=group_id, account_id=aid))
     db.flush()
     return group
+
+
+def _seed_test_identity(db):
+    """Seed test-only identities that runtime config intentionally no longer provides."""
+    import bcrypt
+
+    if not db.query(User).filter(User.username == ADMIN_USERNAME).first():
+        password_hash = bcrypt.hashpw(ADMIN_PASSWORD.encode(), bcrypt.gensalt()).decode()
+        db.add(User(
+            username=ADMIN_USERNAME,
+            password_hash=password_hash,
+            role="admin",
+            nickname="test-admin",
+        ))
+
+    default_limits = {
+        "likes": 50,
+        "comments": 20,
+        "follows": 20,
+        "dms": 10,
+        "replies": 15,
+        "nurture_likes": 200,
+    }
+    for account_id, nickname, douyin_id in (
+        ("acc-001", "test-account-1", "test_user_001"),
+        ("acc-002", "test-account-2", "test_user_002"),
+    ):
+        if not db.query(Account).filter(Account.id == account_id).first():
+            db.add(Account(
+                id=account_id,
+                nickname=nickname,
+                douyin_id=douyin_id,
+                status="active",
+                daily_limits=default_limits,
+            ))
+    db.commit()

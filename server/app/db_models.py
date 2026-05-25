@@ -106,6 +106,7 @@ class Task(Base):
     created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
     chain_instance_id = Column(String(36), ForeignKey("chain_instances.id"), nullable=True)
     step_order = Column(Integer, nullable=True)
+    lease_id = Column(String(36), nullable=True, default=None)
 
     account = relationship("Account", back_populates="tasks")
     device = relationship("Device", back_populates="tasks")
@@ -298,6 +299,7 @@ class ChannelItem(Base):
     assigned_at = Column(DateTime, nullable=True)  # for stale recovery
     task_id = Column(String(36), ForeignKey("tasks.id"), nullable=True)
     queue_position = Column(Integer, nullable=False, default=0)
+    retry_count = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
     completed_at = Column(DateTime, nullable=True)
 
@@ -305,6 +307,25 @@ class ChannelItem(Base):
     account = relationship("Account")
     device = relationship("Device")
     task = relationship("Task")
+
+
+class StatsEvent(Base):
+    """Idempotent stats event — each operation recorded once by composite key."""
+    __tablename__ = "stats_events"
+    __table_args__ = (
+        UniqueConstraint("task_id", "device_id", "event_type", "target_id", "op_index",
+                         name="uq_stats_event_idempotent"),
+    )
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    task_id = Column(String(36), ForeignKey("tasks.id"), nullable=False, index=True)
+    device_id = Column(String(36), ForeignKey("devices.id"), nullable=False)
+    account_id = Column(String(36), ForeignKey("accounts.id"), nullable=False)
+    event_type = Column(String(30), nullable=False)
+    target_id = Column(String(200), nullable=False)
+    op_index = Column(Integer, nullable=False, default=0)
+    count = Column(Integer, nullable=False, default=1)
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
 
 
 class PromptTemplate(Base):
@@ -636,3 +657,81 @@ class AIModel(Base):
 
     __table_args__ = (UniqueConstraint("model_type", "provider", "model_name",
                                         name="uq_ai_models_type_provider_name"),)
+
+
+class VideoProductionRun(Base):
+    """One staged automated production attempt for an episode."""
+    __tablename__ = "video_production_runs"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    series_id = Column(String(36), ForeignKey("series.id", ondelete="CASCADE"), nullable=False)
+    episode_id = Column(String(36), ForeignKey("episodes.id", ondelete="CASCADE"), nullable=False)
+    status = Column(String(40), nullable=False, default="draft")
+    current_stage = Column(String(40), nullable=False, default="draft")
+    pixelle_stage_task_id = Column(String(100), nullable=True)
+    storyboard_json = Column(JSON, nullable=True, default=dict)
+    model_trace_json = Column(JSON, nullable=True, default=dict)
+    edit_manifest_json = Column(JSON, nullable=True, default=dict)
+    error_message = Column(Text, nullable=True)
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
+    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
+
+    __table_args__ = (
+        Index("idx_video_production_runs_series_episode", "series_id", "episode_id"),
+        Index("idx_video_production_runs_status", "status"),
+    )
+
+
+class VideoProductionAsset(Base):
+    """Intermediate or final asset created by staged production."""
+    __tablename__ = "video_production_assets"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    run_id = Column(String(36), ForeignKey("video_production_runs.id", ondelete="CASCADE"), nullable=False)
+    episode_id = Column(String(36), ForeignKey("episodes.id", ondelete="CASCADE"), nullable=False)
+    frame_id = Column(String(100), nullable=False)
+    asset_type = Column(String(30), nullable=False)
+    stage = Column(String(40), nullable=False)
+    url = Column(Text, nullable=True)
+    local_path = Column(Text, nullable=True)
+    thumbnail_url = Column(Text, nullable=True)
+    duration_seconds = Column(Float, nullable=True)
+    version = Column(Integer, nullable=False, default=1)
+    metadata_json = Column(JSON, nullable=True, default=dict)
+    status = Column(String(40), nullable=False, default="generated")
+    pixelle_task_id = Column(String(100), nullable=True)
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
+    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
+
+    __table_args__ = (
+        Index("idx_video_assets_run_stage", "run_id", "stage"),
+        Index("idx_video_assets_run_frame", "run_id", "frame_id"),
+        Index("idx_video_assets_status", "status"),
+        UniqueConstraint("run_id", "frame_id", "asset_type", "version", name="uq_video_asset_version"),
+    )
+
+
+class VideoReviewRecord(Base):
+    """AI or human review decision for a production asset."""
+    __tablename__ = "video_review_records"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    asset_id = Column(String(36), ForeignKey("video_production_assets.id", ondelete="CASCADE"), nullable=False)
+    run_id = Column(String(36), ForeignKey("video_production_runs.id", ondelete="CASCADE"), nullable=False)
+    review_type = Column(String(20), nullable=False)
+    status = Column(String(30), nullable=False)
+    score = Column(Float, nullable=True)
+    criteria_json = Column(JSON, nullable=True, default=list)
+    issues_json = Column(JSON, nullable=True, default=list)
+    reviewer_user_id = Column(String(36), nullable=True)
+    model_trace_json = Column(JSON, nullable=True, default=dict)
+    comment = Column(Text, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
+
+    __table_args__ = (
+        Index("idx_video_review_asset", "asset_id"),
+        Index("idx_video_review_run", "run_id"),
+        Index("idx_video_review_status", "status"),
+    )

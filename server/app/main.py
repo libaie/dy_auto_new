@@ -15,7 +15,7 @@ from contextlib import asynccontextmanager
 from app.config import bj_now
 from app.database import get_db, init_db, SessionLocal
 from app.seed import seed_all
-from app.routers import device, tasks, accounts, devices, auth, selectors, stats, content, account_groups, chains, settings, channels, prompt_templates, data, videos, pixelle, ai_config, characters, scenes, series, pipeline, audit, director, reference_data, dm_sequences
+from app.routers import device, tasks, accounts, devices, auth, selectors, stats, content, account_groups, chains, settings, channels, prompt_templates, data, videos, pixelle, ai_config, characters, scenes, series, pipeline, audit, director, reference_data, dm_sequences, video_production
 from app.services.ai_generator import ai_generator
 
 
@@ -199,6 +199,7 @@ app.include_router(series.router)
 app.include_router(pipeline.router)
 app.include_router(audit.router)
 app.include_router(director.router)
+app.include_router(video_production.router)
 app.include_router(reference_data.router)
 app.include_router(dm_sequences.router)
 

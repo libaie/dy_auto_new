@@ -3,6 +3,7 @@ import pytest
 from app.db_models import Episode, Series, VideoProductionAsset, VideoProductionRun
 from app.services.video_production_service import (
     approve_asset,
+    create_regenerated_image_asset,
     create_run_from_episode,
     latest_approved_assets_by_frame,
     mark_image_stage_assets,
@@ -105,3 +106,26 @@ def test_approve_asset_records_human_review(db):
     db.refresh(asset)
     assert asset.status == "approved"
     assert latest_approved_assets_by_frame(db, run.id)["frame-001"].id == asset.id
+
+
+def test_regeneration_marks_old_asset_and_creates_next_version(db):
+    series, episode = _episode_with_storyboard(db)
+    run = create_run_from_episode(db, series.id, episode.id)
+    asset = mark_image_stage_assets(db, run, [{
+        "frame_id": "frame-001",
+        "asset_type": "image",
+        "url": "https://cdn.test/v1.png",
+        "local_path": "output/v1.png",
+        "metadata": {},
+    }], pixelle_task_id="stage-1")[0]
+
+    new_asset = create_regenerated_image_asset(db, asset.id, {
+        "url": "https://cdn.test/v2.png",
+        "local_path": "output/v2.png",
+        "metadata": {},
+    })
+
+    db.refresh(asset)
+    assert asset.status == "regenerating"
+    assert new_asset.version == 2
+    assert new_asset.status == "review_pending"

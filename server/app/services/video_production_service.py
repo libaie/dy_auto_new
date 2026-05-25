@@ -8,6 +8,8 @@ from app.db_models import (
     VideoProductionRun,
     VideoReviewRecord,
 )
+from app.services.pixelle_stage_client import get_stage_task, submit_image_batch
+from app.services.runtime_model_config import redact_runtime_model_config, resolve_runtime_model_config
 
 
 class VideoProductionError(ValueError):
@@ -143,3 +145,63 @@ def approve_asset(db: Session, asset_id: str, reviewer_user_id: str | None, comm
     db.commit()
     db.refresh(asset)
     return asset
+
+
+async def start_image_stage(db: Session, run_id: str) -> VideoProductionRun:
+    run = db.query(VideoProductionRun).filter(VideoProductionRun.id == run_id).first()
+    if not run:
+        raise VideoProductionError("Run not found")
+    frames = image_stage_frames(run)
+    if not frames:
+        raise VideoProductionError("Run has no storyboard frames")
+    model_config = resolve_runtime_model_config(db, "image_generation")
+    response = await submit_image_batch(
+        db=db,
+        run_id=run.id,
+        episode_id=run.episode_id,
+        frames=frames,
+        model_config=model_config,
+    )
+    return mark_image_stage_submitted(
+        db,
+        run,
+        response["stage_task_id"],
+        {"image_generation": redact_runtime_model_config(model_config)},
+    )
+
+
+async def sync_image_stage_results(db: Session, run_id: str) -> list[VideoProductionAsset]:
+    run = db.query(VideoProductionRun).filter(VideoProductionRun.id == run_id).first()
+    if not run:
+        raise VideoProductionError("Run not found")
+    if not run.pixelle_stage_task_id:
+        raise VideoProductionError("Run has no Pixelle stage task")
+    status = await get_stage_task(db, run.pixelle_stage_task_id)
+    if status.get("status") not in ("completed", "succeeded", "done"):
+        raise VideoProductionError(f"Image stage is not complete: {status.get('status')}")
+    return mark_image_stage_assets(db, run, status.get("assets", []), pixelle_task_id=run.pixelle_stage_task_id)
+
+
+def create_regenerated_image_asset(db: Session, asset_id: str, generated: dict) -> VideoProductionAsset:
+    old = db.query(VideoProductionAsset).filter(VideoProductionAsset.id == asset_id).first()
+    if not old:
+        raise VideoProductionError("Asset not found")
+    old.status = "regenerating"
+    new_asset = VideoProductionAsset(
+        run_id=old.run_id,
+        episode_id=old.episode_id,
+        frame_id=old.frame_id,
+        asset_type="image",
+        stage="image_generation",
+        url=generated.get("url", ""),
+        local_path=generated.get("local_path", ""),
+        thumbnail_url=generated.get("thumbnail_url", ""),
+        version=_next_asset_version(db, old.run_id, old.frame_id, "image"),
+        metadata_json=generated.get("metadata", {}),
+        status="review_pending",
+        pixelle_task_id=generated.get("pixelle_task_id"),
+    )
+    db.add(new_asset)
+    db.commit()
+    db.refresh(new_asset)
+    return new_asset

@@ -55,8 +55,32 @@
           </div>
 
           <div class="aspect-video rounded-lg border border-gray-700/50 bg-slate-950/80 mb-4 overflow-hidden flex items-center justify-center">
-            <img v-if="selected.url" :src="selected.url" :alt="selected.frame_id" class="max-h-full max-w-full object-contain" />
+            <video v-if="selected.asset_type !== 'image' && selected.url" :src="selected.url" controls class="max-h-full max-w-full"></video>
+            <img v-else-if="selected.url" :src="selected.url" :alt="selected.frame_id" class="max-h-full max-w-full object-contain" />
             <span v-else class="text-sm text-slate-500">No preview URL</span>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-5 text-sm">
+            <section class="rounded-lg border border-gray-700/50 p-3 bg-slate-950/40">
+              <h3 class="text-slate-200 font-medium mb-2">Storyboard</h3>
+              <p class="text-slate-400 whitespace-pre-wrap">{{ selected.storyboard_frame?.image_prompt || 'No prompt' }}</p>
+              <p class="text-slate-500 mt-2 whitespace-pre-wrap">{{ selected.storyboard_frame?.narration || 'No narration' }}</p>
+              <div class="mt-2 text-xs text-slate-500 break-all">
+                <div v-for="url in selected.storyboard_frame?.reference_urls || []" :key="url">{{ url }}</div>
+              </div>
+            </section>
+            <section class="rounded-lg border border-gray-700/50 p-3 bg-slate-950/40">
+              <h3 class="text-slate-200 font-medium mb-2">AI Review</h3>
+              <p class="text-slate-400">Status: {{ selected.latest_ai_review?.status || 'none' }}</p>
+              <p class="text-slate-400">Score: {{ selected.latest_ai_review?.score ?? '-' }}</p>
+              <ul class="mt-2 text-xs text-amber-300 space-y-1">
+                <li v-for="issue in selected.latest_ai_review?.issues_json || []" :key="issue">{{ issue }}</li>
+              </ul>
+            </section>
+            <section class="rounded-lg border border-gray-700/50 p-3 bg-slate-950/40">
+              <h3 class="text-slate-200 font-medium mb-2">Model Trace</h3>
+              <pre class="text-xs text-slate-400 whitespace-pre-wrap">{{ JSON.stringify(selected.model_trace_json || {}, null, 2) }}</pre>
+            </section>
           </div>
 
           <dl class="grid grid-cols-2 gap-3 text-sm mb-5">
@@ -85,6 +109,12 @@
             <button @click="reject" :disabled="acting" class="bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm cursor-pointer">
               Reject
             </button>
+            <button v-if="selected.asset_type !== 'final_video'" @click="regenerate" :disabled="acting" class="bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm cursor-pointer">
+              Regenerate
+            </button>
+            <button v-if="selected.asset_type !== 'final_video' && selected.status === 'regenerating'" @click="syncRegen" :disabled="acting" class="bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm cursor-pointer">
+              Sync Regeneration
+            </button>
           </div>
         </template>
         <div v-else class="text-slate-500 text-center py-24">
@@ -98,7 +128,14 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { listReviewItems, reviewAsset, syncImageStage, getVideoProductionRun } from '../api/videoProduction.js'
+import {
+  getVideoProductionRun,
+  listReviewItems,
+  reviewAsset,
+  startAssetRegeneration,
+  syncAssetRegeneration,
+  syncImageStage,
+} from '../api/videoProduction.js'
 
 const route = useRoute()
 const items = ref([])
@@ -175,6 +212,32 @@ async function doSync() {
     error.value = e.response?.data?.detail || e.message || 'Failed to sync Pixelle results'
   } finally {
     syncing.value = false
+  }
+}
+
+async function regenerate() {
+  if (!selected.value) return
+  acting.value = true
+  try {
+    await startAssetRegeneration(selected.value.id)
+    await load()
+  } catch (e) {
+    error.value = e.response?.data?.detail || e.message || 'Failed to start regeneration'
+  } finally {
+    acting.value = false
+  }
+}
+
+async function syncRegen() {
+  if (!selected.value) return
+  acting.value = true
+  try {
+    await syncAssetRegeneration(selected.value.id)
+    await load()
+  } catch (e) {
+    error.value = e.response?.data?.detail || e.message || 'Failed to sync regeneration'
+  } finally {
+    acting.value = false
   }
 }
 

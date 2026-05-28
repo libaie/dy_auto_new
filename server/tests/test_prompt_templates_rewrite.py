@@ -1,6 +1,7 @@
 from contextlib import nullcontext
 import copy
 import json
+import logging
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -140,6 +141,34 @@ def test_rewrite_invalid_current_content_returns_error_before_ai():
     stream.assert_not_called()
 
 
+def test_rewrite_preflight_validation_does_not_log_content_sentinel(caplog):
+    sentinel = "SECRET_PROMPT_SENTINEL"
+    content = valid_template_content()
+    content["analysis"]["replyExample"]["good"] = f"comment -> reply {sentinel}"
+
+    client = TestClient(app)
+    caplog.set_level(logging.WARNING, logger="app.routers.prompt_templates")
+    with (
+        patch(
+            "app.routers.prompt_templates.prompt_template_service.validate_rewrite_request",
+            side_effect=ValueError(f"invalid template text {sentinel}"),
+        ),
+        patch("app.routers.prompt_templates.gen.generate_custom_stream_with_config") as stream,
+    ):
+        response = client.post(
+            "/api/prompt-templates/rewrite-stream",
+            json={"industry": "health", "content": content, "instruction": "make warmer"},
+        )
+
+    events = sse_events(response)
+
+    assert response.status_code == 200
+    assert events[-1]["type"] == "error"
+    assert sentinel in events[-1]["message"]
+    assert sentinel not in caplog.text
+    stream.assert_not_called()
+
+
 def test_rewrite_long_instruction_returns_error_before_ai():
     client = TestClient(app)
     with patch("app.routers.prompt_templates.gen.generate_custom_stream_with_config") as stream:
@@ -241,3 +270,39 @@ def test_rewrite_ai_invalid_template_emits_error_not_warning(db):
     assert response.status_code == 200
     assert "warning" not in {event["type"] for event in events}
     assert events[-1]["type"] == "error"
+
+
+def test_rewrite_output_validation_does_not_log_content_sentinel(db, caplog):
+    sentinel = "SECRET_REWRITE_SENTINEL"
+    invalid = rewritten_template_content()
+    invalid["analysis"]["replyExample"]["good"] = f"comment -> reply {sentinel}"
+
+    async def fake_stream(*args, **kwargs):
+        yield json.dumps(invalid)
+
+    client = TestClient(app)
+    caplog.set_level(logging.WARNING, logger="app.routers.prompt_templates")
+    with (
+        patch("app.routers.prompt_templates.get_ai_config_with_key", return_value={"api_key": "test-key"}),
+        patch("app.routers.prompt_templates.SessionLocal", return_value=nullcontext(db)),
+        patch("app.routers.prompt_templates.gen.generate_custom_stream_with_config", fake_stream),
+        patch(
+            "app.routers.prompt_templates.prompt_template_service.validate_rewrite_output",
+            side_effect=ValueError(f"invalid rewritten text {sentinel}"),
+        ),
+    ):
+        response = client.post(
+            "/api/prompt-templates/rewrite-stream",
+            json={
+                "industry": "health",
+                "content": valid_template_content(),
+                "instruction": "make warmer",
+            },
+        )
+
+    events = sse_events(response)
+
+    assert response.status_code == 200
+    assert events[-1]["type"] == "error"
+    assert sentinel in events[-1]["message"]
+    assert sentinel not in caplog.text

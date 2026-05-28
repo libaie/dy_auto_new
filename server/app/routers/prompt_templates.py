@@ -276,7 +276,10 @@ async def rewrite_template_stream(
         if not ai_cfg:
             raise ValueError("AI API not configured")
     except ValueError as e:
-        logger.warning("Prompt template rewrite failed error_type=preflight error=%s", str(e)[:200])
+        logger.warning(
+            "Prompt template rewrite failed industry=%s error_type=preflight",
+            request.industry,
+        )
         return StreamingResponse(
             error_stream(str(e)[:200]),
             media_type="text/event-stream",
@@ -302,15 +305,23 @@ async def rewrite_template_stream(
             logger.info("Prompt template rewrite succeeded industry=%s", request.industry)
             yield _sse({"type": "done", "content": rewritten})
         except json.JSONDecodeError as e:
-            logger.warning("Prompt template rewrite failed error_type=json error=%s", str(e)[:200])
+            logger.warning(
+                "Prompt template rewrite failed industry=%s error_type=json exception_type=%s",
+                request.industry,
+                type(e).__name__,
+            )
             yield _sse({"type": "error", "message": f"AI generated invalid JSON: {str(e)[:200]}"})
         except ValueError as e:
-            logger.warning("Prompt template rewrite failed error_type=validation error=%s", str(e)[:200])
+            logger.warning(
+                "Prompt template rewrite failed industry=%s error_type=validation",
+                request.industry,
+            )
             yield _sse({"type": "error", "message": str(e)[:200]})
         except Exception as e:
             logger.error(
-                "Prompt template rewrite failed error_type=unexpected error=%s",
-                str(e)[:200],
+                "Prompt template rewrite failed industry=%s error_type=unexpected exception_type=%s",
+                request.industry,
+                type(e).__name__,
             )
             yield _sse({"type": "error", "message": str(e)[:200]})
 

@@ -95,12 +95,39 @@ class AiGeneratorService:
         Only supports OpenAI-compatible streaming (DeepSeek, OpenAI, etc.).
         Anthropic streaming not yet implemented.
         """
-        from app.config import get_ai_config_with_key, AI_MAX_RETRIES
+        from app.config import get_ai_config_with_key
         ai_cfg = get_ai_config_with_key(db)
+        async for chunk in self.generate_custom_stream_with_config(
+            ai_cfg,
+            system_prompt,
+            user_prompt,
+            max_tokens=max_tokens,
+            temperature=temperature,
+        ):
+            yield chunk
+
+    async def generate_custom_stream_with_config(
+        self,
+        ai_cfg: dict,
+        system_prompt: str,
+        user_prompt: str,
+        max_tokens: int = 4096,
+        temperature: float = 0.7,
+    ):
+        """Generate streaming content from a pre-resolved AI config.
+
+        This helper intentionally does not accept a DB session so streaming
+        responses do not keep SQLAlchemy sessions open while waiting on the LLM.
+        """
+        from app.config import AI_MAX_RETRIES
+
         if not ai_cfg or not ai_cfg.get("api_key"):
             raise RuntimeError("AI API not configured")
 
         api_url = ai_cfg.get("api_url", "")
+        if "/v1/messages" in api_url:
+            raise RuntimeError("Streaming is only supported for OpenAI-compatible APIs")
+
         client = self._get_client()
 
         for attempt in range(max(1, AI_MAX_RETRIES)):
@@ -142,12 +169,12 @@ class AiGeneratorService:
                     return  # stream completed
             except httpx.HTTPError as e:
                 logger.warning(
-                    "generate_custom_stream API call failed (attempt %d/%d): %s",
+                    "generate_custom_stream_with_config API call failed (attempt %d/%d): %s",
                     attempt + 1, AI_MAX_RETRIES, e,
                 )
                 if attempt == AI_MAX_RETRIES - 1:
                     raise RuntimeError(
-                        f"generate_custom_stream failed after {AI_MAX_RETRIES} attempts: {e}"
+                        f"generate_custom_stream_with_config failed after {AI_MAX_RETRIES} attempts: {e}"
                     ) from e
                 continue
 

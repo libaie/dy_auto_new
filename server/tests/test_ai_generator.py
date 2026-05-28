@@ -289,6 +289,37 @@ class TestGenerateCustomStreamWithConfig:
             ):
                 pass
 
+    async def test_stream_with_config_rejects_anthropic_api(self):
+        gen = AiGeneratorService()
+
+        with pytest.raises(RuntimeError, match="OpenAI-compatible"):
+            async for _chunk in gen.generate_custom_stream_with_config(
+                _anthropic_cfg(),
+                "system",
+                "user",
+            ):
+                pass
+
+    async def test_stream_with_config_ignores_malformed_json_lines(self):
+        gen = AiGeneratorService()
+        client = _StreamClient([
+            'data: {"choices":[{"delta":{"content":"before"}}]}',
+            "data: {not valid json",
+            'data: {"choices":[{"delta":{"content":"after"}}]}',
+            "data: [DONE]",
+        ])
+        gen._client = client
+
+        chunks = []
+        async for chunk in gen.generate_custom_stream_with_config(
+            _openai_cfg(),
+            "system",
+            "user",
+        ):
+            chunks.append(chunk)
+
+        assert chunks == ["before", "after"]
+
     async def test_existing_db_stream_resolves_config_then_delegates(self, db):
         gen = AiGeneratorService()
 

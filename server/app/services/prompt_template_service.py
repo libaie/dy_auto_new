@@ -95,13 +95,11 @@ class PromptTemplateService:
             if field not in content or not content[field]:
                 raise ValueError(f"Missing required field: '{field}'")
         an = content.get("analysis", {})
-        for field in ("intents", "scoringRules", "replyRules"):
-            if not an.get(field):
-                raise ValueError(f"Missing required field: 'analysis.{field}'")
+        if not an.get("intents") or not an.get("scoringRules") or not an.get("replyRules"):
+            raise ValueError("analysis must contain intents, scoringRules, replyRules")
         sg = content.get("semanticGuide", {})
-        for field in ("highValueSignals", "lowValueSignals", "keyExamples"):
-            if not sg.get(field):
-                raise ValueError(f"Missing required field: 'semanticGuide.{field}'")
+        if not sg.get("highValueSignals") or not sg.get("lowValueSignals") or not sg.get("keyExamples"):
+            raise ValueError("semanticGuide must contain highValueSignals, lowValueSignals, keyExamples")
         cls._validate_reply_example(content)
 
     @classmethod

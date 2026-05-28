@@ -60,8 +60,16 @@ def test_validate_rewrite_request_rejects_invalid_current_content():
     content = valid_template_content()
     del content["analysis"]["replyRules"]
 
-    with pytest.raises(ValueError, match="analysis.replyRules"):
+    with pytest.raises(ValueError, match="analysis must contain intents, scoringRules, replyRules"):
         prompt_template_service.validate_rewrite_request(content, "make warmer")
+
+
+def test_validate_content_keeps_existing_aggregate_analysis_error_message():
+    content = valid_template_content()
+    del content["analysis"]["replyRules"]
+
+    with pytest.raises(ValueError, match="analysis must contain intents, scoringRules, replyRules"):
+        prompt_template_service._validate_content(content)
 
 
 def test_validate_rewrite_request_rejects_oversized_content():
@@ -79,7 +87,7 @@ def test_validate_rewrite_output_requires_full_valid_template():
     assert prompt_template_service.validate_rewrite_output(output) == output
 
     del output["semanticGuide"]["highValueSignals"]
-    with pytest.raises(ValueError, match="semanticGuide.highValueSignals"):
+    with pytest.raises(ValueError, match="semanticGuide must contain highValueSignals, lowValueSignals, keyExamples"):
         prompt_template_service.validate_rewrite_output(output)
 
 
@@ -96,3 +104,7 @@ def test_build_rewrite_prompt_contains_instruction_industry_and_current_json():
     assert "soften dm stages" in prompt
     assert '"disabledWords": "guarantee / cure"' in prompt
     assert "Return the complete rewritten JSON object only." in prompt
+    assert "Preserve the existing schema and all required fields." in prompt
+    assert "Apply only the requested change." in prompt
+    assert "Keep unrelated fields stable where possible." in prompt
+    assert "Do not wrap the JSON in markdown fences." in prompt

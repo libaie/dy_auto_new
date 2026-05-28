@@ -80,6 +80,17 @@ class _StreamClient:
         return _AsyncStreamResponse(self.lines)
 
 
+class _FailingStreamResponse(_AsyncStreamResponse):
+    def raise_for_status(self):
+        raise httpx.ConnectError("connection refused")
+
+
+class _FailingStreamClient(_StreamClient):
+    def stream(self, method, url, headers=None, json=None):
+        self.calls.append({"method": method, "url": url, "headers": headers, "json": json})
+        return _FailingStreamResponse(self.lines)
+
+
 class TestBuildPrompt:
     def test_with_all_context(self):
         prompt = AiGeneratorService._build_prompt(
@@ -319,6 +330,22 @@ class TestGenerateCustomStreamWithConfig:
             chunks.append(chunk)
 
         assert chunks == ["before", "after"]
+
+    async def test_stream_with_config_raises_when_zero_retries_and_http_fails(self):
+        gen = AiGeneratorService()
+        client = _FailingStreamClient([])
+        gen._client = client
+
+        with patch("app.services.ai_generator.AI_MAX_RETRIES", 0), \
+             pytest.raises(RuntimeError, match="generate_custom_stream_with_config failed after 1 attempts"):
+            async for _chunk in gen.generate_custom_stream_with_config(
+                _openai_cfg(),
+                "system",
+                "user",
+            ):
+                pass
+
+        assert len(client.calls) == 1
 
     async def test_existing_db_stream_resolves_config_then_delegates(self, db):
         gen = AiGeneratorService()

@@ -119,8 +119,6 @@ class AiGeneratorService:
         This helper intentionally does not accept a DB session so streaming
         responses do not keep SQLAlchemy sessions open while waiting on the LLM.
         """
-        from app.config import AI_MAX_RETRIES
-
         if not ai_cfg or not ai_cfg.get("api_key"):
             raise RuntimeError("AI API not configured")
 
@@ -129,8 +127,9 @@ class AiGeneratorService:
             raise RuntimeError("Streaming is only supported for OpenAI-compatible APIs")
 
         client = self._get_client()
+        attempts = max(1, AI_MAX_RETRIES)
 
-        for attempt in range(max(1, AI_MAX_RETRIES)):
+        for attempt in range(attempts):
             try:
                 async with client.stream(
                     "POST",
@@ -170,11 +169,11 @@ class AiGeneratorService:
             except httpx.HTTPError as e:
                 logger.warning(
                     "generate_custom_stream_with_config API call failed (attempt %d/%d): %s",
-                    attempt + 1, AI_MAX_RETRIES, e,
+                    attempt + 1, attempts, e,
                 )
-                if attempt == AI_MAX_RETRIES - 1:
+                if attempt == attempts - 1:
                     raise RuntimeError(
-                        f"generate_custom_stream_with_config failed after {AI_MAX_RETRIES} attempts: {e}"
+                        f"generate_custom_stream_with_config failed after {attempts} attempts: {e}"
                     ) from e
                 continue
 

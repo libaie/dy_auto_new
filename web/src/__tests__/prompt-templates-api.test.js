@@ -105,4 +105,61 @@ describe('prompt template SSE API', () => {
     ).rejects.toThrow('Rewrite failed')
     expect(events).toEqual([{ type: 'error', message: 'Rewrite failed' }])
   })
+
+  it('awaits async onEvent handlers before resolving', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      body: streamFrom(['data: {"type":"done"}\n\n']),
+    }))
+    const order = []
+
+    const streamPromise = streamTemplateRewrite({ template: 'old' }, {
+      onEvent: async (event) => {
+        order.push(`start:${event.type}`)
+        await Promise.resolve()
+        order.push(`finish:${event.type}`)
+      },
+    }).then(() => order.push('resolved'))
+
+    await streamPromise
+
+    expect(order).toEqual(['start:done', 'finish:done', 'resolved'])
+  })
+
+  it('rejects when async onEvent rejects', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      body: streamFrom(['data: {"type":"done"}\n\n']),
+    }))
+
+    await expect(
+      streamTemplateRewrite({ template: 'old' }, {
+        onEvent: async () => {
+          await Promise.resolve()
+          throw new Error('handler failed')
+        },
+      })
+    ).rejects.toThrow('handler failed')
+  })
+
+  it('parses CRLF-delimited SSE frames', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      body: streamFrom([
+        'data: {"type":"delta","text":"Hello"}\r\n\r\n',
+        'data: {"type":"done"}\r\n\r\n',
+      ]),
+    }))
+    const events = []
+
+    await streamTemplateRewrite({ template: 'old' }, { onEvent: (event) => events.push(event) })
+
+    expect(events).toEqual([
+      { type: 'delta', text: 'Hello' },
+      { type: 'done' },
+    ])
+  })
 })

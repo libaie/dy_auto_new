@@ -37,9 +37,9 @@ async function parseErrorMessage(response) {
   }
 }
 
-function processSseFrame(frame, onEvent) {
+async function processSseFrame(frame, onEvent) {
   const data = frame
-    .split('\n')
+    .split(/\r?\n/)
     .filter((line) => line.startsWith('data:'))
     .map((line) => line.slice(5).trimStart())
     .join('\n')
@@ -50,7 +50,7 @@ function processSseFrame(frame, onEvent) {
 
   const event = JSON.parse(data)
   if (onEvent) {
-    onEvent(event)
+    await onEvent(event)
   }
   if (event.type === 'error') {
     throw new Error(event.message || 'Stream error')
@@ -95,14 +95,16 @@ export async function streamPromptTemplateSse(path, payload, { onEvent } = {}) {
     }
 
     buffer += decoder.decode(value, { stream: true })
-    const frames = buffer.split('\n\n')
+    const frames = buffer.split(/\r?\n\r?\n/)
     buffer = frames.pop()
-    frames.forEach((frame) => processSseFrame(frame, onEvent))
+    for (const frame of frames) {
+      await processSseFrame(frame, onEvent)
+    }
   }
 
   buffer += decoder.decode()
   if (buffer.trim()) {
-    processSseFrame(buffer, onEvent)
+    await processSseFrame(buffer, onEvent)
   }
 }
 

@@ -115,6 +115,7 @@ function openCreate() {
 }
 
 async function handleGenerate() {
+  if (generating.value) return
   if (!aiDesc.value.trim()) { toast.error('请输入模板需求描述'); return }
   generating.value = true
   generatingStatus.value = '正在连接...'
@@ -530,8 +531,10 @@ onMounted(fetchTemplates)
                     <div class="flex gap-2">
                       <input
                         v-model="aiDesc"
+                        data-testid="template-generate-input"
                         class="flex-1 rounded-lg bg-slate-900/60 border border-white/[0.08] px-3.5 py-2 text-sm text-white placeholder-slate-500 transition-all duration-200"
                         placeholder="例如：大健康行业，针对糖尿病和高血压相关评论进行截流，语气温和专业，偏向中老年用户"
+                        :disabled="generating"
                         @keydown.enter="handleGenerate"
                       />
                       <button
@@ -569,6 +572,7 @@ onMounted(fetchTemplates)
                       :rows="18"
                       spellcheck="false"
                       class="w-full rounded-xl bg-slate-950/60 border border-white/[0.06] px-4 py-3 text-sm text-slate-200 font-mono leading-relaxed placeholder-slate-600 transition-all duration-200 resize-y"
+                      :disabled="rewriting"
                       placeholder='{
   "identity": { "role": "...", "constraints": [...] },
   "semanticGuide": { "mission": "...", "highValueSignals": [...], ... },

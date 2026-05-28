@@ -210,4 +210,45 @@ describe('PromptTemplatesPage rewrite UI', () => {
     resolveRewrite()
     await flushPromises()
   })
+
+  it('disables the JSON editor while rewrite is running', async () => {
+    let resolveRewrite
+    mocks.streamTemplateRewrite.mockReturnValue(new Promise((resolve) => {
+      resolveRewrite = resolve
+    }))
+    const wrapper = await mountPage()
+    await openEdit(wrapper)
+    await wrapper.find('[data-testid="template-rewrite-instruction"]').setValue('make it warmer')
+
+    wrapper.vm.handleRewrite()
+    await nextTick()
+
+    expect(editor(wrapper).element.disabled).toBe(true)
+
+    resolveRewrite()
+    await flushPromises()
+  })
+
+  it('disables generate input and ignores concurrent Enter while generation is running', async () => {
+    let resolveGenerate
+    mocks.streamTemplateGeneration.mockReturnValue(new Promise((resolve) => {
+      resolveGenerate = resolve
+    }))
+    const wrapper = await mountPage()
+    await openCreate(wrapper)
+    const generateInput = wrapper.find('[data-testid="template-generate-input"]')
+    expect(generateInput.exists()).toBe(true)
+    await generateInput.setValue('build a health template')
+
+    wrapper.vm.handleGenerate()
+    await nextTick()
+
+    expect(generateInput.element.disabled).toBe(true)
+
+    await generateInput.trigger('keydown.enter')
+    expect(mocks.streamTemplateGeneration).toHaveBeenCalledTimes(1)
+
+    resolveGenerate()
+    await flushPromises()
+  })
 })

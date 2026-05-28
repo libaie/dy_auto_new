@@ -91,6 +91,19 @@ class _FailingStreamClient(_StreamClient):
         return _FailingStreamResponse(self.lines)
 
 
+class _DisconnectingStreamResponse(_AsyncStreamResponse):
+    async def aiter_lines(self):
+        for line in self._lines:
+            yield line
+        raise httpx.ReadError("stream disconnected")
+
+
+class _DisconnectAfterChunkClient(_StreamClient):
+    def stream(self, method, url, headers=None, json=None):
+        self.calls.append({"method": method, "url": url, "headers": headers, "json": json})
+        return _DisconnectingStreamResponse(self.lines)
+
+
 class TestBuildPrompt:
     def test_with_all_context(self):
         prompt = AiGeneratorService._build_prompt(
@@ -345,6 +358,26 @@ class TestGenerateCustomStreamWithConfig:
             ):
                 pass
 
+        assert len(client.calls) == 1
+
+    async def test_stream_with_config_does_not_retry_after_emitting_content(self):
+        gen = AiGeneratorService()
+        client = _DisconnectAfterChunkClient([
+            'data: {"choices":[{"delta":{"content":"partial"}}]}',
+        ])
+        gen._client = client
+
+        chunks = []
+        with patch("app.services.ai_generator.AI_MAX_RETRIES", 2), \
+             pytest.raises(RuntimeError, match="streaming started"):
+            async for chunk in gen.generate_custom_stream_with_config(
+                _openai_cfg(),
+                "system",
+                "user",
+            ):
+                chunks.append(chunk)
+
+        assert chunks == ["partial"]
         assert len(client.calls) == 1
 
     async def test_existing_db_stream_resolves_config_then_delegates(self, db):

@@ -69,7 +69,7 @@ function resetRewriteState() {
 }
 
 function closeDialog() {
-  if (rewriting.value) return
+  if (generating.value || rewriting.value) return
   dialogOpen.value = false
 }
 
@@ -234,7 +234,7 @@ async function handleRewrite() {
 }
 
 async function handleSave() {
-  if (rewriting.value) return
+  if (generating.value || rewriting.value) return
   let content
   try { content = JSON.parse(form.value.contentJson) }
   catch (e) { toast.error('JSON 格式无效: ' + e.message); return }
@@ -572,7 +572,7 @@ onMounted(fetchTemplates)
                       :rows="18"
                       spellcheck="false"
                       class="w-full rounded-xl bg-slate-950/60 border border-white/[0.06] px-4 py-3 text-sm text-slate-200 font-mono leading-relaxed placeholder-slate-600 transition-all duration-200 resize-y"
-                      :disabled="rewriting"
+                      :disabled="generating || rewriting"
                       placeholder='{
   "identity": { "role": "...", "constraints": [...] },
   "semanticGuide": { "mission": "...", "highValueSignals": [...], ... },
@@ -594,16 +594,18 @@ onMounted(fetchTemplates)
                 <!-- footer -->
                 <div class="mt-6 flex justify-end gap-3 pt-4 border-t border-white/[0.06]">
                   <button
+                    data-testid="template-dialog-cancel"
                     class="rounded-xl px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white hover:bg-white/[0.04] transition-all duration-200"
                     @click="closeDialog"
-                    :disabled="saving || rewriting"
+                    :disabled="saving || generating || rewriting"
                   >
                     取消
                   </button>
                   <button
+                    data-testid="template-save-button"
                     class="btn-aurora rounded-xl px-5 py-2.5 text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
                     @click="handleSave"
-                    :disabled="saving || rewriting"
+                    :disabled="saving || generating || rewriting"
                   >
                     <svg v-if="saving" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
                       <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />

@@ -128,6 +128,7 @@ class AiGeneratorService:
 
         client = self._get_client()
         attempts = max(1, AI_MAX_RETRIES)
+        stream_started = False
 
         for attempt in range(attempts):
             try:
@@ -162,6 +163,7 @@ class AiGeneratorService:
                             delta = data.get("choices", [{}])[0].get("delta", {})
                             content = delta.get("content", "")
                             if content:
+                                stream_started = True
                                 yield content
                         except json.JSONDecodeError:
                             continue
@@ -171,6 +173,10 @@ class AiGeneratorService:
                     "generate_custom_stream_with_config API call failed (attempt %d/%d): %s",
                     attempt + 1, attempts, e,
                 )
+                if stream_started:
+                    raise RuntimeError(
+                        f"generate_custom_stream_with_config failed after streaming started: {e}"
+                    ) from e
                 if attempt == attempts - 1:
                     raise RuntimeError(
                         f"generate_custom_stream_with_config failed after {attempts} attempts: {e}"

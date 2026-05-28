@@ -251,4 +251,34 @@ describe('PromptTemplatesPage rewrite UI', () => {
     resolveGenerate()
     await flushPromises()
   })
+
+  it('while generation is running keeps dialog open and blocks save and JSON edits', async () => {
+    let resolveGenerate
+    mocks.streamTemplateGeneration.mockReturnValue(new Promise((resolve) => {
+      resolveGenerate = resolve
+    }))
+    const wrapper = await mountPage()
+    await openCreate(wrapper)
+    await wrapper.find('[data-testid="template-generate-input"]').setValue('build a health template')
+    wrapper.vm.form.name = 'health-draft'
+    wrapper.vm.form.contentJson = '{"identity":{"role":"draft"}}'
+
+    wrapper.vm.handleGenerate()
+    await nextTick()
+
+    expect(wrapper.vm.generating).toBe(true)
+    expect(editor(wrapper).element.disabled).toBe(true)
+    expect(wrapper.find('[data-testid="template-dialog-cancel"]').element.disabled).toBe(true)
+    expect(wrapper.find('[data-testid="template-save-button"]').element.disabled).toBe(true)
+
+    wrapper.vm.closeDialog()
+    await wrapper.vm.handleSave()
+    await nextTick()
+
+    expect(wrapper.vm.dialogOpen).toBe(true)
+    expect(mocks.createTemplate).not.toHaveBeenCalled()
+
+    resolveGenerate()
+    await flushPromises()
+  })
 })

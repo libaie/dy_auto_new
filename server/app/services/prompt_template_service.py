@@ -1,4 +1,5 @@
 """Prompt template management service — backed by SQLAlchemy database."""
+import json
 from typing import Optional
 
 from sqlalchemy.orm import Session
@@ -28,6 +29,10 @@ def _to_device_dict(tmpl: PromptTemplate) -> dict:
         "industry": tmpl.industry,
         "content": tmpl.content,
     }
+
+
+PROMPT_TEMPLATE_REWRITE_MAX_INSTRUCTION_CHARS = 2000
+PROMPT_TEMPLATE_REWRITE_MAX_CONTENT_BYTES = 50 * 1024
 
 
 class PromptTemplateService:
@@ -90,12 +95,63 @@ class PromptTemplateService:
             if field not in content or not content[field]:
                 raise ValueError(f"Missing required field: '{field}'")
         an = content.get("analysis", {})
-        if not an.get("intents") or not an.get("scoringRules") or not an.get("replyRules"):
-            raise ValueError("analysis must contain intents, scoringRules, replyRules")
+        for field in ("intents", "scoringRules", "replyRules"):
+            if not an.get(field):
+                raise ValueError(f"Missing required field: 'analysis.{field}'")
         sg = content.get("semanticGuide", {})
-        if not sg.get("highValueSignals") or not sg.get("lowValueSignals") or not sg.get("keyExamples"):
-            raise ValueError("semanticGuide must contain highValueSignals, lowValueSignals, keyExamples")
+        for field in ("highValueSignals", "lowValueSignals", "keyExamples"):
+            if not sg.get(field):
+                raise ValueError(f"Missing required field: 'semanticGuide.{field}'")
         cls._validate_reply_example(content)
+
+    @classmethod
+    def _serialized_content_size(cls, content: dict) -> int:
+        return len(json.dumps(content, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
+
+    @classmethod
+    def validate_rewrite_request(
+        cls,
+        content,
+        instruction,
+        max_instruction_chars: int = PROMPT_TEMPLATE_REWRITE_MAX_INSTRUCTION_CHARS,
+        max_content_bytes: int = PROMPT_TEMPLATE_REWRITE_MAX_CONTENT_BYTES,
+    ) -> str:
+        """Validate rewrite input without reading or writing template rows."""
+        if not isinstance(instruction, str) or not instruction.strip():
+            raise ValueError("instruction is required")
+        trimmed_instruction = instruction.strip()
+        if len(trimmed_instruction) > max_instruction_chars:
+            raise ValueError(f"instruction is too long; max {max_instruction_chars} characters")
+        if not isinstance(content, dict):
+            raise ValueError("content must be an object")
+        if cls._serialized_content_size(content) > max_content_bytes:
+            raise ValueError(f"content is too large; max {max_content_bytes} bytes")
+        cls._validate_content(content)
+        return trimmed_instruction
+
+    @classmethod
+    def validate_rewrite_output(cls, content):
+        """Validate AI rewritten output before emitting SSE done."""
+        if not isinstance(content, dict):
+            raise ValueError("rewritten content must be an object")
+        cls._validate_content(content)
+        return content
+
+    @staticmethod
+    def build_rewrite_prompt(industry: str, content: dict, instruction: str) -> str:
+        current_json = json.dumps(content, ensure_ascii=False, indent=2)
+        return (
+            f"Industry: {industry or 'health'}\n"
+            f"User rewrite instruction:\n{instruction}\n\n"
+            "Current prompt template JSON:\n"
+            f"{current_json}\n\n"
+            "Rewrite rules:\n"
+            "1. Return the complete rewritten JSON object only.\n"
+            "2. Preserve the existing schema and all required fields.\n"
+            "3. Apply only the requested change.\n"
+            "4. Keep unrelated fields stable where possible.\n"
+            "5. Do not wrap the JSON in markdown fences.\n"
+        )
 
     def create_template(self, db: Session, name: str, industry: str,
                         content: dict, description: str = "") -> dict:

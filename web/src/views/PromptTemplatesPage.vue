@@ -40,6 +40,11 @@ const generating = ref(false)
 const dialogOpen = ref(false)
 const isEditing = ref(false)
 const aiDesc = useSavedPrompt('template_generator', '')
+const rewriteInstruction = useSavedPrompt('template_rewriter', '')
+const rewriting = ref(false)
+const rewriteStatus = ref('')
+const rewriteRestoreContent = ref('')
+const rewriteHasRestore = ref(false)
 const form = ref({ name: '', industry: 'health', description: '', contentJson: '' })
 const showDeleteDialog = ref(false)
 const deletingName = ref(null)
@@ -56,6 +61,25 @@ function scenePreview(content) {
 
 const industryLabels = { health: '大健康', travel: '旅游', education: '教育', finance: '金融', beauty: '美妆', realestate: '房产', auto: '汽车' }
 function industryLabel(val) { return industryLabels[val] || val }
+
+function resetRewriteState() {
+  rewriteStatus.value = ''
+  rewriteRestoreContent.value = ''
+  rewriteHasRestore.value = false
+}
+
+function closeDialog() {
+  if (generating.value || rewriting.value) return
+  dialogOpen.value = false
+}
+
+function restoreLastRewrite() {
+  if (!rewriteHasRestore.value) return
+  form.value.contentJson = rewriteRestoreContent.value
+  rewriteRestoreContent.value = ''
+  rewriteHasRestore.value = false
+  toast.success('已恢复 AI 修改前内容')
+}
 
 function formatDate(iso) {
   if (!iso) return '-'
@@ -85,67 +109,43 @@ async function fetchTemplates() {
 function openCreate() {
   isEditing.value = false
   generatingStatus.value = ''
+  resetRewriteState()
   form.value = { name: '', industry: 'health', description: '', contentJson: '' }
   dialogOpen.value = true
 }
 
 async function handleGenerate() {
+  if (generating.value) return
   if (!aiDesc.value.trim()) { toast.error('请输入模板需求描述'); return }
   generating.value = true
   generatingStatus.value = '正在连接...'
   try {
-    const token = localStorage.getItem('token') || ''
-    const resp = await fetch('/api/prompt-templates/generate-stream', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-      body: JSON.stringify({ description: aiDesc.value, industry: form.value.industry }),
-    })
-    if (!resp.ok) {
-      const err = await resp.json().catch(() => ({ detail: resp.statusText }))
-      throw new Error(err.detail || 'HTTP ' + resp.status)
-    }
-    const reader = resp.body.getReader()
-    const decoder = new TextDecoder()
-    let buffer = ''
     let receivedDone = false
     let lastRender = Date.now()
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      const chunk = decoder.decode(value, { stream: true })
-      buffer += chunk
-      while (buffer.includes('\n\n')) {
-        const idx = buffer.indexOf('\n\n')
-        const raw = buffer.slice(0, idx).trim()
-        buffer = buffer.slice(idx + 2)
-        if (!raw.startsWith('data: ')) continue
-        try {
-          const data = JSON.parse(raw.slice(6))
-          if (data.type === 'token') {
-            form.value.contentJson += data.text
-            generatingStatus.value = 'AI 正在生成...'
-          } else if (data.type === 'status') {
-            generatingStatus.value = data.text
-          } else if (data.type === 'done') {
-            receivedDone = true
-            form.value.contentJson = JSON.stringify(data.content, null, 2)
-            generatingStatus.value = ''
-            if (!form.value.name) {
-              const words = aiDesc.value.split(/[\s,，]+/).filter(w => w.length > 1)
-              form.value.name = form.value.industry + '-' + (words.slice(0, 3).join('-') || 'custom')
-            }
-            toast.success('模板已生成，请检查并保存')
-          } else if (data.type === 'error') {
-            receivedDone = true
-            toast.error('生成失败: ' + data.message)
-            generatingStatus.value = ''
+    await api.streamTemplateGeneration({ description: aiDesc.value, industry: form.value.industry }, {
+      onEvent: async (data) => {
+        if (data.type === 'token') {
+          form.value.contentJson += data.text
+          generatingStatus.value = 'AI 正在生成...'
+        } else if (data.type === 'status') {
+          generatingStatus.value = data.text
+        } else if (data.type === 'done') {
+          receivedDone = true
+          form.value.contentJson = JSON.stringify(data.content, null, 2)
+          generatingStatus.value = ''
+          if (!form.value.name) {
+            const words = aiDesc.value.split(/[\s,，]+/).filter(w => w.length > 1)
+            form.value.name = form.value.industry + '-' + (words.slice(0, 3).join('-') || 'custom')
           }
-        } catch (e) { /* skip malformed line */ }
-      }
-      // Throttle: render at most every 50ms
-      const now = Date.now()
-      if (now - lastRender > 50) { await nextTick(); lastRender = now }
-    }
+          toast.success('模板已生成，请检查并保存')
+        } else if (data.type === 'error') {
+          generatingStatus.value = ''
+          throw new Error(data.message || 'Stream error')
+        }
+        const now = Date.now()
+        if (now - lastRender > 50) { await nextTick(); lastRender = now }
+      },
+    })
     if (!receivedDone && generatingStatus.value) {
       generatingStatus.value = ''
       toast.error('生成连接中断')
@@ -159,6 +159,7 @@ async function handleGenerate() {
 function openEdit(row) {
   isEditing.value = true
   generatingStatus.value = ''
+  resetRewriteState()
   form.value = {
     name: row.name,
     industry: row.industry,
@@ -168,7 +169,72 @@ function openEdit(row) {
   dialogOpen.value = true
 }
 
+async function handleRewrite() {
+  if (rewriting.value) return
+  const instruction = rewriteInstruction.value.trim()
+  if (!instruction) return
+
+  let currentContent
+  try { currentContent = JSON.parse(form.value.contentJson) }
+  catch (e) { toast.error('JSON 格式无效: ' + e.message); return }
+
+  const previousContent = form.value.contentJson
+  let tokenBuffer = ''
+  let receivedDone = false
+  let lastRender = Date.now()
+
+  rewriting.value = true
+  rewriteStatus.value = '正在连接...'
+  rewriteRestoreContent.value = ''
+  rewriteHasRestore.value = false
+  try {
+    await api.streamTemplateRewrite({
+      industry: form.value.industry,
+      instruction,
+      content: currentContent,
+    }, {
+      onEvent: async (data) => {
+        if (data.type === 'token') {
+          tokenBuffer += data.text
+          rewriteStatus.value = 'AI 正在改写...'
+          const now = Date.now()
+          if (now - lastRender > 50) {
+            form.value.contentJson = tokenBuffer
+            await nextTick()
+            lastRender = now
+          }
+        } else if (data.type === 'status') {
+          rewriteStatus.value = data.text
+        } else if (data.type === 'done') {
+          receivedDone = true
+          rewriteRestoreContent.value = previousContent
+          rewriteHasRestore.value = true
+          form.value.contentJson = JSON.stringify(data.content, null, 2)
+          rewriteStatus.value = ''
+          toast.success('AI 改写完成')
+        } else if (data.type === 'error') {
+          throw new Error(data.message || 'Stream error')
+        }
+      },
+    })
+    if (!receivedDone) {
+      throw new Error('改写连接中断')
+    }
+  } catch (e) {
+    if (!receivedDone) {
+      form.value.contentJson = previousContent
+      rewriteRestoreContent.value = ''
+      rewriteHasRestore.value = false
+      rewriteStatus.value = ''
+      toast.error('AI 改写失败: ' + e.message)
+    }
+  } finally {
+    rewriting.value = false
+  }
+}
+
 async function handleSave() {
+  if (generating.value || rewriting.value) return
   let content
   try { content = JSON.parse(form.value.contentJson) }
   catch (e) { toast.error('JSON 格式无效: ' + e.message); return }
@@ -345,7 +411,7 @@ onMounted(fetchTemplates)
 
     <!-- === Create / Edit Dialog === -->
     <TransitionRoot :show="dialogOpen" as="template">
-      <Dialog as="div" class="relative z-50" @close="dialogOpen = false">
+      <Dialog as="div" class="relative z-50" @close="closeDialog">
         <TransitionChild as="template" enter="ease-out duration-200" enter-from="opacity-0" enter-to="opacity-100" leave="ease-in duration-150" leave-from="opacity-100" leave-to="opacity-0">
           <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" />
         </TransitionChild>
@@ -382,9 +448,11 @@ onMounted(fetchTemplates)
                     </label>
                     <input
                       v-model="form.industry"
+                      data-testid="template-industry-input"
                       list="industry-presets"
                       class="w-full rounded-xl bg-white/[0.04] border border-white/[0.08] px-4 py-2.5 text-sm text-white placeholder-slate-500 transition-all duration-200"
                       placeholder="输入行业标识，如 health / travel / education"
+                      :disabled="generating || rewriting"
                     />
                     <datalist id="industry-presets">
                       <option value="health">大健康</option>
@@ -402,12 +470,60 @@ onMounted(fetchTemplates)
                     <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">描述</label>
                     <input
                       v-model="form.description"
+                      data-testid="template-description-input"
                       class="w-full rounded-xl bg-white/[0.04] border border-white/[0.08] px-4 py-2.5 text-sm text-white placeholder-slate-500 transition-all duration-200"
                       placeholder="简要说明模板的用途和适用场景"
+                      :disabled="generating || rewriting"
                     />
                   </div>
 
                   <!-- AI generate card -->
+                  <div v-if="isEditing" data-testid="template-rewrite-card" class="rounded-xl border border-cyan-500/20 bg-cyan-500/[0.03] p-4 space-y-3">
+                    <div class="flex items-center justify-between gap-3">
+                      <div class="flex items-center gap-2 min-w-0">
+                        <svg class="w-4 h-4 text-cyan-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                        <span class="text-sm font-semibold text-cyan-300">AI 改写模板</span>
+                        <span v-if="rewriteStatus" class="text-xs text-slate-500">{{ rewriteStatus }}</span>
+                      </div>
+                      <button
+                        v-if="rewriteHasRestore"
+                        data-testid="template-rewrite-restore"
+                        class="rounded-lg px-3 py-1.5 text-xs font-semibold text-cyan-300 hover:text-cyan-100 hover:bg-cyan-400/10 transition-all duration-200"
+                        :disabled="rewriting"
+                        @click="restoreLastRewrite"
+                      >
+                        恢复上次修改
+                      </button>
+                    </div>
+                    <div class="flex gap-2">
+                      <input
+                        v-model="rewriteInstruction"
+                        data-testid="template-rewrite-instruction"
+                        class="flex-1 rounded-lg bg-slate-900/60 border border-white/[0.08] px-3.5 py-2 text-sm text-white placeholder-slate-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                        placeholder="输入改写要求，例如：语气更专业，增强私信转化"
+                        :disabled="rewriting"
+                        @keydown.enter="handleRewrite"
+                      />
+                      <button
+                        data-testid="template-rewrite-button"
+                        class="btn-aurora rounded-lg px-4 py-2 text-sm font-semibold inline-flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+                        :disabled="rewriting || !rewriteInstruction.trim()"
+                        @click="handleRewrite"
+                      >
+                        <svg v-if="rewriting" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                        {{ rewriting ? '改写中...' : '改写模板' }}
+                      </button>
+                    </div>
+                  </div>
+
                   <div v-if="!isEditing" class="rounded-xl border border-purple-500/20 bg-purple-500/[0.03] p-4 space-y-3">
                     <div class="flex items-center gap-2">
                       <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -419,8 +535,10 @@ onMounted(fetchTemplates)
                     <div class="flex gap-2">
                       <input
                         v-model="aiDesc"
+                        data-testid="template-generate-input"
                         class="flex-1 rounded-lg bg-slate-900/60 border border-white/[0.08] px-3.5 py-2 text-sm text-white placeholder-slate-500 transition-all duration-200"
                         placeholder="例如：大健康行业，针对糖尿病和高血压相关评论进行截流，语气温和专业，偏向中老年用户"
+                        :disabled="generating"
                         @keydown.enter="handleGenerate"
                       />
                       <button
@@ -454,9 +572,11 @@ onMounted(fetchTemplates)
                     </div>
                     <textarea
                       v-model="form.contentJson"
+                      data-testid="template-content-json"
                       :rows="18"
                       spellcheck="false"
                       class="w-full rounded-xl bg-slate-950/60 border border-white/[0.06] px-4 py-3 text-sm text-slate-200 font-mono leading-relaxed placeholder-slate-600 transition-all duration-200 resize-y"
+                      :disabled="generating || rewriting"
                       placeholder='{
   "identity": { "role": "...", "constraints": [...] },
   "semanticGuide": { "mission": "...", "highValueSignals": [...], ... },
@@ -478,16 +598,18 @@ onMounted(fetchTemplates)
                 <!-- footer -->
                 <div class="mt-6 flex justify-end gap-3 pt-4 border-t border-white/[0.06]">
                   <button
+                    data-testid="template-dialog-cancel"
                     class="rounded-xl px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white hover:bg-white/[0.04] transition-all duration-200"
-                    @click="dialogOpen = false"
-                    :disabled="saving"
+                    @click="closeDialog"
+                    :disabled="saving || generating || rewriting"
                   >
                     取消
                   </button>
                   <button
+                    data-testid="template-save-button"
                     class="btn-aurora rounded-xl px-5 py-2.5 text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
                     @click="handleSave"
-                    :disabled="saving"
+                    :disabled="saving || generating || rewriting"
                   >
                     <svg v-if="saving" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
                       <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />

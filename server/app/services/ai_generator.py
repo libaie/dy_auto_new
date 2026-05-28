@@ -95,15 +95,42 @@ class AiGeneratorService:
         Only supports OpenAI-compatible streaming (DeepSeek, OpenAI, etc.).
         Anthropic streaming not yet implemented.
         """
-        from app.config import get_ai_config_with_key, AI_MAX_RETRIES
+        from app.config import get_ai_config_with_key
         ai_cfg = get_ai_config_with_key(db)
+        async for chunk in self.generate_custom_stream_with_config(
+            ai_cfg,
+            system_prompt,
+            user_prompt,
+            max_tokens=max_tokens,
+            temperature=temperature,
+        ):
+            yield chunk
+
+    async def generate_custom_stream_with_config(
+        self,
+        ai_cfg: dict,
+        system_prompt: str,
+        user_prompt: str,
+        max_tokens: int = 4096,
+        temperature: float = 0.7,
+    ):
+        """Generate streaming content from a pre-resolved AI config.
+
+        This helper intentionally does not accept a DB session so streaming
+        responses do not keep SQLAlchemy sessions open while waiting on the LLM.
+        """
         if not ai_cfg or not ai_cfg.get("api_key"):
             raise RuntimeError("AI API not configured")
 
         api_url = ai_cfg.get("api_url", "")
-        client = self._get_client()
+        if "/v1/messages" in api_url:
+            raise RuntimeError("Streaming is only supported for OpenAI-compatible APIs")
 
-        for attempt in range(max(1, AI_MAX_RETRIES)):
+        client = self._get_client()
+        attempts = max(1, AI_MAX_RETRIES)
+        stream_started = False
+
+        for attempt in range(attempts):
             try:
                 async with client.stream(
                     "POST",
@@ -136,18 +163,23 @@ class AiGeneratorService:
                             delta = data.get("choices", [{}])[0].get("delta", {})
                             content = delta.get("content", "")
                             if content:
+                                stream_started = True
                                 yield content
                         except json.JSONDecodeError:
                             continue
                     return  # stream completed
             except httpx.HTTPError as e:
                 logger.warning(
-                    "generate_custom_stream API call failed (attempt %d/%d): %s",
-                    attempt + 1, AI_MAX_RETRIES, e,
+                    "generate_custom_stream_with_config API call failed (attempt %d/%d): %s",
+                    attempt + 1, attempts, e,
                 )
-                if attempt == AI_MAX_RETRIES - 1:
+                if stream_started:
                     raise RuntimeError(
-                        f"generate_custom_stream failed after {AI_MAX_RETRIES} attempts: {e}"
+                        f"generate_custom_stream_with_config failed after streaming started: {e}"
+                    ) from e
+                if attempt == attempts - 1:
+                    raise RuntimeError(
+                        f"generate_custom_stream_with_config failed after {attempts} attempts: {e}"
                     ) from e
                 continue
 

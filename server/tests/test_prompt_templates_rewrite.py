@@ -243,6 +243,38 @@ def test_rewrite_ai_invalid_json_emits_error(db):
     assert events[-1]["type"] == "error"
 
 
+def test_rewrite_generic_stream_failure_does_not_log_sentinel(db, caplog):
+    sentinel = "SECRET_PROVIDER_SENTINEL"
+
+    async def fake_stream(*args, **kwargs):
+        if False:
+            yield ""
+        raise RuntimeError(f"provider failed {sentinel}")
+
+    client = TestClient(app)
+    caplog.set_level(logging.ERROR, logger="app.routers.prompt_templates")
+    with (
+        patch("app.routers.prompt_templates.get_ai_config_with_key", return_value={"api_key": "test-key"}),
+        patch("app.routers.prompt_templates.SessionLocal", return_value=nullcontext(db)),
+        patch("app.routers.prompt_templates.gen.generate_custom_stream_with_config", fake_stream),
+    ):
+        response = client.post(
+            "/api/prompt-templates/rewrite-stream",
+            json={
+                "industry": "health",
+                "content": valid_template_content(),
+                "instruction": "make warmer",
+            },
+        )
+
+    events = sse_events(response)
+
+    assert response.status_code == 200
+    assert events[-1]["type"] == "error"
+    assert sentinel in events[-1]["message"]
+    assert sentinel not in caplog.text
+
+
 def test_rewrite_ai_invalid_template_emits_error_not_warning(db):
     invalid = rewritten_template_content()
     del invalid["semanticGuide"]["highValueSignals"]

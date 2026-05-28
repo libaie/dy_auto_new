@@ -5,12 +5,14 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.responses import StreamingResponse
-from typing import Optional
+from typing import Any, Optional
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.database import get_db
+from app.config import get_ai_config_with_key
+from app.database import get_db, SessionLocal
 from app.deps import verify_admin_token, require_role
+from app.services.ai_generator import ai_generator as gen
 from app.services.prompt_template_service import prompt_template_service
 
 logger = logging.getLogger(__name__)
@@ -20,6 +22,12 @@ router = APIRouter(prefix="/api/prompt-templates", tags=["prompt-templates"])
 
 class TemplateGenerateRequest(BaseModel):
     description: str
+    industry: str = "health"
+
+
+class TemplateRewriteRequest(BaseModel):
+    content: Any
+    instruction: Any
     industry: str = "health"
 
 
@@ -101,6 +109,31 @@ TEMPLATE_GEN_SYSTEM = """你是一个 AI 提示词模板生成专家。根据用
 ❌ 错误: { "good": "评论'价格多少' → 回复：'私信您了解详情哦'", "bad": "评论'太贵了' → 回复：'一分钱一分货'" }
 ✅ 正确: { "good": "私信您了解详情哦～不同方案价格不同，看看哪个适合您", "bad": "亲可以看看哦" }
 replyExample 中的文本就是最终输出的回复内容，不需要标注原文是什么、回复是什么。"""
+
+
+TEMPLATE_REWRITE_SYSTEM = """You are an AI prompt template rewrite assistant.
+
+Return only the complete rewritten prompt template JSON object. Preserve the
+existing schema and required fields, apply only the user's rewrite instruction,
+and keep unrelated fields stable where possible. Do not include markdown fences
+or explanatory text."""
+
+
+def _sse(payload: dict) -> str:
+    return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+
+def _strip_json_fence(raw: str) -> str:
+    content = raw.strip()
+    if not content.startswith("```"):
+        return content
+
+    lines = content.splitlines()
+    if lines and lines[0].startswith("```"):
+        lines = lines[1:]
+    if lines and lines[-1].strip() == "```":
+        lines = lines[:-1]
+    return "\n".join(lines).strip()
 
 
 @router.post("/generate")
@@ -204,6 +237,87 @@ async def generate_template_stream(
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
         },
+    )
+
+
+@router.post("/rewrite-stream")
+async def rewrite_template_stream(
+    request: TemplateRewriteRequest,
+    user = Depends(require_role("admin")),
+):
+    """AI rewrite preview for prompt template JSON. Stateless SSE endpoint."""
+    def stream_headers():
+        return {
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        }
+
+    def error_stream(message: str):
+        async def stream():
+            yield _sse({"type": "error", "message": message})
+
+        return stream()
+
+    logger.info("Prompt template rewrite started industry=%s", request.industry)
+
+    try:
+        instruction = prompt_template_service.validate_rewrite_request(
+            request.content,
+            request.instruction,
+        )
+        user_prompt = prompt_template_service.build_rewrite_prompt(
+            request.industry,
+            request.content,
+            instruction,
+        )
+        with SessionLocal() as db:
+            ai_cfg = get_ai_config_with_key(db)
+        if not ai_cfg:
+            raise ValueError("AI API not configured")
+    except ValueError as e:
+        logger.warning("Prompt template rewrite failed error_type=preflight error=%s", str(e)[:200])
+        return StreamingResponse(
+            error_stream(str(e)[:200]),
+            media_type="text/event-stream",
+            headers=stream_headers(),
+        )
+
+    async def event_stream():
+        raw_chunks = []
+        try:
+            yield _sse({"type": "status", "text": "Rewriting prompt template..."})
+            async for chunk in gen.generate_custom_stream_with_config(
+                ai_cfg,
+                TEMPLATE_REWRITE_SYSTEM,
+                user_prompt,
+                max_tokens=4096,
+            ):
+                raw_chunks.append(chunk)
+                yield _sse({"type": "token", "text": chunk})
+
+            raw = _strip_json_fence("".join(raw_chunks))
+            rewritten = json.loads(raw)
+            prompt_template_service.validate_rewrite_output(rewritten)
+            logger.info("Prompt template rewrite succeeded industry=%s", request.industry)
+            yield _sse({"type": "done", "content": rewritten})
+        except json.JSONDecodeError as e:
+            logger.warning("Prompt template rewrite failed error_type=json error=%s", str(e)[:200])
+            yield _sse({"type": "error", "message": f"AI generated invalid JSON: {str(e)[:200]}"})
+        except ValueError as e:
+            logger.warning("Prompt template rewrite failed error_type=validation error=%s", str(e)[:200])
+            yield _sse({"type": "error", "message": str(e)[:200]})
+        except Exception as e:
+            logger.error(
+                "Prompt template rewrite failed error_type=unexpected error=%s",
+                str(e)[:200],
+            )
+            yield _sse({"type": "error", "message": str(e)[:200]})
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers=stream_headers(),
     )
 
 

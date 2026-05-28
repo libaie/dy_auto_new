@@ -448,9 +448,11 @@ onMounted(fetchTemplates)
                     </label>
                     <input
                       v-model="form.industry"
+                      data-testid="template-industry-input"
                       list="industry-presets"
                       class="w-full rounded-xl bg-white/[0.04] border border-white/[0.08] px-4 py-2.5 text-sm text-white placeholder-slate-500 transition-all duration-200"
                       placeholder="输入行业标识，如 health / travel / education"
+                      :disabled="generating || rewriting"
                     />
                     <datalist id="industry-presets">
                       <option value="health">大健康</option>
@@ -468,8 +470,10 @@ onMounted(fetchTemplates)
                     <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">描述</label>
                     <input
                       v-model="form.description"
+                      data-testid="template-description-input"
                       class="w-full rounded-xl bg-white/[0.04] border border-white/[0.08] px-4 py-2.5 text-sm text-white placeholder-slate-500 transition-all duration-200"
                       placeholder="简要说明模板的用途和适用场景"
+                      :disabled="generating || rewriting"
                     />
                   </div>
 

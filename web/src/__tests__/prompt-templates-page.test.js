@@ -224,6 +224,8 @@ describe('PromptTemplatesPage rewrite UI', () => {
     await nextTick()
 
     expect(editor(wrapper).element.disabled).toBe(true)
+    expect(wrapper.find('[data-testid="template-industry-input"]').element.disabled).toBe(true)
+    expect(wrapper.find('[data-testid="template-description-input"]').element.disabled).toBe(true)
 
     resolveRewrite()
     await flushPromises()
@@ -268,6 +270,8 @@ describe('PromptTemplatesPage rewrite UI', () => {
 
     expect(wrapper.vm.generating).toBe(true)
     expect(editor(wrapper).element.disabled).toBe(true)
+    expect(wrapper.find('[data-testid="template-industry-input"]').element.disabled).toBe(true)
+    expect(wrapper.find('[data-testid="template-description-input"]').element.disabled).toBe(true)
     expect(wrapper.find('[data-testid="template-dialog-cancel"]').element.disabled).toBe(true)
     expect(wrapper.find('[data-testid="template-save-button"]').element.disabled).toBe(true)
 

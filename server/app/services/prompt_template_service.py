@@ -103,6 +103,49 @@ class PromptTemplateService:
         cls._validate_reply_example(content)
 
     @classmethod
+    def _validate_complete_content(cls, content: dict) -> None:
+        """Validate fields required for a complete generated prompt template."""
+        cls._validate_content(content)
+
+        analysis = content.get("analysis", {})
+        if not analysis.get("sentiments") or not analysis.get("replyExample") or not analysis.get("tiers"):
+            raise ValueError("analysis must contain sentiments, replyExample, tiers")
+
+        video_comment = content.get("videoComment")
+        if not video_comment:
+            raise ValueError("Missing required field: 'videoComment'")
+        if not video_comment.get("context") or not video_comment.get("goal") or not video_comment.get("rules"):
+            raise ValueError("videoComment must contain context, goal, rules")
+
+        dm_opener = content.get("dmOpener")
+        if not dm_opener:
+            raise ValueError("Missing required field: 'dmOpener'")
+        if (
+            not dm_opener.get("context")
+            or not dm_opener.get("identity")
+            or not dm_opener.get("goal")
+            or not dm_opener.get("style")
+            or not dm_opener.get("tierTones")
+        ):
+            raise ValueError("dmOpener must contain context, identity, goal, style, tierTones")
+
+        dm_stages = content.get("dmStages")
+        if not dm_stages:
+            raise ValueError("Missing required field: 'dmStages'")
+        required_stages = ["qualifying", "nurturing", "converting", "follow_up"]
+        for stage in required_stages:
+            if not dm_stages.get(stage):
+                raise ValueError(f"dmStages must contain {', '.join(required_stages)}")
+            stage_config = dm_stages[stage]
+            if (
+                not stage_config.get("name")
+                or not stage_config.get("goal")
+                or not stage_config.get("style")
+                or not stage_config.get("maxTokens")
+            ):
+                raise ValueError(f"dmStages.{stage} must contain name, goal, style, maxTokens")
+
+    @classmethod
     def _serialized_content_size(cls, content: dict) -> int:
         return len(json.dumps(content, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
 
@@ -132,7 +175,7 @@ class PromptTemplateService:
         """Validate AI rewritten output before emitting SSE done."""
         if not isinstance(content, dict):
             raise ValueError("rewritten content must be an object")
-        cls._validate_content(content)
+        cls._validate_complete_content(content)
         return content
 
     @staticmethod

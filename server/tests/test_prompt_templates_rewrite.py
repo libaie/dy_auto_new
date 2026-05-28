@@ -36,9 +36,29 @@ def valid_template_content():
         },
         "analysis": {
             "intents": ["consult"],
+            "sentiments": ["neutral"],
             "scoringRules": ["consult = 40"],
             "replyRules": ["reply naturally"],
             "replyExample": {"good": "I can share a simple idea.", "bad": "No."},
+            "tiers": {"consult": "helpful and warm"},
+        },
+        "videoComment": {
+            "context": "comment under a short video",
+            "goal": "attract qualified viewers",
+            "rules": ["be useful"],
+        },
+        "dmOpener": {
+            "context": "first private message",
+            "identity": {"role": "advisor"},
+            "goal": "start a conversation",
+            "style": ["warm"],
+            "tierTones": {"consult": "gentle"},
+        },
+        "dmStages": {
+            "qualifying": {"name": "Qualify", "goal": "understand need", "style": "plain", "maxTokens": 150},
+            "nurturing": {"name": "Nurture", "goal": "build trust", "style": "specific", "maxTokens": 200},
+            "converting": {"name": "Convert", "goal": "guide next step", "style": "calm", "maxTokens": 150},
+            "follow_up": {"name": "Follow up", "goal": "check back", "style": "light", "maxTokens": 120},
         },
         "localFilter": {"exclude": ["game"], "include": ["health"]},
     }
@@ -302,6 +322,36 @@ def test_rewrite_ai_invalid_template_emits_error_not_warning(db):
     assert response.status_code == 200
     assert "warning" not in {event["type"] for event in events}
     assert events[-1]["type"] == "error"
+
+
+def test_rewrite_ai_incomplete_scenario_template_emits_error_not_done(db):
+    invalid = rewritten_template_content()
+    del invalid["videoComment"]
+
+    async def fake_stream(*args, **kwargs):
+        yield json.dumps(invalid)
+
+    client = TestClient(app)
+    with (
+        patch("app.routers.prompt_templates.get_ai_config_with_key", return_value={"api_key": "test-key"}),
+        patch("app.routers.prompt_templates.SessionLocal", return_value=nullcontext(db)),
+        patch("app.routers.prompt_templates.gen.generate_custom_stream_with_config", fake_stream),
+    ):
+        response = client.post(
+            "/api/prompt-templates/rewrite-stream",
+            json={
+                "industry": "health",
+                "content": valid_template_content(),
+                "instruction": "make warmer",
+            },
+        )
+
+    events = sse_events(response)
+
+    assert response.status_code == 200
+    assert "done" not in {event["type"] for event in events}
+    assert events[-1]["type"] == "error"
+    assert "videoComment" in events[-1]["message"]
 
 
 def test_rewrite_output_validation_does_not_log_content_sentinel(db, caplog):

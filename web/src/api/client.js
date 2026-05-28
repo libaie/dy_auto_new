@@ -23,18 +23,22 @@ client.interceptors.request.use(
 let _authHandler = null
 let _toastHandler = null
 
+export function handleUnauthorizedResponse() {
+  if (_authHandler) {
+    _authHandler()
+  } else {
+    localStorage.removeItem('token')
+    localStorage.removeItem('username')
+    window.location.href = '/login'
+  }
+}
+
 client.interceptors.response.use(
   (response) => response,
   (error) => {
     // 401 → redirect to login
     if (error.response && error.response.status === 401) {
-      if (_authHandler) {
-        _authHandler()
-      } else {
-        localStorage.removeItem('token')
-        localStorage.removeItem('username')
-        window.location.href = '/login'
-      }
+      handleUnauthorizedResponse()
       return Promise.reject(error)
     }
 

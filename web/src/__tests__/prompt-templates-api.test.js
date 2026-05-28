@@ -162,4 +162,53 @@ describe('prompt template SSE API', () => {
       { type: 'done' },
     ])
   })
+
+  it('awaits async onEvent handlers for trailing frames without a final delimiter', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      body: streamFrom(['data: {"type":"done","content":{"a":1}}']),
+    }))
+    const order = []
+
+    const streamPromise = streamTemplateRewrite({ template: 'old' }, {
+      onEvent: async (event) => {
+        order.push(`start:${event.type}`)
+        await Promise.resolve()
+        order.push(`finish:${event.content.a}`)
+      },
+    }).then(() => order.push('resolved'))
+
+    await streamPromise
+
+    expect(order).toEqual(['start:done', 'finish:1', 'resolved'])
+  })
+
+  it('rejects SSE error events after async onEvent handlers finish', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      body: streamFrom(['data: {"type":"error","message":"Rewrite failed"}\n\n']),
+    }))
+    const order = []
+
+    await expect(
+      streamTemplateRewrite({ template: 'old' }, {
+        onEvent: async (event) => {
+          order.push(`start:${event.type}`)
+          await Promise.resolve()
+          order.push(`finish:${event.message}`)
+        },
+      }).catch((error) => {
+        order.push(`rejected:${error.message}`)
+        throw error
+      })
+    ).rejects.toThrow('Rewrite failed')
+
+    expect(order).toEqual([
+      'start:error',
+      'finish:Rewrite failed',
+      'rejected:Rewrite failed',
+    ])
+  })
 })

@@ -26,8 +26,8 @@ class TemplateGenerateRequest(BaseModel):
 
 
 class TemplateRewriteRequest(BaseModel):
-    content: Any
-    instruction: Any
+    content: Any = None
+    instruction: Any = None
     industry: str = "health"
 
 

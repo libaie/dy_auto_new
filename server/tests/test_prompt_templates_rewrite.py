@@ -159,6 +159,36 @@ def test_rewrite_long_instruction_returns_error_before_ai():
     stream.assert_not_called()
 
 
+def test_rewrite_missing_content_returns_error_before_ai():
+    client = TestClient(app)
+    with patch("app.routers.prompt_templates.gen.generate_custom_stream_with_config") as stream:
+        response = client.post(
+            "/api/prompt-templates/rewrite-stream",
+            json={"industry": "health", "instruction": "make warmer"},
+        )
+
+    events = sse_events(response)
+
+    assert response.status_code == 200
+    assert events[-1]["type"] == "error"
+    stream.assert_not_called()
+
+
+def test_rewrite_missing_instruction_returns_error_before_ai():
+    client = TestClient(app)
+    with patch("app.routers.prompt_templates.gen.generate_custom_stream_with_config") as stream:
+        response = client.post(
+            "/api/prompt-templates/rewrite-stream",
+            json={"industry": "health", "content": valid_template_content()},
+        )
+
+    events = sse_events(response)
+
+    assert response.status_code == 200
+    assert events[-1]["type"] == "error"
+    stream.assert_not_called()
+
+
 def test_rewrite_ai_invalid_json_emits_error(db):
     async def fake_stream(*args, **kwargs):
         yield "{not-json"

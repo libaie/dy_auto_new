@@ -8,6 +8,16 @@
 
 目标是让“一句话成片”不再因为可修复缺口卡死，同时保持后台透明、阶段可追踪、刷新页面不丢状态。
 
+## Autoplan Review Corrections
+
+2026-06-03 autoplan 审查后，本方案做出以下收紧：
+
+- `ProductionJob` 当前没有 `job_type` 字段，自动返修第一版不得依赖不存在字段；返修任务使用 `ProductionJob.stage = "agency_auto_repair"` 或 `agency_auto_repair:<repair_type>`，并把完整 `repair_task` 快照放入 `payload_json`。
+- 专家自然语言输出不能直接驱动返修执行；只有结构化 `repair_tasks` 或 classifier 白名单命中的确定性问题可以创建自动任务。
+- 复审循环必须有硬上限。默认同一 `run/series/stage/target/type` 最多自动返修 2 轮，超过后转为 `manual_required`。
+- 自动返修任务必须和 `AgencyExpertInvocation` 关联，前端展示时能从“专家发现”追到“返修 job”和“复审 invocation”。
+- 返修 worker 必须复用已有 `ProductionJob` lease/idempotency、`ProductionAuditEvent`、provider stage task 和预算边界，不新增第二套队列。
+
 ## Goals
 
 - 将专家输出中的 `findings`、`required_changes`、`recommendations` 转化为结构化返修任务。
@@ -205,8 +215,9 @@ flowchart LR
 
 第一版不强制新增 `ProductionRepairTask` 表，优先复用：
 
-- `ProductionJob.job_type = "agency_auto_repair"`。
+- `ProductionJob.stage = "agency_auto_repair"` 或 `agency_auto_repair:<repair_type>`。
 - `ProductionJob.payload_json.repair_task` 保存任务快照。
+- `ProductionJob.idempotency_key` 使用 `repair:{scope}:{stage}:{type}:{target_id}:{source_invocation_id}:{round}` 格式，避免重复 worker 或重复点击造成重复扣费。
 - `Series.story_bible_json.style_lock.reference_progress` 展示风格锁定参考图进度。
 - `Character.meta_json.reference_generation` 展示角色参考图进度。
 - `Scene.meta_json.reference_generation` 展示场景参考图进度。
@@ -334,6 +345,7 @@ flowchart LR
 ## Error Handling
 
 - 自动返修最多重试固定次数，默认 2 次。
+- 自动返修和复审合计最多 2 轮；同一问题连续两轮仍阻断后，必须进入 `manual_required`。
 - 连续失败后任务进入 `manual_required`，不继续消耗 provider。
 - provider timeout 不直接判失败，优先进入后台同步。
 - 找不到 target 时不执行自动返修，只记录人工处理建议。
@@ -343,6 +355,7 @@ flowchart LR
 ## Security And Cost Guard
 
 - 不把专家自然语言直接作为执行命令。
+- 不把专家自然语言中的 URL、文件路径、shell 命令或 provider 参数直接传入执行器。
 - 不允许专家输出任意 URL 写入资产库，必须走现有存储和可用性校验。
 - 所有真实 provider 返修都必须走模型配置中心和预算限制。
 - 用户提供的 API Key 不进入日志、专家输出和前端决策日志。
@@ -474,3 +487,60 @@ flowchart LR
 ## Final Decision
 
 本方案采用 **自动补齐，但不自动放行**。自动返修负责消除可确定的生产断点，审查闸门负责守住主观质量、合规风险和最终入库边界。
+
+## GSTACK REVIEW REPORT
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| CEO Review | `/autoplan` | Scope & strategy | 1 | CLEAR | 边界正确：自动补齐但不自动放行，符合一句话成片闭环和人工闸门目标。 |
+| Design Review | `/autoplan` | UI/UX gaps | 1 | CLEAR | 需要在专家控制台、系列详情、角色资产、场景资产、审查中心和生产监控页同时展示返修状态，方案已覆盖。 |
+| Eng Review | `/autoplan` | Architecture & tests | 1 | CLEAR WITH CORRECTIONS | 发现 `ProductionJob.job_type` 不存在，已修订为使用 `ProductionJob.stage` 和 `payload_json.repair_task`；同时补充复审循环上限和结构化白名单约束。 |
+| DX Review | `/autoplan` | Developer experience gaps | 1 | SKIPPED | 本方案面向产品后台和用户可见生产流程，不新增开发者 API/CLI 入门体验。 |
+
+**NOT in scope:** 不建设可视化时间线、抖音发布、自动最终放行、外部 agent 运行时或独立返修任务表第一版。
+
+**What already exists:** 复用 `AgencyExpertInvocation`、`ProductionJob`、`ProductionAuditEvent`、style-lock worker、reference progress、图像/视频审查闸门、provider stage task、预算和幂等边界。
+
+**Architecture diagram:**
+
+```text
+AgencyExpertInvocation
+  -> agency_repair_classifier
+  -> agency_repair_orchestrator
+  -> ProductionJob(stage=agency_auto_repair, payload_json.repair_task)
+  -> agency_repair_executor
+  -> existing services:
+       reference_asset_service
+       director/storyboard repair
+       production_retry_service
+       provider_stage_executor / worker sync
+  -> ProductionAuditEvent
+  -> stage-specific AgencyOrchestrator re-review
+  -> human review gate
+```
+
+**Test diagram:**
+
+| Codepath | Test expectation |
+|---|---|
+| Expert output has structured `missing_character_reference` | Creates one deduped repair job and writes visible progress. |
+| Expert output has only subjective style complaint | Creates manual suggestion only, no auto job. |
+| Duplicate worker step | Reuses idempotency key and does not create duplicate provider task. |
+| Style-lock repair completes | Reruns `style_lock_quality_reviewer` and stays at confirmation gate. |
+| Storyboard missing references | Repairs `Episode.storyboard_json` and reruns storyboard review. |
+| Image/video failure repair | Creates new version only for affected frame or segment. |
+| Repair loop exceeds 2 rounds | Marks `manual_required` and stops paid provider consumption. |
+
+**Failure modes registry:**
+
+| Failure mode | Severity | Required mitigation |
+|---|---|---|
+| Expert natural language is vague but classifier over-matches | Critical | Use fixed enum whitelist and target validation before auto execution. |
+| Repair task repeats after worker restart | High | Use deterministic `repair:{scope}:{stage}:{type}:{target}:{source_invocation}:{round}` idempotency key. |
+| Re-review creates infinite repair loop | High | Hard cap 2 automatic repair rounds per issue. |
+| Provider retry duplicates paid task | Critical | Route paid repair through provider stage task and budget reservation boundaries. |
+| UI shows issue but not repair progress | Medium | Add `repair_summary` to agency console, style-lock, run, and review APIs. |
+
+**Cross-phase themes:** Product, design and engineering reviews agree that the feature is valuable only if it is transparent and bounded. The key implementation guard is not “repair everything”, but “repair deterministic structure, then stop at review gates”.
+
+**VERDICT:** Spec cleared after corrections. Ready for implementation-plan writing.

@@ -60,6 +60,7 @@ CEO review result: the plan should hold scope, but it must add explicit trust gu
 - **Budget is cumulative:** paid automatic repair authorization is a run/plan-level repair budget, not a per-task limit. Before enqueueing a paid repair job, calculate previously reserved/spent repair cost plus costs reserved earlier in the current enqueue call; anything exceeding `auto_repair_policy.budget_limit` must become manual-required with reason `自动返修预算不足，需要人工确认是否继续付费返修`.
 - **Provider cost boundary still applies:** the repair executor may not call a paid model through a shortcut path. Any paid reference/image/video repair must reuse the existing provider cost reservation and settlement path (`ProviderCostReservation`, provider stage task cost data, and `ProductionPlan.current_cost`). Check both boundaries: repair budget against repair-only reserved/spent estimates, and production plan budget against `ProductionPlan.current_cost + active_reserved_cost(...) + estimated_cost`. If either boundary is unavailable or exceeded, the task must be manual-required instead of auto-executed.
 - **Scale-safe projections:** repair APIs and monitor projections must never scan all `ProductionAuditEvent` rows. Always filter by `production_plan_id`, `run_id`, or current-page `job_id` candidates before reading payloads. Add indexes for `ProductionJob(plan_id, stage, status)` and `ProductionJob(stage, created_at)` so long-video repair summaries stay bounded.
+- **Executor must not commit:** automatic repair execution must not call `db.commit()` or `db.rollback()` internally. The worker/API entrypoint owns transaction commit/rollback so asset metadata, repair events, job status, and cost settlement succeed or fail as one unit. If an existing helper commits internally, do not call it from the executor; route the task to manual-required until a caller-owned transaction path exists.
 
 ## File Structure
 
@@ -1017,6 +1018,43 @@ async def test_unknown_repair_type_blocks_with_manual_action(db):
     assert result.status == "blocked"
     assert result.repair_action == "去审查中心处理"
     assert result.repair_route == "/review-center"
+
+
+@pytest.mark.asyncio
+async def test_execute_repair_job_does_not_commit_internally(db, monkeypatch):
+    series = Series(title="老李控糖")
+    character = Character(name="老李")
+    series.characters.append(character)
+    db.add(series)
+    db.commit()
+    plan = ProductionPlan(series_id=series.id, status="ready")
+    db.add(plan)
+    db.commit()
+    job = ProductionJob(
+        plan_id=plan.id,
+        target_type="character",
+        target_id=character.id,
+        stage="agency_auto_repair:missing_character_reference",
+        idempotency_key="repair:no-hidden-commit",
+    )
+    db.add(job)
+    db.commit()
+
+    async def fake_generate_character_reference_assets(db, character_id):
+        return {"ok": True, "urls": ["http://asset.local/char-front.png"]}
+
+    def fail_commit():
+        raise AssertionError("execute_repair_job must leave commit ownership to the caller")
+
+    monkeypatch.setattr(
+        "app.services.agency_repair_executor.generate_character_reference_assets",
+        fake_generate_character_reference_assets,
+    )
+    monkeypatch.setattr(db, "commit", fail_commit)
+
+    result = await execute_repair_job(db, job)
+
+    assert result.status == "success"
 ```
 
 - [ ] **Step 2: Run executor tests and verify they fail**
@@ -1034,7 +1072,7 @@ Expected: fail with missing `agency_repair_executor`.
 
 Create `server/app/services/agency_repair_executor.py`:
 
-Before implementing any repair branch that may call a paid provider, verify that the invoked service goes through the existing cost reservation/settlement path. For reference-image repairs, prefer existing service helpers only if they already preserve provider cost accounting. If a helper cannot provide that guarantee, return `_manual_block(job, "去审查中心确认付费返修", "/review-center")` instead of calling the provider.
+Before implementing any repair branch that may call a paid provider, verify that the invoked service goes through the existing cost reservation/settlement path and does not commit internally. For reference-image repairs, prefer existing service helpers only if they already preserve provider cost accounting and caller-owned transactions. If a helper cannot provide both guarantees, return `_manual_block(job, "去审查中心确认付费返修", "/review-center")` instead of calling the provider.
 
 ```python
 from __future__ import annotations
@@ -1079,7 +1117,7 @@ async def _repair_character_reference(db: Session, job: ProductionJob) -> Produc
     meta = dict(character.meta_json or {})
     meta["reference_generation"] = {"status": "running", "source": "agency_auto_repair", "job_id": job.id}
     character.meta_json = meta
-    db.commit()
+    db.flush()
     result = await generate_character_reference_assets(db, character.id)
     meta = dict(character.meta_json or {})
     meta["reference_generation"] = {"status": "completed" if result.get("ok") else "failed", "source": "agency_auto_repair", "job_id": job.id, "result": result}
@@ -1089,7 +1127,7 @@ async def _repair_character_reference(db: Session, job: ProductionJob) -> Produc
     _audit(db, job, "agency_repair_completed" if result.get("ok") else "agency_repair_failed", result)
     if result.get("ok"):
         _audit(db, job, "agency_repair_recheck_required", {"target_type": "character", "target_id": character.id, "next_gate": "style_lock_review"})
-    db.commit()
+    db.flush()
     if not result.get("ok"):
         return _manual_block(job, "去角色资产补参考图", f"/characters/{character.id}")
     return ProductionActionResult.success(
@@ -1105,7 +1143,7 @@ async def _repair_scene_reference(db: Session, job: ProductionJob) -> Production
     meta = dict(scene.meta_json or {})
     meta["reference_generation"] = {"status": "running", "source": "agency_auto_repair", "job_id": job.id}
     scene.meta_json = meta
-    db.commit()
+    db.flush()
     result = await generate_scene_reference_assets(db, scene.id)
     meta = dict(scene.meta_json or {})
     meta["reference_generation"] = {"status": "completed" if result.get("ok") else "failed", "source": "agency_auto_repair", "job_id": job.id, "result": result}
@@ -1115,7 +1153,7 @@ async def _repair_scene_reference(db: Session, job: ProductionJob) -> Production
     _audit(db, job, "agency_repair_completed" if result.get("ok") else "agency_repair_failed", result)
     if result.get("ok"):
         _audit(db, job, "agency_repair_recheck_required", {"target_type": "scene", "target_id": scene.id, "next_gate": "style_lock_review"})
-    db.commit()
+    db.flush()
     if not result.get("ok"):
         return _manual_block(job, "去场景资产补参考图", f"/scenes/{scene.id}")
     return ProductionActionResult.success(
@@ -1164,6 +1202,8 @@ At the top of `execute_real_job`, before `_job_spec`:
 if job.stage == AUTO_REPAIR_STAGE or job.stage.startswith(f"{AUTO_REPAIR_STAGE}:"):
     return await execute_repair_job(db, job)
 ```
+
+Do not add a commit inside `execute_repair_job`. The existing worker step must commit or roll back after applying the returned `ProductionActionResult`, exactly like normal production jobs.
 
 - [ ] **Step 5: Write worker dispatch test**
 

@@ -34,6 +34,7 @@ Required corrections for implementation:
 - **Cost trust:** estimated and spent repair cost must be shown beside repair counts when cost is non-zero. If the repair budget is `0` or disabled, show `仅记录建议，不自动付费返修`.
 - **Manual action:** every `manual_required` item must render a concrete button-style action using `repair_action_label`; plain status text is not enough.
 - **Explicit action state:** every repair task returned to the frontend must include a `retry_actions` object. The UI must not infer whether to show `重试返修`, `确认追加预算并重试`, or `去处理` from a failed click or a raw 409 response. It should render one primary action from `retry_actions` on first paint.
+- **Single task renderer:** detailed repair rows must be rendered through one reusable `AutoRepairTaskList` component. The agency console, production monitor drawer, and review-center repair entry must not each implement their own status chips, cost display, and action precedence.
 - **Long-video density:** production monitor defaults to aggregate chips by stage and status. Detailed repair rows stay in a drawer or collapsible panel opened by the user.
 - **Language:** all user-facing labels must be Chinese. Provider/model/internal fields may appear only inside developer/debug affordances, not the default UI.
 - **Visual restraint:** reuse existing dashboard density and table/list patterns. Avoid nested cards, hero-style blocks, decorative gradients, and large instructional copy.
@@ -109,6 +110,8 @@ CEO review result: the plan should hold scope, but it must add explicit trust gu
   - Adds automatic repair policy confirmation card before starting production.
 - Create `web/src/components/agency/AutoRepairSummaryStrip.vue`
   - Reusable compact strip for repair totals, budget state, and manual-required counts.
+- Create `web/src/components/agency/AutoRepairTaskList.vue`
+  - Reusable detailed repair task list for agency console, production monitor drawer, and review-center repair entry.
 - Create `web/src/components/agency/AutoRepairPolicyPanel.vue`
   - Reusable compact policy confirmation panel used by one-sentence production and future batch production entry points.
 
@@ -124,6 +127,7 @@ CEO review result: the plan should hold scope, but it must add explicit trust gu
 - Create `web/src/__tests__/one-sentence-auto-repair-policy.test.js`
 - Create `web/src/__tests__/video-production-repair-node.test.js`
 - Create `web/src/__tests__/auto-repair-summary-strip.test.js`
+- Create `web/src/__tests__/auto-repair-task-list.test.js`
 
 ---
 
@@ -2085,11 +2089,13 @@ git commit -m "feat: expose agency repair status"
 - Modify: `web/src/api/agency.js`
 - Modify: `web/src/api/videoProduction.js`
 - Create: `web/src/components/agency/AutoRepairSummaryStrip.vue`
+- Create: `web/src/components/agency/AutoRepairTaskList.vue`
 - Create: `web/src/components/agency/AutoRepairPolicyPanel.vue`
 - Modify: `web/src/components/agency/AgencyDecisionLog.vue`
 - Modify: `web/src/views/OneSentenceVideoPage.vue`
 - Modify: `web/src/views/VideoProductionMonitorPage.vue`
 - Create: `web/src/__tests__/auto-repair-summary-strip.test.js`
+- Create: `web/src/__tests__/auto-repair-task-list.test.js`
 - Create: `web/src/__tests__/agency-auto-repair-log.test.js`
 - Create: `web/src/__tests__/one-sentence-auto-repair-policy.test.js`
 - Create: `web/src/__tests__/video-production-repair-node.test.js`
@@ -2292,13 +2298,59 @@ describe('AutoRepairSummaryStrip', () => {
 })
 ```
 
+- [ ] **Step 1b: Write reusable task list test**
+
+Create `web/src/__tests__/auto-repair-task-list.test.js`:
+
+```javascript
+import { mount } from '@vue/test-utils'
+import AutoRepairTaskList from '../components/agency/AutoRepairTaskList.vue'
+
+describe('AutoRepairTaskList', () => {
+  it('renders one consistent task row with cost, next gate, and primary action', () => {
+    const wrapper = mount(AutoRepairTaskList, {
+      props: {
+        tasks: [
+          {
+            id: 'repair-job-1',
+            status: 'failed',
+            reason: '角色缺少侧面参考图',
+            expected_result: '补齐角色侧面参考图后重新审查',
+            repair_action_label: '确认追加预算并重试',
+            estimated_cost: 0.3,
+            recheck_required: false,
+            next_gate: '角色资产审查',
+            retry_actions: {
+              normal_retry_enabled: false,
+              paid_authorize_required: true,
+              manual_action_enabled: true,
+              primary_label: '确认追加预算并重试',
+              reason: '需要人工确认追加预算后才能继续付费返修',
+              estimated_cost: 0.3,
+              budget_gap: 0.3,
+            },
+          },
+        ],
+      },
+    })
+
+    expect(wrapper.text()).toContain('角色缺少侧面参考图')
+    expect(wrapper.text()).toContain('补齐角色侧面参考图后重新审查')
+    expect(wrapper.text()).toContain('预计返修成本：0.3 元')
+    expect(wrapper.text()).toContain('下一审查：角色资产审查')
+    expect(wrapper.text()).toContain('确认追加预算并重试')
+    expect(wrapper.text()).not.toContain('重试返修')
+  })
+})
+```
+
 - [ ] **Step 2: Run frontend tests and verify they fail**
 
 Run:
 
 ```powershell
 cd web
-npm test -- auto-repair-summary-strip agency-auto-repair-log one-sentence-auto-repair-policy video-production-repair-node --run
+npm test -- auto-repair-summary-strip auto-repair-task-list agency-auto-repair-log one-sentence-auto-repair-policy video-production-repair-node --run
 ```
 
 Expected: tests fail because UI and selectors are not implemented yet.
@@ -2374,6 +2426,63 @@ defineProps({
 </script>
 ```
 
+- [ ] **Step 4a: Create reusable detailed task list**
+
+Create `web/src/components/agency/AutoRepairTaskList.vue`:
+
+```vue
+<template>
+  <section class="space-y-2" data-test="auto-repair-task-list">
+    <article
+      v-for="task in tasks"
+      :key="task.id || `${task.type}-${task.target_id || task.repair_route}`"
+      class="border-l-2 border-cyan-500/60 bg-slate-950/50 p-3"
+    >
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <p class="text-sm text-slate-100">{{ task.reason }}</p>
+        <span v-if="task.recheck_required" class="text-xs text-cyan-200">待复审</span>
+      </div>
+      <p v-if="task.expected_result" class="mt-1 text-xs text-slate-400">{{ task.expected_result }}</p>
+      <p v-if="task.next_gate" class="mt-1 text-xs text-slate-400">下一审查：{{ task.next_gate }}</p>
+      <p v-if="Number(task.estimated_cost || 0) > 0" class="mt-1 text-xs text-amber-200">预计返修成本：{{ task.estimated_cost }} 元</p>
+      <p v-if="task.retry_actions?.reason" class="mt-1 text-xs text-amber-200">{{ task.retry_actions.reason }}</p>
+
+      <button
+        v-if="task.retry_actions?.paid_authorize_required"
+        type="button"
+        class="mt-2 inline-flex text-xs text-amber-200 hover:text-amber-100"
+        @click="$emit('authorize-paid-retry', task)"
+      >
+        {{ task.retry_actions.primary_label || '确认追加预算并重试' }}
+      </button>
+      <button
+        v-else-if="task.retry_actions?.normal_retry_enabled"
+        type="button"
+        class="mt-2 inline-flex text-xs text-cyan-200 hover:text-cyan-100"
+        @click="$emit('retry', task)"
+      >
+        {{ task.retry_actions.primary_label || '重试返修' }}
+      </button>
+      <RouterLink v-else-if="task.repair_route" :to="task.repair_route" class="mt-2 inline-flex text-xs text-cyan-200 hover:text-cyan-100">
+        {{ task.repair_action_label || '去处理' }}
+      </RouterLink>
+    </article>
+  </section>
+</template>
+
+<script setup>
+defineProps({
+  tasks: {
+    type: Array,
+    default: () => [],
+  },
+})
+defineEmits(['retry', 'authorize-paid-retry'])
+</script>
+```
+
+Use this component for all detailed repair rows. `AgencyDecisionLog.vue`, `VideoProductionMonitorPage.vue` drawer content, and any review-center repair entry must not duplicate the task-row rendering logic.
+
 - [ ] **Step 5: Create compact policy panel**
 
 Create `web/src/components/agency/AutoRepairPolicyPanel.vue`:
@@ -2424,6 +2533,21 @@ function update(key, value) {
 
 - [ ] **Step 6: Add repair section to `AgencyDecisionLog.vue`**
 
+Import and use the shared task list:
+
+```javascript
+import AutoRepairTaskList from './AutoRepairTaskList.vue'
+```
+
+```vue
+<AutoRepairTaskList
+  v-if="item.repair_tasks?.length"
+  :tasks="item.repair_tasks"
+  @retry="retryRepairTask($event.id)"
+  @authorize-paid-retry="openPaidRetryDialog"
+/>
+```
+
 Inside each decision log item template in `web/src/components/agency/AgencyDecisionLog.vue`, add:
 
 ```vue
@@ -2454,6 +2578,11 @@ The primary action must call `authorizeRepairRetry(task.id, { reason, confirmed_
 
 Design review override for Step 6:
 
+- Treat the inline `<section v-if="item.repair_tasks?.length">` example above as obsolete after introducing `AutoRepairTaskList`. Do not implement both.
+- `AgencyDecisionLog.vue` must use `AutoRepairTaskList` for task rows.
+- `VideoProductionMonitorPage.vue` must use `AutoRepairSummaryStrip` for aggregate state and `AutoRepairTaskList` inside the detail drawer/collapsible panel.
+- Review-center repair entry points must use `AutoRepairTaskList` when displaying actionable repair tasks.
+- Any future change to status labels, cost visibility, recheck labels, or retry action precedence should be made in `AutoRepairTaskList` first, then covered by `auto-repair-task-list.test.js`.
 - The default UI state must come from `task.retry_actions`, not from a failed click or a raw 409 response.
 - Do not render multiple primary actions for the same repair task.
 - Action precedence is `paid_authorize_required`, then `normal_retry_enabled`, then `manual_action_enabled`.

@@ -59,6 +59,7 @@ CEO review result: the plan should hold scope, but it must add explicit trust gu
 - **Repair completion is not approval:** successful automatic repair must create `agency_repair_recheck_required`, set the repaired target metadata to `repair_recheck_pending`, and surface `待复审` in the UI. It must never mark any asset, stage, or final video as `approved`; only the existing review gate may do that.
 - **Budget is cumulative:** paid automatic repair authorization is a run/plan-level repair budget, not a per-task limit. Before enqueueing a paid repair job, calculate previously reserved/spent repair cost plus costs reserved earlier in the current enqueue call; anything exceeding `auto_repair_policy.budget_limit` must become manual-required with reason `自动返修预算不足，需要人工确认是否继续付费返修`.
 - **Provider cost boundary still applies:** the repair executor may not call a paid model through a shortcut path. Any paid reference/image/video repair must reuse the existing provider cost reservation and settlement path (`ProviderCostReservation`, provider stage task cost data, and `ProductionPlan.current_cost`). Check both boundaries: repair budget against repair-only reserved/spent estimates, and production plan budget against `ProductionPlan.current_cost + active_reserved_cost(...) + estimated_cost`. If either boundary is unavailable or exceeded, the task must be manual-required instead of auto-executed.
+- **Scale-safe projections:** repair APIs and monitor projections must never scan all `ProductionAuditEvent` rows. Always filter by `production_plan_id`, `run_id`, or current-page `job_id` candidates before reading payloads. Add indexes for `ProductionJob(plan_id, stage, status)` and `ProductionJob(stage, created_at)` so long-video repair summaries stay bounded.
 
 ## File Structure
 
@@ -84,6 +85,8 @@ CEO review result: the plan should hold scope, but it must add explicit trust gu
   - Adds `GET /api/agency/repair-tasks` and manual retry route for failed repair jobs.
 - Modify `server/app/routers/video_production.py`
   - Accepts and persists `auto_repair_policy` snapshot for both `/runs/start` and `/one-sentence`.
+- Add Alembic migration
+  - Adds scale-safe repair query indexes on `production_jobs`.
 
 ### Frontend
 
@@ -110,6 +113,7 @@ CEO review result: the plan should hold scope, but it must add explicit trust gu
 - Create `server/tests/test_agency_repair_orchestrator.py`
 - Create `server/tests/test_agency_repair_executor.py`
 - Create `server/tests/test_agency_repair_api.py`
+- Create `server/tests/test_agency_repair_query_scale.py`
 - Create `server/tests/test_agency_repair_worker.py`
 - Create `web/src/__tests__/agency-auto-repair-log.test.js`
 - Create `web/src/__tests__/one-sentence-auto-repair-policy.test.js`
@@ -1290,6 +1294,53 @@ def test_repair_tasks_api_returns_manual_action(client, db):
     assert body["items"][0]["repair_route"] == "/characters/char-1"
 ```
 
+Create `server/tests/test_agency_repair_query_scale.py`:
+
+```python
+from app.db_models import ProductionAuditEvent, ProductionJob, ProductionPlan, Series
+
+
+def test_repair_task_query_ignores_unrelated_plan_audit_events(client, db):
+    target_series = Series(title="目标系列")
+    noise_series = Series(title="噪声系列")
+    db.add_all([target_series, noise_series])
+    db.commit()
+    target_plan = ProductionPlan(series_id=target_series.id, status="ready")
+    noise_plan = ProductionPlan(series_id=noise_series.id, status="ready")
+    db.add_all([target_plan, noise_plan])
+    db.commit()
+    job = ProductionJob(
+        plan_id=target_plan.id,
+        target_type="character",
+        target_id="char-1",
+        stage="agency_auto_repair:missing_character_reference",
+        status="queued",
+        idempotency_key="repair:target",
+    )
+    db.add(job)
+    db.flush()
+    db.add(ProductionAuditEvent(
+        event_type="agency_repair_task_created",
+        production_plan_id=target_plan.id,
+        payload_json={"job_id": job.id, "repair_task": {"reason": "目标返修", "repair_action_label": "去角色资产补参考图"}},
+    ))
+    for index in range(1000):
+        db.add(ProductionAuditEvent(
+            event_type="agency_repair_task_created",
+            production_plan_id=noise_plan.id,
+            payload_json={"job_id": f"noise-{index}", "repair_task": {"reason": "无关返修"}},
+        ))
+    db.commit()
+
+    resp = client.get(f"/api/agency/repair-tasks?series_id={target_series.id}&page_size=10")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["summary"]["total"] == 1
+    assert len(body["items"]) == 1
+    assert body["items"][0]["reason"] == "目标返修"
+```
+
 - [ ] **Step 2: Run API test and verify it fails**
 
 Run:
@@ -1301,7 +1352,43 @@ pytest tests/test_agency_repair_api.py -q
 
 Expected: fail with 404 for `/api/agency/repair-tasks`.
 
-- [ ] **Step 3: Implement API helper and route**
+- [ ] **Step 3: Add scale-safe production job indexes**
+
+Create an Alembic migration, for example `server/alembic/versions/<revision>_agency_repair_job_indexes.py`:
+
+```python
+from alembic import op
+
+
+revision = "<revision>"
+down_revision = "<previous_revision>"
+branch_labels = None
+depends_on = None
+
+
+def upgrade() -> None:
+    op.create_index(
+        "idx_production_jobs_plan_stage_status",
+        "production_jobs",
+        ["plan_id", "stage", "status"],
+        unique=False,
+    )
+    op.create_index(
+        "idx_production_jobs_stage_created",
+        "production_jobs",
+        ["stage", "created_at"],
+        unique=False,
+    )
+
+
+def downgrade() -> None:
+    op.drop_index("idx_production_jobs_stage_created", table_name="production_jobs")
+    op.drop_index("idx_production_jobs_plan_stage_status", table_name="production_jobs")
+```
+
+Do not add indexes on `ProductionAuditEvent.payload_json` for this phase. Repair projections must first narrow by `production_plan_id`, optional `run_id`, and current-page `job_id` candidates, then inspect payloads in memory.
+
+- [ ] **Step 4: Implement API helper and route**
 
 Modify `server/app/routers/agency.py` with:
 
@@ -1330,7 +1417,8 @@ def list_repair_tasks(
         query = query.filter(ProductionJob.stage == stage)
     total = query.count()
     jobs = query.order_by(ProductionJob.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
-    audit_by_job = _repair_audit_by_job(db, [job.id for job in jobs])
+    plan_ids = list({job.plan_id for job in jobs})
+    audit_by_job = _repair_audit_by_job(db, [job.id for job in jobs], plan_ids=plan_ids, run_id=run_id)
     items = [_repair_task_item(job, audit_by_job.get(job.id)) for job in jobs]
     return {"summary": _repair_summary(items), "items": items, "page": page, "page_size": page_size, "total": total}
 
@@ -1362,10 +1450,17 @@ def retry_repair_task(
     return _repair_task_item(job, None)
 
 
-def _repair_audit_by_job(db: Session, job_ids: list[str]) -> dict[str, dict]:
+def _repair_audit_by_job(db: Session, job_ids: list[str], *, plan_ids: list[str], run_id: str | None = None) -> dict[str, dict]:
     if not job_ids:
         return {}
-    rows = db.query(ProductionAuditEvent).filter(ProductionAuditEvent.event_type.in_(["agency_repair_task_created", "agency_repair_manual_required", "agency_repair_completed", "agency_repair_failed", "agency_repair_recheck_required"])).all()
+    query = (
+        db.query(ProductionAuditEvent)
+        .filter(ProductionAuditEvent.production_plan_id.in_(plan_ids))
+        .filter(ProductionAuditEvent.event_type.in_(["agency_repair_task_created", "agency_repair_manual_required", "agency_repair_completed", "agency_repair_failed", "agency_repair_recheck_required"]))
+    )
+    if run_id:
+        query = query.filter(ProductionAuditEvent.run_id == run_id)
+    rows = query.order_by(ProductionAuditEvent.created_at.asc()).all()
     result = {}
     for row in rows:
         payload = row.payload_json or {}
@@ -1414,7 +1509,7 @@ def _repair_summary(items: list[dict]) -> dict:
     return summary
 ```
 
-- [ ] **Step 4: Add console `repair_summary`**
+- [ ] **Step 5: Add console `repair_summary`**
 
 In `server/app/services/agency_console.py`, where the response dict is assembled, add:
 
@@ -1433,6 +1528,8 @@ def _repair_summary_for_series(db: Session, series_id: str) -> dict:
         .filter(ProductionJob.stage.like("agency_auto_repair%"))
         .all()
     )
+    plan_ids = list({row.plan_id for row in rows})
+    job_ids = [row.id for row in rows]
     return {
         "total": len(rows),
         "queued": sum(1 for row in rows if row.status == "queued"),
@@ -1440,14 +1537,19 @@ def _repair_summary_for_series(db: Session, series_id: str) -> dict:
         "completed": sum(1 for row in rows if row.status == "completed"),
         "failed": sum(1 for row in rows if row.status == "failed"),
         "manual_required": sum(1 for row in rows if row.status in {"blocked", "failed"}),
-        "recheck_required": _repair_recheck_required_count(db, [row.id for row in rows]),
+        "recheck_required": _repair_recheck_required_count(db, job_ids, plan_ids=plan_ids),
     }
 
 
-def _repair_recheck_required_count(db: Session, job_ids: list[str]) -> int:
+def _repair_recheck_required_count(db: Session, job_ids: list[str], *, plan_ids: list[str]) -> int:
     if not job_ids:
         return 0
-    rows = db.query(ProductionAuditEvent).filter(ProductionAuditEvent.event_type == "agency_repair_recheck_required").all()
+    rows = (
+        db.query(ProductionAuditEvent)
+        .filter(ProductionAuditEvent.production_plan_id.in_(plan_ids))
+        .filter(ProductionAuditEvent.event_type == "agency_repair_recheck_required")
+        .all()
+    )
     return sum(1 for row in rows if (row.payload_json or {}).get("job_id") in job_ids)
 ```
 
@@ -1457,7 +1559,7 @@ Add imports if missing:
 from app.db_models import ProductionAuditEvent, ProductionJob, ProductionPlan
 ```
 
-- [ ] **Step 5: Add production tree repair node**
+- [ ] **Step 6: Add production tree repair node**
 
 In `server/app/services/production_tree_service.py`, add repair aggregation to the returned tree:
 
@@ -1469,6 +1571,7 @@ def _repair_tree_node(db: Session, plan_id: str) -> dict | None:
     job_ids = [job.id for job in jobs]
     recheck_events = (
         db.query(ProductionAuditEvent)
+        .filter(ProductionAuditEvent.production_plan_id == plan_id)
         .filter(ProductionAuditEvent.event_type == "agency_repair_recheck_required")
         .all()
     )
@@ -1498,21 +1601,21 @@ Add imports to `server/app/services/production_tree_service.py` if missing:
 from app.db_models import ProductionAuditEvent, ProductionJob
 ```
 
-- [ ] **Step 6: Run tests**
+- [ ] **Step 7: Run tests**
 
 Run:
 
 ```powershell
 cd server
-pytest tests/test_agency_repair_api.py tests/test_agency_console.py tests/test_video_production_tree_api.py -q
+pytest tests/test_agency_repair_api.py tests/test_agency_repair_query_scale.py tests/test_agency_console.py tests/test_video_production_tree_api.py -q
 ```
 
 Expected: all selected tests pass.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```powershell
-git add server/app/routers/agency.py server/app/services/agency_console.py server/app/services/production_tree_service.py server/tests/test_agency_repair_api.py server/tests/test_agency_console.py server/tests/test_video_production_tree_api.py
+git add server/app/routers/agency.py server/app/services/agency_console.py server/app/services/production_tree_service.py server/alembic/versions/<revision>_agency_repair_job_indexes.py server/tests/test_agency_repair_api.py server/tests/test_agency_repair_query_scale.py server/tests/test_agency_console.py server/tests/test_video_production_tree_api.py
 git commit -m "feat: expose agency repair status"
 ```
 
@@ -2033,7 +2136,7 @@ Run:
 
 ```powershell
 cd server
-pytest tests/test_agency_repair_classifier.py tests/test_agency_repair_orchestrator.py tests/test_agency_repair_executor.py tests/test_agency_repair_api.py tests/test_agency_repair_worker.py tests/test_agency_console.py tests/test_series_style_lock_pipeline.py tests/test_video_production_full_mocked_e2e.py tests/test_video_production_real_worker_step.py -q
+pytest tests/test_agency_repair_classifier.py tests/test_agency_repair_orchestrator.py tests/test_agency_repair_executor.py tests/test_agency_repair_api.py tests/test_agency_repair_query_scale.py tests/test_agency_repair_worker.py tests/test_agency_console.py tests/test_series_style_lock_pipeline.py tests/test_video_production_full_mocked_e2e.py tests/test_video_production_real_worker_step.py -q
 ```
 
 Expected: all selected tests pass.

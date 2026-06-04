@@ -33,6 +33,7 @@ Required corrections for implementation:
 - **Policy confirmation:** the auto-repair policy block must be compact, explicit, and action-bound. The primary start button copy must make authorization visible, for example `启动生产并应用返修策略`.
 - **Cost trust:** estimated and spent repair cost must be shown beside repair counts when cost is non-zero. If the repair budget is `0` or disabled, show `仅记录建议，不自动付费返修`.
 - **Manual action:** every `manual_required` item must render a concrete button-style action using `repair_action_label`; plain status text is not enough.
+- **Explicit action state:** every repair task returned to the frontend must include a `retry_actions` object. The UI must not infer whether to show `重试返修`, `确认追加预算并重试`, or `去处理` from a failed click or a raw 409 response. It should render one primary action from `retry_actions` on first paint.
 - **Long-video density:** production monitor defaults to aggregate chips by stage and status. Detailed repair rows stay in a drawer or collapsible panel opened by the user.
 - **Language:** all user-facing labels must be Chinese. Provider/model/internal fields may appear only inside developer/debug affordances, not the default UI.
 - **Visual restraint:** reuse existing dashboard density and table/list patterns. Avoid nested cards, hero-style blocks, decorative gradients, and large instructional copy.
@@ -1934,6 +1935,22 @@ def _repair_task_item(job: ProductionJob, audit: dict | None) -> dict:
         "updated_at": job.updated_at.isoformat() if job.updated_at else None,
         "recheck_required": bool((audit or {}).get("recheck_required")) or job.status == "repair_recheck_pending",
         "next_gate": (audit or {}).get("next_gate"),
+        "retry_actions": _repair_retry_actions(job, repair_task),
+    }
+
+
+def _repair_retry_actions(job: ProductionJob, repair_task: dict) -> dict:
+    requires_paid = bool(repair_task.get("requires_paid_provider"))
+    estimated_cost = float(repair_task.get("estimated_cost") or 0)
+    is_retryable = job.status in {"failed", "blocked"}
+    return {
+        "normal_retry_enabled": is_retryable and not requires_paid,
+        "paid_authorize_required": is_retryable and requires_paid,
+        "manual_action_enabled": bool(repair_task.get("repair_route")),
+        "primary_label": "确认追加预算并重试" if is_retryable and requires_paid else ("重试返修" if is_retryable else (repair_task.get("repair_action_label") or "去处理")),
+        "reason": "需要人工确认追加预算后才能继续付费返修" if is_retryable and requires_paid else "",
+        "estimated_cost": estimated_cost,
+        "budget_gap": max(estimated_cost, 0),
     }
 
 
@@ -2116,6 +2133,48 @@ describe('AgencyDecisionLog auto repair transparency', () => {
     expect(wrapper.text()).not.toContain('provider')
     expect(wrapper.text()).not.toMatch(/[鍘鑰鎺瑙闇鐢琛]|鈥|渆|�/)
   })
+})
+```
+
+Add a second test in the same file for explicit action state:
+
+```javascript
+it('shows paid retry authorization as the only primary action', () => {
+  const wrapper = mount(AgencyDecisionLog, {
+    props: {
+      decisionLog: [
+        {
+          stage: 'style_lock',
+          expert_name: '风格锁定质量审查专家',
+          result_status: 'warning',
+          summary: '角色参考图缺失',
+          repair_tasks: [
+            {
+              id: 'repair-job-1',
+              type: 'missing_character_reference',
+              status: 'failed',
+              reason: '角色缺少侧面参考图',
+              requires_paid_provider: true,
+              estimated_cost: 0.3,
+              retry_actions: {
+                normal_retry_enabled: false,
+                paid_authorize_required: true,
+                manual_action_enabled: true,
+                primary_label: '确认追加预算并重试',
+                reason: '需要人工确认追加预算后才能继续付费返修',
+                estimated_cost: 0.3,
+                budget_gap: 0.3,
+              },
+            },
+          ],
+        },
+      ],
+    },
+  })
+
+  expect(wrapper.text()).toContain('确认追加预算并重试')
+  expect(wrapper.text()).toContain('需要人工确认追加预算后才能继续付费返修')
+  expect(wrapper.text()).not.toContain('重试返修')
 })
 ```
 
@@ -2392,6 +2451,16 @@ When a repair task has `requires_paid_provider` and the normal retry API returns
 - The estimated retry cost and current failure reason.
 
 The primary action must call `authorizeRepairRetry(task.id, { reason, confirmed_budget_delta })`. Do not call normal `retryRepairTask` again after a paid/budget 409.
+
+Design review override for Step 6:
+
+- The default UI state must come from `task.retry_actions`, not from a failed click or a raw 409 response.
+- Do not render multiple primary actions for the same repair task.
+- Action precedence is `paid_authorize_required`, then `normal_retry_enabled`, then `manual_action_enabled`.
+- If `task.retry_actions.paid_authorize_required` is true, show one primary button labeled `确认追加预算并重试`, plus the retry reason, estimated cost, budget gap, required reason input, and additional budget input.
+- If `task.retry_actions.normal_retry_enabled` is true, show one primary button labeled `重试返修`.
+- If neither retry action is available, show the manual route button using `repair_action_label`.
+- The frontend should still handle a defensive 409 from `retryRepairTask`, but that fallback must not be the normal way users discover paid authorization is required.
 
 - [ ] **Step 7: Add policy confirmation panel to `OneSentenceVideoPage.vue`**
 

@@ -18,6 +18,24 @@ This plan implements the first version only:
 - Excluded: new `ProductionRepairTask` table, visual timeline editor, external multi-agent runtime, auto final approval, Douyin publishing, changing provider billing internals beyond using existing cost boundaries.
 - Hard rule: automatic repair may fix deterministic structure, but it may only advance to the next review gate. It must never mark final assets as approved.
 
+### Not In Scope
+
+- Building a visual timeline editor or manual clip editor.
+- Replacing the existing production queue, provider billing path, or review-center approval model.
+- Auto-approving images, videos, or final composed assets after repair.
+- Creating a separate multi-agent runtime outside the current embedded expert invocation flow.
+- Adding a new repair task database table in this slice.
+- Solving provider/model quality problems that require a human creative decision.
+
+### What Already Exists
+
+- Existing production run, production plan, and `ProductionJob` worker infrastructure.
+- Existing expert invocation persistence through `AgencyExpertInvocation`.
+- Existing audit event surface through `ProductionAuditEvent`.
+- Existing style-lock, storyboard, image/video generation, review-center, and production-monitor surfaces.
+- Existing provider cost reservation/settlement boundaries that paid repair must reuse.
+- Existing Vue dashboard/list styling that the repair UI should follow instead of introducing a new visual system.
+
 ## Design Review Corrections
 
 Design review result: the plan is implementable, but the frontend must not become another dense log surface. The UX standard for this feature is: users can answer four questions in under 10 seconds:
@@ -2992,7 +3010,7 @@ Run:
 
 ```powershell
 cd web
-npm test -- auto-repair-summary-strip agency-auto-repair-log one-sentence-auto-repair-policy video-production-repair-node agency-console-page series-detail-agency video-production-monitor-page api-clients --run
+npm test -- auto-repair-copy auto-repair-summary-strip auto-repair-task-list agency-auto-repair-log one-sentence-auto-repair-policy video-production-repair-node agency-console-page series-detail-agency video-production-monitor-page api-clients --run
 ```
 
 Expected: all selected tests pass.
@@ -3036,6 +3054,39 @@ git commit -m "test: cover agency auto repair loop"
 6. Task 6: E2E and regression verification.
 
 Each task should be committed independently. If a task fails review, fix it before starting the next task.
+
+## GSTACK REVIEW REPORT: Design Review
+
+### Design Review Dashboard
+
+| Dimension | Score | Result |
+| --- | ---: | --- |
+| User trust and transparency | 9/10 | Expert finding, repair action, cost impact, and next human gate are visible together. |
+| Interaction clarity | 9/10 | `retry_actions` removes guesswork from retry, paid authorization, and manual handling. |
+| UI consistency | 9/10 | Summary, task list, and policy panel are reusable components with centralized copy. |
+| Long-video density | 8/10 | Aggregate-first monitor and expandable task lists prevent long-video overload. |
+| Responsive behavior | 8/10 | Desktop drawer and mobile bottom sheet/collapsible behavior are specified. |
+| Accessibility | 8/10 | Status text, `aria-label`, `aria-busy`, focus trap, and live error rules are specified. |
+| Localization/readability | 9/10 | Chinese copy is centralized and guarded by mojibake tests. |
+| Implementation risk | 7/10 | Existing older inline examples must be treated as obsolete where design overrides say so. |
+
+### Design Review Fixes Applied
+
+- Added explicit `retry_actions` API/UI state so the frontend no longer discovers paid authorization through a failed 409 click.
+- Centralized detailed task rendering into `AutoRepairTaskList` so agency console, monitor drawer, and review center share the same status/action/cost behavior.
+- Added loading, empty, API failure, submitting, and paid-authorization failure states.
+- Added desktop/mobile density rules and initial visible-count behavior for long repair lists.
+- Added accessibility rules for status text, `aria-label`, `aria-busy`, dialog focus trap, Escape close, focus restore, and inline live errors.
+- Added centralized Chinese copy through `AUTO_REPAIR_COPY` and a frontend regression test against English fallback and mojibake.
+- Added explicit `Not In Scope` and `What Already Exists` sections so implementation boundaries stay clear.
+
+### Design TODOs For Implementation
+
+- Replace obsolete inline `AgencyDecisionLog.vue` repair-row examples with `AutoRepairTaskList` during implementation; do not implement both.
+- Move repeated labels in `AutoRepairSummaryStrip`, `AutoRepairTaskList`, `AutoRepairPolicyPanel`, monitor drawer, and review-center entry to `AUTO_REPAIR_COPY`.
+- Add a paid authorization dialog implementation that meets the focus and inline-error requirements.
+- Verify mobile viewport behavior for monitor repair details before marking Task 5 complete.
+- Replace any remaining mojibake in copied test fixtures or UI examples with readable Chinese before writing source files.
 
 ## Self-Review
 

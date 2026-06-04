@@ -71,6 +71,10 @@ Engineering review result: the plan is viable only after the following correctio
 - **Reference generation is async:** existing reference helpers are `generate_character_reference_images` and `generate_scene_reference_images`, both async. The repair executor must be async and the worker must `await` it.
 - **Action result signature:** `ProductionActionResult.success()` takes `message` first and `data` second. Do not pass the result data as the first positional argument.
 - **Repair job dedupe:** return an explicit `(job, created)` tuple from the enqueue helper instead of inferring dedupe from timestamps.
+- **No rollback in helpers:** dedupe helpers must not catch `IntegrityError` and call `db.rollback()` internally. If a concurrent insert races the pre-check, let the caller-owned transaction roll back and retry at the API/worker boundary.
+- **Paid retry authorization updates both budgets:** paid retry authorization must update the production budget boundary and the run-scoped `auto_repair_policy.budget_limit` or equivalent authorization ledger; otherwise later retry checks will still fail against the old repair budget.
+- **No fake manual route:** repair task projections must not default missing `repair_route` to `/`. A task without a concrete route should render no manual link and should explain why manual routing is unavailable.
+- **Projection copy must be readable:** API projection examples must use readable Chinese in `primary_label`, `reason`, and fallback labels so implementation does not copy mojibake into user-facing fields.
 
 ## CEO Review Corrections
 
@@ -88,6 +92,7 @@ CEO review result: the plan should hold scope, but it must add explicit trust gu
 - **Repair round is backend-owned:** automatic repair round count must be calculated from persisted repair history by `production_plan_id + stage + repair_type + target_type + target_id`. Do not trust `RepairTask.round` from expert/model output. The idempotency key must not include `invocation.id`; otherwise repeated expert rechecks can create an endless auto-repair loop for the same target.
 - **Retry is not a bypass:** manual retry may requeue free deterministic repair jobs, but any paid/provider-backed retry must re-read the original repair task and current `auto_repair_policy`, then re-check repair budget, production budget, active provider reservations, allowed stage/type, and backend-owned round limits before setting the job back to queued.
 - **Paid retry requires explicit authorization:** if a paid retry is blocked by budget, the only way to continue is a separate audited authorization action. That action must require a human reason and a confirmed budget delta, update the production plan budget limit by the confirmed amount, write `agency_repair_paid_retry_authorized`, then requeue the job. Plain retry must never perform this authorization implicitly.
+- **Authorization is not a policy bypass:** `authorize-retry` must still validate allowed stage, allowed repair type, backend-owned round limit, provider production budget, active cost reservations, and paid-provider status before requeueing. It may only relax the repair-budget boundary by the confirmed human budget delta.
 
 ## File Structure
 
@@ -833,7 +838,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.db_models import AgencyExpertInvocation, ProductionAuditEvent, ProductionJob, ProductionPlan
@@ -978,14 +982,7 @@ def _enqueue_repair_job(db: Session, invocation: AgencyExpertInvocation, task: R
         blocked_reason=task.reason[:120],
     )
     db.add(job)
-    try:
-        db.flush()
-    except IntegrityError:
-        db.rollback()
-        existing = db.query(ProductionJob).filter(ProductionJob.idempotency_key == idempotency_key).first()
-        if existing:
-            return existing, False
-        raise
+    db.flush()
     db.add(ProductionAuditEvent(
         event_type="agency_repair_task_created",
         run_id=invocation.run_id,
@@ -1028,6 +1025,8 @@ def _idempotency_key(invocation: AgencyExpertInvocation, task: RepairTask, repai
     plan_id, stage, repair_type, target_type, target = _stable_repair_scope(invocation, task)
     return f"repair:{plan_id}:{stage}:{repair_type}:{target_type}:{target}:round:{repair_round}"
 ```
+
+Do not import or catch `IntegrityError` inside `agency_repair_orchestrator.py` for this helper. If a concurrent insert violates the idempotency key, the caller-owned transaction must roll back and the API/worker boundary may retry the enqueue operation.
 
 - [ ] **Step 4: Persist policy snapshot from production start**
 
@@ -1493,8 +1492,52 @@ def test_repair_tasks_api_returns_manual_action(client, db):
     assert body["summary"]["total"] == 1
     assert body["items"][0]["repair_action_label"] == "去角色资产补参考图"
     assert body["items"][0]["repair_route"] == "/characters/char-1"
+```
 
 
+Before implementing this file, replace any mojibake fixture strings in `test_repair_tasks_api_returns_manual_action` with readable Chinese. Add this projection regression test:
+
+```python
+def test_repair_task_projection_does_not_default_missing_route_to_root(client, db):
+    series = Series(title="老李控糖")
+    db.add(series)
+    db.commit()
+    plan = ProductionPlan(series_id=series.id, status="ready")
+    db.add(plan)
+    db.commit()
+    job = ProductionJob(
+        plan_id=plan.id,
+        target_type="character",
+        target_id="char-1",
+        stage="agency_auto_repair:manual_incomplete_repair_task",
+        status="blocked",
+        idempotency_key="repair:no-route",
+        blocked_reason="缺少可执行结论，需要人工确认",
+    )
+    db.add(job)
+    db.add(ProductionAuditEvent(
+        event_type="agency_repair_task_created",
+        production_plan_id=plan.id,
+        payload_json={
+            "job_id": job.id,
+            "repair_task": {
+                "reason": "缺少可执行结论，需要人工确认",
+                "repair_action_label": "联系人工处理",
+            },
+        },
+    ))
+    db.commit()
+
+    resp = client.get(f"/api/agency/repair-tasks?series_id={series.id}")
+
+    assert resp.status_code == 200
+    item = resp.json()["items"][0]
+    assert item["repair_route"] is None
+    assert item["retry_actions"]["manual_action_enabled"] is False
+    assert item["retry_actions"]["primary_label"] == "去处理"
+```
+
+```python
 def test_retry_paid_repair_respects_current_budget(client, db):
     series = Series(title="老李控糖")
     db.add(series)
@@ -1631,9 +1674,81 @@ def test_authorize_paid_repair_retry_records_audit_and_requeues(client, db):
     assert resp.status_code == 200
     db.refresh(job)
     db.refresh(plan)
+    db.refresh(run)
     assert job.status == "queued"
     assert plan.budget_limit == 0.4
+    assert run.model_trace_json["auto_repair_policy"]["budget_limit"] == 1.3
     assert db.query(ProductionAuditEvent).filter_by(event_type="agency_repair_paid_retry_authorized").count() == 1
+```
+
+Add this policy-bypass regression test in the same file:
+
+```python
+def test_authorize_paid_repair_retry_does_not_bypass_allowed_types(client, db):
+    series = Series(title="老李控糖")
+    db.add(series)
+    db.commit()
+    plan = ProductionPlan(series_id=series.id, status="ready", budget_limit=5.0, current_cost=0.0)
+    db.add(plan)
+    run = VideoProductionRun(
+        series_id=series.id,
+        production_plan_id=plan.id,
+        run_type="real_short_e2e",
+        status="running",
+        model_trace_json={
+            "auto_repair_policy": {
+                "enabled": True,
+                "max_rounds": 2,
+                "budget_limit": 5.0,
+                "currency": "CNY",
+                "allowed_stages": ["style_lock"],
+                "allowed_types": ["missing_scene_reference"],
+                "requires_human_gate_after_repair": True,
+            }
+        },
+    )
+    db.add(run)
+    job = ProductionJob(
+        plan_id=plan.id,
+        target_type="character",
+        target_id="char-1",
+        stage="agency_auto_repair:missing_character_reference",
+        status="failed",
+        idempotency_key="repair:authorize-disallowed-type",
+        blocked_reason="自动返修预算不足，需要人工确认是否继续付费返修",
+    )
+    db.add(job)
+    db.flush()
+    db.add(ProductionAuditEvent(
+        event_type="agency_repair_task_created",
+        run_id=run.id,
+        production_plan_id=plan.id,
+        payload_json={
+            "job_id": job.id,
+            "repair_task": {
+                "type": "missing_character_reference",
+                "stage": "style_lock",
+                "target_type": "character",
+                "target_id": "char-1",
+                "requires_paid_provider": True,
+                "estimated_cost": 0.2,
+                "round": 1,
+                "reason": "角色缺少侧面参考图",
+                "repair_action_label": "去角色资产补参考图",
+                "repair_route": "/characters/char-1",
+            },
+        },
+    ))
+    db.commit()
+
+    resp = client.post(
+        f"/api/agency/repair-tasks/{job.id}/authorize-retry",
+        json={"reason": "确认继续付费补齐参考图", "confirmed_budget_delta": 1.0},
+    )
+
+    assert resp.status_code == 409
+    db.refresh(job)
+    assert job.status == "failed"
 ```
 
 Create `server/tests/test_agency_repair_query_scale.py`:
@@ -1829,6 +1944,16 @@ def authorize_paid_repair_retry(
     if not plan:
         raise HTTPException(status_code=404, detail="生产计划不存在")
     plan.budget_limit = float(plan.budget_limit or 0.0) + confirmed_budget_delta
+    run_id = _latest_repair_run_id(db, job.id, job.plan_id)
+    run = db.query(VideoProductionRun).filter(VideoProductionRun.id == run_id).first() if run_id else None
+    if run:
+        trace = dict(run.model_trace_json or {})
+        policy = dict(trace.get("auto_repair_policy") or {})
+        policy["budget_limit"] = float(policy.get("budget_limit") or 0.0) + confirmed_budget_delta
+        trace["auto_repair_policy"] = policy
+        run.model_trace_json = trace
+    if float(plan.current_cost or 0.0) + active_reserved_cost(db, job.plan_id) + estimated_cost > float(plan.budget_limit):
+        raise HTTPException(status_code=409, detail="追加预算后生产预算仍不足，需要人工确认")
     job.status = JOB_QUEUED
     job.error_code = None
     job.error_message = None
@@ -1855,7 +1980,16 @@ def authorize_paid_repair_retry(
     db.refresh(job)
     return _repair_task_item(job, audit)
 
+```
 
+Engineering review override for `authorize_paid_repair_retry`:
+
+- Do not let this route bypass `_can_retry_repair_job` policy checks.
+- Extract a shared validation helper so both `retry_repair_task` and `authorize_paid_repair_retry` validate allowed stage, allowed type, backend-owned round limit, provider budget, and active cost reservations.
+- The authorization route may apply `confirmed_budget_delta` only to the repair-budget check. It must still reject disallowed stage/type/round even when the user confirms extra budget.
+- Persist the confirmed delta either by updating the run-scoped `auto_repair_policy.budget_limit` as shown above or by a separate `agency_repair_paid_retry_authorized` ledger that `_can_retry_repair_job` reads. Do not leave future checks pointed at the stale original budget snapshot.
+
+```python
 def _can_retry_repair_job(db: Session, job: ProductionJob, repair_task: dict) -> tuple[bool, str]:
     if not repair_task:
         return False, "缺少原始返修任务信息，需要人工确认"
@@ -1995,6 +2129,15 @@ def _repair_summary(items: list[dict]) -> dict:
             summary["manual_required"] += 1 if status in {"failed", "blocked"} else 0
     return summary
 ```
+
+Engineering review override for repair task projection:
+
+- Replace any mojibake inside `_repair_task_item` and `_repair_retry_actions` before implementation.
+- `repair_action_label` fallback must be `联系人工处理`.
+- `repair_route` must remain `None`/missing when the repair task has no concrete route; never default it to `/`.
+- `manual_action_enabled` must be true only when `repair_route` is present.
+- `primary_label` must be readable Chinese: `确认追加预算并重试`, `重试返修`, or the validated `repair_action_label`.
+- `reason` for paid retry authorization must be `需要人工确认追加预算后才能继续付费返修`.
 
 - [ ] **Step 5: Add console `repair_summary`**
 
@@ -3087,6 +3230,39 @@ Each task should be committed independently. If a task fails review, fix it befo
 - Add a paid authorization dialog implementation that meets the focus and inline-error requirements.
 - Verify mobile viewport behavior for monitor repair details before marking Task 5 complete.
 - Replace any remaining mojibake in copied test fixtures or UI examples with readable Chinese before writing source files.
+
+## GSTACK REVIEW REPORT: Engineering Review
+
+### Engineering Review Dashboard
+
+| Dimension | Score | Result |
+| --- | ---: | --- |
+| Transaction boundaries | 9/10 | Hidden commit/rollback rules are explicit; orchestrator enqueue no longer catches and rolls back `IntegrityError`. |
+| Queue/idempotency | 8/10 | Repair idempotency is plan/stage/type/target/round scoped and avoids invocation-id loops. |
+| Paid cost safety | 8/10 | Paid retry now updates both production and repair budget boundaries and must re-check active reservations. |
+| Policy enforcement | 8/10 | Authorization route is now explicitly barred from bypassing allowed stage/type/round checks. |
+| API projection correctness | 8/10 | Missing manual routes must not become `/`; readable labels are required. |
+| Long-video query scale | 8/10 | Bounded job/audit projections and repair indexes are specified. |
+| Test coverage | 8/10 | Added regressions for route projection, budget authorization, and policy-bypass prevention. |
+| Residual implementation risk | 7/10 | Some older examples are marked obsolete/override-only; implementers must not copy them verbatim. |
+
+### Engineering Review Fixes Applied
+
+- Removed internal `db.rollback()` from the enqueue helper example and removed the stale `IntegrityError` import.
+- Required caller-owned rollback/retry for concurrent idempotency-key races.
+- Required paid retry authorization to update run-scoped repair budget, not only production plan budget.
+- Required paid authorization to re-check provider budget and active reservations before requeue.
+- Added policy-bypass guardrails so `authorize-retry` cannot ignore allowed stage/type/round limits.
+- Required repair projections to keep missing `repair_route` as `None` instead of `/`.
+- Added regression tests for missing-route projection and disallowed paid authorization.
+
+### Engineering TODOs For Implementation
+
+- Extract a shared retry validation helper used by both normal retry and paid authorization.
+- Replace any mojibake strings in backend route examples before writing source files.
+- Keep `agency_repair_orchestrator.py` free of internal `commit()` and `rollback()` calls.
+- If production needs race-safe dedupe beyond pre-checks, implement retry at the API/worker boundary rather than inside the helper.
+- Ensure JSON mutation for `VideoProductionRun.model_trace_json` reassigns a fresh dict so SQLAlchemy tracks the change.
 
 ## Self-Review
 

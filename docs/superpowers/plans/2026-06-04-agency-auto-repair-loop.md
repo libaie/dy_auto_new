@@ -38,6 +38,7 @@ Required corrections for implementation:
 - **Non-happy-path states:** repair UI must define Chinese loading, empty, API failure, retry-in-progress, and paid-authorization-failed states. A user should never see a blank drawer, frozen button, or raw HTTP error after a repair action.
 - **Long-video density:** production monitor defaults to aggregate chips by stage and status. Detailed repair rows stay in a drawer or collapsible panel opened by the user.
 - **Responsive density:** long-video repair details must have desktop and mobile layouts. Desktop uses a right-side drawer or constrained panel; mobile uses a bottom sheet or single-column collapsible list. Action buttons must wrap or stack instead of overflowing.
+- **Accessible controls:** repair status and paid-confirmation controls must be keyboard usable, have visible focus states, and not rely on color alone. Paid confirmation dialogs must trap focus, restore focus to the triggering task action when closed, and expose inline errors to assistive technology.
 - **Language:** all user-facing labels must be Chinese. Provider/model/internal fields may appear only inside developer/debug affordances, not the default UI.
 - **Visual restraint:** reuse existing dashboard density and table/list patterns. Avoid nested cards, hero-style blocks, decorative gradients, and large instructional copy.
 
@@ -2387,6 +2388,30 @@ describe('AutoRepairTaskList', () => {
     expect(wrapper.text()).not.toContain('第 8 个返修问题')
     expect(wrapper.text()).toContain('展开全部 8 项')
   })
+
+  it('exposes task status and busy state without relying on color only', () => {
+    const wrapper = mount(AutoRepairTaskList, {
+      props: {
+        submittingTaskId: 'repair-job-1',
+        tasks: [
+          {
+            id: 'repair-job-1',
+            status: 'failed',
+            status_label: '失败',
+            reason: '角色缺少侧面参考图',
+            retry_actions: {
+              normal_retry_enabled: true,
+              primary_label: '重试返修',
+            },
+          },
+        ],
+      },
+    })
+
+    expect(wrapper.text()).toContain('状态：失败')
+    expect(wrapper.find('[aria-busy="true"]').exists()).toBe(true)
+    expect(wrapper.find('button').attributes('aria-label')).toContain('重试返修')
+  })
 })
 ```
 
@@ -2490,6 +2515,7 @@ Create `web/src/components/agency/AutoRepairTaskList.vue`:
       >
       <div class="flex flex-wrap items-center justify-between gap-2">
         <p class="text-sm text-slate-100">{{ task.reason }}</p>
+        <span class="text-xs text-slate-300">状态：{{ task.status_label || task.status }}</span>
         <span v-if="task.recheck_required" class="text-xs text-cyan-200">待复审</span>
       </div>
       <p v-if="task.expected_result" class="mt-1 text-xs text-slate-400">{{ task.expected_result }}</p>
@@ -2502,6 +2528,8 @@ Create `web/src/components/agency/AutoRepairTaskList.vue`:
           v-if="task.retry_actions?.paid_authorize_required"
           type="button"
           :disabled="submittingTaskId === task.id"
+          :aria-busy="submittingTaskId === task.id ? 'true' : 'false'"
+          :aria-label="task.retry_actions.primary_label || '确认追加预算并重试'"
           class="inline-flex text-xs text-amber-200 hover:text-amber-100"
           @click="$emit('authorize-paid-retry', task)"
         >
@@ -2511,6 +2539,8 @@ Create `web/src/components/agency/AutoRepairTaskList.vue`:
           v-else-if="task.retry_actions?.normal_retry_enabled"
           type="button"
           :disabled="submittingTaskId === task.id"
+          :aria-busy="submittingTaskId === task.id ? 'true' : 'false'"
+          :aria-label="task.retry_actions.primary_label || '重试返修'"
           class="inline-flex text-xs text-cyan-200 hover:text-cyan-100"
           @click="$emit('retry', task)"
         >
@@ -2687,6 +2717,14 @@ Additional design review override for non-happy-path states:
 - Paid authorization failures must be shown inline as `付费返修确认失败：{message}` and must not close the dialog.
 - Empty task lists should show `暂无需要处理的返修任务`, not a blank panel.
 - API failures should show `返修任务加载失败：{message}` with a retry affordance when the parent page can reload.
+
+Accessibility design review override:
+
+- Every visible status chip must also include readable status text such as `状态：失败`; color alone is not enough.
+- Every repair action button must have a stable text label and `aria-label`.
+- Submitting actions must expose `aria-busy="true"` on the active button.
+- The paid authorization dialog must use `role="dialog"` and `aria-modal="true"`, focus the first required field when opened, trap keyboard focus while open, close on Escape, and restore focus to the task action that opened it.
+- Inline dialog errors must use `role="alert"` or an equivalent live region.
 
 - [ ] **Step 7: Add policy confirmation panel to `OneSentenceVideoPage.vue`**
 

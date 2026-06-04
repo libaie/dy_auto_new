@@ -62,6 +62,7 @@ CEO review result: the plan should hold scope, but it must add explicit trust gu
 - **Scale-safe projections:** repair APIs and monitor projections must never scan all `ProductionAuditEvent` rows. Always filter by `production_plan_id`, `run_id`, or current-page `job_id` candidates before reading payloads. Add indexes for `ProductionJob(plan_id, stage, status)` and `ProductionJob(stage, created_at)` so long-video repair summaries stay bounded.
 - **Executor must not commit:** automatic repair execution must not call `db.commit()` or `db.rollback()` internally. The worker/API entrypoint owns transaction commit/rollback so asset metadata, repair events, job status, and cost settlement succeed or fail as one unit. If an existing helper commits internally, do not call it from the executor; route the task to manual-required until a caller-owned transaction path exists.
 - **Repair round is backend-owned:** automatic repair round count must be calculated from persisted repair history by `production_plan_id + stage + repair_type + target_type + target_id`. Do not trust `RepairTask.round` from expert/model output. The idempotency key must not include `invocation.id`; otherwise repeated expert rechecks can create an endless auto-repair loop for the same target.
+- **Retry is not a bypass:** manual retry may requeue free deterministic repair jobs, but any paid/provider-backed retry must re-read the original repair task and current `auto_repair_policy`, then re-check repair budget, production budget, active provider reservations, allowed stage/type, and backend-owned round limits before setting the job back to queued.
 
 ## File Structure
 
@@ -1412,7 +1413,7 @@ git commit -m "feat: execute agency repair jobs"
 Create `server/tests/test_agency_repair_api.py`:
 
 ```python
-from app.db_models import ProductionAuditEvent, ProductionJob, ProductionPlan, Series
+from app.db_models import ProductionAuditEvent, ProductionJob, ProductionPlan, Series, VideoProductionRun
 
 
 def test_repair_tasks_api_returns_manual_action(client, db):
@@ -1461,6 +1462,74 @@ def test_repair_tasks_api_returns_manual_action(client, db):
     assert body["summary"]["total"] == 1
     assert body["items"][0]["repair_action_label"] == "去角色资产补参考图"
     assert body["items"][0]["repair_route"] == "/characters/char-1"
+
+
+def test_retry_paid_repair_respects_current_budget(client, db):
+    series = Series(title="老李控糖")
+    db.add(series)
+    db.commit()
+    plan = ProductionPlan(series_id=series.id, status="ready", budget_limit=0.1, current_cost=0.1)
+    db.add(plan)
+    run = VideoProductionRun(
+        series_id=series.id,
+        production_plan_id=plan.id,
+        run_type="real_short_e2e",
+        status="running",
+        model_trace_json={
+            "auto_repair_policy": {
+                "enabled": True,
+                "max_rounds": 2,
+                "budget_limit": 1.0,
+                "currency": "CNY",
+                "allowed_stages": ["style_lock"],
+                "allowed_types": ["missing_character_reference"],
+                "requires_human_gate_after_repair": True,
+            }
+        },
+    )
+    db.add(run)
+    job = ProductionJob(
+        plan_id=plan.id,
+        target_type="character",
+        target_id="char-1",
+        stage="agency_auto_repair:missing_character_reference",
+        status="failed",
+        idempotency_key="repair:retry-budget",
+        blocked_reason="缺少角色参考图",
+    )
+    db.add(job)
+    db.flush()
+    db.add(ProductionAuditEvent(
+        event_type="agency_repair_task_created",
+        run_id=run.id,
+        production_plan_id=plan.id,
+        payload_json={
+            "job_id": job.id,
+            "repair_task": {
+                "type": "missing_character_reference",
+                "stage": "style_lock",
+                "target_type": "character",
+                "target_id": "char-1",
+                "series_id": series.id,
+                "auto_execute": True,
+                "requires_paid_provider": True,
+                "estimated_cost": 0.2,
+                "reason": "缺少角色参考图",
+                "expected_result": "补齐角色参考图",
+                "repair_action_label": "去角色资产补参考图",
+                "repair_route": "/characters/char-1",
+                "affected_ids": ["char-1"],
+            },
+        },
+    ))
+    db.commit()
+
+    resp = client.post(f"/api/agency/repair-tasks/{job.id}/retry")
+
+    assert resp.status_code == 409
+    db.refresh(job)
+    assert job.status == "failed"
+    assert "生产预算不足" in resp.json()["detail"]
 ```
 
 Create `server/tests/test_agency_repair_query_scale.py`:
@@ -1562,7 +1631,8 @@ Do not add indexes on `ProductionAuditEvent.payload_json` for this phase. Repair
 Modify `server/app/routers/agency.py` with:
 
 ```python
-from app.db_models import ProductionAuditEvent, ProductionJob, ProductionPlan
+from app.db_models import ProductionAuditEvent, ProductionJob, ProductionPlan, VideoProductionRun
+from app.services.provider_cost_reservation_service import active_reserved_cost
 from app.services.production_status import JOB_BLOCKED, JOB_FAILED, JOB_QUEUED, JOB_RETRY_WAIT
 ```
 
@@ -1603,6 +1673,11 @@ def retry_repair_task(
         raise HTTPException(status_code=404, detail="返修任务不存在")
     if job.status not in {JOB_FAILED, JOB_BLOCKED, JOB_RETRY_WAIT}:
         raise HTTPException(status_code=409, detail="当前返修任务状态不允许重试")
+    audit = _repair_audit_by_job(db, [job.id], plan_ids=[job.plan_id]).get(job.id) or {}
+    repair_task = audit.get("repair_task") or {}
+    retry_allowed, retry_reason = _can_retry_repair_job(db, job, repair_task)
+    if not retry_allowed:
+        raise HTTPException(status_code=409, detail=retry_reason)
     job.status = JOB_QUEUED
     job.error_code = None
     job.error_message = None
@@ -1617,6 +1692,71 @@ def retry_repair_task(
     db.commit()
     db.refresh(job)
     return _repair_task_item(job, None)
+
+
+def _can_retry_repair_job(db: Session, job: ProductionJob, repair_task: dict) -> tuple[bool, str]:
+    if not repair_task:
+        return False, "缺少原始返修任务信息，需要人工确认"
+    if not repair_task.get("requires_paid_provider"):
+        return True, ""
+    run_id = _latest_repair_run_id(db, job.id, job.plan_id)
+    policy = _auto_repair_policy_for_run(db, run_id)
+    if not policy.get("enabled"):
+        return False, "自动返修策略未启用，需要人工确认"
+    if repair_task.get("stage") not in set(policy.get("allowed_stages") or []):
+        return False, "当前阶段未授权自动返修"
+    if repair_task.get("type") not in set(policy.get("allowed_types") or []):
+        return False, "当前返修类型未授权自动执行"
+    current_round = int(repair_task.get("round") or 1)
+    if current_round > int(policy.get("max_rounds") or 0):
+        return False, "自动返修轮数已达上限"
+    estimated_cost = float(repair_task.get("estimated_cost") or 0.0)
+    if _repair_budget_used_for_plan(db, job.plan_id, run_id) + estimated_cost > float(policy.get("budget_limit") or 0.0):
+        return False, "自动返修预算不足，需要人工确认是否继续付费返修"
+    plan = db.query(ProductionPlan).filter(ProductionPlan.id == job.plan_id).first()
+    if not plan or plan.budget_limit is None:
+        return False, "生产预算未配置，需要人工确认"
+    if float(plan.current_cost or 0.0) + active_reserved_cost(db, job.plan_id) + estimated_cost > float(plan.budget_limit):
+        return False, "生产预算不足，需要人工确认是否继续付费返修"
+    return True, ""
+
+
+def _latest_repair_run_id(db: Session, job_id: str, plan_id: str) -> str | None:
+    rows = (
+        db.query(ProductionAuditEvent)
+        .filter(ProductionAuditEvent.production_plan_id == plan_id)
+        .filter(ProductionAuditEvent.event_type == "agency_repair_task_created")
+        .order_by(ProductionAuditEvent.created_at.desc())
+        .all()
+    )
+    for event in rows:
+        if (event.payload_json or {}).get("job_id") == job_id:
+            return event.run_id
+    return None
+
+
+def _auto_repair_policy_for_run(db: Session, run_id: str | None) -> dict:
+    if not run_id:
+        return {}
+    run = db.query(VideoProductionRun).filter(VideoProductionRun.id == run_id).first()
+    return ((run.model_trace_json or {}).get("auto_repair_policy") or {}) if run else {}
+
+
+def _repair_budget_used_for_plan(db: Session, plan_id: str, run_id: str | None) -> float:
+    rows = (
+        db.query(ProductionAuditEvent)
+        .filter(ProductionAuditEvent.production_plan_id == plan_id)
+        .filter(ProductionAuditEvent.event_type == "agency_repair_task_created")
+        .all()
+    )
+    total = 0.0
+    for row in rows:
+        if run_id and row.run_id and row.run_id != run_id:
+            continue
+        repair_task = ((row.payload_json or {}).get("repair_task") or {})
+        if repair_task.get("requires_paid_provider"):
+            total += float(repair_task.get("estimated_cost") or 0.0)
+    return total
 
 
 def _repair_audit_by_job(db: Session, job_ids: list[str], *, plan_ids: list[str], run_id: str | None = None) -> dict[str, dict]:

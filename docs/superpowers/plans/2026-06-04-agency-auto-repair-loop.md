@@ -37,6 +37,17 @@ Required corrections for implementation:
 - **Language:** all user-facing labels must be Chinese. Provider/model/internal fields may appear only inside developer/debug affordances, not the default UI.
 - **Visual restraint:** reuse existing dashboard density and table/list patterns. Avoid nested cards, hero-style blocks, decorative gradients, and large instructional copy.
 
+## Engineering Review Corrections
+
+Engineering review result: the plan is viable only after the following corrections are applied during implementation:
+
+- **No `ProductionJob.payload_json`:** the current `ProductionJob` model has no `payload_json` column. Repair detail must live in `AgencyExpertInvocation.output_summary_json.repair_tasks` and `ProductionAuditEvent.payload_json`; `ProductionJob.blocked_reason` may contain only a short user-readable reason.
+- **Caller-owned transactions:** new repair classifier/orchestrator helpers must not call `db.commit()` internally. They may `db.flush()` when they need ids. Existing entrypoints such as `finalize_invocation_and_audit`, API routes, and worker processing own commits.
+- **Model-compatible tests:** `ProductionPlan` has no `title` column, and `Character` has no `avatar_url` column. Tests must construct these models only with existing fields.
+- **Reference generation is async:** existing reference helpers are `generate_character_reference_images` and `generate_scene_reference_images`, both async. The repair executor must be async and the worker must `await` it.
+- **Action result signature:** `ProductionActionResult.success()` takes `message` first and `data` second. Do not pass the result data as the first positional argument.
+- **Repair job dedupe:** return an explicit `(job, created)` tuple from the enqueue helper instead of inferring dedupe from timestamps.
+
 ## File Structure
 
 ### Backend
@@ -60,7 +71,7 @@ Required corrections for implementation:
 - Modify `server/app/routers/agency.py`
   - Adds `GET /api/agency/repair-tasks` and manual retry route for failed repair jobs.
 - Modify `server/app/routers/video_production.py`
-  - Accepts and persists `auto_repair_policy` snapshot when starting a run.
+  - Accepts and persists `auto_repair_policy` snapshot for both `/runs/start` and `/one-sentence`.
 
 ### Frontend
 
@@ -472,7 +483,7 @@ def _series(db):
 
 
 def _plan(db, series):
-    plan = ProductionPlan(series_id=series.id, status="ready", title="测试生产计划")
+    plan = ProductionPlan(series_id=series.id, status="ready")
     db.add(plan)
     db.commit()
     db.refresh(plan)
@@ -586,7 +597,6 @@ from typing import Any
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.config import bj_now
 from app.db_models import AgencyExpertInvocation, ProductionAuditEvent, ProductionJob
 from app.services.agency_repair_contracts import (
     AUTO_REPAIR_STAGE,
@@ -613,9 +623,8 @@ def enqueue_repair_tasks_for_invocation(
             _record_manual_required(db, invocation, task, reason)
             result["manual_required"] += 1
             continue
-        job = _enqueue_repair_job(db, invocation, task)
-        result["deduped" if job.created_at < bj_now() and job.idempotency_key == _idempotency_key(invocation, task) else "created"] += 1
-    db.commit()
+        _job, created = _enqueue_repair_job(db, invocation, task)
+        result["created" if created else "deduped"] += 1
     return result
 
 
@@ -637,11 +646,11 @@ def _can_auto_execute(task: RepairTask, policy: AutoRepairPolicy) -> tuple[bool,
     return True, ""
 
 
-def _enqueue_repair_job(db: Session, invocation: AgencyExpertInvocation, task: RepairTask) -> ProductionJob:
+def _enqueue_repair_job(db: Session, invocation: AgencyExpertInvocation, task: RepairTask) -> tuple[ProductionJob, bool]:
     idempotency_key = _idempotency_key(invocation, task)
     existing = db.query(ProductionJob).filter(ProductionJob.idempotency_key == idempotency_key).first()
     if existing:
-        return existing
+        return existing, False
     job = ProductionJob(
         plan_id=invocation.production_plan_id,
         target_type=task.target_type,
@@ -654,6 +663,14 @@ def _enqueue_repair_job(db: Session, invocation: AgencyExpertInvocation, task: R
         blocked_reason=task.reason[:120],
     )
     db.add(job)
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        existing = db.query(ProductionJob).filter(ProductionJob.idempotency_key == idempotency_key).first()
+        if existing:
+            return existing, False
+        raise
     db.add(ProductionAuditEvent(
         event_type="agency_repair_task_created",
         run_id=invocation.run_id,
@@ -666,15 +683,7 @@ def _enqueue_repair_job(db: Session, invocation: AgencyExpertInvocation, task: R
             "job_id": job.id,
         },
     ))
-    try:
-        db.flush()
-    except IntegrityError:
-        db.rollback()
-        existing = db.query(ProductionJob).filter(ProductionJob.idempotency_key == idempotency_key).first()
-        if existing:
-            return existing
-        raise
-    return job
+    return job, True
 
 
 def _record_manual_required(db: Session, invocation: AgencyExpertInvocation, task: RepairTask, reason: str) -> None:
@@ -702,13 +711,19 @@ def _idempotency_key(invocation: AgencyExpertInvocation, task: RepairTask) -> st
 
 - [ ] **Step 4: Persist policy snapshot from production start**
 
-In `server/app/routers/video_production.py`, extend the run start request model with:
+In `server/app/routers/video_production.py`, extend both production start request models with:
 
 ```python
 auto_repair_policy: dict | None = None
 ```
 
-Where `VideoProductionRun.model_trace_json` is initialized or updated for `/api/video-production/runs/start`, merge:
+When calling `start_episode_production(...)` and `create_one_sentence_video(...)`, pass:
+
+```python
+auto_repair_policy=body.auto_repair_policy,
+```
+
+Where `VideoProductionRun.model_trace_json` is initialized or updated for `/api/video-production/runs/start` and `/api/video-production/one-sentence`, merge:
 
 ```python
 trace = dict(run.model_trace_json or {})
@@ -723,6 +738,8 @@ trace["auto_repair_policy"] = body.auto_repair_policy or {
 }
 run.model_trace_json = trace
 ```
+
+If the snapshot is persisted inside service helpers such as `start_episode_production` or `create_one_sentence_video`, those helpers must accept `auto_repair_policy: dict | None = None` and write the snapshot before their existing caller-owned commit.
 
 - [ ] **Step 5: Invoke orchestrator after persistence**
 
@@ -774,18 +791,21 @@ git commit -m "feat: enqueue authorized agency repair jobs"
 Create `server/tests/test_agency_repair_executor.py`:
 
 ```python
+import pytest
+
 from app.db_models import Character, ProductionAuditEvent, ProductionJob, ProductionPlan, Series
 from app.services.agency_repair_executor import execute_repair_job
 from app.services.production_status import JOB_BLOCKED, JOB_COMPLETED
 
 
-def test_missing_character_reference_updates_progress(db, monkeypatch):
+@pytest.mark.asyncio
+async def test_missing_character_reference_updates_progress(db, monkeypatch):
     series = Series(title="老李控糖")
-    character = Character(name="老李", avatar_url=None)
+    character = Character(name="老李")
     series.characters.append(character)
     db.add(series)
     db.commit()
-    plan = ProductionPlan(series_id=series.id, status="ready", title="计划")
+    plan = ProductionPlan(series_id=series.id, status="ready")
     db.add(plan)
     db.commit()
     job = ProductionJob(
@@ -798,12 +818,15 @@ def test_missing_character_reference_updates_progress(db, monkeypatch):
     db.add(job)
     db.commit()
 
+    async def fake_generate_character_reference_assets(db, character_id):
+        return {"ok": True, "urls": ["http://asset.local/char-front.png"]}
+
     monkeypatch.setattr(
         "app.services.agency_repair_executor.generate_character_reference_assets",
-        lambda db, character_id: {"ok": True, "urls": ["http://asset.local/char-front.png"]},
+        fake_generate_character_reference_assets,
     )
 
-    result = execute_repair_job(db, job)
+    result = await execute_repair_job(db, job)
 
     assert result.status == "success"
     refreshed = db.query(Character).filter_by(id=character.id).one()
@@ -811,11 +834,12 @@ def test_missing_character_reference_updates_progress(db, monkeypatch):
     assert db.query(ProductionAuditEvent).filter_by(event_type="agency_repair_completed").count() == 1
 
 
-def test_unknown_repair_type_blocks_with_manual_action(db):
+@pytest.mark.asyncio
+async def test_unknown_repair_type_blocks_with_manual_action(db):
     series = Series(title="老李控糖")
     db.add(series)
     db.commit()
-    plan = ProductionPlan(series_id=series.id, status="ready", title="计划")
+    plan = ProductionPlan(series_id=series.id, status="ready")
     db.add(plan)
     db.commit()
     job = ProductionJob(
@@ -828,7 +852,7 @@ def test_unknown_repair_type_blocks_with_manual_action(db):
     db.add(job)
     db.commit()
 
-    result = execute_repair_job(db, job)
+    result = await execute_repair_job(db, job)
 
     assert result.status == "blocked"
     assert result.repair_action == "去审查中心处理"
@@ -859,24 +883,24 @@ from app.db_models import Character, ProductionAuditEvent, ProductionJob, Scene
 from app.services.production_action_result import ProductionActionResult
 
 
-def generate_character_reference_assets(db: Session, character_id: str) -> dict:
-    from app.services.reference_asset_service import generate_missing_character_references
+async def generate_character_reference_assets(db: Session, character_id: str) -> dict:
+    from app.services.reference_asset_service import generate_character_reference_images
 
-    return generate_missing_character_references(db, character_id)
-
-
-def generate_scene_reference_assets(db: Session, scene_id: str) -> dict:
-    from app.services.reference_asset_service import generate_missing_scene_references
-
-    return generate_missing_scene_references(db, scene_id)
+    return await generate_character_reference_images(db, character_id)
 
 
-def execute_repair_job(db: Session, job: ProductionJob) -> ProductionActionResult:
+async def generate_scene_reference_assets(db: Session, scene_id: str) -> dict:
+    from app.services.reference_asset_service import generate_scene_reference_images
+
+    return await generate_scene_reference_images(db, scene_id)
+
+
+async def execute_repair_job(db: Session, job: ProductionJob) -> ProductionActionResult:
     repair_type = _repair_type(job.stage)
     if repair_type == "missing_character_reference":
-        return _repair_character_reference(db, job)
+        return await _repair_character_reference(db, job)
     if repair_type == "missing_scene_reference":
-        return _repair_scene_reference(db, job)
+        return await _repair_scene_reference(db, job)
     if repair_type.startswith("storyboard_"):
         return _manual_block(job, "去分镜脚本处理", "/series")
     if repair_type.startswith("image_"):
@@ -886,7 +910,7 @@ def execute_repair_job(db: Session, job: ProductionJob) -> ProductionActionResul
     return _manual_block(job, "去审查中心处理", "/review-center")
 
 
-def _repair_character_reference(db: Session, job: ProductionJob) -> ProductionActionResult:
+async def _repair_character_reference(db: Session, job: ProductionJob) -> ProductionActionResult:
     character = db.query(Character).filter(Character.id == job.target_id).first()
     if not character:
         return _manual_block(job, "去角色资产补参考图", f"/characters/{job.target_id}")
@@ -894,7 +918,7 @@ def _repair_character_reference(db: Session, job: ProductionJob) -> ProductionAc
     meta["reference_generation"] = {"status": "running", "source": "agency_auto_repair", "job_id": job.id}
     character.meta_json = meta
     db.commit()
-    result = generate_character_reference_assets(db, character.id)
+    result = await generate_character_reference_assets(db, character.id)
     meta = dict(character.meta_json or {})
     meta["reference_generation"] = {"status": "completed" if result.get("ok") else "failed", "source": "agency_auto_repair", "job_id": job.id, "result": result}
     character.meta_json = meta
@@ -902,10 +926,13 @@ def _repair_character_reference(db: Session, job: ProductionJob) -> ProductionAc
     db.commit()
     if not result.get("ok"):
         return _manual_block(job, "去角色资产补参考图", f"/characters/{character.id}")
-    return ProductionActionResult.success({"repair_type": "missing_character_reference", "target_id": character.id})
+    return ProductionActionResult.success(
+        "角色参考图返修完成",
+        {"repair_type": "missing_character_reference", "target_id": character.id},
+    )
 
 
-def _repair_scene_reference(db: Session, job: ProductionJob) -> ProductionActionResult:
+async def _repair_scene_reference(db: Session, job: ProductionJob) -> ProductionActionResult:
     scene = db.query(Scene).filter(Scene.id == job.target_id).first()
     if not scene:
         return _manual_block(job, "去场景资产补参考图", f"/scenes/{job.target_id}")
@@ -913,7 +940,7 @@ def _repair_scene_reference(db: Session, job: ProductionJob) -> ProductionAction
     meta["reference_generation"] = {"status": "running", "source": "agency_auto_repair", "job_id": job.id}
     scene.meta_json = meta
     db.commit()
-    result = generate_scene_reference_assets(db, scene.id)
+    result = await generate_scene_reference_assets(db, scene.id)
     meta = dict(scene.meta_json or {})
     meta["reference_generation"] = {"status": "completed" if result.get("ok") else "failed", "source": "agency_auto_repair", "job_id": job.id, "result": result}
     scene.meta_json = meta
@@ -921,7 +948,10 @@ def _repair_scene_reference(db: Session, job: ProductionJob) -> ProductionAction
     db.commit()
     if not result.get("ok"):
         return _manual_block(job, "去场景资产补参考图", f"/scenes/{scene.id}")
-    return ProductionActionResult.success({"repair_type": "missing_scene_reference", "target_id": scene.id})
+    return ProductionActionResult.success(
+        "场景参考图返修完成",
+        {"repair_type": "missing_scene_reference", "target_id": scene.id},
+    )
 
 
 def _manual_block(job: ProductionJob, label: str, route: str) -> ProductionActionResult:
@@ -962,7 +992,7 @@ At the top of `execute_real_job`, before `_job_spec`:
 
 ```python
 if job.stage == AUTO_REPAIR_STAGE or job.stage.startswith(f"{AUTO_REPAIR_STAGE}:"):
-    return execute_repair_job(db, job)
+    return await execute_repair_job(db, job)
 ```
 
 - [ ] **Step 5: Write worker dispatch test**
@@ -971,6 +1001,7 @@ Create `server/tests/test_agency_repair_worker.py`:
 
 ```python
 from app.db_models import ProductionJob, ProductionPlan, Series, VideoProductionRun
+from app.services.production_action_result import ProductionActionResult
 from app.services.production_worker_service import run_real_worker_step
 
 
@@ -978,7 +1009,7 @@ def test_real_worker_dispatches_agency_auto_repair(db, monkeypatch):
     series = Series(title="老李控糖")
     db.add(series)
     db.commit()
-    plan = ProductionPlan(series_id=series.id, status="ready", title="计划")
+    plan = ProductionPlan(series_id=series.id, status="ready")
     db.add(plan)
     db.commit()
     run = VideoProductionRun(series_id=series.id, production_plan_id=plan.id, run_type="real_short_e2e", status="running")
@@ -993,9 +1024,12 @@ def test_real_worker_dispatches_agency_auto_repair(db, monkeypatch):
     db.add(job)
     db.commit()
 
+    async def fake_execute_repair_job(db, job):
+        return ProductionActionResult.success("返修完成", {"ok": True})
+
     monkeypatch.setattr(
         "app.services.production_worker_service.execute_repair_job",
-        lambda db, job: type("Result", (), {"status": "success", "data": {"ok": True}, "provider_task_id": None})(),
+        fake_execute_repair_job,
     )
 
     result = run_real_worker_step(db, run.id, lease_id="test-lease", batch_size=1)
@@ -1046,7 +1080,7 @@ def test_repair_tasks_api_returns_manual_action(client, db):
     series = Series(title="老李控糖")
     db.add(series)
     db.commit()
-    plan = ProductionPlan(series_id=series.id, status="ready", title="计划")
+    plan = ProductionPlan(series_id=series.id, status="ready")
     db.add(plan)
     db.commit()
     job = ProductionJob(
@@ -1107,6 +1141,7 @@ Modify `server/app/routers/agency.py` with:
 
 ```python
 from app.db_models import ProductionAuditEvent, ProductionJob, ProductionPlan
+from app.services.production_status import JOB_BLOCKED, JOB_FAILED, JOB_QUEUED, JOB_RETRY_WAIT
 ```
 
 Add:
@@ -1132,6 +1167,33 @@ def list_repair_tasks(
     audit_by_job = _repair_audit_by_job(db, [job.id for job in jobs])
     items = [_repair_task_item(job, audit_by_job.get(job.id)) for job in jobs]
     return {"summary": _repair_summary(items), "items": items, "page": page, "page_size": page_size, "total": total}
+
+
+@router.post("/repair-tasks/{job_id}/retry")
+def retry_repair_task(
+    job_id: str,
+    db: Session = Depends(get_db),
+    _=Depends(require_role("admin")),
+):
+    job = db.query(ProductionJob).filter(ProductionJob.id == job_id).first()
+    if not job or not job.stage.startswith("agency_auto_repair"):
+        raise HTTPException(status_code=404, detail="返修任务不存在")
+    if job.status not in {JOB_FAILED, JOB_BLOCKED, JOB_RETRY_WAIT}:
+        raise HTTPException(status_code=409, detail="当前返修任务状态不允许重试")
+    job.status = JOB_QUEUED
+    job.error_code = None
+    job.error_message = None
+    job.blocked_reason = None
+    job.lease_id = None
+    job.leased_until = None
+    db.add(ProductionAuditEvent(
+        event_type="agency_repair_retry_requested",
+        production_plan_id=job.plan_id,
+        payload_json={"job_id": job.id, "stage": job.stage, "target_type": job.target_type, "target_id": job.target_id},
+    ))
+    db.commit()
+    db.refresh(job)
+    return _repair_task_item(job, None)
 
 
 def _repair_audit_by_job(db: Session, job_ids: list[str]) -> dict[str, dict]:
@@ -1322,7 +1384,7 @@ import OneSentenceVideoPage from '../views/OneSentenceVideoPage.vue'
 import * as videoProductionApi from '../api/videoProduction'
 
 vi.mock('../api/videoProduction', () => ({
-  startEpisodeProduction: vi.fn(() => Promise.resolve({ id: 'run-1' })),
+  createOneSentenceVideo: vi.fn(() => Promise.resolve({ id: 'run-1' })),
 }))
 
 describe('OneSentenceVideoPage auto repair policy', () => {
@@ -1333,10 +1395,10 @@ describe('OneSentenceVideoPage auto repair policy', () => {
 
     await wrapper.find('[data-test="auto-repair-enabled"]').setValue(true)
     await wrapper.find('[data-test="auto-repair-budget"]').setValue('1.5')
-    await wrapper.find('[data-test="start-one-sentence-production"]').trigger('click')
+    await wrapper.find('[data-test="submit-one-sentence"]').trigger('click')
 
-    expect(videoProductionApi.startEpisodeProduction).toHaveBeenCalled()
-    const payload = videoProductionApi.startEpisodeProduction.mock.calls[0][0]
+    expect(videoProductionApi.createOneSentenceVideo).toHaveBeenCalled()
+    const payload = videoProductionApi.createOneSentenceVideo.mock.calls[0][0]
     expect(payload.auto_repair_policy.enabled).toBe(true)
     expect(payload.auto_repair_policy.budget_limit).toBe(1.5)
     expect(payload.auto_repair_policy.requires_human_gate_after_repair).toBe(true)
@@ -1452,11 +1514,18 @@ export function retryRepairTask(jobId) {
 }
 ```
 
-Modify `web/src/api/videoProduction.js` so `startEpisodeProduction(payload)` forwards `auto_repair_policy`:
+Modify `web/src/api/videoProduction.js` so both `startEpisodeProduction(payload)` and `createOneSentenceVideo(payload)` forward `auto_repair_policy`:
 
 ```javascript
 export function startEpisodeProduction(payload) {
   return client.post('/video-production/runs/start', {
+    ...payload,
+    auto_repair_policy: payload.auto_repair_policy,
+  })
+}
+
+export function createOneSentenceVideo(payload) {
+  return client.post('/video-production/one-sentence', {
     ...payload,
     auto_repair_policy: payload.auto_repair_policy,
   })
@@ -1679,7 +1748,7 @@ def test_expert_finding_creates_repair_job_and_visible_audit(client, db):
     series = Series(title="老李控糖")
     db.add(series)
     db.commit()
-    plan = ProductionPlan(series_id=series.id, status="ready", title="计划")
+    plan = ProductionPlan(series_id=series.id, status="ready")
     db.add(plan)
     run = VideoProductionRun(
         series_id=series.id,

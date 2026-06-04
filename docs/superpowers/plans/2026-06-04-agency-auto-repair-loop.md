@@ -61,6 +61,7 @@ CEO review result: the plan should hold scope, but it must add explicit trust gu
 - **Provider cost boundary still applies:** the repair executor may not call a paid model through a shortcut path. Any paid reference/image/video repair must reuse the existing provider cost reservation and settlement path (`ProviderCostReservation`, provider stage task cost data, and `ProductionPlan.current_cost`). Check both boundaries: repair budget against repair-only reserved/spent estimates, and production plan budget against `ProductionPlan.current_cost + active_reserved_cost(...) + estimated_cost`. If either boundary is unavailable or exceeded, the task must be manual-required instead of auto-executed.
 - **Scale-safe projections:** repair APIs and monitor projections must never scan all `ProductionAuditEvent` rows. Always filter by `production_plan_id`, `run_id`, or current-page `job_id` candidates before reading payloads. Add indexes for `ProductionJob(plan_id, stage, status)` and `ProductionJob(stage, created_at)` so long-video repair summaries stay bounded.
 - **Executor must not commit:** automatic repair execution must not call `db.commit()` or `db.rollback()` internally. The worker/API entrypoint owns transaction commit/rollback so asset metadata, repair events, job status, and cost settlement succeed or fail as one unit. If an existing helper commits internally, do not call it from the executor; route the task to manual-required until a caller-owned transaction path exists.
+- **Repair round is backend-owned:** automatic repair round count must be calculated from persisted repair history by `production_plan_id + stage + repair_type + target_type + target_id`. Do not trust `RepairTask.round` from expert/model output. The idempotency key must not include `invocation.id`; otherwise repeated expert rechecks can create an endless auto-repair loop for the same target.
 
 ## File Structure
 
@@ -321,6 +322,7 @@ class RepairTask(BaseModel):
     affected_ids: list[str] = Field(default_factory=list)
     manual_gate_after_repair: bool = True
     source_invocation_id: str | None = None
+    # Backend overwrites this in the orchestrator; never trust model-provided round for policy decisions.
     round: int = 1
 
 
@@ -411,7 +413,7 @@ def _task_from_structured(raw: dict[str, Any], *, stage: str, series_id: str) ->
         affected_ids=list(raw.get("affected_ids") or ([target_id] if target_id else [])),
         manual_gate_after_repair=bool(raw.get("manual_gate_after_repair", True)),
         source_invocation_id=raw.get("source_invocation_id"),
-        round=int(raw.get("round") or 1),
+        round=1,
     )
 
 
@@ -515,6 +517,8 @@ git commit -m "feat: classify agency repair tasks"
 Create `server/tests/test_agency_repair_orchestrator.py`:
 
 ```python
+from uuid import uuid4
+
 from app.db_models import AgencyExpertInvocation, ProductionJob, ProductionPlan, Series
 from app.services.agency_repair_orchestrator import enqueue_repair_tasks_for_invocation
 from app.services.production_status import JOB_QUEUED
@@ -538,7 +542,7 @@ def _plan(db, series):
 
 def _invocation(db, series, plan, task):
     row = AgencyExpertInvocation(
-        idempotency_key=f"invocation:{task['type']}",
+        idempotency_key=f"invocation:{task['type']}:{uuid4()}",
         series_id=series.id,
         production_plan_id=plan.id,
         stage=task["stage"],
@@ -695,6 +699,86 @@ def test_provider_plan_budget_blocks_paid_repair(db):
     assert result["created"] == 0
     assert result["manual_required"] == 1
     assert db.query(ProductionJob).count() == 0
+
+
+def test_model_supplied_round_is_ignored_for_idempotency(db):
+    series = _series(db)
+    plan = _plan(db, series)
+    task = {
+        "type": "missing_character_reference",
+        "stage": "style_lock",
+        "target_type": "character",
+        "target_id": "char-1",
+        "series_id": series.id,
+        "auto_execute": True,
+        "requires_paid_provider": False,
+        "estimated_cost": 0,
+        "round": 999,
+        "reason": "缺少角色参考图",
+        "expected_result": "补齐角色参考图",
+        "repair_action_label": "去角色资产补参考图",
+        "repair_route": "/characters/char-1",
+        "affected_ids": ["char-1"],
+    }
+    first = _invocation(db, series, plan, task)
+    second = _invocation(db, series, plan, task)
+    policy = {
+        "enabled": True,
+        "max_rounds": 2,
+        "budget_limit": 0,
+        "currency": "CNY",
+        "allowed_stages": ["style_lock"],
+        "allowed_types": ["missing_character_reference"],
+        "requires_human_gate_after_repair": True,
+    }
+
+    first_result = enqueue_repair_tasks_for_invocation(db, first, policy)
+    second_result = enqueue_repair_tasks_for_invocation(db, second, policy)
+
+    assert first_result["created"] == 1
+    assert second_result["created"] == 0
+    assert second_result["deduped"] == 1
+    assert db.query(ProductionJob).count() == 1
+
+
+def test_backend_round_limit_blocks_repeated_target_repair(db):
+    series = _series(db)
+    plan = _plan(db, series)
+    task = {
+        "type": "missing_character_reference",
+        "stage": "style_lock",
+        "target_type": "character",
+        "target_id": "char-1",
+        "series_id": series.id,
+        "auto_execute": True,
+        "requires_paid_provider": False,
+        "estimated_cost": 0,
+        "round": 1,
+        "reason": "缺少角色参考图",
+        "expected_result": "补齐角色参考图",
+        "repair_action_label": "去角色资产补参考图",
+        "repair_route": "/characters/char-1",
+        "affected_ids": ["char-1"],
+    }
+    policy = {
+        "enabled": True,
+        "max_rounds": 1,
+        "budget_limit": 0,
+        "currency": "CNY",
+        "allowed_stages": ["style_lock"],
+        "allowed_types": ["missing_character_reference"],
+        "requires_human_gate_after_repair": True,
+    }
+
+    first = enqueue_repair_tasks_for_invocation(db, _invocation(db, series, plan, task), policy)
+    db.query(ProductionJob).filter(ProductionJob.stage == "agency_auto_repair:missing_character_reference").one().status = "completed"
+    db.commit()
+    second = enqueue_repair_tasks_for_invocation(db, _invocation(db, series, plan, task), policy)
+
+    assert first["created"] == 1
+    assert second["created"] == 0
+    assert second["manual_required"] == 1
+    assert db.query(ProductionJob).count() == 1
 ```
 
 - [ ] **Step 2: Run orchestrator tests and verify they fail**
@@ -744,12 +828,17 @@ def enqueue_repair_tasks_for_invocation(
     reserved_this_call = 0.0
     for task in tasks:
         task.source_invocation_id = invocation.id
-        allowed, reason = _can_auto_execute(db, invocation, task, policy, repair_budget_used + reserved_this_call)
+        existing = _existing_open_repair_job(db, invocation, task)
+        if existing:
+            result["deduped"] += 1
+            continue
+        repair_round = _next_repair_round(db, invocation, task)
+        allowed, reason = _can_auto_execute(db, invocation, task, policy, repair_budget_used + reserved_this_call, repair_round)
         if not allowed:
-            _record_manual_required(db, invocation, task, reason)
+            _record_manual_required(db, invocation, task, reason, repair_round=repair_round)
             result["manual_required"] += 1
             continue
-        _job, created = _enqueue_repair_job(db, invocation, task)
+        _job, created = _enqueue_repair_job(db, invocation, task, repair_round)
         result["created" if created else "deduped"] += 1
         if created and task.requires_paid_provider:
             reserved_this_call += task.estimated_cost
@@ -757,7 +846,7 @@ def enqueue_repair_tasks_for_invocation(
     return result
 
 
-def _can_auto_execute(db: Session, invocation: AgencyExpertInvocation, task: RepairTask, policy: AutoRepairPolicy, repair_budget_used: float) -> tuple[bool, str]:
+def _can_auto_execute(db: Session, invocation: AgencyExpertInvocation, task: RepairTask, policy: AutoRepairPolicy, repair_budget_used: float, repair_round: int) -> tuple[bool, str]:
     if not task.auto_execute:
         return False, "该问题需要人工处理"
     if not policy.enabled:
@@ -766,7 +855,7 @@ def _can_auto_execute(db: Session, invocation: AgencyExpertInvocation, task: Rep
         return False, "当前阶段未授权自动返修"
     if task.type not in set(policy.allowed_types):
         return False, "当前返修类型未授权自动执行"
-    if task.round > min(policy.max_rounds, MAX_AUTO_REPAIR_ROUNDS):
+    if repair_round > min(policy.max_rounds, MAX_AUTO_REPAIR_ROUNDS):
         return False, "自动返修轮数已达上限"
     if task.requires_paid_provider and repair_budget_used + task.estimated_cost > policy.budget_limit:
         return False, "自动返修预算不足，需要人工确认是否继续付费返修"
@@ -805,8 +894,43 @@ def _provider_budget_available(db: Session, plan_id: str | None, estimated_cost:
     return current + reserved + float(estimated_cost or 0.0) <= float(plan.budget_limit)
 
 
-def _enqueue_repair_job(db: Session, invocation: AgencyExpertInvocation, task: RepairTask) -> tuple[ProductionJob, bool]:
-    idempotency_key = _idempotency_key(invocation, task)
+def _existing_open_repair_job(db: Session, invocation: AgencyExpertInvocation, task: RepairTask) -> ProductionJob | None:
+    return (
+        db.query(ProductionJob)
+        .filter(ProductionJob.plan_id == invocation.production_plan_id)
+        .filter(ProductionJob.stage == f"{AUTO_REPAIR_STAGE}:{task.type}")
+        .filter(ProductionJob.target_type == task.target_type)
+        .filter(ProductionJob.target_id == (task.target_id or invocation.series_id))
+        .filter(ProductionJob.status.in_(["queued", "leased", "running", "retry_wait", "blocked"]))
+        .first()
+    )
+
+
+def _next_repair_round(db: Session, invocation: AgencyExpertInvocation, task: RepairTask) -> int:
+    rows = (
+        db.query(ProductionAuditEvent)
+        .filter(ProductionAuditEvent.event_type == "agency_repair_task_created")
+        .filter(ProductionAuditEvent.production_plan_id == invocation.production_plan_id)
+        .all()
+    )
+    scope = _stable_repair_scope(invocation, task)
+    previous_rounds = 0
+    for row in rows:
+        repair_task = ((row.payload_json or {}).get("repair_task") or {})
+        row_scope = (
+            row.production_plan_id,
+            repair_task.get("stage"),
+            repair_task.get("type"),
+            repair_task.get("target_type"),
+            repair_task.get("target_id") or invocation.series_id,
+        )
+        if row_scope == scope:
+            previous_rounds += 1
+    return previous_rounds + 1
+
+
+def _enqueue_repair_job(db: Session, invocation: AgencyExpertInvocation, task: RepairTask, repair_round: int) -> tuple[ProductionJob, bool]:
+    idempotency_key = _idempotency_key(invocation, task, repair_round)
     existing = db.query(ProductionJob).filter(ProductionJob.idempotency_key == idempotency_key).first()
     if existing:
         return existing, False
@@ -838,14 +962,14 @@ def _enqueue_repair_job(db: Session, invocation: AgencyExpertInvocation, task: R
         production_segment_id=invocation.production_segment_id,
         payload_json={
             "invocation_id": invocation.id,
-            "repair_task": task.model_dump(),
+            "repair_task": {**task.model_dump(), "round": repair_round},
             "job_id": job.id,
         },
     ))
     return job, True
 
 
-def _record_manual_required(db: Session, invocation: AgencyExpertInvocation, task: RepairTask, reason: str) -> None:
+def _record_manual_required(db: Session, invocation: AgencyExpertInvocation, task: RepairTask, reason: str, *, repair_round: int) -> None:
     db.add(ProductionAuditEvent(
         event_type="agency_repair_manual_required",
         run_id=invocation.run_id,
@@ -855,7 +979,7 @@ def _record_manual_required(db: Session, invocation: AgencyExpertInvocation, tas
         payload_json={
             "invocation_id": invocation.id,
             "reason": reason,
-            "repair_task": task.model_dump(),
+            "repair_task": {**task.model_dump(), "round": repair_round},
             "repair_action_label": task.repair_action_label or "联系人工处理",
             "repair_route": task.repair_route or "/",
             "affected_ids": task.affected_ids,
@@ -863,9 +987,14 @@ def _record_manual_required(db: Session, invocation: AgencyExpertInvocation, tas
     ))
 
 
-def _idempotency_key(invocation: AgencyExpertInvocation, task: RepairTask) -> str:
+def _stable_repair_scope(invocation: AgencyExpertInvocation, task: RepairTask) -> tuple[str | None, str, str, str, str]:
     target = task.target_id or "missing-target"
-    return f"repair:{invocation.production_plan_id}:{task.stage}:{task.type}:{target}:{invocation.id}:{task.round}"
+    return (invocation.production_plan_id, task.stage, task.type, task.target_type, target)
+
+
+def _idempotency_key(invocation: AgencyExpertInvocation, task: RepairTask, repair_round: int) -> str:
+    plan_id, stage, repair_type, target_type, target = _stable_repair_scope(invocation, task)
+    return f"repair:{plan_id}:{stage}:{repair_type}:{target_type}:{target}:round:{repair_round}"
 ```
 
 - [ ] **Step 4: Persist policy snapshot from production start**

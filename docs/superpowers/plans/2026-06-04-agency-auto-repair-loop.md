@@ -48,6 +48,15 @@ Engineering review result: the plan is viable only after the following correctio
 - **Action result signature:** `ProductionActionResult.success()` takes `message` first and `data` second. Do not pass the result data as the first positional argument.
 - **Repair job dedupe:** return an explicit `(job, created)` tuple from the enqueue helper instead of inferring dedupe from timestamps.
 
+## CEO Review Corrections
+
+CEO review result: the plan should hold scope, but it must add explicit trust guardrails so the automatic repair loop does not reintroduce opaque or unreadable output.
+
+- **Chinese readability gate:** every user-facing field emitted by the repair loop must be readable Chinese, not mojibake. This applies to `reason`, `expected_result`, `repair_action_label`, `blocked_reason`, button labels, empty states, toast messages, and test fixtures.
+- **Mojibake regression tests:** backend and frontend tests must fail if user-facing repair text contains common mojibake patterns such as `鍘`, `鑰`, `鎺`, `瑙`, `闇`, `鐢`, `琛`, `鈥`, `渆`, or `�`.
+- **No generic expert filler:** if the expert output is empty, English, malformed, or only contains generic text such as `已记录审查发现`, the classifier must produce a manual-required item with a specific fallback reason: `专家审查结果缺少可执行结论，需要人工确认`.
+- **Trust first:** the UI must show the original expert finding, the planned repair action, cost impact, and the next human gate in the same visible repair block. A repair task that cannot explain these four fields is not eligible for automatic execution.
+
 ## File Structure
 
 ### Backend
@@ -191,6 +200,23 @@ def test_missing_target_never_auto_executes():
     assert result.repairable is False
     assert result.repair_tasks[0].auto_execute is False
     assert result.repair_tasks[0].status == "manual_required"
+
+
+def test_unreadable_or_generic_finding_requires_manual_confirmation():
+    output = {
+        "decision": "warning",
+        "findings": ["已记录审查发现", "鍘昏鑹茶祫浜цˉ鍙傝€冨浘"],
+        "required_changes": [],
+    }
+
+    result = classify_repair_tasks(output, stage="style_lock", series_id="series-1")
+
+    assert result.repairable is False
+    assert result.manual_gate_required is True
+    task = result.repair_tasks[0]
+    assert task.auto_execute is False
+    assert task.reason == "专家审查结果缺少可执行结论，需要人工确认"
+    assert not any(token in task.reason for token in ["鍘", "鑰", "鎺", "瑙", "闇", "鐢", "琛", "鈥", "渆", "�"])
 ```
 
 - [ ] **Step 2: Run classifier tests and verify they fail**
@@ -383,6 +409,8 @@ def _task_from_structured(raw: dict[str, Any], *, stage: str, series_id: str) ->
 
 def _manual_tasks_from_findings(output: dict[str, Any], *, stage: str, series_id: str) -> list[RepairTask]:
     text = " ".join(str(item) for key in ("findings", "required_changes", "recommendations") for item in output.get(key, []) if item)
+    if _looks_unreadable_or_generic(text):
+        text = "专家审查结果缺少可执行结论，需要人工确认"
     lowered = text.lower()
     if "合规" in text or "医疗" in text or "控糖" in text:
         task_type = "medical_or_health_compliance_risk"
@@ -411,6 +439,16 @@ def _manual_tasks_from_findings(output: dict[str, Any], *, stage: str, series_id
             affected_ids=[],
         )
     ]
+
+
+def _looks_unreadable_or_generic(text: str) -> bool:
+    if not text.strip():
+        return True
+    mojibake_tokens = ("鍘", "鑰", "鎺", "瑙", "闇", "鐢", "琛", "鈥", "渆", "�")
+    if any(token in text for token in mojibake_tokens):
+        return True
+    generic_phrases = ("已记录审查发现", "已记录异常结论", "等待下一步处理")
+    return any(phrase in text for phrase in generic_phrases) and len(text.strip()) < 40
 ```
 
 - [ ] **Step 5: Store repair tasks when invocations are persisted**
@@ -1372,6 +1410,7 @@ describe('AgencyDecisionLog auto repair transparency', () => {
     expect(wrapper.text()).toContain('角色缺少侧面参考图')
     expect(wrapper.text()).toContain('去角色资产补参考图')
     expect(wrapper.text()).not.toContain('provider')
+    expect(wrapper.text()).not.toMatch(/[鍘鑰鎺瑙闇鐢琛]|鈥|渆|�/)
   })
 })
 ```

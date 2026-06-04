@@ -57,6 +57,8 @@ CEO review result: the plan should hold scope, but it must add explicit trust gu
 - **No generic expert filler:** if the expert output is empty, English, malformed, or only contains generic text such as `已记录审查发现`, the classifier must produce a manual-required item with a specific fallback reason: `专家审查结果缺少可执行结论，需要人工确认`.
 - **Trust first:** the UI must show the original expert finding, the planned repair action, cost impact, and the next human gate in the same visible repair block. A repair task that cannot explain these four fields is not eligible for automatic execution.
 - **Repair completion is not approval:** successful automatic repair must create `agency_repair_recheck_required`, set the repaired target metadata to `repair_recheck_pending`, and surface `待复审` in the UI. It must never mark any asset, stage, or final video as `approved`; only the existing review gate may do that.
+- **Budget is cumulative:** paid automatic repair authorization is a run/plan-level repair budget, not a per-task limit. Before enqueueing a paid repair job, calculate previously reserved/spent repair cost plus costs reserved earlier in the current enqueue call; anything exceeding `auto_repair_policy.budget_limit` must become manual-required with reason `自动返修预算不足，需要人工确认是否继续付费返修`.
+- **Provider cost boundary still applies:** the repair executor may not call a paid model through a shortcut path. Any paid reference/image/video repair must reuse the existing provider cost reservation and settlement path (`ProviderCostReservation`, provider stage task cost data, and `ProductionPlan.current_cost`). Check both boundaries: repair budget against repair-only reserved/spent estimates, and production plan budget against `ProductionPlan.current_cost + active_reserved_cost(...) + estimated_cost`. If either boundary is unavailable or exceeded, the task must be manual-required instead of auto-executed.
 
 ## File Structure
 
@@ -522,7 +524,7 @@ def _series(db):
 
 
 def _plan(db, series):
-    plan = ProductionPlan(series_id=series.id, status="ready")
+    plan = ProductionPlan(series_id=series.id, status="ready", budget_limit=5.0, current_cost=0.0)
     db.add(plan)
     db.commit()
     db.refresh(plan)
@@ -611,6 +613,83 @@ def test_disabled_policy_does_not_enqueue_paid_job(db):
     assert result["created"] == 0
     assert result["manual_required"] == 1
     assert db.query(ProductionJob).count() == 0
+
+
+def test_cumulative_budget_blocks_tasks_after_limit(db):
+    series = _series(db)
+    plan = _plan(db, series)
+    task_a = {
+        "type": "missing_character_reference",
+        "stage": "style_lock",
+        "target_type": "character",
+        "target_id": "char-1",
+        "series_id": series.id,
+        "auto_execute": True,
+        "requires_paid_provider": True,
+        "estimated_cost": 0.6,
+        "reason": "缺少角色正面参考图",
+        "expected_result": "补齐角色正面参考图",
+        "repair_action_label": "去角色资产补参考图",
+        "repair_route": "/characters/char-1",
+        "affected_ids": ["char-1"],
+    }
+    task_b = {**task_a, "target_id": "char-2", "reason": "缺少角色侧面参考图", "affected_ids": ["char-2"]}
+    invocation = _invocation(db, series, plan, task_a)
+    output = dict(invocation.output_summary_json)
+    output["repair_tasks"] = [task_a, task_b]
+    invocation.output_summary_json = output
+    db.commit()
+
+    result = enqueue_repair_tasks_for_invocation(db, invocation, {
+        "enabled": True,
+        "max_rounds": 2,
+        "budget_limit": 1.0,
+        "currency": "CNY",
+        "allowed_stages": ["style_lock"],
+        "allowed_types": ["missing_character_reference"],
+        "requires_human_gate_after_repair": True,
+    })
+
+    assert result["created"] == 1
+    assert result["manual_required"] == 1
+    assert db.query(ProductionJob).count() == 1
+
+
+def test_provider_plan_budget_blocks_paid_repair(db):
+    series = _series(db)
+    plan = _plan(db, series)
+    plan.current_cost = 4.95
+    db.commit()
+    task = {
+        "type": "missing_character_reference",
+        "stage": "style_lock",
+        "target_type": "character",
+        "target_id": "char-1",
+        "series_id": series.id,
+        "auto_execute": True,
+        "requires_paid_provider": True,
+        "estimated_cost": 0.2,
+        "reason": "缺少角色参考图",
+        "expected_result": "补齐角色参考图",
+        "repair_action_label": "去角色资产补参考图",
+        "repair_route": "/characters/char-1",
+        "affected_ids": ["char-1"],
+    }
+    invocation = _invocation(db, series, plan, task)
+
+    result = enqueue_repair_tasks_for_invocation(db, invocation, {
+        "enabled": True,
+        "max_rounds": 2,
+        "budget_limit": 1.0,
+        "currency": "CNY",
+        "allowed_stages": ["style_lock"],
+        "allowed_types": ["missing_character_reference"],
+        "requires_human_gate_after_repair": True,
+    })
+
+    assert result["created"] == 0
+    assert result["manual_required"] == 1
+    assert db.query(ProductionJob).count() == 0
 ```
 
 - [ ] **Step 2: Run orchestrator tests and verify they fail**
@@ -636,13 +715,14 @@ from typing import Any
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.db_models import AgencyExpertInvocation, ProductionAuditEvent, ProductionJob
+from app.db_models import AgencyExpertInvocation, ProductionAuditEvent, ProductionJob, ProductionPlan
 from app.services.agency_repair_contracts import (
     AUTO_REPAIR_STAGE,
     MAX_AUTO_REPAIR_ROUNDS,
     AutoRepairPolicy,
     RepairTask,
 )
+from app.services.provider_cost_reservation_service import active_reserved_cost
 from app.services.production_status import JOB_QUEUED
 
 
@@ -650,24 +730,29 @@ def enqueue_repair_tasks_for_invocation(
     db: Session,
     invocation: AgencyExpertInvocation,
     policy_snapshot: dict[str, Any] | None,
-) -> dict[str, int]:
+) -> dict[str, int | float]:
     policy = AutoRepairPolicy.model_validate(policy_snapshot or {})
     output = invocation.output_summary_json or {}
     tasks = [RepairTask.model_validate(item) for item in output.get("repair_tasks") or [] if isinstance(item, dict)]
-    result = {"created": 0, "deduped": 0, "manual_required": 0}
+    result = {"created": 0, "deduped": 0, "manual_required": 0, "budget_reserved": 0.0}
+    repair_budget_used = _repair_budget_used(db, invocation)
+    reserved_this_call = 0.0
     for task in tasks:
         task.source_invocation_id = invocation.id
-        allowed, reason = _can_auto_execute(task, policy)
+        allowed, reason = _can_auto_execute(db, invocation, task, policy, repair_budget_used + reserved_this_call)
         if not allowed:
             _record_manual_required(db, invocation, task, reason)
             result["manual_required"] += 1
             continue
         _job, created = _enqueue_repair_job(db, invocation, task)
         result["created" if created else "deduped"] += 1
+        if created and task.requires_paid_provider:
+            reserved_this_call += task.estimated_cost
+            result["budget_reserved"] = round(result["budget_reserved"] + task.estimated_cost, 4)
     return result
 
 
-def _can_auto_execute(task: RepairTask, policy: AutoRepairPolicy) -> tuple[bool, str]:
+def _can_auto_execute(db: Session, invocation: AgencyExpertInvocation, task: RepairTask, policy: AutoRepairPolicy, repair_budget_used: float) -> tuple[bool, str]:
     if not task.auto_execute:
         return False, "该问题需要人工处理"
     if not policy.enabled:
@@ -678,11 +763,41 @@ def _can_auto_execute(task: RepairTask, policy: AutoRepairPolicy) -> tuple[bool,
         return False, "当前返修类型未授权自动执行"
     if task.round > min(policy.max_rounds, MAX_AUTO_REPAIR_ROUNDS):
         return False, "自动返修轮数已达上限"
-    if task.requires_paid_provider and task.estimated_cost > policy.budget_limit:
-        return False, "自动返修预算不足"
+    if task.requires_paid_provider and repair_budget_used + task.estimated_cost > policy.budget_limit:
+        return False, "自动返修预算不足，需要人工确认是否继续付费返修"
+    if task.requires_paid_provider and not _provider_budget_available(db, invocation.production_plan_id, task.estimated_cost):
+        return False, "生产预算不足，需要人工确认是否继续付费返修"
     if not task.target_id:
         return False, "无法定位需要返修的对象"
     return True, ""
+
+
+def _repair_budget_used(db: Session, invocation: AgencyExpertInvocation) -> float:
+    rows = (
+        db.query(ProductionAuditEvent)
+        .filter(ProductionAuditEvent.event_type == "agency_repair_task_created")
+        .filter(ProductionAuditEvent.production_plan_id == invocation.production_plan_id)
+        .all()
+    )
+    total = 0.0
+    for row in rows:
+        if invocation.run_id and row.run_id and row.run_id != invocation.run_id:
+            continue
+        task = ((row.payload_json or {}).get("repair_task") or {})
+        if task.get("requires_paid_provider"):
+            total += float(task.get("estimated_cost") or 0.0)
+    return total
+
+
+def _provider_budget_available(db: Session, plan_id: str | None, estimated_cost: float) -> bool:
+    if not plan_id:
+        return False
+    plan = db.query(ProductionPlan).filter(ProductionPlan.id == plan_id).first()
+    if not plan or plan.budget_limit is None:
+        return False
+    current = float(plan.current_cost or 0.0)
+    reserved = active_reserved_cost(db, plan_id)
+    return current + reserved + float(estimated_cost or 0.0) <= float(plan.budget_limit)
 
 
 def _enqueue_repair_job(db: Session, invocation: AgencyExpertInvocation, task: RepairTask) -> tuple[ProductionJob, bool]:
@@ -914,6 +1029,8 @@ Expected: fail with missing `agency_repair_executor`.
 - [ ] **Step 3: Implement executor**
 
 Create `server/app/services/agency_repair_executor.py`:
+
+Before implementing any repair branch that may call a paid provider, verify that the invoked service goes through the existing cost reservation/settlement path. For reference-image repairs, prefer existing service helpers only if they already preserve provider cost accounting. If a helper cannot provide that guarantee, return `_manual_block(job, "去审查中心确认付费返修", "/review-center")` instead of calling the provider.
 
 ```python
 from __future__ import annotations

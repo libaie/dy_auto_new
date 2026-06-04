@@ -39,6 +39,7 @@ Required corrections for implementation:
 - **Long-video density:** production monitor defaults to aggregate chips by stage and status. Detailed repair rows stay in a drawer or collapsible panel opened by the user.
 - **Responsive density:** long-video repair details must have desktop and mobile layouts. Desktop uses a right-side drawer or constrained panel; mobile uses a bottom sheet or single-column collapsible list. Action buttons must wrap or stack instead of overflowing.
 - **Accessible controls:** repair status and paid-confirmation controls must be keyboard usable, have visible focus states, and not rely on color alone. Paid confirmation dialogs must trap focus, restore focus to the triggering task action when closed, and expose inline errors to assistive technology.
+- **Centralized Chinese copy:** repeated repair UI labels must live in one frontend copy module, not be hard-coded across summary strip, task list, policy panel, monitor drawer, and review center. This prevents English fallback, mojibake, and inconsistent status wording.
 - **Language:** all user-facing labels must be Chinese. Provider/model/internal fields may appear only inside developer/debug affordances, not the default UI.
 - **Visual restraint:** reuse existing dashboard density and table/list patterns. Avoid nested cards, hero-style blocks, decorative gradients, and large instructional copy.
 
@@ -103,6 +104,8 @@ CEO review result: the plan should hold scope, but it must add explicit trust gu
   - Adds repair task API helpers.
 - Modify `web/src/api/videoProduction.js`
   - Sends `auto_repair_policy` with start payload.
+- Create `web/src/constants/autoRepairCopy.js`
+  - Central Chinese copy and status labels for repair UI components.
 - Modify `web/src/components/agency/AgencyDecisionLog.vue`
   - Displays repair task status, manual action, cost, and re-review status.
 - Modify `web/src/views/SeriesDetailPage.vue`
@@ -131,6 +134,7 @@ CEO review result: the plan should hold scope, but it must add explicit trust gu
 - Create `web/src/__tests__/video-production-repair-node.test.js`
 - Create `web/src/__tests__/auto-repair-summary-strip.test.js`
 - Create `web/src/__tests__/auto-repair-task-list.test.js`
+- Create `web/src/__tests__/auto-repair-copy.test.js`
 
 ---
 
@@ -2091,6 +2095,7 @@ git commit -m "feat: expose agency repair status"
 **Files:**
 - Modify: `web/src/api/agency.js`
 - Modify: `web/src/api/videoProduction.js`
+- Create: `web/src/constants/autoRepairCopy.js`
 - Create: `web/src/components/agency/AutoRepairSummaryStrip.vue`
 - Create: `web/src/components/agency/AutoRepairTaskList.vue`
 - Create: `web/src/components/agency/AutoRepairPolicyPanel.vue`
@@ -2099,6 +2104,7 @@ git commit -m "feat: expose agency repair status"
 - Modify: `web/src/views/VideoProductionMonitorPage.vue`
 - Create: `web/src/__tests__/auto-repair-summary-strip.test.js`
 - Create: `web/src/__tests__/auto-repair-task-list.test.js`
+- Create: `web/src/__tests__/auto-repair-copy.test.js`
 - Create: `web/src/__tests__/agency-auto-repair-log.test.js`
 - Create: `web/src/__tests__/one-sentence-auto-repair-policy.test.js`
 - Create: `web/src/__tests__/video-production-repair-node.test.js`
@@ -2184,6 +2190,22 @@ it('shows paid retry authorization as the only primary action', () => {
   expect(wrapper.text()).toContain('确认追加预算并重试')
   expect(wrapper.text()).toContain('需要人工确认追加预算后才能继续付费返修')
   expect(wrapper.text()).not.toContain('重试返修')
+})
+```
+
+Create `web/src/__tests__/auto-repair-copy.test.js`:
+
+```javascript
+import { AUTO_REPAIR_COPY } from '../constants/autoRepairCopy'
+
+describe('AUTO_REPAIR_COPY', () => {
+  it('keeps all user-facing repair copy readable Chinese', () => {
+    const serialized = JSON.stringify(AUTO_REPAIR_COPY)
+    expect(serialized).toContain('自动返修')
+    expect(serialized).toContain('确认追加预算并重试')
+    expect(serialized).not.toMatch(/[A-Za-z]{4,}/)
+    expect(serialized).not.toMatch(/[鍘鑰鎺瑙闇鐢琛鈥渆�]/)
+  })
 })
 ```
 
@@ -2421,7 +2443,7 @@ Run:
 
 ```powershell
 cd web
-npm test -- auto-repair-summary-strip auto-repair-task-list agency-auto-repair-log one-sentence-auto-repair-policy video-production-repair-node --run
+npm test -- auto-repair-copy auto-repair-summary-strip auto-repair-task-list agency-auto-repair-log one-sentence-auto-repair-policy video-production-repair-node --run
 ```
 
 Expected: tests fail because UI and selectors are not implemented yet.
@@ -2463,6 +2485,36 @@ export function createOneSentenceVideo(payload) {
   })
 }
 ```
+
+- [ ] **Step 3a: Add centralized Chinese repair copy**
+
+Create `web/src/constants/autoRepairCopy.js`:
+
+```javascript
+export const AUTO_REPAIR_COPY = {
+  title: '自动返修',
+  policyTitle: '自动返修策略',
+  suggestionOnly: '仅记录建议，不自动付费返修',
+  loadingTasks: '正在加载返修任务...',
+  emptyTasks: '暂无需要处理的返修任务',
+  loadTasksFailed: '返修任务加载失败',
+  submitRepairing: '正在提交返修',
+  confirmingPaidRepair: '正在确认付费返修',
+  paidAuthorizationFailed: '付费返修确认失败',
+  retryRepair: '重试返修',
+  authorizePaidRetry: '确认追加预算并重试',
+  manualAction: '去处理',
+  contactManual: '联系人工处理',
+  recheckPending: '待复审',
+  statusPrefix: '状态',
+  nextGatePrefix: '下一审查',
+  nextStepPrefix: '下一步',
+  estimatedCostPrefix: '预计返修成本',
+  expandAll: (count) => `展开全部 ${count} 项`,
+}
+```
+
+All repair UI components must import labels from this module for repeated copy. Component-specific dynamic text such as `task.reason` and backend-provided `repair_action_label` may still come from API data after readability validation.
 
 - [ ] **Step 4: Create reusable summary strip**
 
@@ -2725,6 +2777,12 @@ Accessibility design review override:
 - Submitting actions must expose `aria-busy="true"` on the active button.
 - The paid authorization dialog must use `role="dialog"` and `aria-modal="true"`, focus the first required field when opened, trap keyboard focus while open, close on Escape, and restore focus to the task action that opened it.
 - Inline dialog errors must use `role="alert"` or an equivalent live region.
+
+Copy design review override:
+
+- Repeated labels such as `自动返修`, `待复审`, `重试返修`, `确认追加预算并重试`, loading text, empty text, and failure text must come from `AUTO_REPAIR_COPY`.
+- Older component examples in this plan may still show inline labels for readability, but implementation should centralize repeated copy before wiring UI.
+- Backend-provided `reason`, `expected_result`, and `repair_action_label` remain data fields; they must pass the existing Chinese readability/mojibake gate before display.
 
 - [ ] **Step 7: Add policy confirmation panel to `OneSentenceVideoPage.vue`**
 

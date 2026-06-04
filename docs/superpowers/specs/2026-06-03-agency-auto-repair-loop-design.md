@@ -18,6 +18,16 @@
 - 自动返修任务必须和 `AgencyExpertInvocation` 关联，前端展示时能从“专家发现”追到“返修 job”和“复审 invocation”。
 - 返修 worker 必须复用已有 `ProductionJob` lease/idempotency、`ProductionAuditEvent`、provider stage task 和预算边界，不新增第二套队列。
 
+## CEO Review Corrections
+
+2026-06-04 CEO review 后，本方案补充一个产品级边界：**自动返修可以自动执行，但必须在用户已授权的生产策略内执行**。
+
+- 一句话成片、系列批量生产或手动启动流水线时，必须展示并保存自动返修策略：是否启用自动返修、最大自动返修轮数、自动返修预算上限、允许自动返修的阶段。
+- 默认策略为“自动补齐结构性缺口，不自动放行质量闸门”。若用户没有授权真实付费返修预算，系统只能生成返修建议和待执行任务，不能静默调用付费 provider。
+- 每次自动返修消耗预算时，必须归因到对应 `repair_task`，前端显示“本次返修预计/已消耗成本”。
+- 自动返修预算耗尽后，任务进入 `manual_required`，用户可以追加预算或手动处理。
+- 这个授权不替代人工审查；它只允许系统在已批准成本范围内自动补齐确定性缺口。
+
 ## Goals
 
 - 将专家输出中的 `findings`、`required_changes`、`recommendations` 转化为结构化返修任务。
@@ -26,6 +36,7 @@
 - 所有返修状态必须在专家控制台、角色资产、场景资产、审查中心和生产监控页可见。
 - 自动返修不得绕过图像审查、视频审查、最终合成前审查和最终人工确认。
 - 刷新页面、切换页面、worker 重启后仍可看到返修进度。
+- 自动返修真实付费调用必须受用户授权的返修预算和轮数限制。
 
 ## Non Goals
 
@@ -58,6 +69,8 @@
 ## Design Principle
 
 自动返修只处理 **可机器判断完成状态** 的问题。
+
+自动返修还有一个前置条件：当前 run 或 series 必须有有效的 `auto_repair_policy`。没有策略时，classifier 仍可生成建议，但 orchestrator 不得创建真实付费返修任务。
 
 可自动修：
 
@@ -117,6 +130,9 @@ flowchart LR
       "asset_id": null,
       "priority": "high",
       "auto_execute": true,
+      "requires_paid_provider": true,
+      "budget_authorized": true,
+      "estimated_cost": 0.02,
       "reason": "角色缺少侧面和全身锚定参考图",
       "expected_result": "生成并写回角色参考图 URL，更新 reference_progress",
       "manual_gate_after_repair": true
@@ -131,8 +147,39 @@ flowchart LR
 - `manual_gate_required` 表示返修后是否仍需人工或审查闸门确认。
 - `type` 使用固定枚举，不允许直接执行任意自然语言。
 - `auto_execute=true` 只允许用于白名单类型。
+- `requires_paid_provider=true` 的任务必须校验 `auto_repair_policy` 和预算授权。
 - `reason` 和 `expected_result` 面向用户展示，必须中文。
 - `target_id` 必须能定位到现有系列、剧集、角色、场景、资产或片段。
+
+## Auto Repair Policy
+
+自动返修策略是用户授权边界，保存到 run 或 series 关联的生产上下文中。第一版建议随 `ProductionPlan` 或 `VideoProductionRun.model_trace_json.auto_repair_policy` 保存快照，避免后续系列配置变化影响已启动任务。
+
+```json
+{
+  "enabled": true,
+  "max_rounds": 2,
+  "budget_limit": 1.0,
+  "currency": "CNY",
+  "allowed_stages": ["style_lock", "storyboard", "image_stage", "video_stage", "compose"],
+  "allowed_types": [
+    "missing_character_reference",
+    "missing_scene_reference",
+    "storyboard_missing_references",
+    "image_generation_timeout",
+    "video_segment_timeout"
+  ],
+  "requires_human_gate_after_repair": true
+}
+```
+
+规则：
+
+- `enabled=false` 时只生成返修建议，不创建自动执行 job。
+- `budget_limit` 只约束自动返修，不替代生产总预算。
+- `max_rounds` 不能超过系统硬上限 2。
+- `allowed_types` 不能包含主观质量、合规或最终放行类问题。
+- 前端必须在启动生产前展示该策略摘要，用户确认后写入快照。
 
 ## Repair Types
 
@@ -358,6 +405,7 @@ flowchart LR
 - 不把专家自然语言中的 URL、文件路径、shell 命令或 provider 参数直接传入执行器。
 - 不允许专家输出任意 URL 写入资产库，必须走现有存储和可用性校验。
 - 所有真实 provider 返修都必须走模型配置中心和预算限制。
+- 所有真实付费返修必须先校验 `auto_repair_policy.enabled`、`allowed_types`、`allowed_stages`、`max_rounds` 和剩余返修预算。
 - 用户提供的 API Key 不进入日志、专家输出和前端决策日志。
 - 医疗、健康、真人肖像风险只允许生成审查建议，不允许自动放行。
 

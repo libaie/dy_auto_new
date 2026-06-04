@@ -63,6 +63,7 @@ CEO review result: the plan should hold scope, but it must add explicit trust gu
 - **Executor must not commit:** automatic repair execution must not call `db.commit()` or `db.rollback()` internally. The worker/API entrypoint owns transaction commit/rollback so asset metadata, repair events, job status, and cost settlement succeed or fail as one unit. If an existing helper commits internally, do not call it from the executor; route the task to manual-required until a caller-owned transaction path exists.
 - **Repair round is backend-owned:** automatic repair round count must be calculated from persisted repair history by `production_plan_id + stage + repair_type + target_type + target_id`. Do not trust `RepairTask.round` from expert/model output. The idempotency key must not include `invocation.id`; otherwise repeated expert rechecks can create an endless auto-repair loop for the same target.
 - **Retry is not a bypass:** manual retry may requeue free deterministic repair jobs, but any paid/provider-backed retry must re-read the original repair task and current `auto_repair_policy`, then re-check repair budget, production budget, active provider reservations, allowed stage/type, and backend-owned round limits before setting the job back to queued.
+- **Paid retry requires explicit authorization:** if a paid retry is blocked by budget, the only way to continue is a separate audited authorization action. That action must require a human reason and a confirmed budget delta, update the production plan budget limit by the confirmed amount, write `agency_repair_paid_retry_authorized`, then requeue the job. Plain retry must never perform this authorization implicitly.
 
 ## File Structure
 
@@ -1530,6 +1531,79 @@ def test_retry_paid_repair_respects_current_budget(client, db):
     db.refresh(job)
     assert job.status == "failed"
     assert "生产预算不足" in resp.json()["detail"]
+
+
+def test_authorize_paid_repair_retry_records_audit_and_requeues(client, db):
+    series = Series(title="老李控糖")
+    db.add(series)
+    db.commit()
+    plan = ProductionPlan(series_id=series.id, status="ready", budget_limit=0.1, current_cost=0.1)
+    db.add(plan)
+    run = VideoProductionRun(
+        series_id=series.id,
+        production_plan_id=plan.id,
+        run_type="real_short_e2e",
+        status="running",
+        model_trace_json={
+            "auto_repair_policy": {
+                "enabled": True,
+                "max_rounds": 2,
+                "budget_limit": 1.0,
+                "currency": "CNY",
+                "allowed_stages": ["style_lock"],
+                "allowed_types": ["missing_character_reference"],
+                "requires_human_gate_after_repair": True,
+            }
+        },
+    )
+    db.add(run)
+    job = ProductionJob(
+        plan_id=plan.id,
+        target_type="character",
+        target_id="char-1",
+        stage="agency_auto_repair:missing_character_reference",
+        status="failed",
+        idempotency_key="repair:authorize-retry",
+        blocked_reason="缺少角色参考图",
+    )
+    db.add(job)
+    db.flush()
+    db.add(ProductionAuditEvent(
+        event_type="agency_repair_task_created",
+        run_id=run.id,
+        production_plan_id=plan.id,
+        payload_json={
+            "job_id": job.id,
+            "repair_task": {
+                "type": "missing_character_reference",
+                "stage": "style_lock",
+                "target_type": "character",
+                "target_id": "char-1",
+                "series_id": series.id,
+                "auto_execute": True,
+                "requires_paid_provider": True,
+                "estimated_cost": 0.2,
+                "reason": "缺少角色参考图",
+                "expected_result": "补齐角色参考图",
+                "repair_action_label": "去角色资产补参考图",
+                "repair_route": "/characters/char-1",
+                "affected_ids": ["char-1"],
+            },
+        },
+    ))
+    db.commit()
+
+    resp = client.post(
+        f"/api/agency/repair-tasks/{job.id}/authorize-retry",
+        json={"reason": "确认继续付费补齐参考图", "confirmed_budget_delta": 0.3},
+    )
+
+    assert resp.status_code == 200
+    db.refresh(job)
+    db.refresh(plan)
+    assert job.status == "queued"
+    assert plan.budget_limit == 0.4
+    assert db.query(ProductionAuditEvent).filter_by(event_type="agency_repair_paid_retry_authorized").count() == 1
 ```
 
 Create `server/tests/test_agency_repair_query_scale.py`:
@@ -1631,6 +1705,8 @@ Do not add indexes on `ProductionAuditEvent.payload_json` for this phase. Repair
 Modify `server/app/routers/agency.py` with:
 
 ```python
+from fastapi import Body
+
 from app.db_models import ProductionAuditEvent, ProductionJob, ProductionPlan, VideoProductionRun
 from app.services.provider_cost_reservation_service import active_reserved_cost
 from app.services.production_status import JOB_BLOCKED, JOB_FAILED, JOB_QUEUED, JOB_RETRY_WAIT
@@ -1692,6 +1768,62 @@ def retry_repair_task(
     db.commit()
     db.refresh(job)
     return _repair_task_item(job, None)
+
+
+@router.post("/repair-tasks/{job_id}/authorize-retry")
+def authorize_paid_repair_retry(
+    job_id: str,
+    body: dict = Body(...),
+    db: Session = Depends(get_db),
+    _=Depends(require_role("admin")),
+):
+    reason = str(body.get("reason") or "").strip()
+    confirmed_budget_delta = float(body.get("confirmed_budget_delta") or 0.0)
+    if not reason:
+        raise HTTPException(status_code=422, detail="必须填写继续付费返修原因")
+    if confirmed_budget_delta <= 0:
+        raise HTTPException(status_code=422, detail="必须确认追加预算金额")
+    job = db.query(ProductionJob).filter(ProductionJob.id == job_id).first()
+    if not job or not job.stage.startswith("agency_auto_repair"):
+        raise HTTPException(status_code=404, detail="返修任务不存在")
+    if job.status not in {JOB_FAILED, JOB_BLOCKED, JOB_RETRY_WAIT}:
+        raise HTTPException(status_code=409, detail="当前返修任务状态不允许授权重试")
+    audit = _repair_audit_by_job(db, [job.id], plan_ids=[job.plan_id]).get(job.id) or {}
+    repair_task = audit.get("repair_task") or {}
+    if not repair_task.get("requires_paid_provider"):
+        raise HTTPException(status_code=409, detail="非付费返修请使用普通重试")
+    estimated_cost = float(repair_task.get("estimated_cost") or 0.0)
+    if confirmed_budget_delta < estimated_cost:
+        raise HTTPException(status_code=409, detail="确认追加预算小于预计返修费用")
+    plan = db.query(ProductionPlan).filter(ProductionPlan.id == job.plan_id).first()
+    if not plan:
+        raise HTTPException(status_code=404, detail="生产计划不存在")
+    plan.budget_limit = float(plan.budget_limit or 0.0) + confirmed_budget_delta
+    job.status = JOB_QUEUED
+    job.error_code = None
+    job.error_message = None
+    job.blocked_reason = None
+    job.lease_id = None
+    job.leased_until = None
+    db.add(ProductionAuditEvent(
+        event_type="agency_repair_paid_retry_authorized",
+        production_plan_id=job.plan_id,
+        payload_json={
+            "job_id": job.id,
+            "reason": reason,
+            "confirmed_budget_delta": confirmed_budget_delta,
+            "estimated_cost": estimated_cost,
+            "repair_task": repair_task,
+        },
+    ))
+    db.add(ProductionAuditEvent(
+        event_type="agency_repair_retry_requested",
+        production_plan_id=job.plan_id,
+        payload_json={"job_id": job.id, "stage": job.stage, "target_type": job.target_type, "target_id": job.target_id, "authorized": True},
+    ))
+    db.commit()
+    db.refresh(job)
+    return _repair_task_item(job, audit)
 
 
 def _can_retry_repair_job(db: Session, job: ProductionJob, repair_task: dict) -> tuple[bool, str]:
@@ -2126,6 +2258,10 @@ export function getRepairTasks(params = {}) {
 export function retryRepairTask(jobId) {
   return client.post(`/agency/repair-tasks/${jobId}/retry`)
 }
+
+export function authorizeRepairRetry(jobId, payload) {
+  return client.post(`/agency/repair-tasks/${jobId}/authorize-retry`, payload)
+}
 ```
 
 Modify `web/src/api/videoProduction.js` so both `startEpisodeProduction(payload)` and `createOneSentenceVideo(payload)` forward `auto_repair_policy`:
@@ -2247,6 +2383,15 @@ Inside each decision log item template in `web/src/components/agency/AgencyDecis
   </div>
 </section>
 ```
+
+When a repair task has `requires_paid_provider` and the normal retry API returns 409 with a budget-related message, show a compact confirmation dialog with:
+
+- `继续付费返修` as the primary action.
+- A required `确认原因` input.
+- A numeric `追加预算` input.
+- The estimated retry cost and current failure reason.
+
+The primary action must call `authorizeRepairRetry(task.id, { reason, confirmed_budget_delta })`. Do not call normal `retryRepairTask` again after a paid/budget 409.
 
 - [ ] **Step 7: Add policy confirmation panel to `OneSentenceVideoPage.vue`**
 

@@ -56,6 +56,7 @@ CEO review result: the plan should hold scope, but it must add explicit trust gu
 - **Mojibake regression tests:** backend and frontend tests must fail if user-facing repair text contains common mojibake patterns such as `鍘`, `鑰`, `鎺`, `瑙`, `闇`, `鐢`, `琛`, `鈥`, `渆`, or `�`.
 - **No generic expert filler:** if the expert output is empty, English, malformed, or only contains generic text such as `已记录审查发现`, the classifier must produce a manual-required item with a specific fallback reason: `专家审查结果缺少可执行结论，需要人工确认`.
 - **Trust first:** the UI must show the original expert finding, the planned repair action, cost impact, and the next human gate in the same visible repair block. A repair task that cannot explain these four fields is not eligible for automatic execution.
+- **Repair completion is not approval:** successful automatic repair must create `agency_repair_recheck_required`, set the repaired target metadata to `repair_recheck_pending`, and surface `待复审` in the UI. It must never mark any asset, stage, or final video as `approved`; only the existing review gate may do that.
 
 ## File Structure
 
@@ -869,7 +870,9 @@ async def test_missing_character_reference_updates_progress(db, monkeypatch):
     assert result.status == "success"
     refreshed = db.query(Character).filter_by(id=character.id).one()
     assert refreshed.meta_json["reference_generation"]["status"] == "completed"
+    assert refreshed.meta_json["repair_review_gate"]["status"] == "repair_recheck_pending"
     assert db.query(ProductionAuditEvent).filter_by(event_type="agency_repair_completed").count() == 1
+    assert db.query(ProductionAuditEvent).filter_by(event_type="agency_repair_recheck_required").count() == 1
 
 
 @pytest.mark.asyncio
@@ -959,14 +962,18 @@ async def _repair_character_reference(db: Session, job: ProductionJob) -> Produc
     result = await generate_character_reference_assets(db, character.id)
     meta = dict(character.meta_json or {})
     meta["reference_generation"] = {"status": "completed" if result.get("ok") else "failed", "source": "agency_auto_repair", "job_id": job.id, "result": result}
+    if result.get("ok"):
+        meta["repair_review_gate"] = {"status": "repair_recheck_pending", "source": "agency_auto_repair", "job_id": job.id}
     character.meta_json = meta
     _audit(db, job, "agency_repair_completed" if result.get("ok") else "agency_repair_failed", result)
+    if result.get("ok"):
+        _audit(db, job, "agency_repair_recheck_required", {"target_type": "character", "target_id": character.id, "next_gate": "style_lock_review"})
     db.commit()
     if not result.get("ok"):
         return _manual_block(job, "去角色资产补参考图", f"/characters/{character.id}")
     return ProductionActionResult.success(
-        "角色参考图返修完成",
-        {"repair_type": "missing_character_reference", "target_id": character.id},
+        "角色参考图返修完成，等待复审",
+        {"repair_type": "missing_character_reference", "target_id": character.id, "next_status": "repair_recheck_pending"},
     )
 
 
@@ -981,14 +988,18 @@ async def _repair_scene_reference(db: Session, job: ProductionJob) -> Production
     result = await generate_scene_reference_assets(db, scene.id)
     meta = dict(scene.meta_json or {})
     meta["reference_generation"] = {"status": "completed" if result.get("ok") else "failed", "source": "agency_auto_repair", "job_id": job.id, "result": result}
+    if result.get("ok"):
+        meta["repair_review_gate"] = {"status": "repair_recheck_pending", "source": "agency_auto_repair", "job_id": job.id}
     scene.meta_json = meta
     _audit(db, job, "agency_repair_completed" if result.get("ok") else "agency_repair_failed", result)
+    if result.get("ok"):
+        _audit(db, job, "agency_repair_recheck_required", {"target_type": "scene", "target_id": scene.id, "next_gate": "style_lock_review"})
     db.commit()
     if not result.get("ok"):
         return _manual_block(job, "去场景资产补参考图", f"/scenes/{scene.id}")
     return ProductionActionResult.success(
-        "场景参考图返修完成",
-        {"repair_type": "missing_scene_reference", "target_id": scene.id},
+        "场景参考图返修完成，等待复审",
+        {"repair_type": "missing_scene_reference", "target_id": scene.id, "next_status": "repair_recheck_pending"},
     )
 
 
@@ -1237,13 +1248,19 @@ def retry_repair_task(
 def _repair_audit_by_job(db: Session, job_ids: list[str]) -> dict[str, dict]:
     if not job_ids:
         return {}
-    rows = db.query(ProductionAuditEvent).filter(ProductionAuditEvent.event_type.in_(["agency_repair_task_created", "agency_repair_manual_required", "agency_repair_completed", "agency_repair_failed"])).all()
+    rows = db.query(ProductionAuditEvent).filter(ProductionAuditEvent.event_type.in_(["agency_repair_task_created", "agency_repair_manual_required", "agency_repair_completed", "agency_repair_failed", "agency_repair_recheck_required"])).all()
     result = {}
     for row in rows:
         payload = row.payload_json or {}
         job_id = payload.get("job_id")
         if job_id in job_ids:
-            result[job_id] = payload
+            current = result.setdefault(job_id, {})
+            if payload.get("repair_task"):
+                current["repair_task"] = payload["repair_task"]
+            if row.event_type == "agency_repair_recheck_required":
+                current["recheck_required"] = True
+                current["next_gate"] = (payload.get("result") or {}).get("next_gate")
+            current["last_event_type"] = row.event_type
     return result
 
 
@@ -1262,15 +1279,19 @@ def _repair_task_item(job: ProductionJob, audit: dict | None) -> dict:
         "estimated_cost": repair_task.get("estimated_cost") or 0,
         "created_at": job.created_at.isoformat() if job.created_at else None,
         "updated_at": job.updated_at.isoformat() if job.updated_at else None,
+        "recheck_required": bool((audit or {}).get("recheck_required")) or job.status == "repair_recheck_pending",
+        "next_gate": (audit or {}).get("next_gate"),
     }
 
 
 def _repair_summary(items: list[dict]) -> dict:
-    summary = {"total": len(items), "queued": 0, "running": 0, "completed": 0, "failed": 0, "manual_required": 0}
+    summary = {"total": len(items), "queued": 0, "running": 0, "completed": 0, "failed": 0, "manual_required": 0, "recheck_required": 0}
     for item in items:
         status = item["status"]
         if status in summary:
             summary[status] += 1
+        if item.get("recheck_required"):
+            summary["recheck_required"] += 1
         if item["repair_action_label"]:
             summary["manual_required"] += 1 if status in {"failed", "blocked"} else 0
     return summary
@@ -1302,13 +1323,21 @@ def _repair_summary_for_series(db: Session, series_id: str) -> dict:
         "completed": sum(1 for row in rows if row.status == "completed"),
         "failed": sum(1 for row in rows if row.status == "failed"),
         "manual_required": sum(1 for row in rows if row.status in {"blocked", "failed"}),
+        "recheck_required": _repair_recheck_required_count(db, [row.id for row in rows]),
     }
+
+
+def _repair_recheck_required_count(db: Session, job_ids: list[str]) -> int:
+    if not job_ids:
+        return 0
+    rows = db.query(ProductionAuditEvent).filter(ProductionAuditEvent.event_type == "agency_repair_recheck_required").all()
+    return sum(1 for row in rows if (row.payload_json or {}).get("job_id") in job_ids)
 ```
 
 Add imports if missing:
 
 ```python
-from app.db_models import ProductionJob, ProductionPlan
+from app.db_models import ProductionAuditEvent, ProductionJob, ProductionPlan
 ```
 
 - [ ] **Step 5: Add production tree repair node**
@@ -1320,6 +1349,13 @@ def _repair_tree_node(db: Session, plan_id: str) -> dict | None:
     jobs = db.query(ProductionJob).filter(ProductionJob.plan_id == plan_id, ProductionJob.stage.like("agency_auto_repair%")).all()
     if not jobs:
         return None
+    job_ids = [job.id for job in jobs]
+    recheck_events = (
+        db.query(ProductionAuditEvent)
+        .filter(ProductionAuditEvent.event_type == "agency_repair_recheck_required")
+        .all()
+    )
+    recheck_required = sum(1 for event in recheck_events if (event.payload_json or {}).get("job_id") in job_ids)
     return {
         "id": f"repair:{plan_id}",
         "type": "agency_auto_repair",
@@ -1332,11 +1368,18 @@ def _repair_tree_node(db: Session, plan_id: str) -> dict | None:
             "completed": sum(1 for job in jobs if job.status == "completed"),
             "failed": sum(1 for job in jobs if job.status == "failed"),
             "manual_required": sum(1 for job in jobs if job.status in {"blocked", "failed"}),
+            "recheck_required": recheck_required,
         },
     }
 ```
 
 Append this node to the root or stage nodes according to the existing tree structure.
+
+Add imports to `server/app/services/production_tree_service.py` if missing:
+
+```python
+from app.db_models import ProductionAuditEvent, ProductionJob
+```
 
 - [ ] **Step 6: Run tests**
 
@@ -1465,7 +1508,7 @@ describe('VideoProductionMonitorPage repair node', () => {
           id: 'repair:plan-1',
           type: 'agency_auto_repair',
           label: '自动返修',
-          summary: { total: 12, running: 3, manual_required: 2, failed: 1, completed: 6 },
+          summary: { total: 12, running: 3, manual_required: 2, recheck_required: 1, failed: 1, completed: 6 },
         },
       ],
     }
@@ -1473,6 +1516,7 @@ describe('VideoProductionMonitorPage repair node', () => {
 
     expect(wrapper.text()).toContain('自动返修')
     expect(wrapper.text()).toContain('待人工 2')
+    expect(wrapper.text()).toContain('待复审')
     expect(wrapper.text()).toContain('失败 1')
   })
 })
@@ -1497,6 +1541,7 @@ describe('AutoRepairSummaryStrip', () => {
           failed: 1,
           completed: 6,
           repair_budget_spent: 0.8,
+          recheck_required: 1,
           currency: 'CNY',
         },
       },
@@ -1505,6 +1550,7 @@ describe('AutoRepairSummaryStrip', () => {
     expect(wrapper.text()).toContain('自动返修')
     expect(wrapper.text()).toContain('返修中 3')
     expect(wrapper.text()).toContain('待人工 2')
+    expect(wrapper.text()).toContain('待复审 1')
     expect(wrapper.text()).toContain('已花费 0.8 CNY')
     expect(wrapper.text()).not.toContain('provider')
   })
@@ -1583,6 +1629,7 @@ Create `web/src/components/agency/AutoRepairSummaryStrip.vue`:
       <span>共 {{ summary?.total || 0 }} 项</span>
       <span v-if="summary?.running">返修中 {{ summary.running }}</span>
       <span v-if="summary?.manual_required" class="text-amber-200">待人工 {{ summary.manual_required }}</span>
+      <span v-if="summary?.recheck_required" class="text-cyan-200">待复审 {{ summary.recheck_required }}</span>
       <span v-if="summary?.failed" class="text-rose-200">失败 {{ summary.failed }}</span>
       <span v-if="summary?.completed">已完成 {{ summary.completed }}</span>
       <span v-if="Number(summary?.repair_budget_spent || 0) > 0" class="text-emerald-200">
@@ -1846,6 +1893,7 @@ def test_expert_finding_creates_repair_job_and_visible_audit(client, db):
 
     assert db.query(ProductionJob).filter(ProductionJob.stage.like("agency_auto_repair%")).count() == 1
     assert db.query(ProductionAuditEvent).filter_by(event_type="agency_repair_task_created").count() == 1
+    assert db.query(ProductionAuditEvent).filter_by(event_type="agency_repair_recheck_required").count() == 0
     resp = client.get(f"/api/agency/repair-tasks?series_id={series.id}")
     assert resp.status_code == 200
     assert resp.json()["summary"]["total"] == 1
@@ -1860,7 +1908,7 @@ cd server
 pytest tests/test_agency_auto_repair_e2e.py -q
 ```
 
-Expected: pass.
+Expected: pass. This test covers task creation only; executor tests must separately prove successful auto-repair creates `agency_repair_recheck_required` and does not mark assets as `approved`.
 
 - [ ] **Step 3: Run backend regression set**
 

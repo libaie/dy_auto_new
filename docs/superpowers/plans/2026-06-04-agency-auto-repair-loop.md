@@ -37,6 +37,7 @@ Required corrections for implementation:
 - **Single task renderer:** detailed repair rows must be rendered through one reusable `AutoRepairTaskList` component. The agency console, production monitor drawer, and review-center repair entry must not each implement their own status chips, cost display, and action precedence.
 - **Non-happy-path states:** repair UI must define Chinese loading, empty, API failure, retry-in-progress, and paid-authorization-failed states. A user should never see a blank drawer, frozen button, or raw HTTP error after a repair action.
 - **Long-video density:** production monitor defaults to aggregate chips by stage and status. Detailed repair rows stay in a drawer or collapsible panel opened by the user.
+- **Responsive density:** long-video repair details must have desktop and mobile layouts. Desktop uses a right-side drawer or constrained panel; mobile uses a bottom sheet or single-column collapsible list. Action buttons must wrap or stack instead of overflowing.
 - **Language:** all user-facing labels must be Chinese. Provider/model/internal fields may appear only inside developer/debug affordances, not the default UI.
 - **Visual restraint:** reuse existing dashboard density and table/list patterns. Avoid nested cards, hero-style blocks, decorative gradients, and large instructional copy.
 
@@ -2370,6 +2371,22 @@ describe('AutoRepairTaskList', () => {
     expect(wrapper.text()).toContain('正在提交返修')
     expect(wrapper.find('button').attributes('disabled')).toBeDefined()
   })
+
+  it('limits long repair lists until the user expands details', () => {
+    const tasks = Array.from({ length: 8 }, (_, index) => ({
+      id: `repair-job-${index}`,
+      status: 'failed',
+      reason: `第 ${index + 1} 个返修问题`,
+      retry_actions: { normal_retry_enabled: false },
+    }))
+    const wrapper = mount(AutoRepairTaskList, {
+      props: { tasks, initialVisibleCount: 5 },
+    })
+
+    expect(wrapper.text()).toContain('第 1 个返修问题')
+    expect(wrapper.text()).not.toContain('第 8 个返修问题')
+    expect(wrapper.text()).toContain('展开全部 8 项')
+  })
 })
 ```
 
@@ -2467,7 +2484,7 @@ Create `web/src/components/agency/AutoRepairTaskList.vue`:
     <p v-else-if="!tasks.length" class="text-sm text-slate-400">暂无需要处理的返修任务</p>
     <template v-else>
       <article
-        v-for="task in tasks"
+        v-for="task in visibleTasks"
         :key="task.id || `${task.type}-${task.target_id || task.repair_route}`"
         class="border-l-2 border-cyan-500/60 bg-slate-950/50 p-3"
       >
@@ -2480,34 +2497,46 @@ Create `web/src/components/agency/AutoRepairTaskList.vue`:
       <p v-if="Number(task.estimated_cost || 0) > 0" class="mt-1 text-xs text-amber-200">预计返修成本：{{ task.estimated_cost }} 元</p>
       <p v-if="task.retry_actions?.reason" class="mt-1 text-xs text-amber-200">{{ task.retry_actions.reason }}</p>
 
-      <button
-        v-if="task.retry_actions?.paid_authorize_required"
-        type="button"
-        :disabled="submittingTaskId === task.id"
-        class="mt-2 inline-flex text-xs text-amber-200 hover:text-amber-100"
-        @click="$emit('authorize-paid-retry', task)"
-      >
-        {{ submittingTaskId === task.id ? '正在提交返修' : (task.retry_actions.primary_label || '确认追加预算并重试') }}
-      </button>
-      <button
-        v-else-if="task.retry_actions?.normal_retry_enabled"
-        type="button"
-        :disabled="submittingTaskId === task.id"
-        class="mt-2 inline-flex text-xs text-cyan-200 hover:text-cyan-100"
-        @click="$emit('retry', task)"
-      >
-        {{ submittingTaskId === task.id ? '正在提交返修' : (task.retry_actions.primary_label || '重试返修') }}
-      </button>
-      <RouterLink v-else-if="task.repair_route" :to="task.repair_route" class="mt-2 inline-flex text-xs text-cyan-200 hover:text-cyan-100">
-        {{ task.repair_action_label || '去处理' }}
-      </RouterLink>
+      <div class="mt-2 flex flex-wrap gap-2">
+        <button
+          v-if="task.retry_actions?.paid_authorize_required"
+          type="button"
+          :disabled="submittingTaskId === task.id"
+          class="inline-flex text-xs text-amber-200 hover:text-amber-100"
+          @click="$emit('authorize-paid-retry', task)"
+        >
+          {{ submittingTaskId === task.id ? '正在提交返修' : (task.retry_actions.primary_label || '确认追加预算并重试') }}
+        </button>
+        <button
+          v-else-if="task.retry_actions?.normal_retry_enabled"
+          type="button"
+          :disabled="submittingTaskId === task.id"
+          class="inline-flex text-xs text-cyan-200 hover:text-cyan-100"
+          @click="$emit('retry', task)"
+        >
+          {{ submittingTaskId === task.id ? '正在提交返修' : (task.retry_actions.primary_label || '重试返修') }}
+        </button>
+        <RouterLink v-else-if="task.repair_route" :to="task.repair_route" class="inline-flex text-xs text-cyan-200 hover:text-cyan-100">
+          {{ task.repair_action_label || '去处理' }}
+        </RouterLink>
+      </div>
       </article>
+      <button
+        v-if="hasHiddenTasks"
+        type="button"
+        class="text-xs text-cyan-200 hover:text-cyan-100"
+        @click="expanded = true"
+      >
+        展开全部 {{ tasks.length }} 项
+      </button>
     </template>
   </section>
 </template>
 
 <script setup>
-defineProps({
+import { computed, ref } from 'vue'
+
+const props = defineProps({
   tasks: {
     type: Array,
     default: () => [],
@@ -2524,8 +2553,16 @@ defineProps({
     type: String,
     default: '',
   },
+  initialVisibleCount: {
+    type: Number,
+    default: 5,
+  },
 })
 defineEmits(['retry', 'authorize-paid-retry'])
+
+const expanded = ref(false)
+const visibleTasks = computed(() => expanded.value ? props.tasks : props.tasks.slice(0, props.initialVisibleCount))
+const hasHiddenTasks = computed(() => !expanded.value && props.tasks.length > props.initialVisibleCount)
 </script>
 ```
 
@@ -2631,6 +2668,9 @@ Design review override for Step 6:
 - `VideoProductionMonitorPage.vue` must use `AutoRepairSummaryStrip` for aggregate state and `AutoRepairTaskList` inside the detail drawer/collapsible panel.
 - Review-center repair entry points must use `AutoRepairTaskList` when displaying actionable repair tasks.
 - Any future change to status labels, cost visibility, recheck labels, or retry action precedence should be made in `AutoRepairTaskList` first, then covered by `auto-repair-task-list.test.js`.
+- On desktop, production-monitor repair details should open in a constrained right drawer with its own scroll container.
+- On mobile, production-monitor repair details should open as a bottom sheet or inline collapsible panel; never use a wide table that forces horizontal scrolling.
+- Long repair lists should render an initial visible count, then an `展开全部 {n} 项` action. Do not render hundreds of long-video repair rows by default.
 - The default UI state must come from `task.retry_actions`, not from a failed click or a raw 409 response.
 - Do not render multiple primary actions for the same repair task.
 - Action precedence is `paid_authorize_required`, then `normal_retry_enabled`, then `manual_action_enabled`.

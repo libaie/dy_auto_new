@@ -18,6 +18,25 @@ This plan implements the first version only:
 - Excluded: new `ProductionRepairTask` table, visual timeline editor, external multi-agent runtime, auto final approval, Douyin publishing, changing provider billing internals beyond using existing cost boundaries.
 - Hard rule: automatic repair may fix deterministic structure, but it may only advance to the next review gate. It must never mark final assets as approved.
 
+## Design Review Corrections
+
+Design review result: the plan is implementable, but the frontend must not become another dense log surface. The UX standard for this feature is: users can answer four questions in under 10 seconds:
+
+1. 系统发现了什么问题？
+2. 系统正在自动补什么？
+3. 这次自动补齐会不会继续花钱？
+4. 哪些地方仍然必须我来确认？
+
+Required corrections for implementation:
+
+- **Information hierarchy:** repair information is a secondary strip inside existing production surfaces, not a new dominant page. The main flow remains series/style lock, review center, and production monitor.
+- **Policy confirmation:** the auto-repair policy block must be compact, explicit, and action-bound. The primary start button copy must make authorization visible, for example `启动生产并应用返修策略`.
+- **Cost trust:** estimated and spent repair cost must be shown beside repair counts when cost is non-zero. If the repair budget is `0` or disabled, show `仅记录建议，不自动付费返修`.
+- **Manual action:** every `manual_required` item must render a concrete button-style action using `repair_action_label`; plain status text is not enough.
+- **Long-video density:** production monitor defaults to aggregate chips by stage and status. Detailed repair rows stay in a drawer or collapsible panel opened by the user.
+- **Language:** all user-facing labels must be Chinese. Provider/model/internal fields may appear only inside developer/debug affordances, not the default UI.
+- **Visual restraint:** reuse existing dashboard density and table/list patterns. Avoid nested cards, hero-style blocks, decorative gradients, and large instructional copy.
+
 ## File Structure
 
 ### Backend
@@ -57,6 +76,10 @@ This plan implements the first version only:
   - Shows aggregated repair node and detail drawer.
 - Modify `web/src/views/OneSentenceVideoPage.vue`
   - Adds automatic repair policy confirmation card before starting production.
+- Create `web/src/components/agency/AutoRepairSummaryStrip.vue`
+  - Reusable compact strip for repair totals, budget state, and manual-required counts.
+- Create `web/src/components/agency/AutoRepairPolicyPanel.vue`
+  - Reusable compact policy confirmation panel used by one-sentence production and future batch production entry points.
 
 ### Tests
 
@@ -68,6 +91,7 @@ This plan implements the first version only:
 - Create `web/src/__tests__/agency-auto-repair-log.test.js`
 - Create `web/src/__tests__/one-sentence-auto-repair-policy.test.js`
 - Create `web/src/__tests__/video-production-repair-node.test.js`
+- Create `web/src/__tests__/auto-repair-summary-strip.test.js`
 
 ---
 
@@ -1239,9 +1263,12 @@ git commit -m "feat: expose agency repair status"
 **Files:**
 - Modify: `web/src/api/agency.js`
 - Modify: `web/src/api/videoProduction.js`
+- Create: `web/src/components/agency/AutoRepairSummaryStrip.vue`
+- Create: `web/src/components/agency/AutoRepairPolicyPanel.vue`
 - Modify: `web/src/components/agency/AgencyDecisionLog.vue`
 - Modify: `web/src/views/OneSentenceVideoPage.vue`
 - Modify: `web/src/views/VideoProductionMonitorPage.vue`
+- Create: `web/src/__tests__/auto-repair-summary-strip.test.js`
 - Create: `web/src/__tests__/agency-auto-repair-log.test.js`
 - Create: `web/src/__tests__/one-sentence-auto-repair-policy.test.js`
 - Create: `web/src/__tests__/video-production-repair-node.test.js`
@@ -1350,13 +1377,61 @@ describe('VideoProductionMonitorPage repair node', () => {
 })
 ```
 
+- [ ] **Step 1a: Write reusable summary strip test**
+
+Create `web/src/__tests__/auto-repair-summary-strip.test.js`:
+
+```javascript
+import { mount } from '@vue/test-utils'
+import AutoRepairSummaryStrip from '../components/agency/AutoRepairSummaryStrip.vue'
+
+describe('AutoRepairSummaryStrip', () => {
+  it('summarizes repair state without exposing provider internals', () => {
+    const wrapper = mount(AutoRepairSummaryStrip, {
+      props: {
+        summary: {
+          total: 12,
+          running: 3,
+          manual_required: 2,
+          failed: 1,
+          completed: 6,
+          repair_budget_spent: 0.8,
+          currency: 'CNY',
+        },
+      },
+    })
+
+    expect(wrapper.text()).toContain('自动返修')
+    expect(wrapper.text()).toContain('返修中 3')
+    expect(wrapper.text()).toContain('待人工 2')
+    expect(wrapper.text()).toContain('已花费 0.8 CNY')
+    expect(wrapper.text()).not.toContain('provider')
+  })
+
+  it('shows suggestion-only state when budget is disabled', () => {
+    const wrapper = mount(AutoRepairSummaryStrip, {
+      props: {
+        summary: {
+          total: 2,
+          manual_required: 2,
+          repair_budget_spent: 0,
+          budget_disabled: true,
+        },
+      },
+    })
+
+    expect(wrapper.text()).toContain('仅记录建议，不自动付费返修')
+  })
+})
+```
+
 - [ ] **Step 2: Run frontend tests and verify they fail**
 
 Run:
 
 ```powershell
 cd web
-npm test -- agency-auto-repair-log one-sentence-auto-repair-policy video-production-repair-node --run
+npm test -- auto-repair-summary-strip agency-auto-repair-log one-sentence-auto-repair-policy video-production-repair-node --run
 ```
 
 Expected: tests fail because UI and selectors are not implemented yet.
@@ -1388,12 +1463,92 @@ export function startEpisodeProduction(payload) {
 }
 ```
 
-- [ ] **Step 4: Add repair section to `AgencyDecisionLog.vue`**
+- [ ] **Step 4: Create reusable summary strip**
+
+Create `web/src/components/agency/AutoRepairSummaryStrip.vue`:
+
+```vue
+<template>
+  <section class="border-y border-slate-800 bg-slate-950/60 px-3 py-2" data-test="auto-repair-summary-strip">
+    <div class="flex flex-wrap items-center gap-2 text-xs text-slate-300">
+      <strong class="text-slate-100">自动返修</strong>
+      <span>共 {{ summary?.total || 0 }} 项</span>
+      <span v-if="summary?.running">返修中 {{ summary.running }}</span>
+      <span v-if="summary?.manual_required" class="text-amber-200">待人工 {{ summary.manual_required }}</span>
+      <span v-if="summary?.failed" class="text-rose-200">失败 {{ summary.failed }}</span>
+      <span v-if="summary?.completed">已完成 {{ summary.completed }}</span>
+      <span v-if="Number(summary?.repair_budget_spent || 0) > 0" class="text-emerald-200">
+        已花费 {{ summary.repair_budget_spent }} {{ summary.currency || 'CNY' }}
+      </span>
+      <span v-if="summary?.budget_disabled" class="text-slate-400">仅记录建议，不自动付费返修</span>
+    </div>
+  </section>
+</template>
+
+<script setup>
+defineProps({
+  summary: {
+    type: Object,
+    default: () => ({}),
+  },
+})
+</script>
+```
+
+- [ ] **Step 5: Create compact policy panel**
+
+Create `web/src/components/agency/AutoRepairPolicyPanel.vue`:
+
+```vue
+<template>
+  <section class="border border-slate-800 bg-slate-950/50 p-3" data-test="auto-repair-policy-card">
+    <div class="flex items-center justify-between gap-3">
+      <div>
+        <h3 class="text-sm font-semibold text-slate-100">自动返修策略</h3>
+        <p class="mt-1 text-xs text-slate-400">结构性缺口可自动补齐，质量和最终成片仍需审查确认。</p>
+      </div>
+      <label class="flex items-center gap-2 text-sm text-slate-200">
+        <input data-test="auto-repair-enabled" :checked="policy.enabled" type="checkbox" class="h-4 w-4" @change="update('enabled', $event.target.checked)" />
+        启用
+      </label>
+    </div>
+    <div class="mt-3 grid gap-3 md:grid-cols-2">
+      <label class="text-xs text-slate-300">
+        最大返修轮数
+        <input :value="policy.max_rounds" min="0" max="2" type="number" class="mt-1 w-full border border-slate-700 bg-slate-950 px-3 py-2 text-sm" @input="update('max_rounds', Number($event.target.value || 0))" />
+      </label>
+      <label class="text-xs text-slate-300">
+        返修预算上限
+        <input data-test="auto-repair-budget" :value="policy.budget_limit" min="0" step="0.1" type="number" class="mt-1 w-full border border-slate-700 bg-slate-950 px-3 py-2 text-sm" @input="update('budget_limit', Number($event.target.value || 0))" />
+      </label>
+    </div>
+    <p v-if="!policy.enabled || Number(policy.budget_limit || 0) <= 0" class="mt-2 text-xs text-amber-200">
+      仅记录返修建议，不自动调用付费模型。
+    </p>
+  </section>
+</template>
+
+<script setup>
+const props = defineProps({
+  policy: {
+    type: Object,
+    required: true,
+  },
+})
+const emit = defineEmits(['update:policy'])
+
+function update(key, value) {
+  emit('update:policy', { ...props.policy, [key]: value })
+}
+</script>
+```
+
+- [ ] **Step 6: Add repair section to `AgencyDecisionLog.vue`**
 
 Inside each decision log item template in `web/src/components/agency/AgencyDecisionLog.vue`, add:
 
 ```vue
-<section v-if="item.repair_tasks?.length" class="mt-3 rounded border border-cyan-500/30 bg-cyan-500/5 p-3" data-test="agency-repair-tasks">
+<section v-if="item.repair_tasks?.length" class="mt-3 border-l-2 border-cyan-500/60 bg-slate-950/50 p-3" data-test="agency-repair-tasks">
   <div class="mb-2 flex items-center justify-between">
     <h4 class="text-sm font-semibold text-cyan-100">自动返修</h4>
     <span class="text-xs text-cyan-200">共 {{ item.repair_tasks.length }} 项</span>
@@ -1409,15 +1564,15 @@ Inside each decision log item template in `web/src/components/agency/AgencyDecis
 </section>
 ```
 
-- [ ] **Step 5: Add policy confirmation card to `OneSentenceVideoPage.vue`**
+- [ ] **Step 7: Add policy confirmation panel to `OneSentenceVideoPage.vue`**
 
 Add reactive state:
 
 ```javascript
 const autoRepairPolicy = reactive({
-  enabled: true,
+  enabled: false,
   max_rounds: 2,
-  budget_limit: 1.0,
+  budget_limit: 0,
   currency: 'CNY',
   allowed_stages: ['style_lock', 'storyboard', 'image_stage', 'video_stage', 'compose'],
   allowed_types: [
@@ -1431,31 +1586,19 @@ const autoRepairPolicy = reactive({
 })
 ```
 
-Add template card before the start button:
+Add import:
+
+```javascript
+import AutoRepairPolicyPanel from '../components/agency/AutoRepairPolicyPanel.vue'
+```
+
+Add template before the start button:
 
 ```vue
-<section class="rounded border border-slate-700 bg-slate-900/60 p-4" data-test="auto-repair-policy-card">
-  <div class="flex items-start justify-between gap-4">
-    <div>
-      <h3 class="text-sm font-semibold text-slate-100">自动返修策略</h3>
-      <p class="mt-1 text-xs text-slate-400">只补齐结构性缺口，不自动通过质量、合规和最终成片闸门。</p>
-    </div>
-    <label class="flex items-center gap-2 text-sm text-slate-200">
-      <input data-test="auto-repair-enabled" v-model="autoRepairPolicy.enabled" type="checkbox" class="h-4 w-4" />
-      启用
-    </label>
-  </div>
-  <div class="mt-3 grid gap-3 md:grid-cols-2">
-    <label class="text-xs text-slate-300">
-      最大返修轮数
-      <input v-model.number="autoRepairPolicy.max_rounds" min="0" max="2" type="number" class="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm" />
-    </label>
-    <label class="text-xs text-slate-300">
-      返修预算上限
-      <input data-test="auto-repair-budget" v-model.number="autoRepairPolicy.budget_limit" min="0" step="0.1" type="number" class="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm" />
-    </label>
-  </div>
-</section>
+<AutoRepairPolicyPanel
+  :policy="autoRepairPolicy"
+  @update:policy="Object.assign(autoRepairPolicy, $event)"
+/>
 ```
 
 When starting production, include:
@@ -1464,24 +1607,27 @@ When starting production, include:
 auto_repair_policy: { ...autoRepairPolicy },
 ```
 
-- [ ] **Step 6: Add repair aggregation to monitor page**
-
-In `web/src/views/VideoProductionMonitorPage.vue`, render repair tree nodes:
+The primary start button text should be:
 
 ```vue
-<section v-for="node in repairNodes" :key="node.id" class="rounded border border-cyan-500/30 bg-cyan-500/5 p-4" data-test="repair-tree-node">
-  <div class="flex items-center justify-between">
-    <h3 class="text-sm font-semibold text-cyan-100">{{ node.label || '自动返修' }}</h3>
-    <span class="text-xs text-cyan-200">共 {{ node.summary?.total || 0 }} 项</span>
-  </div>
-  <div class="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-300 md:grid-cols-5">
-    <span>返修中 {{ node.summary?.running || 0 }}</span>
-    <span>待人工 {{ node.summary?.manual_required || 0 }}</span>
-    <span>失败 {{ node.summary?.failed || 0 }}</span>
-    <span>已完成 {{ node.summary?.completed || 0 }}</span>
-    <span>排队 {{ node.summary?.queued || 0 }}</span>
-  </div>
-</section>
+启动生产并应用返修策略
+```
+
+- [ ] **Step 8: Add repair aggregation to monitor page**
+
+In `web/src/views/VideoProductionMonitorPage.vue`, import and render the summary strip before detailed nodes:
+
+```javascript
+import AutoRepairSummaryStrip from '../components/agency/AutoRepairSummaryStrip.vue'
+```
+
+```vue
+<AutoRepairSummaryStrip
+  v-for="node in repairNodes"
+  :key="node.id"
+  :summary="node.summary"
+  data-test="repair-tree-node"
+/>
 ```
 
 Add computed:
@@ -1493,21 +1639,21 @@ const repairNodes = computed(() => {
 })
 ```
 
-- [ ] **Step 7: Run frontend tests**
+- [ ] **Step 9: Run frontend tests**
 
 Run:
 
 ```powershell
 cd web
-npm test -- agency-auto-repair-log one-sentence-auto-repair-policy video-production-repair-node api-clients --run
+npm test -- auto-repair-summary-strip agency-auto-repair-log one-sentence-auto-repair-policy video-production-repair-node api-clients --run
 ```
 
 Expected: selected tests pass.
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 10: Commit**
 
 ```powershell
-git add web/src/api/agency.js web/src/api/videoProduction.js web/src/components/agency/AgencyDecisionLog.vue web/src/views/OneSentenceVideoPage.vue web/src/views/VideoProductionMonitorPage.vue web/src/__tests__/agency-auto-repair-log.test.js web/src/__tests__/one-sentence-auto-repair-policy.test.js web/src/__tests__/video-production-repair-node.test.js
+git add web/src/api/agency.js web/src/api/videoProduction.js web/src/components/agency/AutoRepairSummaryStrip.vue web/src/components/agency/AutoRepairPolicyPanel.vue web/src/components/agency/AgencyDecisionLog.vue web/src/views/OneSentenceVideoPage.vue web/src/views/VideoProductionMonitorPage.vue web/src/__tests__/auto-repair-summary-strip.test.js web/src/__tests__/agency-auto-repair-log.test.js web/src/__tests__/one-sentence-auto-repair-policy.test.js web/src/__tests__/video-production-repair-node.test.js
 git commit -m "feat: show agency auto repair flow"
 ```
 
@@ -1625,7 +1771,7 @@ Run:
 
 ```powershell
 cd web
-npm test -- agency-auto-repair-log one-sentence-auto-repair-policy video-production-repair-node agency-console-page series-detail-agency video-production-monitor-page api-clients --run
+npm test -- auto-repair-summary-strip agency-auto-repair-log one-sentence-auto-repair-policy video-production-repair-node agency-console-page series-detail-agency video-production-monitor-page api-clients --run
 ```
 
 Expected: all selected tests pass.
@@ -1681,6 +1827,7 @@ Each task should be committed independently. If a task fails review, fix it befo
 - Worker execution and retry boundaries: Task 3.
 - Repair status visible in agency console, assets, review center, and monitor: Task 4 and Task 5.
 - Long-video aggregated repair display: Task 4 and Task 5.
+- Compact reusable repair summary and policy components: Task 5.
 - Manual-required action fields: Task 1, Task 4, and Task 5.
 - Cost and provider audit trace: Task 2, Task 4, and Task 6.
 - No automatic final approval: Task 3 and Task 6.
@@ -1695,4 +1842,3 @@ The plan avoids placeholder instructions. Each code-changing step includes concr
 - `AUTO_REPAIR_STAGE = "agency_auto_repair"` is defined in Task 1 and reused in Tasks 2 and 3.
 - `auto_repair_policy` is persisted in `VideoProductionRun.model_trace_json` in Task 2 and sent from the frontend in Task 5.
 - `ProductionJob.stage` uses `agency_auto_repair:<repair_type>` consistently.
-

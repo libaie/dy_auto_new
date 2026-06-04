@@ -35,6 +35,7 @@ Required corrections for implementation:
 - **Manual action:** every `manual_required` item must render a concrete button-style action using `repair_action_label`; plain status text is not enough.
 - **Explicit action state:** every repair task returned to the frontend must include a `retry_actions` object. The UI must not infer whether to show `重试返修`, `确认追加预算并重试`, or `去处理` from a failed click or a raw 409 response. It should render one primary action from `retry_actions` on first paint.
 - **Single task renderer:** detailed repair rows must be rendered through one reusable `AutoRepairTaskList` component. The agency console, production monitor drawer, and review-center repair entry must not each implement their own status chips, cost display, and action precedence.
+- **Non-happy-path states:** repair UI must define Chinese loading, empty, API failure, retry-in-progress, and paid-authorization-failed states. A user should never see a blank drawer, frozen button, or raw HTTP error after a repair action.
 - **Long-video density:** production monitor defaults to aggregate chips by stage and status. Detailed repair rows stay in a drawer or collapsible panel opened by the user.
 - **Language:** all user-facing labels must be Chinese. Provider/model/internal fields may appear only inside developer/debug affordances, not the default UI.
 - **Visual restraint:** reuse existing dashboard density and table/list patterns. Avoid nested cards, hero-style blocks, decorative gradients, and large instructional copy.
@@ -2341,6 +2342,34 @@ describe('AutoRepairTaskList', () => {
     expect(wrapper.text()).toContain('确认追加预算并重试')
     expect(wrapper.text()).not.toContain('重试返修')
   })
+
+  it('shows Chinese loading, empty, and error states', () => {
+    expect(mount(AutoRepairTaskList, { props: { loading: true } }).text()).toContain('正在加载返修任务')
+    expect(mount(AutoRepairTaskList, { props: { tasks: [] } }).text()).toContain('暂无需要处理的返修任务')
+    expect(mount(AutoRepairTaskList, { props: { error: '接口请求失败' } }).text()).toContain('返修任务加载失败')
+  })
+
+  it('keeps the active action visible while retry is submitting', () => {
+    const wrapper = mount(AutoRepairTaskList, {
+      props: {
+        submittingTaskId: 'repair-job-1',
+        tasks: [
+          {
+            id: 'repair-job-1',
+            status: 'failed',
+            reason: '角色缺少侧面参考图',
+            retry_actions: {
+              normal_retry_enabled: true,
+              primary_label: '重试返修',
+            },
+          },
+        ],
+      },
+    })
+
+    expect(wrapper.text()).toContain('正在提交返修')
+    expect(wrapper.find('button').attributes('disabled')).toBeDefined()
+  })
 })
 ```
 
@@ -2433,11 +2462,15 @@ Create `web/src/components/agency/AutoRepairTaskList.vue`:
 ```vue
 <template>
   <section class="space-y-2" data-test="auto-repair-task-list">
-    <article
-      v-for="task in tasks"
-      :key="task.id || `${task.type}-${task.target_id || task.repair_route}`"
-      class="border-l-2 border-cyan-500/60 bg-slate-950/50 p-3"
-    >
+    <p v-if="loading" class="text-sm text-slate-400">正在加载返修任务...</p>
+    <p v-else-if="error" class="text-sm text-rose-200">返修任务加载失败：{{ error }}</p>
+    <p v-else-if="!tasks.length" class="text-sm text-slate-400">暂无需要处理的返修任务</p>
+    <template v-else>
+      <article
+        v-for="task in tasks"
+        :key="task.id || `${task.type}-${task.target_id || task.repair_route}`"
+        class="border-l-2 border-cyan-500/60 bg-slate-950/50 p-3"
+      >
       <div class="flex flex-wrap items-center justify-between gap-2">
         <p class="text-sm text-slate-100">{{ task.reason }}</p>
         <span v-if="task.recheck_required" class="text-xs text-cyan-200">待复审</span>
@@ -2450,23 +2483,26 @@ Create `web/src/components/agency/AutoRepairTaskList.vue`:
       <button
         v-if="task.retry_actions?.paid_authorize_required"
         type="button"
+        :disabled="submittingTaskId === task.id"
         class="mt-2 inline-flex text-xs text-amber-200 hover:text-amber-100"
         @click="$emit('authorize-paid-retry', task)"
       >
-        {{ task.retry_actions.primary_label || '确认追加预算并重试' }}
+        {{ submittingTaskId === task.id ? '正在提交返修' : (task.retry_actions.primary_label || '确认追加预算并重试') }}
       </button>
       <button
         v-else-if="task.retry_actions?.normal_retry_enabled"
         type="button"
+        :disabled="submittingTaskId === task.id"
         class="mt-2 inline-flex text-xs text-cyan-200 hover:text-cyan-100"
         @click="$emit('retry', task)"
       >
-        {{ task.retry_actions.primary_label || '重试返修' }}
+        {{ submittingTaskId === task.id ? '正在提交返修' : (task.retry_actions.primary_label || '重试返修') }}
       </button>
       <RouterLink v-else-if="task.repair_route" :to="task.repair_route" class="mt-2 inline-flex text-xs text-cyan-200 hover:text-cyan-100">
         {{ task.repair_action_label || '去处理' }}
       </RouterLink>
-    </article>
+      </article>
+    </template>
   </section>
 </template>
 
@@ -2475,6 +2511,18 @@ defineProps({
   tasks: {
     type: Array,
     default: () => [],
+  },
+  loading: {
+    type: Boolean,
+    default: false,
+  },
+  error: {
+    type: String,
+    default: '',
+  },
+  submittingTaskId: {
+    type: String,
+    default: '',
   },
 })
 defineEmits(['retry', 'authorize-paid-retry'])
@@ -2590,6 +2638,15 @@ Design review override for Step 6:
 - If `task.retry_actions.normal_retry_enabled` is true, show one primary button labeled `重试返修`.
 - If neither retry action is available, show the manual route button using `repair_action_label`.
 - The frontend should still handle a defensive 409 from `retryRepairTask`, but that fallback must not be the normal way users discover paid authorization is required.
+
+Additional design review override for non-happy-path states:
+
+- If any older text in this step contains mojibake, replace it with readable Chinese before implementation.
+- Loading, empty, and API failure states must come from `AutoRepairTaskList` props: `loading`, `error`, and `submittingTaskId`.
+- While retry or paid authorization is submitting, disable only the active task action and show `正在提交返修` or `正在确认付费返修`.
+- Paid authorization failures must be shown inline as `付费返修确认失败：{message}` and must not close the dialog.
+- Empty task lists should show `暂无需要处理的返修任务`, not a blank panel.
+- API failures should show `返修任务加载失败：{message}` with a retry affordance when the parent page can reload.
 
 - [ ] **Step 7: Add policy confirmation panel to `OneSentenceVideoPage.vue`**
 

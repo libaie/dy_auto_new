@@ -27,6 +27,7 @@
 - 每次自动返修消耗预算时，必须归因到对应 `repair_task`，前端显示“本次返修预计/已消耗成本”。
 - 自动返修预算耗尽后，任务进入 `manual_required`，用户可以追加预算或手动处理。
 - 这个授权不替代人工审查；它只允许系统在已批准成本范围内自动补齐确定性缺口。
+- OpenClaw CEO review 后进一步补充：`manual_required` 不能只是技术状态，必须给用户一个明确的下一步动作；长视频场景下返修状态必须按阶段聚合展示，避免明细刷屏；每一次付费返修都必须形成可追踪的成本审计。
 
 ## Goals
 
@@ -135,6 +136,9 @@ flowchart LR
       "estimated_cost": 0.02,
       "reason": "角色缺少侧面和全身锚定参考图",
       "expected_result": "生成并写回角色参考图 URL，更新 reference_progress",
+      "repair_action_label": "去角色资产补参考图",
+      "repair_route": "/characters/character-id",
+      "affected_ids": ["character-id"],
       "manual_gate_after_repair": true
     }
   ]
@@ -150,6 +154,9 @@ flowchart LR
 - `requires_paid_provider=true` 的任务必须校验 `auto_repair_policy` 和预算授权。
 - `reason` 和 `expected_result` 面向用户展示，必须中文。
 - `target_id` 必须能定位到现有系列、剧集、角色、场景、资产或片段。
+- `repair_action_label` 是用户可见的下一步动作文案，必须使用中文，不允许显示 provider 或内部技术字段。
+- `repair_route` 是前端可跳转的处理入口；`manual_required` 状态必须提供该字段。
+- `affected_ids` 用于把用户从聚合状态定位到具体角色、场景、资产、分镜 frame 或视频 segment。
 
 ## Auto Repair Policy
 
@@ -180,6 +187,19 @@ flowchart LR
 - `max_rounds` 不能超过系统硬上限 2。
 - `allowed_types` 不能包含主观质量、合规或最终放行类问题。
 - 前端必须在启动生产前展示该策略摘要，用户确认后写入快照。
+
+### 策略确认卡
+
+一句话成片、系列批量生产和手动启动流水线前，前端必须展示“自动返修策略确认卡”：
+
+- 是否启用自动返修。
+- 最大自动返修轮数。
+- 自动返修预算上限和币种。
+- 允许自动返修的阶段。
+- 允许自动执行的返修类型。
+- 预算耗尽后的处理方式：停止自动返修并进入人工处理。
+
+默认文案必须明确说明：自动返修只补齐结构性缺口，不代表最终画面、合规和成片质量已经通过。用户确认后，策略快照写入 run 上下文；后续 series 配置变化不能影响已启动 run 的返修授权。
 
 ## Repair Types
 
@@ -388,6 +408,23 @@ flowchart LR
 - 返修节点归属到对应阶段。
 - 展示任务数、成功数、失败数、等待人工数。
 - 点击节点查看返修明细。
+- 长视频和批量剧集默认按阶段聚合展示，不默认展开所有返修任务。
+- 聚合状态至少展示：待返修、返修中、复审中、待人工、失败、已完成。
+- 明细抽屉内再展示具体 `repair_task`、关联专家发现、受影响对象、预算消耗、下一步动作。
+
+### 返修指标和成本审计
+
+前端和后台监控至少需要记录以下指标：
+
+- `repair_tasks_created`：返修任务创建数。
+- `repair_tasks_completed`：返修任务完成数。
+- `repair_tasks_failed`：返修任务失败数。
+- `repair_tasks_manual_required`：转人工处理数。
+- `repair_budget_estimated`：预计返修成本。
+- `repair_budget_spent`：实际返修成本。
+- `repair_provider_calls`：真实 provider 调用次数。
+
+每一次付费返修必须能追踪到：专家发现、`repair_task`、`ProductionJob`、provider task、预算扣减记录、复审结果和最终人工闸门状态。
 
 ## Error Handling
 
@@ -398,6 +435,9 @@ flowchart LR
 - 找不到 target 时不执行自动返修，只记录人工处理建议。
 - 返修任务必须有 idempotency key，避免重复点击或重复 worker 导致重复扣费。
 - 所有付费 provider 返修必须经过已有预算和 provider task 幂等边界。
+- 任何 `manual_required` 都必须返回 `repair_action_label`、`repair_route` 和 `affected_ids`；如果无法生成处理入口，则显示“联系人工处理”，并记录缺失入口的审计事件。
+- 预算耗尽、策略禁用、类型不在白名单、阶段不允许时，系统只能生成返修建议，不能创建真实付费 provider 任务。
+- 复审通过只能推进到下一阶段闸门，不允许跳过图像审查、视频审查、合成前审查和最终人工确认。
 
 ## Security And Cost Guard
 
@@ -474,6 +514,9 @@ flowchart LR
 - 返修完成后触发对应阶段专家复审。
 - 重复 worker step 不会创建重复 provider 任务。
 - 付费 provider 返修会经过预算和 provider task 幂等保护。
+- `auto_repair_policy.enabled=false` 时只生成返修建议，不创建自动执行 job。
+- 预算耗尽时任务进入 `manual_required`，并返回中文处理入口。
+- 同一付费返修能追踪到专家发现、provider task、预算扣减和复审 invocation。
 
 前端测试：
 
@@ -482,6 +525,9 @@ flowchart LR
 - 角色资产、场景资产显示参考图槽位生成进度。
 - 审查中心能看到自动返修生成的新版本。
 - 生产监控页显示返修节点和失败原因。
+- 启动生产前展示自动返修策略确认卡，并能保存策略快照。
+- 长视频 run 的返修节点默认聚合展示，点击后再展开明细。
+- `manual_required` 项展示明确中文动作入口，并能跳转到对应页面。
 - 用户面向文案保持中文，不暴露 provider 技术字段。
 
 ## Rollout
@@ -524,6 +570,10 @@ flowchart LR
 - 主观质量和最终放行仍然需要人工或明确审查通过。
 - 页面刷新后仍能看到返修状态。
 - 不产生重复 provider 提交和重复扣费。
+- 用户在生产启动前能看到并确认自动返修策略。
+- 每个需要人工处理的返修项都有明确中文下一步入口。
+- 长视频返修状态默认聚合展示，不因大量 segment 任务造成页面刷屏。
+- 每一次付费返修都能追踪到成本、provider 调用和复审结果。
 
 ## Open Risks
 
@@ -531,6 +581,8 @@ flowchart LR
 - 复审可能再次生成返修任务，需要限制循环次数。
 - 长视频场景下返修任务量大，前端必须按阶段聚合展示，不能全量刷屏。
 - 真实 provider 失败原因复杂，第一版应优先保证状态可见和可恢复，而不是强行自动修好所有失败。
+- 如果自动返修策略确认卡设计不清晰，用户仍会觉得后台在暗箱操作；实施计划必须把该确认卡作为第一阶段交付物。
+- 如果 `manual_required` 没有明确动作入口，自动返修闭环会退化成另一种日志展示；实施时必须把处理入口作为接口契约校验项。
 
 ## Final Decision
 

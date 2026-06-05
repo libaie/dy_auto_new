@@ -3,13 +3,88 @@ var logger = require("../utils/logger");
 
 var TAG = "UPDATE";
 
-var LOCAL_VERSION_FILE = "update/local_version.txt";
+function ensureDirPath(dir) {
+  if (!dir) return false;
+  try {
+    var f = new java.io.File(String(dir));
+    if (!f.exists()) f.mkdirs();
+    return f.exists() && f.isDirectory();
+  } catch (e) {
+    logger.warn(TAG, "Failed to create directory: " + dir + " - " + e.message);
+    return false;
+  }
+}
+
+function parentDir(path) {
+  var s = String(path || "");
+  var idx = Math.max(s.lastIndexOf("/"), s.lastIndexOf("\\"));
+  return idx > 0 ? s.substring(0, idx) : "";
+}
+
+function extractZip(zipPath, destDir) {
+  ensureDirPath(destDir);
+
+  if (typeof $zip !== "undefined") {
+    if (typeof $zip.extract === "function") {
+      $zip.extract(zipPath, destDir);
+      return;
+    }
+    if (typeof $zip.unzip === "function") {
+      $zip.unzip(zipPath, destDir);
+      return;
+    }
+  }
+
+  var root = new java.io.File(String(destDir)).getCanonicalPath() + java.io.File.separator;
+  var input = new java.util.zip.ZipInputStream(
+    new java.io.BufferedInputStream(new java.io.FileInputStream(String(zipPath)))
+  );
+  var buffer = java.lang.reflect.Array.newInstance(java.lang.Byte.TYPE, 8192);
+  try {
+    var entry;
+    while ((entry = input.getNextEntry()) != null) {
+      var outFile = new java.io.File(String(destDir), String(entry.getName()));
+      var outPath = outFile.getCanonicalPath();
+      if (outPath.indexOf(root) !== 0) {
+        throw new Error("Unsafe zip entry: " + entry.getName());
+      }
+      if (entry.isDirectory()) {
+        outFile.mkdirs();
+      } else {
+        ensureDirPath(parentDir(outPath));
+        var output = new java.io.BufferedOutputStream(new java.io.FileOutputStream(outFile));
+        try {
+          var len;
+          while ((len = input.read(buffer)) > 0) {
+            output.write(buffer, 0, len);
+          }
+        } finally {
+          output.close();
+        }
+      }
+      input.closeEntry();
+    }
+  } finally {
+    input.close();
+  }
+}
 
 var updateChecker = {
+  _getBaseDir: function () {
+    try { return context.getFilesDir().getAbsolutePath(); } catch (e) {}
+    try { return context.getExternalFilesDir(null).getAbsolutePath(); } catch (e2) {}
+    return files.cwd();
+  },
+
+  _versionFile: function () {
+    return this._getBaseDir() + "/update/local_version.txt";
+  },
+
   getLocalVersion: function () {
     try {
-      if (files.exists(LOCAL_VERSION_FILE)) {
-        return files.read(LOCAL_VERSION_FILE).trim();
+      var vf = this._versionFile();
+      if (files.exists(vf)) {
+        return files.read(vf).trim();
       }
     } catch (e) {
       logger.warn(TAG, "Failed to read local version: " + e.message);
@@ -19,8 +94,9 @@ var updateChecker = {
 
   saveLocalVersion: function (version) {
     try {
-      files.ensureDir(files.path(LOCAL_VERSION_FILE).getParent());
-      files.write(LOCAL_VERSION_FILE, version);
+      var vf = this._versionFile();
+      ensureDirPath(parentDir(vf));
+      files.write(vf, version);
     } catch (e) {
       logger.warn(TAG, "Failed to save local version: " + e.message);
     }
@@ -53,10 +129,7 @@ var updateChecker = {
     }
 
     try {
-      // 优先用 app 私有目录（与 downloadScript 一致）
-      var baseDir = null;
-      try { baseDir = context.getExternalFilesDir(null).getAbsolutePath(); } catch (e) {}
-      if (!baseDir) { baseDir = files.cwd(); }
+      var baseDir = this._getBaseDir();
       var updateDir = baseDir + "/update";
       var zipPath = updateDir + "/device-script.zip";
       var tempDir = updateDir + "/temp";
@@ -66,9 +139,9 @@ var updateChecker = {
         return false;
       }
 
-      files.ensureDir(tempDir);
+      ensureDirPath(tempDir);
 
-      $zip.extract(zipPath, tempDir);
+      extractZip(zipPath, tempDir);
 
       // 验证关键文件存在
       var criticalFiles = ["main.js", "config.js"];
@@ -99,17 +172,16 @@ var updateChecker = {
   },
 
   _copyDir: function (src, dst) {
-    var srcPath = files.path(src);
-    var items = files.listDir(srcPath);
+    var items = files.listDir(src);
     for (var i = 0; i < items.length; i++) {
       var item = items[i];
       var srcFile = src + "/" + item;
       var dstFile = dst + "/" + item;
       if (files.isDir(srcFile)) {
-        files.ensureDir(dstFile);
+        ensureDirPath(dstFile);
         this._copyDir(srcFile, dstFile);
       } else {
-        files.ensureDir(files.path(dstFile).getParent());
+        ensureDirPath(parentDir(dstFile));
         files.copy(srcFile, dstFile);
       }
     }

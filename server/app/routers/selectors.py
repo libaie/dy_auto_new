@@ -1,5 +1,5 @@
 """Selector management CRUD API — admin only."""
-from fastapi import APIRouter, HTTPException, Depends, Query, UploadFile, File as FastAPIFile
+from fastapi import APIRouter, HTTPException, Depends, Query, UploadFile, File as FastAPIFile, Form
 from typing import Optional
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -57,6 +57,51 @@ def list_selectors(
     selectors = selector_service.list_all_selectors(db, include_disabled=include_disabled, category=category)
     version = selector_service.get_version(db)
     return {"selectors": selectors, "total": len(selectors), "version": version}
+
+
+# --- Template image endpoints (must precede /{action_name} to avoid route shadowing) ---
+
+@router.get("/templates")
+def list_templates(
+    resolution: str = Query(None),
+    user = Depends(verify_admin_token),
+):
+    templates = template_service.list_templates(resolution=resolution)
+    return {"templates": templates, "total": len(templates)}
+
+
+@router.post("/templates/upload")
+async def upload_template(
+    file: UploadFile = FastAPIFile(...),
+    action_name: str = Form(""),
+    resolution: str = Query("default"),
+    user = Depends(require_role("admin")),
+):
+    import os
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if ext not in (".png", ".jpg", ".jpeg"):
+        raise HTTPException(status_code=400, detail="仅支持 .png/.jpg/.jpeg 格式")
+
+    content = await file.read()
+    if len(content) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="文件大小不能超过 5MB")
+
+    safe_name = (action_name or "template").replace("/", "_").replace("\\", "_")
+    filename = f"{safe_name}_{int(time.time() * 1000)}{ext}"
+    template_service.save_template(filename, content, resolution=resolution)
+    return {"filename": filename, "size": len(content), "resolution": resolution}
+
+
+@router.delete("/templates/{filename}")
+def delete_template(
+    filename: str,
+    resolution: str = Query("default"),
+    user = Depends(require_role("admin")),
+):
+    deleted = template_service.delete_template(filename, resolution=resolution)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="模板文件不存在")
+    return {"deleted": True, "filename": filename}
 
 
 @router.get("/{action_name}")
@@ -143,10 +188,13 @@ async def update_selector(
 @router.delete("/{action_name}")
 async def delete_selector(
     action_name: str,
+    platform_version: Optional[str] = Query(None),
+    resolution_profile: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     user = Depends(require_role("admin")),
 ):
-    deleted = selector_service.delete_selector(db, action_name)
+    deleted = selector_service.delete_selector(db, action_name,
+        platform_version=platform_version, resolution_profile=resolution_profile)
     if not deleted:
         raise HTTPException(status_code=404, detail="Selector not found")
 
@@ -164,11 +212,14 @@ async def delete_selector(
 async def toggle_selector(
     action_name: str,
     request: SelectorToggleRequest,
+    platform_version: Optional[str] = Query(None),
+    resolution_profile: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     user = Depends(require_role("admin")),
 ):
     try:
-        sel = selector_service.toggle_selector(db, action_name, request.enabled)
+        sel = selector_service.toggle_selector(db, action_name, request.enabled,
+            platform_version=platform_version, resolution_profile=resolution_profile)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -180,48 +231,3 @@ async def toggle_selector(
     })
     await pair_ws_manager.broadcast_to_admins({"event": "selectors_changed"})
     return sel
-
-
-# --- Template image endpoints ---
-
-@router.get("/templates")
-def list_templates(
-    resolution: str = Query(None),
-    user = Depends(verify_admin_token),
-):
-    templates = template_service.list_templates(resolution=resolution)
-    return {"templates": templates, "total": len(templates)}
-
-
-@router.post("/templates/upload")
-async def upload_template(
-    file: UploadFile = FastAPIFile(...),
-    action_name: str = "",
-    resolution: str = Query("default"),
-    user = Depends(require_role("admin")),
-):
-    import os
-    ext = os.path.splitext(file.filename or "")[1].lower()
-    if ext not in (".png", ".jpg", ".jpeg"):
-        raise HTTPException(status_code=400, detail="仅支持 .png/.jpg/.jpeg 格式")
-
-    content = await file.read()
-    if len(content) > 5 * 1024 * 1024:
-        raise HTTPException(status_code=400, detail="文件大小不能超过 5MB")
-
-    safe_name = (action_name or "template").replace("/", "_").replace("\\", "_")
-    filename = f"{safe_name}_{int(time.time() * 1000)}{ext}"
-    template_service.save_template(filename, content, resolution=resolution)
-    return {"filename": filename, "size": len(content), "resolution": resolution}
-
-
-@router.delete("/templates/{filename}")
-def delete_template(
-    filename: str,
-    resolution: str = Query("default"),
-    user = Depends(require_role("admin")),
-):
-    deleted = template_service.delete_template(filename, resolution=resolution)
-    if not deleted:
-        raise HTTPException(status_code=404, detail="模板文件不存在")
-    return {"deleted": True, "filename": filename}

@@ -79,7 +79,7 @@ server/app/db_models.py      ← CollectedComment, CollectedUser
 ```javascript
 // comment-utils.js
 parseCommentItem: function (item, handler) {
-    var findChild = (handler && handler._findChildBySelector) 
+    var findChild = (handler && handler._findChildBySelector)
         ? function(p, a) { return handler._findChildBySelector(p, a); }
         : _findChildBySelector;  // 独立模式兜底
     var extractVal = (handler && handler._extractChildValue)

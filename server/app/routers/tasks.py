@@ -82,6 +82,10 @@ async def _maybe_expand_keywords(params: dict, task_type: str, db=None) -> dict:
     seeds = [k.strip() for k in params.get("keywords", []) if k and k.strip()]
     if not seeds:
         return params
+    existing_matrix = [k.strip() for k in params.get("keyword_matrix", []) if k and k.strip()]
+    if existing_matrix:
+        params["keyword_matrix"] = list(dict.fromkeys(seeds + existing_matrix))
+        return params
     try:
         all_expanded = []
         for seed in seeds[:3]:
@@ -94,6 +98,34 @@ async def _maybe_expand_keywords(params: dict, task_type: str, db=None) -> dict:
             logger.info("AI expanded keyword: %s", kw)
     except Exception as e:
         logger.warning("Failed to expand keywords for nurture task: %s", e)
+    return params
+
+
+def _maybe_resolve_nurture_subtask_templates(params: dict, task_type: str, db=None) -> dict:
+    if task_type != "nurture" or not db:
+        return params
+    sub_tasks = params.get("sub_tasks")
+    if not isinstance(sub_tasks, list):
+        return params
+    keyword = params.get("keyword") or ""
+    if not keyword:
+        keywords = params.get("keywords") or params.get("keyword_matrix") or []
+        if keywords:
+            keyword = keywords[0]
+    for sub_task in sub_tasks:
+        if not isinstance(sub_task, dict) or sub_task.get("type") != "comment":
+            continue
+        template_id = sub_task.get("content_template_id")
+        if not template_id or sub_task.get("content"):
+            continue
+        try:
+            tpl_body = content_service.get_template_body(db, template_id)
+            if tpl_body:
+                sub_task["content"] = content_service.substitute_variables(
+                    tpl_body, {"keyword": keyword}
+                )
+        except Exception as e:
+            logger.warning("Failed to resolve nurture sub_task template=%s: %s", template_id, e)
     return params
 
 
@@ -137,6 +169,7 @@ async def create_task(
     params = await _maybe_resolve_content_template(params, request.type.value, db=db)
     params = await _maybe_resolve_dm_sequence(params, db=db)
     params = await _maybe_expand_keywords(params, request.type.value, db=db)
+    params = _maybe_resolve_nurture_subtask_templates(params, request.type.value, db=db)
 
     try:
         user_id, _ = user
@@ -178,17 +211,18 @@ async def batch_create_tasks(
         raise HTTPException(status_code=422, detail=f"Invalid params for {ttype}: {str(e)}")
 
     from app.db_models import Account, AccountGroupMember, Channel, ChannelItem as DBChannelItem
-    from app.models import TaskType as TT, TASK_PARAMS_VALIDATORS
+    from app.models import TaskType as TT
 
     params = await _maybe_resolve_content_template(params, ttype, db=db)
     params = await _maybe_resolve_dm_sequence(params, db=db)
     params = await _maybe_expand_keywords(params, ttype, db=db)
+    params = _maybe_resolve_nurture_subtask_templates(params, ttype, db=db)
     raw_keywords = params.get("keywords", []) or ([params.get("keyword")] if params.get("keyword") else [])
     keywords = [k.strip() for k in raw_keywords if k and k.strip()]
 
     # Only require keywords for keyword-based task types (those with a params validator)
     # collect 允许只用 share_links (分享链接采集)，不需要 keyword
-    _needs_keywords = ttype in TASK_PARAMS_VALIDATORS
+    _needs_keywords = ttype in {"search_comment", "search_like", "search_dm", "reply_comment", "collect"}
     _has_share_links = bool(params.get("share_links"))
     if _needs_keywords and not keywords and not request.params.get("keyword") and not _has_share_links:
         raise HTTPException(status_code=400, detail="关键词不能为空（采集任务可使用分享链接代替）")
@@ -273,7 +307,7 @@ async def batch_create_tasks(
                 db.flush()
 
         # 总是新建通道（UUID 自动生成），不复用旧通道
-        template_params = {k: v for k, v in params.items() if k not in ("keyword", "keywords", "keyword_matrix")}
+        template_params = {k: v for k, v in params.items() if k not in ("keyword", "keywords")}
         ch = Channel(
             group_id=channel_group_id,
             task_type=ttype,

@@ -17,6 +17,38 @@ TEMPLATE_DIR.mkdir(exist_ok=True)
 ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg"}
 
 
+def _aspect_tag(resolution: str) -> str:
+    """Compute aspect-ratio tag from 'WxH' string, e.g. '1080x2400' → '9:20'."""
+    try:
+        w, h = resolution.split("x")
+        w, h = int(w), int(h)
+    except (ValueError, AttributeError):
+        return "unknown"
+    if w == 0 or h == 0:
+        return "unknown"
+    a, b = w, h
+    while b:
+        a, b = b, a % b
+    gcd = a
+    return f"{w // gcd}:{h // gcd}"
+
+
+def _same_aspect_dirs(resolution: str) -> list[Path]:
+    """Return all resolution subdirectories with the same aspect ratio as `resolution`."""
+    target_ar = _aspect_tag(resolution)
+    if target_ar == "unknown":
+        return []
+    result = []
+    try:
+        for d in TEMPLATE_DIR.iterdir():
+            if d.is_dir() and d.name != "default" and d.name != resolution:
+                if _aspect_tag(d.name) == target_ar:
+                    result.append(d)
+    except OSError:
+        pass
+    return result
+
+
 def _ensure_resolution_dir(resolution: str) -> Path:
     """Ensure a resolution subdirectory exists."""
     d = TEMPLATE_DIR / resolution
@@ -40,11 +72,13 @@ class TemplateService:
         self._md5_cache: dict[str, dict] = {}
 
     def _iter_templates(self, resolution: str = None):
-        """Iterate template files. If resolution given, includes that subdirectory
-        plus 'default' as fallback (resolution-specific wins on duplicate names).
+        """Iterate template files. If resolution given, includes that subdirectory,
+        same-aspect-ratio directories, plus 'default' as fallback.
         Otherwise iterates all resolution subdirectories."""
         if resolution:
-            dirs = [TEMPLATE_DIR / resolution, TEMPLATE_DIR / "default"]
+            dirs = [TEMPLATE_DIR / resolution]
+            dirs.extend(_same_aspect_dirs(resolution))
+            dirs.append(TEMPLATE_DIR / "default")
         else:
             dirs = [d for d in TEMPLATE_DIR.iterdir() if d.is_dir()]
         seen = set()

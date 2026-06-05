@@ -32,6 +32,8 @@ export const NAV_CATEGORIES = [
     label: 'AI 视频',
     items: [
       { name: 'AI 视频工坊', path: '/video-studio', icon: 'M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z' },
+      { name: '图像创作', path: '/image-creation', icon: 'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z' },
+      { name: '图像策略中心', path: '/image-production/strategies', icon: 'M9 17v-2a4 4 0 014-4h6M9 7h12M3 7h2m-2 5h2m-2 5h2m4-5h12' },
       { name: '系列管理', path: '/series', icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10' },
       { name: '角色资产库', path: '/characters', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
       { name: '场景资产库', path: '/scenes', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
@@ -55,6 +57,15 @@ export const NAV_CATEGORIES = [
 ]
 
 // 静态路由精确匹配。动态路由由 getCategoryByRoute 通过 route.matched 处理。
+const aiVideoCategory = NAV_CATEGORIES.find((category) => category.key === 'ai-video')
+if (aiVideoCategory && !aiVideoCategory.items.some((item) => item.path === '/one-sentence-video')) {
+  aiVideoCategory.items.unshift({
+    name: '一句话成片',
+    path: '/one-sentence-video',
+    icon: 'M13 10V3L4 14h7v7l9-11h-7z',
+  })
+}
+
 export const ROUTE_CATEGORY_MAP = {
   '/': 'ops',
   '/accounts': 'ops',
@@ -67,6 +78,9 @@ export const ROUTE_CATEGORY_MAP = {
   '/data': 'data',
   '/stats': 'data',
   '/video-studio': 'ai-video',
+  '/one-sentence-video': 'ai-video',
+  '/image-creation': 'ai-video',
+  '/image-production/strategies': 'ai-video',
   '/series': 'ai-video',
   '/characters': 'ai-video',
   '/scenes': 'ai-video',

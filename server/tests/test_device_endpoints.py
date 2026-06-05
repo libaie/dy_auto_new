@@ -1,11 +1,22 @@
 """Device-facing API endpoint tests."""
 import io
+import pytest
 from fastapi.testclient import TestClient
 from app.main import app
 
 client = TestClient(app)
 SECRET = "change-me-to-a-random-string"
 HEADERS = {"X-Device-Secret": SECRET}
+
+
+@pytest.fixture(autouse=True)
+def isolate_script_service(tmp_path, monkeypatch):
+    """Keep script upload/download endpoint tests out of the real server/scripts dir."""
+    from app.services.script_service import script_service
+
+    script_dir = tmp_path / "scripts"
+    monkeypatch.setattr(script_service, "_script_dir", script_dir)
+    monkeypatch.setattr(script_service, "_version_file", script_dir / "version.txt")
 
 
 def test_script_version():
@@ -57,6 +68,35 @@ def test_script_upload_rejects_oversized():
     assert resp.status_code == 400
 
 
+def test_device_template_download_with_per_device_secret(db, tmp_path, monkeypatch):
+    """Per-device auth should resolve device resolution and still fall back to default templates."""
+    from app.db_models import Device
+    from app.services import template_service as template_module
+
+    monkeypatch.setattr(template_module, "TEMPLATE_DIR", tmp_path)
+    template_module.template_service._md5_cache.clear()
+    default_dir = tmp_path / "default"
+    default_dir.mkdir()
+    (default_dir / "sort_latest_test.jpg").write_bytes(b"jpg-bytes")
+
+    db.add(Device(
+        id="dev-template-test",
+        name="Template Test",
+        status="online",
+        device_secret="template-secret",
+        screen_resolution="1080x2340",
+    ))
+    db.commit()
+
+    resp = client.get(
+        "/api/device/templates/sort_latest_test.jpg",
+        headers={"X-Device-Secret": "template-secret"},
+    )
+
+    assert resp.status_code == 200
+    assert resp.content == b"jpg-bytes"
+
+
 def test_register_device():
     resp = client.post("/api/device/register", json={
         "device_id": "dev-register-test", "name": "Test Phone",
@@ -102,3 +142,49 @@ def test_poll_returns_proxy_config(db):
     data = resp.json()
     assert data.get("proxy") is not None
     assert data["proxy"]["host"] == "proxy.test"
+
+
+def test_device_task_dm_sequence_is_included_even_when_not_device_scoped(db):
+    """A device must receive the full DM sequence referenced by its assigned task."""
+    from app.db_models import Device, DMSequence, Task
+
+    seq_id = "seq-owned-by-web-user"
+    device_headers = {"X-Device-Secret": "dev-dm-seq-secret"}
+    db.add(Device(
+        id="dev-dm-seq-task",
+        name="DM Seq Device",
+        status="online",
+        device_secret="dev-dm-seq-secret",
+    ))
+    db.add(DMSequence(
+        id=seq_id,
+        name="Owned Sequence",
+        messages=[{"order": 1, "content": "base", "delay_ms": 100}],
+        variants=[[{"order": 1, "content": "variant", "delay_ms": 100}]],
+        user_id="web-user-1",
+    ))
+    db.add(Task(
+        type="reply_comment",
+        account_id="acc-001",
+        device_id="dev-dm-seq-task",
+        user_id=None,
+        params={"keyword": "餐后血糖", "dm_sequence_id": seq_id},
+        status="pending",
+    ))
+    db.commit()
+
+    sync_resp = client.get("/api/dm-sequences/device/sync", headers=device_headers)
+    assert sync_resp.status_code == 200
+    assert any(s["id"] == seq_id for s in sync_resp.json()["dm_sequences"])
+
+    poll_resp = client.get(
+        "/api/device/poll",
+        params={"device_id": "dev-dm-seq-task"},
+        headers=device_headers,
+    )
+    assert poll_resp.status_code == 200
+    poll_data = poll_resp.json()
+    assert poll_data["task"]["params"]["dm_sequence_id"] == seq_id
+    matched = [s for s in poll_data["dm_sequences"] if s["id"] == seq_id]
+    assert matched
+    assert matched[0]["variants"][0][0]["content"] == "variant"

@@ -13,14 +13,14 @@ from app.services.stats_service import stats_service
 MAX_RETRIES = 3
 
 
-def _db_task_to_pydantic(task: DBTask) -> PydanticTask:
+def _db_task_to_pydantic(task: DBTask, params_override: Optional[dict] = None) -> PydanticTask:
     """Convert SQLAlchemy Task to Pydantic Task for API responses."""
     return PydanticTask(
         id=task.id,
         type=TaskType(task.type),
         account_id=task.account_id,
         device_id=task.device_id or "",
-        params=task.params or {},
+        params=params_override if params_override is not None else (task.params or {}),
         status=TaskStatus(task.status),
         created_at=task.created_at,
         scheduled_at=task.scheduled_at,
@@ -30,6 +30,7 @@ def _db_task_to_pydantic(task: DBTask) -> PydanticTask:
         retry_count=task.retry_count,
         chain_instance_id=task.chain_instance_id,
         step_order=task.step_order,
+        lease_id=task.lease_id,
     )
 
 
@@ -124,28 +125,57 @@ class TaskService:
             DBTask.started_at < stale_threshold,
             ~DBTask.device_id.in_(online_device_ids),  # skip tasks on online devices
         ).all()
+        # Query ChannelItems FIRST to distinguish channel-backed tasks from direct tasks.
+        # Channel-backed tasks MUST be cancelled (not reset to PENDING) — otherwise
+        # the old task enters the direct queue AND the ChannelItem generates a new
+        # task, creating two execution paths for the same keyword/account.
+        from app.db_models import ChannelItem
+        from app.services.channel_service import channel_service as ch_svc
+        stale_ids = [t.id for t in stale_running]
+        stale_ch_items = db.query(ChannelItem).filter(ChannelItem.task_id.in_(stale_ids)).all()
+        channel_backed_ids = {sci.task_id for sci in stale_ch_items}
+
         for stale in stale_running:
             stale.retry_count += 1
             if stale.retry_count >= MAX_RETRIES:
                 stale.status = TaskStatus.FAILED.value
                 stale.completed_at = bj_now()
+                stale.device_id = None
+                stale.lease_id = None
+            elif stale.id in channel_backed_ids:
+                # Channel-backed: cancel old task, let ChannelItem re-generate a fresh one.
+                # Consistent with channel_service.claim_channel_item() stale recovery.
+                stale.status = TaskStatus.CANCELLED.value
+                stale.completed_at = bj_now()
+                stale.device_id = None
+                stale.lease_id = None
             else:
+                # Direct task (no ChannelItem): reset to PENDING for re-dispatch.
                 stale.status = TaskStatus.PENDING.value
                 stale.device_id = None
                 stale.started_at = None
+                stale.lease_id = None
+
         if stale_running:
-            # Reset associated channel items so keywords can be re-dispatched
-            from app.db_models import ChannelItem
-            from app.services.channel_service import channel_service as ch_svc
-            stale_ids = [t.id for t in stale_running]
-            stale_ch_items = db.query(ChannelItem).filter(ChannelItem.task_id.in_(stale_ids)).all()
+            db.flush()
+            # Reset channel items based on the task's new status:
+            # - FAILED (max retries) → channel item → "failed" (terminal)
+            # - CANCELLED (retry)    → channel item → "pending" (re-dispatch)
+            _task_status = {t.id: t.status for t in stale_running}
             stale_ch_ids = set()
             for sci in stale_ch_items:
-                sci.status = "pending"
-                sci.assigned_device_id = None
-                sci.assigned_at = None
-                sci.task_id = None
-                stale_ch_ids.add(sci.channel_id)
+                new_status = _task_status.get(sci.task_id)
+                if new_status == TaskStatus.FAILED.value:
+                    sci.status = "failed"
+                    sci.assigned_device_id = None
+                    sci.assigned_at = None
+                    sci.task_id = None
+                elif new_status == TaskStatus.CANCELLED.value:
+                    sci.status = "pending"
+                    sci.assigned_device_id = None
+                    sci.assigned_at = None
+                    sci.task_id = None
+                    stale_ch_ids.add(sci.channel_id)
             if stale_ch_items:
                 db.flush()
                 for cid in stale_ch_ids:
@@ -175,9 +205,11 @@ class TaskService:
 
         for db_task in candidates:
             # Check task quota (reply_comment 不阻塞 follow/DM，handler 内部优雅降级)
-            if not stats_service.check_quota(db, db_task.account_id, db_task.type):
+            if not stats_service.check_quota(db, db_task.account_id, db_task.type, db_task.params):
                 continue
             # Atomic claim: only succeeds if no other task for this account is RUNNING
+            import uuid
+            _lease_id = str(uuid.uuid4())
             result = db.execute(
                 update(DBTask)
                 .where(
@@ -185,7 +217,7 @@ class TaskService:
                     DBTask.status == TaskStatus.PENDING.value,
                     ~DBTask.account_id.in_(busy_account_ids),
                 )
-                .values(status=TaskStatus.RUNNING.value, device_id=device_id, started_at=bj_now())
+                .values(status=TaskStatus.RUNNING.value, device_id=device_id, started_at=bj_now(), lease_id=_lease_id)
             )
             db.commit()
 
@@ -193,7 +225,8 @@ class TaskService:
                 continue
 
             db.refresh(db_task)
-            return _db_task_to_pydantic(db_task)
+            params = stats_service.inject_task_quota_params(db, db_task.account_id, db_task.type, db_task.params)
+            return _db_task_to_pydantic(db_task, params_override=params)
 
         return None
 
@@ -209,6 +242,30 @@ class TaskService:
         if not db_task:
             raise ValueError(f"Task {task_id} not found")
 
+        # Pre-load channel association (used by both the ack path and retry logic)
+        from app.db_models import ChannelItem
+        from app.services.channel_service import channel_service
+        channel_item = db.query(ChannelItem).filter(ChannelItem.task_id == task_id).first()
+
+        # Device ack'ing a server-initiated cancel — clean up device_id
+        # and reset channel item so the keyword can be re-dispatched.
+        # Must happen BEFORE the "already terminal" guard below.
+        if db_task.status == TaskStatus.CANCELLED.value and status == TaskStatus.CANCELLED:
+            db_task.device_id = None
+            # Only reset assigned items — skipped/cancelled channel items
+            # must stay terminal (channel-level cancel already handled them).
+            if channel_item and channel_item.status == "assigned":
+                channel_item.status = "pending"
+                channel_item.assigned_device_id = None
+                channel_item.assigned_at = None
+                channel_item.task_id = None
+                channel_service._reactivate_channel(db, channel_item.channel_id)
+            import logging
+            _logger = logging.getLogger("task_service")
+            _logger.info("Device ack'ed cancellation for task %s — device_id cleared, channel item reset",
+                         task_id)
+            return _db_task_to_pydantic(db_task), None
+
         # Task already in terminal state — ignore late reports
         if db_task.status in (TaskStatus.CANCELLED.value, TaskStatus.COMPLETED.value, TaskStatus.FAILED.value):
             import logging
@@ -217,17 +274,25 @@ class TaskService:
                             task_id, db_task.status, status.value if hasattr(status, 'value') else status)
             return _db_task_to_pydantic(db_task), None
 
-        # Check channel association early (affects retry logic)
-        from app.db_models import ChannelItem
-        from app.services.channel_service import channel_service
-        channel_item = db.query(ChannelItem).filter(ChannelItem.task_id == task_id).first()
-
         if status == TaskStatus.COMPLETED:
             db_task.status = TaskStatus.COMPLETED.value
             db_task.result = result
             db_task.completed_at = bj_now()
             # 统计由设备端增量上报 (POST /api/device/stats/increment)
             # 每个子操作完成后实时上报，避免中途崩溃丢失数据 + 防止双重计数
+        elif status == TaskStatus.CANCELLED:
+            # Device self-cancelled (not server-initiated).
+            # Only reset assigned ChannelItem — skipped/cancelled items stay terminal.
+            db_task.status = TaskStatus.CANCELLED.value
+            db_task.result = result
+            db_task.completed_at = bj_now()
+            db_task.device_id = None
+            if channel_item and channel_item.status == "assigned":
+                channel_item.status = "pending"
+                channel_item.assigned_device_id = None
+                channel_item.assigned_at = None
+                channel_item.task_id = None
+                channel_service._reactivate_channel(db, channel_item.channel_id)
         elif status == TaskStatus.FAILED:
             db_task.retry_count += 1
             if db_task.retry_count >= MAX_RETRIES:
@@ -235,14 +300,32 @@ class TaskService:
                 db_task.result = result
                 db_task.completed_at = bj_now()
             else:
-                db_task.status = TaskStatus.PENDING.value  # re-queue for retry
-                db_task.device_id = None
-                db_task.started_at = None
-                # Keep ChannelItem assigned — prevents channel from re-dispatching
-                # the same keyword while the task retries via the direct queue.
-                # Refresh assigned_at to extend the stale recovery window.
                 if channel_item:
-                    channel_item.assigned_at = bj_now()
+                    # Channel-driven retry: increment item-level retry counter,
+                    # reset to pending so claim_channel_item re-dispatches with
+                    # proper routing/cooldown/quota. Old task cancelled to avoid
+                    # orphan direct-queue pickup (single recovery path, no fork).
+                    channel_item.retry_count += 1
+                    if channel_item.retry_count >= MAX_RETRIES:
+                        channel_item.status = "failed"
+                        channel_item.completed_at = bj_now()
+                        db_task.status = TaskStatus.FAILED.value
+                        db_task.completed_at = bj_now()
+                    else:
+                        channel_item.status = "pending"
+                        channel_item.assigned_device_id = None
+                        channel_item.assigned_at = None
+                        channel_item.task_id = None
+                        db.flush()
+                        channel_service._reactivate_channel(db, channel_item.channel_id)
+                        db_task.status = TaskStatus.CANCELLED.value
+                        db_task.completed_at = bj_now()
+                else:
+                    # Non-channel task: standard direct retry
+                    db_task.status = TaskStatus.PENDING.value
+                    db_task.device_id = None
+                    db_task.started_at = None
+                    db_task.lease_id = None
 
         # Advance chain if this task is part of one
         if db_task.chain_instance_id and db_task.status in ("completed", "failed"):
@@ -299,7 +382,13 @@ class TaskService:
         return query.count()
 
     def cancel_task(self, db: Session, task_id: str):
-        """Cancel a pending or running task. Resets associated channel item if any."""
+        """Cancel a pending or running task.
+
+        Keeps device_id so the cancellation can be delivered to the running
+        device (via poll check_cancelled_running or WebSocket).  ChannelItem
+        reset and device_id clear are deferred to report_result(CANCELLED),
+        which the device calls after ack'ing the cancel.
+        """
         task = db.query(DBTask).filter(DBTask.id == task_id).first()
         if not task:
             raise ValueError(f"Task {task_id} not found")
@@ -307,12 +396,13 @@ class TaskService:
             raise ValueError(f"Cannot cancel task in status: {task.status}")
         task.status = TaskStatus.CANCELLED.value
         task.completed_at = bj_now()
-
-        # Reset associated channel item so it can be re-dispatched
+        # Keep device_id — check_cancelled_running and WS both need it for
+        # cancellation delivery.  Reset ChannelItem immediately so the channel
+        # can re-dispatch without waiting for the device to ack.
         from app.db_models import ChannelItem
         from app.services.channel_service import channel_service as ch_svc
         channel_item = db.query(ChannelItem).filter(ChannelItem.task_id == task_id).first()
-        if channel_item:
+        if channel_item and channel_item.status == "assigned":
             channel_item.status = "pending"
             channel_item.assigned_device_id = None
             channel_item.assigned_at = None

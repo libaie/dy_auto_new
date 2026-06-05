@@ -5,6 +5,7 @@ var bezier = require("../utils/bezier");
 
 var TAG = "反检测";
 var settings = config.antiDetect;
+var MAX_SWIPE_DURATION = 1500;  // 单次手势耗时熔断上限，防止阻塞 Accessibility 线程
 
 var antiDetect = {
   _skipDisabled: false,  // 序列发送期间禁用随机跳过
@@ -66,7 +67,8 @@ var antiDetect = {
       return sum + p.duration;
     }, 0);
 
-    // AutoJS6 gestures API: gestures([delay, duration, [x1,y1], [x2,y2], ...])
+    // 熔断保护: 总耗时不超过 MAX_SWIPE_DURATION，防止 Accessibility 线程僵死
+    totalDuration = Math.min(totalDuration, MAX_SWIPE_DURATION);
     gestures([0, totalDuration].concat(gesturePoints));
   },
 
@@ -155,6 +157,7 @@ var antiDetect = {
       return sum + Math.round(p.duration / speedFactor);
     }, 0);
 
+    totalDuration = Math.min(totalDuration, MAX_SWIPE_DURATION);
     gestures([0, totalDuration].concat(gesturePoints));
   },
 

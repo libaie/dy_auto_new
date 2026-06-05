@@ -346,6 +346,66 @@ def test_claim_respects_quota_limit(db):
     assert result is None
 
 
+def test_claim_nurture_injects_item_keyword_matrix(db):
+    setup_group(db, group_id="grp-cl-nurture-matrix", account_ids=["acc-cl-nurture-matrix"])
+    ch = channel_service.create_channel(
+        db,
+        group_id="grp-cl-nurture-matrix",
+        task_type="nurture",
+        account_mode="single_account",
+        account_id="acc-cl-nurture-matrix",
+        keywords=["diet-keyword"],
+        params_template={
+            "sub_tasks": [{"type": "like", "count": 1}],
+            "keyword_matrix": ["health-keyword"],
+            "duration": 10,
+        },
+    )
+    from app.db_models import Device
+    db.add(Device(id="dev-cl-nurture-matrix", name="dev", status="online"))
+    db.flush()
+
+    result = channel_service.claim_channel_item(db, "dev-cl-nurture-matrix")
+
+    assert result is not None
+    task, _ = result
+    assert task.params["keyword"] == "diet-keyword"
+    assert task.params["keyword_matrix"] == ["diet-keyword", "health-keyword"]
+
+
+def test_claim_nurture_respects_comment_quota(db):
+    from app.services.stats_service import stats_service
+    setup_group(db, group_id="grp-cl-nurture-quota", account_ids=["acc-cl-nurture-quota"])
+    account = db.query(Account).filter(Account.id == "acc-cl-nurture-quota").first()
+    account.daily_limits = {
+        "comments": 1,
+        "follows": 20,
+        "likes": 50,
+        "nurture_likes": 200,
+    }
+    db.flush()
+    stats_service.increment(db, "acc-cl-nurture-quota", "search_comment", count=1)
+    ch = channel_service.create_channel(
+        db,
+        group_id="grp-cl-nurture-quota",
+        task_type="nurture",
+        account_mode="single_account",
+        account_id="acc-cl-nurture-quota",
+        keywords=["quota-keyword"],
+        params_template={
+            "sub_tasks": [{"type": "comment", "count": 1}],
+            "duration": 10,
+        },
+    )
+    from app.db_models import Device
+    db.add(Device(id="dev-cl-nurture-quota", name="dev", status="online"))
+    db.flush()
+
+    result = channel_service.claim_channel_item(db, "dev-cl-nurture-quota")
+
+    assert result is None
+
+
 def test_complete_item_marks_channel_completed_when_all_done(db):
     """Channel should be marked completed when all items are terminal."""
     setup_group(db, group_id="grp-cm-001", account_ids=["acc-cm-001"])

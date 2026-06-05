@@ -90,3 +90,23 @@ def test_toggle_selector_enabled(client):
     })
     assert response.status_code == 200
     assert response.json()["enabled"] is False
+
+
+def test_upload_template_uses_form_action_and_query_resolution(client, tmp_path, monkeypatch):
+    from app.services import template_service as template_module
+
+    monkeypatch.setattr(template_module, "TEMPLATE_DIR", tmp_path)
+    template_module.template_service._md5_cache.clear()
+
+    response = client.post(
+        "/api/selectors/templates/upload",
+        params={"resolution": "1080x2340"},
+        data={"action_name": "sort_latest"},
+        files={"file": ("latest.png", b"png-bytes", "image/png")},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["resolution"] == "1080x2340"
+    assert data["filename"].startswith("sort_latest_")
+    assert (tmp_path / "1080x2340" / data["filename"]).exists()

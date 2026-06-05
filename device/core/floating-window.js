@@ -24,9 +24,9 @@ function dpToPx(dp) {
 }
 
 // 尺寸配置（微调了尺寸比例，留出阴影空间）
-var ROOT_DP = 64;       // 悬浮窗根容器大小（透明，用于装载阴影）
-var BALL_DP = 46;       // 悬浮球实体直径
-var MARGIN_DP = 8;      // 距屏幕边缘距离
+var ROOT_DP = 46;       // 悬浮窗根容器大小（透明，用于装载阴影）
+var BALL_DP = 38;       // 悬浮球实体直径
+var MARGIN_DP = -8;      // 距屏幕边缘距离
 
 var floatingWindow = {
   _window: null,
@@ -99,10 +99,10 @@ var floatingWindow = {
       }
     });
 
-    // 初始位置
+    // 初始位置：贴右边缘，只露一半，Y 轴整体上移 30px
     this._window.setPosition(
-      this._screenW - this._rootPx, 
-      Math.round(this._screenH * 0.3)
+      this._screenW - Math.round(this._rootPx / 2),
+      Math.round(this._screenH * 0.3) - 30
     );
 
     var downX, downY, windowX, windowY;
@@ -400,7 +400,7 @@ var floatingWindow = {
       '</card>'
     );
 
-    var pairW = dpToPx(280);
+    var pairW = dpToPx(260);
     this._pairWindow.setPosition(
       this._screenW - pairW - dpToPx(5),
       dpToPx(20)

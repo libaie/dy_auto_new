@@ -4,7 +4,39 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from app.db_models import PromptTemplate
+from app.db_models import PromptTemplate, SystemSetting
+
+_TEMPLATES_REVISION_KEY = "prompt_templates_revision"
+
+
+def _get_tmpl_revision(db: Session) -> int:
+    row = db.query(SystemSetting).filter(SystemSetting.key == _TEMPLATES_REVISION_KEY).first()
+    if row and row.value:
+        try:
+            return int(row.value)
+        except ValueError:
+            pass
+    templates = db.query(PromptTemplate).filter(PromptTemplate.enabled == True).all()
+    if not templates:
+        return 0
+    rev = int(max(t.updated_at for t in templates).timestamp())
+    _set_tmpl_revision(db, rev)
+    return rev
+
+
+def _set_tmpl_revision(db: Session, rev: int) -> None:
+    row = db.query(SystemSetting).filter(SystemSetting.key == _TEMPLATES_REVISION_KEY).first()
+    if row:
+        row.value = str(rev)
+    else:
+        db.add(SystemSetting(key=_TEMPLATES_REVISION_KEY, value=str(rev)))
+    db.flush()
+
+
+def _bump_tmpl_revision(db: Session) -> int:
+    rev = _get_tmpl_revision(db) + 1
+    _set_tmpl_revision(db, rev)
+    return rev
 
 
 def _to_dict(tmpl: PromptTemplate) -> dict:
@@ -43,15 +75,12 @@ class PromptTemplateService:
         templates = db.query(PromptTemplate).filter(PromptTemplate.enabled == True).all()
         if not templates:
             return 0, []
-        version = max(t.version for t in templates)
+        version = _get_tmpl_revision(db)
         return version, [_to_device_dict(t) for t in templates]
 
     def get_version(self, db: Session) -> int:
-        """Get current max version across all enabled templates."""
-        templates = db.query(PromptTemplate).filter(PromptTemplate.enabled == True).all()
-        if not templates:
-            return 0
-        return max(t.version for t in templates)
+        """Get current prompt templates revision — guaranteed monotonic across all CRUD."""
+        return _get_tmpl_revision(db)
 
     def get_template(self, db: Session, name: str) -> Optional[dict]:
         """Get a single template by name."""
@@ -191,7 +220,12 @@ class PromptTemplateService:
             "2. Preserve the existing schema and all required fields.\n"
             "3. Apply only the requested change.\n"
             "4. Keep unrelated fields stable where possible.\n"
-            "5. Do not wrap the JSON in markdown fences.\n"
+            "5. Do not return a no-op rewrite. If the current template already "
+            "covers the instruction, make a concrete improvement in the directly "
+            "related fields while preserving unrelated fields.\n"
+            "6. Make changed content operational and specific enough that a "
+            "reviewer can identify what changed.\n"
+            "7. Do not wrap the JSON in markdown fences.\n"
         )
 
     def create_template(self, db: Session, name: str, industry: str,
@@ -210,6 +244,7 @@ class PromptTemplateService:
             version=1,
         )
         db.add(tmpl)
+        _bump_tmpl_revision(db)
         db.commit()
         db.refresh(tmpl)
         return _to_dict(tmpl)
@@ -232,6 +267,7 @@ class PromptTemplateService:
             tmpl.description = description
         tmpl.version = (tmpl.version or 1) + 1
 
+        _bump_tmpl_revision(db)
         db.commit()
         db.refresh(tmpl)
         return _to_dict(tmpl)
@@ -242,6 +278,7 @@ class PromptTemplateService:
         if not tmpl:
             return False
         db.delete(tmpl)
+        _bump_tmpl_revision(db)
         db.commit()
         return True
 
@@ -252,6 +289,7 @@ class PromptTemplateService:
             raise ValueError(f"Template '{name}' not found")
 
         tmpl.enabled = enabled
+        _bump_tmpl_revision(db)
         db.commit()
         db.refresh(tmpl)
         return _to_dict(tmpl)

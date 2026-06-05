@@ -100,6 +100,10 @@ def test_approve_asset_records_human_review(db):
         "local_path": "output/image.png",
         "metadata": {},
     }], pixelle_task_id="stage-1")[0]
+    asset.copy_status = "persisted"
+    asset.checksum = "image-checksum"
+    asset.storage_path = "output/image.png"
+    db.commit()
 
     approve_asset(db, asset.id, reviewer_user_id="user-1", comment="looks good")
 
@@ -122,6 +126,9 @@ def test_regeneration_marks_old_asset_and_creates_next_version(db):
     new_asset = create_regenerated_image_asset(db, asset.id, {
         "url": "https://cdn.test/v2.png",
         "local_path": "output/v2.png",
+        "storage_path": "output/v2.png",
+        "checksum": "sha256-v2",
+        "copy_status": "persisted",
         "metadata": {},
     })
 

@@ -55,15 +55,11 @@ def upgrade() -> None:
         sa.Column("pixelle_task_id", sa.String(length=100), nullable=True),
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.Column("updated_at", sa.DateTime(), nullable=False),
+        sa.UniqueConstraint("run_id", "frame_id", "asset_type", "version", name="uq_video_asset_version"),
     )
     op.create_index("idx_video_assets_run_stage", "video_production_assets", ["run_id", "stage"])
     op.create_index("idx_video_assets_run_frame", "video_production_assets", ["run_id", "frame_id"])
     op.create_index("idx_video_assets_status", "video_production_assets", ["status"])
-    op.create_unique_constraint(
-        "uq_video_asset_version",
-        "video_production_assets",
-        ["run_id", "frame_id", "asset_type", "version"],
-    )
 
     op.create_table(
         "video_review_records",
@@ -91,7 +87,6 @@ def downgrade() -> None:
     op.drop_index("idx_video_review_asset", table_name="video_review_records")
     op.drop_table("video_review_records")
 
-    op.drop_constraint("uq_video_asset_version", "video_production_assets", type_="unique")
     op.drop_index("idx_video_assets_status", table_name="video_production_assets")
     op.drop_index("idx_video_assets_run_frame", table_name="video_production_assets")
     op.drop_index("idx_video_assets_run_stage", table_name="video_production_assets")

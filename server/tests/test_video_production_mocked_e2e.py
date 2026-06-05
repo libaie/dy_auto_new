@@ -7,6 +7,10 @@ from app.main import app
 client = TestClient(app)
 
 
+async def _agency_pass(*args, **kwargs):
+    return {"stage_status": "passed", "invocation_ids": ["agency-ok"], "invocations": []}
+
+
 def test_mocked_image_stage_to_human_approval(db, monkeypatch):
     series = Series(title="Mocked E2E", logline="Test", genre="drama", target_duration=60)
     db.add(series)
@@ -41,11 +45,15 @@ def test_mocked_image_stage_to_human_approval(db, monkeypatch):
                 "asset_type": "image",
                 "url": "https://cdn.test/frame-001.png",
                 "local_path": "output/frame-001.png",
+                "storage_path": "output/frame-001.png",
+                "checksum": "checksum-frame-001",
+                "copy_status": "persisted",
                 "metadata": {},
             }],
         }
 
     monkeypatch.setattr("app.services.video_production_service.submit_image_batch", fake_submit_image_batch)
+    monkeypatch.setattr("app.services.video_production_service._guard_provider_stage", _agency_pass)
     monkeypatch.setattr("app.services.video_production_service.get_stage_task", fake_get_stage_task)
 
     run_resp = client.post("/api/video-production/runs", json={"series_id": series.id, "episode_id": episode.id})

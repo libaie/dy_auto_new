@@ -69,5 +69,6 @@ export const NURTURE_DEFAULT_FORM = {
   video_count: 5,  // reply_comment / search_comment / collect 共用
   sort_by: '',
   max_age_days: 5,
+  max_age_unit: 'days',
   duration: 30,
 }

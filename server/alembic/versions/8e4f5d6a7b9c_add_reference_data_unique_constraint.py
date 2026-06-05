@@ -18,16 +18,24 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.create_unique_constraint(
-        'uq_reference_data_category_value',
-        'reference_data',
-        ['category', 'value']
-    )
+    inspector = sa.inspect(op.get_bind())
+    if 'reference_data' not in set(inspector.get_table_names()):
+        return
+    columns = {column['name'] for column in inspector.get_columns('reference_data')}
+    if {'category', 'value'}.issubset(columns):
+        with op.batch_alter_table('reference_data') as batch:
+            batch.create_unique_constraint(
+                'uq_reference_data_category_value',
+                ['category', 'value']
+            )
 
 
 def downgrade() -> None:
-    op.drop_constraint(
-        'uq_reference_data_category_value',
-        'reference_data',
-        type_='unique'
-    )
+    inspector = sa.inspect(op.get_bind())
+    if 'reference_data' not in set(inspector.get_table_names()):
+        return
+    with op.batch_alter_table('reference_data') as batch:
+        batch.drop_constraint(
+            'uq_reference_data_category_value',
+            type_='unique'
+        )

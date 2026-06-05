@@ -324,6 +324,33 @@ def test_rewrite_ai_invalid_template_emits_error_not_warning(db):
     assert events[-1]["type"] == "error"
 
 
+def test_rewrite_ai_unchanged_template_emits_error_not_done(db):
+    async def fake_stream(*args, **kwargs):
+        yield json.dumps(valid_template_content())
+
+    client = TestClient(app)
+    with (
+        patch("app.routers.prompt_templates.get_ai_config_with_key", return_value={"api_key": "test-key"}),
+        patch("app.routers.prompt_templates.SessionLocal", return_value=nullcontext(db)),
+        patch("app.routers.prompt_templates.gen.generate_custom_stream_with_config", fake_stream),
+    ):
+        response = client.post(
+            "/api/prompt-templates/rewrite-stream",
+            json={
+                "industry": "health",
+                "content": valid_template_content(),
+                "instruction": "make warmer",
+            },
+        )
+
+    events = sse_events(response)
+
+    assert response.status_code == 200
+    assert "done" not in {event["type"] for event in events}
+    assert events[-1]["type"] == "error"
+    assert "unchanged content" in events[-1]["message"]
+
+
 def test_rewrite_ai_incomplete_scenario_template_emits_error_not_done(db):
     invalid = rewritten_template_content()
     del invalid["videoComment"]

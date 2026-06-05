@@ -265,9 +265,9 @@ localPreFilter: function (text) {
    * @param {number} maxAgeDays
    * @returns {Array}
    */
-  filterByTime: function (comments, maxAgeDays) {
+  filterByTime: function (comments, maxAgeMs) {
     var now = new Date();
-    var cutoff = (maxAgeDays === Infinity) ? new Date(0) : new Date(now.getTime() - maxAgeDays * 24 * 60 * 60 * 1000);
+    var cutoff = (maxAgeMs === Infinity) ? new Date(0) : new Date(now.getTime() - maxAgeMs);
     var filtered = [];
     for (var i = 0; i < comments.length; i++) {
       var commentDate = commentUtils.parseTime(comments[i].time);

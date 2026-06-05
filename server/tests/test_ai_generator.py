@@ -9,22 +9,22 @@ from app.services.ai_generator import AiGeneratorService
 pytestmark = pytest.mark.anyio
 
 
-def _openai_cfg():
-    return {
+def _openai_cfg(**overrides):
+    cfg = {
         "api_key": "test-key",
         "api_url": "https://api.example.test/v1/chat/completions",
         "model": "test-model",
         "thinking_enabled": False,
+        "thinking_budget": 0,
     }
+    cfg.update(overrides)
+    return cfg
 
 
-def _anthropic_cfg():
-    return {
-        "api_key": "test-key",
-        "api_url": "https://api.example.test/v1/messages",
-        "model": "claude-test",
-        "thinking_enabled": False,
-    }
+def _anthropic_cfg(**overrides):
+    cfg = _openai_cfg(api_url="https://api.example.test/v1/messages", model="claude-test")
+    cfg.update(overrides)
+    return cfg
 
 
 def _mock_response(json_data, status_code=200):
@@ -133,26 +133,28 @@ class TestGenerate:
     async def test_no_api_key_raises(self, db):
         gen = AiGeneratorService()
 
-        with patch("app.config.get_ai_config_with_key", return_value={}), \
+        with patch("app.config.get_ai_config_with_key", return_value=None), \
              pytest.raises(RuntimeError, match="AI API not configured"):
             await gen.generate(db, "body", {})
 
     async def test_happy_path(self, db):
         gen = AiGeneratorService()
+        cfg = _openai_cfg()
 
-        with patch("app.config.get_ai_config_with_key", return_value=_openai_cfg()), \
+        with patch("app.config.get_ai_config_with_key", return_value=cfg), \
              patch("app.services.ai_generator.AI_MAX_RETRIES", 3), \
              patch.object(gen, "_call_api", new_callable=AsyncMock, return_value="good content") as mock_call:
             result = await gen.generate(db, "body", {"keyword": "test"})
 
         assert result == "good content"
         mock_call.assert_awaited_once()
-        assert mock_call.await_args.args[0] == _openai_cfg()
+        assert mock_call.await_args.args[0] == cfg
 
     async def test_sensitive_retry_then_success(self, db):
         gen = AiGeneratorService()
+        cfg = _openai_cfg()
 
-        with patch("app.config.get_ai_config_with_key", return_value=_openai_cfg()), \
+        with patch("app.config.get_ai_config_with_key", return_value=cfg), \
              patch("app.services.ai_generator.AI_MAX_RETRIES", 3), \
              patch.object(gen, "_call_api", new_callable=AsyncMock, return_value="normal content"), \
              patch("app.services.ai_generator.content_service") as mock_cs:
@@ -164,8 +166,9 @@ class TestGenerate:
 
     async def test_all_retries_sensitive_raises(self, db):
         gen = AiGeneratorService()
+        cfg = _openai_cfg()
 
-        with patch("app.config.get_ai_config_with_key", return_value=_openai_cfg()), \
+        with patch("app.config.get_ai_config_with_key", return_value=cfg), \
              patch("app.services.ai_generator.AI_MAX_RETRIES", 3), \
              patch.object(gen, "_call_api", new_callable=AsyncMock, return_value="blocked content"), \
              patch("app.services.ai_generator.content_service") as mock_cs:
@@ -175,8 +178,9 @@ class TestGenerate:
 
     async def test_api_error_retry_then_success(self, db):
         gen = AiGeneratorService()
+        cfg = _openai_cfg()
 
-        with patch("app.config.get_ai_config_with_key", return_value=_openai_cfg()), \
+        with patch("app.config.get_ai_config_with_key", return_value=cfg), \
              patch("app.services.ai_generator.AI_MAX_RETRIES", 3), \
              patch.object(gen, "_call_api", new_callable=AsyncMock) as mock_call:
             mock_call.side_effect = [
@@ -189,8 +193,9 @@ class TestGenerate:
 
     async def test_all_retries_api_fail_raises(self, db):
         gen = AiGeneratorService()
+        cfg = _openai_cfg()
 
-        with patch("app.config.get_ai_config_with_key", return_value=_openai_cfg()), \
+        with patch("app.config.get_ai_config_with_key", return_value=cfg), \
              patch("app.services.ai_generator.AI_MAX_RETRIES", 2), \
              patch.object(gen, "_call_api", new_callable=AsyncMock) as mock_call:
             mock_call.side_effect = httpx.ConnectError("connection refused")
@@ -206,7 +211,8 @@ class TestCallAnthropic:
         mock_client.post.return_value = _anthropic_response("  generated content  ")
         gen._client = mock_client
 
-        result = await gen._call_anthropic(_anthropic_cfg(), "test prompt")
+        cfg = _anthropic_cfg()
+        result = await gen._call_anthropic(cfg, "test prompt")
 
         assert result == "generated content"
         mock_client.post.assert_called_once()
@@ -233,7 +239,8 @@ class TestCallOpenai:
         mock_client.post.return_value = _openai_response("  generated content  ")
         gen._client = mock_client
 
-        result = await gen._call_openai(_openai_cfg(), "test prompt")
+        cfg = _openai_cfg()
+        result = await gen._call_openai(cfg, "test prompt")
 
         assert result == "generated content"
         mock_client.post.assert_called_once()
@@ -255,21 +262,23 @@ class TestCallOpenai:
 class TestCallApiDispatch:
     async def test_dispatches_to_anthropic(self):
         gen = AiGeneratorService()
+        cfg = _anthropic_cfg()
 
         with patch.object(gen, "_call_anthropic", new_callable=AsyncMock, return_value="ok") as mock:
-            result = await gen._call_api(_anthropic_cfg(), "prompt")
+            result = await gen._call_api(cfg, "prompt")
 
         assert result == "ok"
-        mock.assert_awaited_once_with(_anthropic_cfg(), "prompt")
+        mock.assert_awaited_once_with(cfg, "prompt")
 
     async def test_dispatches_to_openai(self):
         gen = AiGeneratorService()
+        cfg = _openai_cfg()
 
         with patch.object(gen, "_call_openai", new_callable=AsyncMock, return_value="ok") as mock:
-            result = await gen._call_api(_openai_cfg(), "prompt")
+            result = await gen._call_api(cfg, "prompt")
 
         assert result == "ok"
-        mock.assert_awaited_once_with(_openai_cfg(), "prompt")
+        mock.assert_awaited_once_with(cfg, "prompt")
 
 
 class TestGenerateCustomStreamWithConfig:

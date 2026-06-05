@@ -86,15 +86,27 @@ CommentBaseHandler.execute = function (params) {
 
     // 进入视频
     if (v === 0) {
+      // 前置弹窗清洗：排序弹窗残留会拦截视频点击
+      var popupOpen = uiOperator.findElement("sort_latest", 800) || uiOperator.findElement("sort_most_liked", 800);
+      if (popupOpen) {
+        logger.warn(TAG, "检测到残留排序弹窗，点击 sort_button 切换关闭");
+        this.safeClick("sort_button", 2);
+        sleep(400);
+      }
+
       if (!this._clickSearchResult(0)) break;
-      sleep(2000);
+      // _waitForVideoPage 内部已做显式等待，无需 sleep 赌页面加载
     } else {
       uiOperator.swipeUp();
       sleep(this._config.interVideoDelay);
     }
 
-    // 等待视频页加载
-    if (!this._waitForVideoPage(params, v)) continue;
+    // 等待视频页加载 — 内置显式等待 + 状态断言
+    if (!this._waitForVideoPage(params, v)) {
+      // 未进入视频详情页——如果已在视频页则 back 还原，仍在搜索页则无需 back
+      if (uiOperator.isOnPage("is_video_view")) { try { back(); sleep(600); } catch (e) {} }
+      continue;
+    }
 
     // 预检评论数
     if (!this._shouldProcessVideo(params, v)) {
@@ -106,11 +118,14 @@ CommentBaseHandler.execute = function (params) {
     if (!this._ensureCommentsOpen(params, v)) continue;
 
     // 处理评论 — 子类实现
-    var processResult = this._processComments(params, stats, v);
-    if (processResult === "break") break;
-
-    // 关闭评论区 + 切视频
-    this._closeComments();
+    // try-finally 确保评论区关闭 + flowContext 重置，防止异常/超时导致状态锁死
+    try {
+      var processResult = this._processComments(params, stats, v);
+      if (processResult === "break") break;
+    } finally {
+      try { this._closeComments(); } catch (e) { logger.warn(TAG, "关闭评论区异常: " + e.message); }
+      flowContext.reset();
+    }
 
     stats.videos_processed = (stats.videos_processed || 0) + 1;
     antiDetect.maybePause();
@@ -162,6 +177,7 @@ CommentBaseHandler._shouldProcessVideo = function (params, videoIndex) {
   if (!commentBtn) return false;
 
   var cc = commentUtils.preCheckCommentCount(commentBtn);
+  this._currentVideoCommentCount = cc.count;
   logger.info(TAG, "视频 " + (videoIndex + 1) + " 评论数: " + (cc.count >= 0 ? cc.count : "未知"));
 
   if (cc.count === 0) {

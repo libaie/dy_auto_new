@@ -95,7 +95,7 @@ SearchCommentHandler._interactWithVideo = function (content, stats) {
 
   logger.info(TAG, "评论成功: '" + content.substring(0, 20) + "'");
   stats.details.push("commented: " + content.substring(0, 30));
-  try { apiClient.incrementStats((this._params || {}).account_id, "search_comment", 1); } catch (e) {}
+  try { apiClient.incrementStats((this._params || {}).account_id, "search_comment", "", 1); } catch (e) {}
   return true;
 };
 

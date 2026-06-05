@@ -3,7 +3,43 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from app.db_models import UISelector, Device
+from app.db_models import UISelector, Device, SystemSetting
+
+_SELECTORS_REVISION_KEY = "selectors_revision"
+
+
+def _get_revision(db: Session) -> int:
+    """Get current selectors revision counter. Falls back to max(updated_at)
+    ts for migration from pre-revision installations."""
+    row = db.query(SystemSetting).filter(SystemSetting.key == _SELECTORS_REVISION_KEY).first()
+    if row and row.value:
+        try:
+            return int(row.value)
+        except ValueError:
+            pass
+    # Migration: seed from existing data
+    selectors = db.query(UISelector).filter(UISelector.enabled == True).all()
+    if not selectors:
+        return 0
+    rev = int(max(s.updated_at for s in selectors).timestamp())
+    _set_revision(db, rev)
+    return rev
+
+
+def _set_revision(db: Session, rev: int) -> None:
+    row = db.query(SystemSetting).filter(SystemSetting.key == _SELECTORS_REVISION_KEY).first()
+    if row:
+        row.value = str(rev)
+    else:
+        db.add(SystemSetting(key=_SELECTORS_REVISION_KEY, value=str(rev)))
+    db.flush()
+
+
+def _bump_revision(db: Session) -> int:
+    """Increment selectors revision counter and return new value."""
+    rev = _get_revision(db) + 1
+    _set_revision(db, rev)
+    return rev
 
 
 def _aspect_tag(resolution: str) -> str:
@@ -87,15 +123,15 @@ class SelectorService:
             if device and device.screen_resolution:
                 dev_res = device.screen_resolution
                 dev_ar = _aspect_tag(dev_res)
-                # Group by action_name, keep best-matching resolution_profile per action
-                best = {}
-                for s in selectors:
-                    priority = _profile_priority(s.resolution_profile or "default", dev_res, dev_ar)
-                    if s.action_name not in best or priority > best[s.action_name][0]:
-                        best[s.action_name] = (priority, s)
-                selectors = [v[1] for v in best.values()]
+                # Keep all resolution-compatible candidates. The device knows the
+                # installed Douyin version, so it must make the final per-action
+                # choice between platform-specific/default selector rows.
+                selectors = [
+                    s for s in selectors
+                    if _profile_priority(s.resolution_profile or "default", dev_res, dev_ar) > 0
+                ]
 
-        version = max(s.version for s in selectors)
+        version = _get_revision(db)
         return version, [_to_device_dict(s) for s in selectors]
 
     def get_selector(self, db: Session, action_name: str) -> Optional[dict]:
@@ -109,11 +145,8 @@ class SelectorService:
         return _to_dict(s)
 
     def get_version(self, db: Session) -> int:
-        """Get current selectors version."""
-        selectors = db.query(UISelector).filter(UISelector.enabled == True).all()
-        if not selectors:
-            return 0
-        return max(s.version for s in selectors)
+        """Get current selectors revision — guaranteed monotonic across all CRUD."""
+        return _get_revision(db)
 
     def create_selector(self, db: Session, action_name: str, strategies: list,
                         platform_version: str = "default", version: int = 1,
@@ -147,6 +180,7 @@ class SelectorService:
             clean_prompt=clean_prompt,
         )
         db.add(sel)
+        _bump_revision(db)
         db.commit()
         db.refresh(sel)
         return _to_dict(sel)
@@ -158,17 +192,19 @@ class SelectorService:
                         extract_field: str = None,
                         clean_mode: str = None, clean_pattern: str = None,
                         clean_prompt: str = None, resolution_profile: str = None) -> dict:
-        """Update an existing selector. Auto-bumps version on any change."""
-        sel = db.query(UISelector).filter(UISelector.action_name == action_name).first()
+        """Update an existing selector. platform_version and resolution_profile
+        are lookup-only (composite key) — never updated. To change them, delete+recreate."""
+        q = db.query(UISelector).filter(UISelector.action_name == action_name)
+        if platform_version:
+            q = q.filter(UISelector.platform_version == platform_version)
+        if resolution_profile:
+            q = q.filter(UISelector.resolution_profile == resolution_profile)
+        sel = q.first()
         if not sel:
             raise ValueError(f"Selector '{action_name}' not found")
 
         if strategies is not None:
             sel.strategies = strategies
-        if platform_version is not None:
-            sel.platform_version = platform_version
-        if resolution_profile is not None:
-            sel.resolution_profile = resolution_profile
         if description is not None:
             sel.description = description
         if category is not None:
@@ -188,29 +224,41 @@ class SelectorService:
         # Auto-bump version on any change
         sel.version = (sel.version or 1) + 1
 
+        _bump_revision(db)
         db.commit()
         db.refresh(sel)
         return _to_dict(sel)
 
-    def delete_selector(self, db: Session, action_name: str, platform_version: str = None) -> bool:
-        """Delete a selector by action_name (and optionally platform_version)."""
+    def delete_selector(self, db: Session, action_name: str, platform_version: str = None,
+                        resolution_profile: str = None) -> bool:
+        """Delete a selector by (action_name, platform_version, resolution_profile)."""
         q = db.query(UISelector).filter(UISelector.action_name == action_name)
         if platform_version:
             q = q.filter(UISelector.platform_version == platform_version)
+        if resolution_profile:
+            q = q.filter(UISelector.resolution_profile == resolution_profile)
         sel = q.first()
         if not sel:
             return False
         db.delete(sel)
+        _bump_revision(db)
         db.commit()
         return True
 
-    def toggle_selector(self, db: Session, action_name: str, enabled: bool) -> dict:
-        """Enable or disable a selector."""
-        sel = db.query(UISelector).filter(UISelector.action_name == action_name).first()
+    def toggle_selector(self, db: Session, action_name: str, enabled: bool,
+                        platform_version: str = None, resolution_profile: str = None) -> dict:
+        """Enable or disable a selector by (action_name, platform_version, resolution_profile)."""
+        q = db.query(UISelector).filter(UISelector.action_name == action_name)
+        if platform_version:
+            q = q.filter(UISelector.platform_version == platform_version)
+        if resolution_profile:
+            q = q.filter(UISelector.resolution_profile == resolution_profile)
+        sel = q.first()
         if not sel:
             raise ValueError(f"Selector '{action_name}' not found")
 
         sel.enabled = enabled
+        _bump_revision(db)
         db.commit()
         db.refresh(sel)
         return _to_dict(sel)

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { Dialog, DialogPanel, DialogTitle, TransitionRoot, TransitionChild } from '@headlessui/vue'
 import TipIcon from '../TipIcon.vue'
 import { batchCreateTasks } from '../../api/tasks.js'
@@ -37,11 +37,46 @@ const keywordContent = ref('')
 const keywordDMSequenceId = ref('')
 const dmSequences = ref([])
 const keywordMaxAgeDays = ref(5)
+const keywordMaxAgeUnit = ref('days')
 const keywordGenerateCount = ref(10)
 const keywordProcessingCount = ref(5)
 const keywordVideoCount = ref(3)
 const keywordShareLinks = ref('')  // 分享链接（collect 类型专用）
+const keywordSkipReply = ref(false)  // reply_comment: 跳过回复，仅关注+私信
 const creating = ref(false)
+
+const keywordProcessingCountMeta = computed(() => {
+  if (keywordActionType.value === 'search_dm') {
+    return {
+      label: '私信数量',
+      tip: '要发送私信的目标数量，范围 1-50；私信任务不支持 -1 全量。',
+      min: 1,
+      max: 50,
+    }
+  }
+  if (keywordActionType.value === 'search_like') {
+    return {
+      label: '点赞数',
+      tip: '要点赞的数量，范围 1-30。',
+      min: 1,
+      max: 30,
+    }
+  }
+  return {
+    label: '每视频评论数',
+    tip: '每个视频要处理的评论数量，-1=全量。',
+    min: -1,
+    max: null,
+  }
+})
+
+function validateKeywordProcessingCount() {
+  if (keywordActionType.value === 'search_dm' && (keywordProcessingCount.value < 1 || keywordProcessingCount.value > 50)) {
+    keywordError.value = '搜索私信数量需在 1-50 之间'
+    return false
+  }
+  return true
+}
 
 function resetForm() {
   keywordSeed.value = ''
@@ -58,15 +93,23 @@ function resetForm() {
   keywordPromptTemplateId.value = ''
   keywordContent.value = ''
   keywordMaxAgeDays.value = 5
+  keywordMaxAgeUnit.value = 'days'
   keywordGenerateCount.value = 10
   keywordProcessingCount.value = 5
   keywordVideoCount.value = 3
+  keywordSkipReply.value = false
 }
 
 watch(() => props.open, async (val) => {
   if (val) {
     resetForm()
     try { const res = await listDMSequences(); dmSequences.value = res.data.sequences || [] } catch (e) {}
+  }
+})
+
+watch(keywordActionType, (newType) => {
+  if (newType === 'search_dm' && keywordProcessingCount.value < 1) {
+    keywordProcessingCount.value = 5
   }
 })
 
@@ -94,6 +137,9 @@ async function handleBatchCreateKeywordTasks() {
   if (keywordList.value.length === 0) { keywordError.value = '请先生成关键词'; return }
   if (keywordSelectionMode.value === 'single' && !keywordSingleAccountId.value) { keywordError.value = '请选择账号'; return }
   if (keywordSelectionMode.value === 'group' && keywordSelectedGroupIds.value.length === 0) { keywordError.value = '请至少选择一个分组'; return }
+  if (keywordActionType.value === 'reply_comment' && keywordProcessingCount.value === 0 && !keywordSkipReply.value) { keywordError.value = '每视频评论数为 0 时请开启"跳过回复"开关，或设置 -1(全量)/>0(指定数量)'; return }
+
+  if (!validateKeywordProcessingCount()) return
 
   creating.value = true
   keywordError.value = null
@@ -105,12 +151,16 @@ async function handleBatchCreateKeywordTasks() {
     const params = { keyword: kwList[0] || '', keywords: kwList, count: keywordProcessingCount.value }
     if (keywordSortBy.value) params.sort_by = keywordSortBy.value
     params.max_age_days = keywordMaxAgeDays.value || 30
+    if (keywordMaxAgeUnit.value) params.max_age_unit = keywordMaxAgeUnit.value
     if (keywordDMSequenceId.value) { params.dm_sequence_id = keywordDMSequenceId.value }
     else if (keywordTemplateId.value) { params.content_template_id = keywordTemplateId.value }
     else if (keywordContent.value) { params.content = keywordContent.value }
     if (keywordPromptTemplateId.value) params.prompt_template_id = keywordPromptTemplateId.value
     if (['reply_comment', 'search_comment', 'collect'].includes(keywordActionType.value)) {
       params.video_count = keywordVideoCount.value
+    }
+    if (keywordActionType.value === 'reply_comment' && keywordSkipReply.value) {
+      params.skip_reply = true
     }
     if (keywordActionType.value === 'collect' && keywordShareLinks.value.trim()) {
       params.share_links = (keywordShareLinks.value.match(/https?:\/\/v\.douyin\.com\/[A-Za-z0-9_?=&%]+\/?/g) || [])
@@ -150,7 +200,7 @@ async function handleBatchCreateKeywordTasks() {
       <div class="fixed inset-0 overflow-y-auto">
         <div class="flex min-h-full items-center justify-center p-4">
           <TransitionChild as="template" enter="ease-out duration-300" enter-from="opacity-0 scale-95" enter-to="opacity-100 scale-100" leave="ease-in duration-200" leave-from="opacity-100 scale-100" leave-to="opacity-0 scale-95">
-            <DialogPanel class="glass-card w-full max-w-xl p-6 gradient-border">
+            <DialogPanel class="glass-card w-full max-w-2xl p-6 gradient-border">
               <DialogTitle class="text-lg font-medium text-white">关键词搜索</DialogTitle>
 
               <div v-if="keywordError" class="mt-3 bg-red-500/10 border border-red-500/20 text-red-400 text-sm px-3 py-2 rounded-lg">{{ keywordError }}</div>
@@ -203,9 +253,27 @@ async function handleBatchCreateKeywordTasks() {
                     <input v-model.number="keywordVideoCount" type="number" min="-1" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200" />
                   </div>
                   <div>
-                    <label class="block text-sm font-medium text-slate-300">每视频评论数 <TipIcon text="每个视频要处理的评论数量，-1=全量" /></label>
-                    <input v-model.number="keywordProcessingCount" type="number" min="-1" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200" />
+                    <label class="block text-sm font-medium text-slate-300">{{ keywordProcessingCountMeta.label }} <TipIcon :text="keywordProcessingCountMeta.tip" /></label>
+                    <input v-model.number="keywordProcessingCount" type="number" :min="keywordProcessingCountMeta.min" :max="keywordProcessingCountMeta.max || undefined" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200" />
                   </div>
+                </div>
+
+                <!-- skip_reply 开关（仅 reply_comment） -->
+                <div v-if="keywordActionType === 'reply_comment'" class="flex items-center justify-between p-3 rounded-lg border"
+                  :class="keywordSkipReply ? 'border-amber-500/30 bg-amber-500/5' : 'border-white/10 bg-white/[0.02]'">
+                  <div>
+                    <span class="text-sm font-medium" :class="keywordSkipReply ? 'text-amber-300' : 'text-slate-300'">跳过回复</span>
+                    <p class="text-xs text-slate-500 mt-0.5">
+                      {{ keywordSkipReply ? '仅关注+私信，不回复评论。每视频评论数=-1 直接跳过，每视频评论数>0 先完成指定回复' : '正常回复+关注+私信' }}
+                    </p>
+                  </div>
+                  <button type="button"
+                    @click="keywordSkipReply = !keywordSkipReply"
+                    class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0"
+                    :class="keywordSkipReply ? 'bg-amber-500' : 'bg-white/10'">
+                    <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
+                      :class="keywordSkipReply ? 'translate-x-6' : 'translate-x-1'" />
+                  </button>
                 </div>
 
                 <!-- Selection mode -->
@@ -245,8 +313,16 @@ async function handleBatchCreateKeywordTasks() {
                 </div>
 
                 <div v-if="['search_comment', 'reply_comment', 'collect'].includes(keywordActionType)">
-                  <label class="block text-sm font-medium text-slate-300">评论最大天数 <TipIcon text="只处理在此天数内发布的评论，-1=不限天数" /></label>
-                  <input v-model.number="keywordMaxAgeDays" type="number" min="-1" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200" />
+                  <label class="block text-sm font-medium text-slate-300">评论最大时间 <TipIcon text="只处理在此时间内发布的评论，-1=不限" /></label>
+                  <div class="mt-1 flex gap-2">
+                    <input v-model.number="keywordMaxAgeDays" type="number" min="-1" class="flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200" />
+                    <select v-model="keywordMaxAgeUnit" class="w-24 rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-sm text-slate-200">
+                      <option value="days">天</option>
+                      <option value="hours">时</option>
+                      <option value="minutes">分</option>
+                      <option value="seconds">秒</option>
+                    </select>
+                  </div>
                 </div>
 
                 <template v-if="['search_comment', 'search_dm', 'reply_comment'].includes(keywordActionType)">

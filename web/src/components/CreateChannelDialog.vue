@@ -94,13 +94,21 @@
         <template v-if="['reply_comment', 'search_comment', 'collect'].includes(form.task_type)">
           <div class="grid grid-cols-2 gap-3 mb-4">
             <div>
-              <label class="block text-sm font-medium text-slate-300 mb-1">评论最大天数 <span class="text-slate-500 text-xs">-1=不限</span></label>
-              <input
-                v-model.number="formParams.max_age_days"
-                type="number"
-                min="-1"
-                class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
-              />
+              <label class="block text-sm font-medium text-slate-300 mb-1">评论最大时间 <span class="text-slate-500 text-xs">-1=不限</span></label>
+              <div class="flex gap-2">
+                <input
+                  v-model.number="formParams.max_age_days"
+                  type="number"
+                  min="-1"
+                  class="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                />
+                <select v-model="formParams.max_age_unit" class="w-20 bg-slate-700 border border-slate-600 rounded-lg px-2 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
+                  <option value="days">天</option>
+                  <option value="hours">时</option>
+                  <option value="minutes">分</option>
+                  <option value="seconds">秒</option>
+                </select>
+              </div>
             </div>
             <div>
               <label class="block text-sm font-medium text-slate-300 mb-1">排序方式</label>
@@ -188,6 +196,7 @@ const formParams = ref({
   count: 10,
   video_count: 5,
   max_age_days: 5,
+  max_age_unit: 'days',
   sort_by: '',
   content: '',
 })
@@ -273,6 +282,7 @@ async function submit() {
   }
   if (['reply_comment', 'search_comment', 'collect'].includes(form.value.task_type)) {
     merged.max_age_days = params.max_age_days !== undefined ? params.max_age_days : fp.max_age_days
+    merged.max_age_unit = params.max_age_unit !== undefined ? params.max_age_unit : fp.max_age_unit
     if (fp.sort_by) merged.sort_by = params.sort_by || fp.sort_by
   }
   // 其他 JSON 参数

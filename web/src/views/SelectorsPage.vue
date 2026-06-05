@@ -189,11 +189,17 @@ const showFormDialog = ref(false)
 const isEditing = ref(false)
 const saving = ref(false)
 const formError = ref(null)
+// Original composite-key values captured at edit-open time.
+// platform_version/resolution_profile are lookup-only (never updated).
+// These are sent as the lookup key so changing the form fields doesn't 404.
+const originalPlatformVersion = ref('')
+const originalResolutionProfile = ref('')
 
 const defaultForm = {
   action_name: '',
   description: '',
   platform_version: '',
+  resolution_profile: 'default',
   strategies: '[]',
   category: '',
 }
@@ -361,6 +367,7 @@ function openCreateDialog() {
   form.action_name = ''
   form.description = ''
   form.platform_version = ''
+  form.resolution_profile = 'default'
   form.strategies = '[]'
   form.category = ''
   form.purpose = 'locate'
@@ -380,9 +387,15 @@ function openCreateDialog() {
 // --- Open edit dialog ---
 function openEditDialog(sel) {
   isEditing.value = true
+  // Snapshot the original composite key — platform_version/resolution_profile
+  // are lookup-only.  If the user edits them in the form, we still send the
+  // original values so the backend can find the correct row.
+  originalPlatformVersion.value = sel.platform_version || ''
+  originalResolutionProfile.value = sel.resolution_profile || 'default'
   form.action_name = sel.action_name
   form.description = sel.description || ''
   form.platform_version = sel.platform_version || ''
+  form.resolution_profile = sel.resolution_profile || 'default'
   form.strategies = JSON.stringify(sel.strategies || [], null, 2)
   form.category = sel.category || ''
   form.purpose = sel.purpose || 'locate'
@@ -421,7 +434,15 @@ async function handleSave() {
 
   const payload = {
     strategies: parsedStrategies,
-    platform_version: form.platform_version.trim() || undefined,
+    // When editing, use the ORIGINAL composite-key values captured at
+    // dialog-open time.  platform_version/resolution_profile are lookup-only;
+    // sending the current form values would 404 if the user edited them.
+    platform_version: isEditing.value
+      ? (originalPlatformVersion.value.trim() || undefined)
+      : (form.platform_version.trim() || undefined),
+    resolution_profile: isEditing.value
+      ? (originalResolutionProfile.value.trim() || 'default')
+      : (form.resolution_profile.trim() || 'default'),
     description: form.description.trim() || '',
     category: form.category || '',
     purpose: form.purpose || 'locate',
@@ -461,7 +482,7 @@ async function handleDelete() {
   if (!deletingSelector.value) return
   deleting.value = true
   try {
-    await deleteSelector(deletingSelector.value.action_name)
+    await deleteSelector(deletingSelector.value.action_name, deletingSelector.value.platform_version, deletingSelector.value.resolution_profile)
     showDeleteDialog.value = false
     deletingSelector.value = null
     fetchSelectors()
@@ -477,7 +498,7 @@ async function handleToggle(sel, newValue) {
   const previous = sel.enabled
   sel.enabled = newValue
   try {
-    await toggleSelector(sel.action_name, newValue)
+    await toggleSelector(sel.action_name, newValue, sel.platform_version, sel.resolution_profile)
   } catch (e) {
     sel.enabled = previous
     pageError.value = e.response?.data?.detail || '切换失败，请重试'
@@ -576,7 +597,7 @@ onMounted(fetchSelectors)
     <div v-else class="grid gap-4">
       <div
         v-for="sel in filteredSelectors"
-        :key="sel.action_name + '_' + (sel.platform_version || 'default')"
+        :key="sel.action_name + '_' + (sel.platform_version || 'default') + '_' + (sel.resolution_profile || 'default')"
         :class="[
           'glass-card p-5 transition-opacity',
           !sel.enabled && 'opacity-50',
@@ -787,10 +808,31 @@ onMounted(fetchSelectors)
                       id="sel-platform-version"
                       v-model="form.platform_version"
                       type="text"
-                      class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 placeholder-slate-500"
+                      :disabled="isEditing"
+                      class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 disabled:bg-white/5 disabled:text-slate-500 disabled:cursor-not-allowed"
                       placeholder="例如 29.0.0（留空表示所有版本）"
                     />
-                    <p class="mt-1 text-xs text-slate-500">抖音 App 版本号，用于多版本适配，留空表示通用</p>
+                    <p class="mt-1 text-xs text-slate-500">
+                      {{ isEditing ? '编辑时不可修改平台版本（需变更请删除后新建）' : '抖音 App 版本号，用于多版本适配，留空表示通用' }}
+                    </p>
+                  </div>
+
+                  <!-- resolution_profile -->
+                  <div>
+                    <label for="sel-resolution-profile" class="flex items-center gap-1.5 text-sm font-medium text-slate-300">
+                      resolution_profile
+                    </label>
+                    <input
+                      id="sel-resolution-profile"
+                      v-model="form.resolution_profile"
+                      type="text"
+                      :disabled="isEditing"
+                      class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 disabled:bg-white/5 disabled:text-slate-500 disabled:cursor-not-allowed"
+                      placeholder="default 或 1080x2340"
+                    />
+                    <p class="mt-1 text-xs text-slate-500">
+                      {{ isEditing ? '编辑时不可修改分辨率（需变更请删除后新建）' : '图片模板上传时会保存到 server/app/template_images/该目录' }}
+                    </p>
                   </div>
 
                   <!-- category -->
@@ -1018,6 +1060,7 @@ onMounted(fetchSelectors)
                         :index="i"
                         :total-count="strategyList.length"
                         :action-name="form.action_name"
+                        :resolution-profile="form.resolution_profile"
                         :purpose="form.purpose"
                         @update="updateStrategy(i, $event)"
                         @delete="deleteStrategy(i)"

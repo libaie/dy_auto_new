@@ -4,6 +4,7 @@ from unittest.mock import patch, AsyncMock
 from fastapi.testclient import TestClient
 from app.main import app
 from app.services.content_service import content_service
+from tests.conftest import setup_group
 
 client = TestClient(app)
 
@@ -167,6 +168,60 @@ class TestNurtureV2Params:
             },
         })
         assert resp.status_code == 200
+
+    def test_nurture_v2_resolves_comment_subtask_template(self, db):
+        tpl = content_service.create_template(
+            db, name="nurture-comment-template", body="reply for {keyword}",
+            category="comment", variables=["keyword"],
+        )
+
+        resp = client.post("/api/tasks", json={
+            "type": "nurture",
+            "account_id": "acc-001",
+            "params": {
+                "sub_tasks": [{"type": "comment", "count": 1, "content_template_id": tpl.id}],
+                "duration": 15,
+                "keywords": ["seed-a"],
+                "keyword_matrix": ["seed-a", "expanded-a"],
+            },
+        })
+
+        assert resp.status_code == 200
+        sub_task = resp.json()["params"]["sub_tasks"][0]
+        assert sub_task["content"] == "reply for seed-a"
+
+    def test_nurture_v2_preserves_expand_count_for_keyword_expansion(self):
+        with patch("app.services.content_service.ContentService.generate_keyword_matrix",
+                   new_callable=AsyncMock, return_value=["expanded-a", "expanded-b"]) as mock_expand:
+            resp = client.post("/api/tasks", json={
+                "type": "nurture",
+                "account_id": "acc-001",
+                "params": {
+                    "sub_tasks": [{"type": "like", "count": 1}],
+                    "completion_mode": "all",
+                    "duration": 15,
+                    "keywords": ["seed-a"],
+                    "expand_count": 13,
+                },
+            })
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["params"]["expand_count"] == 13
+        assert data["params"]["keyword_matrix"] == ["seed-a", "expanded-a", "expanded-b"]
+        assert mock_expand.await_args.args[:2] == ("seed-a", 13)
+
+    def test_batch_nurture_without_keywords_creates_direct_tasks(self, db):
+        setup_group(db, group_id="grp-nurture-no-keywords", account_ids=["acc-nurture-a", "acc-nurture-b"])
+
+        resp = client.post("/api/tasks/batch", json={
+            "type": "nurture",
+            "group_ids": ["grp-nurture-no-keywords"],
+            "params": {"duration": 20},
+        })
+
+        assert resp.status_code == 200
+        assert resp.json() == {"created": 2, "mode": "direct"}
 
     def test_nurture_v2_duration_exceeds_limit(self):
         resp = client.post("/api/tasks", json={

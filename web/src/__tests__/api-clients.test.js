@@ -48,6 +48,20 @@ describe('API Clients', () => {
       expect(mockPost).toHaveBeenCalledWith('/series/sid/characters/cid')
     })
 
+    it('management helpers call update and unlink endpoints', async () => {
+      const { updateSeries, unlinkCharacter, unlinkScene } = await import('../api/series.js')
+      mockPut.mockResolvedValue({ data: { ok: true } })
+      mockDelete.mockResolvedValue({ data: { ok: true } })
+
+      await updateSeries('sid', { title: '新剧集' })
+      await unlinkCharacter('sid', 'cid')
+      await unlinkScene('sid', 'scene-id')
+
+      expect(mockPut).toHaveBeenCalledWith('/series/sid', { title: '新剧集' })
+      expect(mockDelete).toHaveBeenCalledWith('/series/sid/characters/cid')
+      expect(mockDelete).toHaveBeenCalledWith('/series/sid/scenes/scene-id')
+    })
+
     it('getAgencyConsole calls the agency console endpoint', async () => {
       const { getAgencyConsole } = await import('../api/series.js')
       mockGet.mockResolvedValue({ data: { ok: true } })
@@ -62,7 +76,7 @@ describe('API Clients', () => {
       await getStyleLock('sid')
       await lockSeriesStyle('sid')
       expect(mockGet).toHaveBeenCalledWith('/series/sid/style-lock')
-      expect(mockPost).toHaveBeenCalledWith('/series/sid/style-lock')
+      expect(mockPost).toHaveBeenCalledWith('/series/sid/style-lock', undefined, { timeout: 600000 })
     })
   })
 
@@ -71,7 +85,14 @@ describe('API Clients', () => {
       const { listCharacters } = await import('../api/characters.js')
       mockGet.mockResolvedValue({ data: { ok: true, characters: [] } })
       await listCharacters()
-      expect(mockGet).toHaveBeenCalledWith('/characters')
+      expect(mockGet).toHaveBeenCalledWith('/characters', { params: undefined })
+    })
+
+    it('listCharacters forwards query params', async () => {
+      const { listCharacters } = await import('../api/characters.js')
+      mockGet.mockResolvedValue({ data: { ok: true, characters: [] } })
+      await listCharacters({ include_archived: true })
+      expect(mockGet).toHaveBeenCalledWith('/characters', { params: { include_archived: true } })
     })
 
     it('createCharacter calls POST /characters', async () => {
@@ -79,6 +100,37 @@ describe('API Clients', () => {
       mockPost.mockResolvedValue({ data: { ok: true } })
       await createCharacter({ name: 'Hero' })
       expect(mockPost).toHaveBeenCalledWith('/characters', { name: 'Hero' })
+    })
+
+    it('asset management helpers call AI rewrite candidate and reference generation endpoints', async () => {
+      const { aiRewriteCharacter, generateCharacterReferences } = await import('../api/characters.js')
+      mockPost.mockResolvedValue({ data: { ok: true } })
+
+      await aiRewriteCharacter('char-1')
+      await generateCharacterReferences('char-1', { slot: 'avatar_front_url' })
+
+      expect(mockPost).toHaveBeenCalledWith('/characters/char-1/ai-rewrite-candidate', {})
+      expect(mockPost).toHaveBeenCalledWith('/characters/char-1/reference-images/generate', { slot: 'avatar_front_url' })
+    })
+  })
+
+  describe('scenes API', () => {
+    it('listScenes forwards query params', async () => {
+      const { listScenes } = await import('../api/scenes.js')
+      mockGet.mockResolvedValue({ data: { ok: true, scenes: [] } })
+      await listScenes({ include_archived: true })
+      expect(mockGet).toHaveBeenCalledWith('/scenes', { params: { include_archived: true } })
+    })
+
+    it('asset management helpers call AI rewrite candidate and reference generation endpoints', async () => {
+      const { aiRewriteScene, generateSceneReferences } = await import('../api/scenes.js')
+      mockPost.mockResolvedValue({ data: { ok: true } })
+
+      await aiRewriteScene('scene-1', { instruction: '强化空间感' })
+      await generateSceneReferences('scene-1')
+
+      expect(mockPost).toHaveBeenCalledWith('/scenes/scene-1/ai-rewrite-candidate', { instruction: '强化空间感' })
+      expect(mockPost).toHaveBeenCalledWith('/scenes/scene-1/reference-images/generate', {})
     })
   })
 
@@ -117,6 +169,21 @@ describe('API Clients', () => {
         series_id: 'sid',
         episode_id: 'eid',
         target_duration: 60,
+      })
+    })
+
+    it('episode plan helpers call director control-plane endpoints', async () => {
+      const { createEpisodePlan, createShotSegments } = await import('../api/director.js')
+      mockPost.mockResolvedValue({ data: { ok: true } })
+      await createEpisodePlan({ series_id: 'sid', episode_id: 'eid', include_segments: false })
+      await createShotSegments({ production_shot_id: 'shot-1' })
+      expect(mockPost).toHaveBeenCalledWith('/director/episode-plan', {
+        series_id: 'sid',
+        episode_id: 'eid',
+        include_segments: false,
+      })
+      expect(mockPost).toHaveBeenCalledWith('/director/shot-segments', {
+        production_shot_id: 'shot-1',
       })
     })
   })
@@ -162,12 +229,45 @@ describe('API Clients', () => {
       })
     })
 
+    it('startEpisodeProduction calls POST /video-production/runs/start', async () => {
+      const { startEpisodeProduction } = await import('../api/videoProduction.js')
+      mockPost.mockResolvedValue({ data: { ok: true } })
+      await startEpisodeProduction({ series_id: 'sid', episode_id: 'eid', target_duration_seconds: 60 })
+      expect(mockPost).toHaveBeenCalledWith('/video-production/runs/start', {
+        series_id: 'sid',
+        episode_id: 'eid',
+        target_duration_seconds: 60,
+        budget_limit: 1,
+        autostart_images: true,
+        run_type: 'real_short_e2e',
+      })
+    })
+
+    it('createOneSentenceVideo calls POST /video-production/one-sentence', async () => {
+      const { createOneSentenceVideo } = await import('../api/videoProduction.js')
+      mockPost.mockResolvedValue({ data: { ok: true } })
+      await createOneSentenceVideo({
+        prompt: 'one sentence story',
+        target_duration_seconds: 60,
+        autostart_images: false,
+      })
+      expect(mockPost).toHaveBeenCalledWith('/video-production/one-sentence', {
+        prompt: 'one sentence story',
+        title: undefined,
+        genre: undefined,
+        target_duration_seconds: 60,
+        budget_limit: 1,
+        autostart_images: false,
+        run_type: 'real_short_e2e',
+      })
+    })
+
     it('listReviewItems calls GET with filters', async () => {
       const { listReviewItems } = await import('../api/videoProduction.js')
       mockGet.mockResolvedValue({ data: { ok: true, items: [] } })
-      await listReviewItems({ run_id: 'rid', status: 'review_pending' })
+      await listReviewItems({ run_id: 'rid', statuses: 'review_pending,regenerating' })
       expect(mockGet).toHaveBeenCalledWith('/video-production/review-items', {
-        params: { run_id: 'rid', status: 'review_pending' },
+        params: { run_id: 'rid', statuses: 'review_pending,regenerating' },
       })
     })
 
@@ -179,6 +279,107 @@ describe('API Clients', () => {
         action: 'approve',
         comment: 'ok',
       })
+    })
+
+    it('review management helpers call void and image-edit endpoints', async () => {
+      const { voidProductionAsset, imageEditProductionAsset } = await import('../api/videoProduction.js')
+      mockPost.mockResolvedValue({ data: { ok: true } })
+
+      await voidProductionAsset('asset-1')
+      await imageEditProductionAsset('asset-1', { instruction: '去掉杂物' })
+
+      expect(mockPost).toHaveBeenCalledWith('/video-production/assets/asset-1/void', {})
+      expect(mockPost).toHaveBeenCalledWith('/video-production/assets/asset-1/image-edit', { instruction: '去掉杂物' })
+    })
+
+    it('video stage helpers call the video endpoints', async () => {
+      const { startVideoStage, syncVideoStage } = await import('../api/videoProduction.js')
+      mockPost.mockResolvedValue({ data: { ok: true } })
+      await startVideoStage('rid')
+      await syncVideoStage('rid')
+      expect(mockPost).toHaveBeenCalledWith('/video-production/runs/rid/start-videos')
+      expect(mockPost).toHaveBeenCalledWith('/video-production/runs/rid/sync-video-results')
+    })
+
+    it('compose helpers call the compose endpoints', async () => {
+      const { startComposeStage, syncComposeStage } = await import('../api/videoProduction.js')
+      mockPost.mockResolvedValue({ data: { ok: true } })
+      await startComposeStage('rid')
+      await syncComposeStage('rid')
+      expect(mockPost).toHaveBeenCalledWith('/video-production/runs/rid/compose')
+      expect(mockPost).toHaveBeenCalledWith('/video-production/runs/rid/sync-compose-results')
+    })
+
+    it('regeneration helpers call the regeneration endpoints', async () => {
+      const { startAssetRegeneration, syncAssetRegeneration } = await import('../api/videoProduction.js')
+      mockPost.mockResolvedValue({ data: { ok: true } })
+      await startAssetRegeneration('aid')
+      await syncAssetRegeneration('aid')
+      expect(mockPost).toHaveBeenCalledWith('/video-production/assets/aid/start-regeneration')
+      expect(mockPost).toHaveBeenCalledWith('/video-production/assets/aid/sync-regeneration')
+    })
+
+    it('production control helpers call tree, retry, bulk review, and collection endpoints', async () => {
+      const {
+        getProductionTree,
+        getRunProductionTree,
+        getSegmentDetail,
+        getSegmentRetryImpact,
+        getRunCosts,
+        retryProductionSegment,
+        bulkReviewProductionAssets,
+        createVideoCollection,
+        pauseProductionRun,
+        resumeProductionRun,
+        runRealWorkerStep,
+        retryAssetPersistence,
+        getProviderStageTasks,
+      } = await import('../api/videoProduction.js')
+      mockGet.mockResolvedValue({ data: { ok: true } })
+      mockPost.mockResolvedValue({ data: { ok: true } })
+
+      await getProductionTree('plan-1', { page: 2, status: 'failed' })
+      await getRunProductionTree('run-1', { page: 1 })
+      await getSegmentDetail('seg-1', { history_limit: 10 })
+      await getSegmentRetryImpact('seg-1')
+      await getRunCosts('run-1')
+      await retryProductionSegment('seg-1')
+      await bulkReviewProductionAssets({ asset_ids: ['a1'], action: 'approve', comment: 'ok' })
+      await createVideoCollection('series-1')
+      await pauseProductionRun('run-1')
+      await resumeProductionRun('run-1')
+      await runRealWorkerStep('run-1')
+      await retryAssetPersistence('asset-1')
+      await getProviderStageTasks('run-1', { page: 2 })
+
+      expect(mockGet).toHaveBeenCalledWith('/video-production/plans/plan-1/tree', {
+        params: { page: 2, page_size: 50, status: 'failed' },
+      })
+      expect(mockGet).toHaveBeenCalledWith('/video-production/runs/run-1/tree', {
+        params: { page: 1, page_size: 50 },
+      })
+      expect(mockGet).toHaveBeenCalledWith('/video-production/segments/seg-1/detail', {
+        params: { history_limit: 10 },
+      })
+      expect(mockGet).toHaveBeenCalledWith('/video-production/runs/run-1/provider-stage-tasks', {
+        params: { page: 2, page_size: 50 },
+      })
+      expect(mockGet).toHaveBeenCalledWith('/video-production/segments/seg-1/retry-impact')
+      expect(mockGet).toHaveBeenCalledWith('/video-production/runs/run-1/costs')
+      expect(mockPost).toHaveBeenCalledWith('/video-production/segments/seg-1/retry')
+      expect(mockPost).toHaveBeenCalledWith('/video-production/reviews/bulk-action', {
+        asset_ids: ['a1'],
+        action: 'approve',
+        comment: 'ok',
+      })
+      expect(mockPost).toHaveBeenCalledWith('/video-production/collections', { series_id: 'series-1' })
+      expect(mockPost).toHaveBeenCalledWith('/video-production/runs/run-1/pause')
+      expect(mockPost).toHaveBeenCalledWith('/video-production/runs/run-1/resume')
+      expect(mockPost).toHaveBeenCalledWith('/video-production/runs/run-1/worker-step', {
+        lease_id: 'ui-real-worker',
+        batch_size: 1,
+      })
+      expect(mockPost).toHaveBeenCalledWith('/video-production/assets/asset-1/persist-retry')
     })
   })
 })

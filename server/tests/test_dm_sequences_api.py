@@ -1,4 +1,6 @@
 """DM Sequence template CRUD API tests."""
+import json
+
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app
@@ -222,3 +224,179 @@ def test_device_poll_includes_dm_sequences(db):
         seqs = data["dm_sequences"]
         assert len(seqs) >= 1
         assert "messages" in seqs[0]
+
+
+def test_device_sync_keeps_variant_delay_ms_between_1500_and_3000(db, monkeypatch):
+    from app.config import DEVICE_SECRET
+    from app.db_models import DMSequence as DS
+
+    _clean(db)
+    db.add(DS(
+        id="seq-variant-delay-sync",
+        name="Variant Delay Sync",
+        messages=[{"order": 1, "content": "base", "delay_ms": 2000}],
+        variants=[[{"order": 1, "content": "variant", "delay_ms": 1500}]],
+        industry="general",
+    ))
+    db.commit()
+    monkeypatch.setattr(
+        "app.routers.dm_sequences.random.randint",
+        lambda low, _high: low,
+    )
+
+    with TestClient(app) as c:
+        resp = c.get(
+            "/api/dm-sequences/device/sync",
+            headers={"X-Device-Secret": DEVICE_SECRET},
+        )
+
+    assert resp.status_code == 200
+    seq = [
+        item for item in resp.json()["dm_sequences"]
+        if item["id"] == "seq-variant-delay-sync"
+    ][0]
+    assert 1500 <= seq["variants"][0][0]["delay_ms"] <= 3000
+
+
+def test_device_sync_randomizes_each_variant_group_delay_ms(db, monkeypatch):
+    from app.config import DEVICE_SECRET
+    from app.db_models import DMSequence as DS
+
+    _clean(db)
+    db.add(DS(
+        id="seq-variant-group-random-delay",
+        name="Variant Group Random Delay",
+        messages=[{"order": 1, "content": "base", "delay_ms": 2000}],
+        variants=[
+            [
+                {"order": 1, "content": "variant 1-1", "delay_ms": 100},
+                {"order": 2, "content": "variant 1-2", "delay_ms": 100},
+            ],
+            [
+                {"order": 1, "content": "variant 2-1", "delay_ms": 100},
+                {"order": 2, "content": "variant 2-2", "delay_ms": 100},
+            ],
+        ],
+        industry="general",
+    ))
+    db.commit()
+    delays = iter([1500, 1600, 1700, 1800])
+    monkeypatch.setattr(
+        "app.routers.dm_sequences._variant_delay_ms",
+        lambda: next(delays),
+    )
+
+    with TestClient(app) as c:
+        resp = c.get(
+            "/api/dm-sequences/device/sync",
+            headers={"X-Device-Secret": DEVICE_SECRET},
+        )
+
+    assert resp.status_code == 200
+    seq = [
+        item for item in resp.json()["dm_sequences"]
+        if item["id"] == "seq-variant-group-random-delay"
+    ][0]
+    synced_delays = [
+        message["delay_ms"]
+        for variant in seq["variants"]
+        for message in variant
+    ]
+    assert synced_delays == [1500, 1600, 1700, 1800]
+
+
+# ======== AI generate ========
+
+
+def _sse_events(response):
+    events = []
+    for frame in response.text.split("\n\n"):
+        frame = frame.strip()
+        if not frame.startswith("data: "):
+            continue
+        events.append(json.loads(frame[6:]))
+    return events
+
+
+def test_generate_normalizes_common_ai_message_fields(client, monkeypatch):
+    async def fake_stream(_db, _system_prompt, _user_prompt, **_kwargs):
+        yield json.dumps([
+            {"order": 1, "message": "开场自然内容", "delay_ms": 2000},
+            {"order": 2, "text": "https://t.cn/test", "delay_ms": 1500},
+            {"order": 3, "msg": "收尾自然内容", "delay_ms": 2000},
+        ], ensure_ascii=False)
+
+    monkeypatch.setattr(
+        "app.services.ai_generator.ai_generator.generate_custom_stream",
+        fake_stream,
+    )
+
+    response = client.post("/api/dm-sequences/generate", json={
+        "industry": "general",
+        "description": "帮我生成自然的三段私信",
+        "link_url": "https://t.cn/test",
+    })
+
+    assert response.status_code == 200
+    done = [event for event in _sse_events(response) if event["type"] == "done"][0]
+    assert [message["content"] for message in done["messages"]] == [
+        "开场自然内容",
+        "https://t.cn/test",
+        "收尾自然内容",
+    ]
+
+
+def test_generate_variants_randomizes_delay_ms_between_1500_and_3000(client, db, monkeypatch):
+    _clean(db)
+    create_resp = _create_one(client, messages=[
+        {"order": 1, "content": "开场原始内容", "delay_ms": 100},
+        {"order": 2, "content": "https://t.cn/test", "delay_ms": 100},
+        {"order": 3, "content": "收尾原始内容", "delay_ms": 100},
+    ])
+    seq_id = create_resp.json()["id"]
+
+    async def fake_generate_custom(_db, _system_prompt, _user_prompt, **_kwargs):
+        return json.dumps({
+            "msg1": "开场变体内容",
+            "msg3": "收尾变体内容",
+        }, ensure_ascii=False)
+
+    monkeypatch.setattr(
+        "app.services.ai_generator.ai_generator.generate_custom",
+        fake_generate_custom,
+    )
+
+    response = client.post(f"/api/dm-sequences/{seq_id}/variants", json={"count": 1})
+
+    assert response.status_code == 200
+    variant = response.json()["variants"][-1]
+    assert [message["order"] for message in variant] == [1, 2, 3]
+    assert all(1500 <= message["delay_ms"] <= 3000 for message in variant)
+    assert any(message["delay_ms"] != 100 for message in variant)
+
+
+def test_generate_variants_accepts_count_20(client, db, monkeypatch):
+    _clean(db)
+    create_resp = _create_one(client, messages=[
+        {"order": 1, "content": "开场原始内容", "delay_ms": 100},
+        {"order": 2, "content": "https://t.cn/test", "delay_ms": 100},
+        {"order": 3, "content": "收尾原始内容", "delay_ms": 100},
+    ])
+    seq_id = create_resp.json()["id"]
+
+    async def fake_generate_custom(_db, _system_prompt, _user_prompt, **_kwargs):
+        return json.dumps({
+            "msg1": "开场变体内容",
+            "msg3": "收尾变体内容",
+        }, ensure_ascii=False)
+
+    monkeypatch.setattr(
+        "app.services.ai_generator.ai_generator.generate_custom",
+        fake_generate_custom,
+    )
+
+    response = client.post(f"/api/dm-sequences/{seq_id}/variants", json={"count": 20})
+
+    assert response.status_code == 200
+    assert response.json()["variants_count"] == 20
+    assert response.json()["total_variants"] == 20

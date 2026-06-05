@@ -98,6 +98,32 @@ def test_start_video_stage_rejects_duplicate_inflight_run(db):
         raise AssertionError("Expected duplicate video stage gate failure")
 
 
+def test_can_retry_video_stage_after_pre_video_gate_block_without_video_assets(db):
+    run = _run(db, frame_count=1)
+    run.status = "video_human_review_required"
+    run.current_stage = "video_review"
+    _asset(db, run, "frame-001", "image", 1, "approved")
+    db.commit()
+
+    assert_can_start_videos(db, run)
+
+
+def test_cannot_retry_video_stage_when_video_assets_exist_for_review(db):
+    run = _run(db, frame_count=1)
+    run.status = "video_human_review_required"
+    run.current_stage = "video_review"
+    _asset(db, run, "frame-001", "image", 1, "approved")
+    _asset(db, run, "frame-001", "video_segment", 1, "rejected")
+    db.commit()
+
+    try:
+        assert_can_start_videos(db, run)
+    except ValueError as exc:
+        assert "Video stage can start only after images are approved" in str(exc)
+    else:
+        raise AssertionError("Expected video review retry gate failure")
+
+
 def test_start_compose_stage_rejects_duplicate_inflight_run(db):
     run = _run(db, frame_count=1)
     run.status = "composing"
@@ -159,6 +185,17 @@ def test_recompute_video_gate_sets_video_segments_approved_when_all_latest_segme
     db.refresh(run)
 
     assert run.status == "video_segments_approved"
+    assert run.current_stage == "video_review"
+
+
+def test_recompute_video_gate_treats_failed_segment_as_human_blocked(db):
+    run = _run(db, frame_count=1)
+    _asset(db, run, "frame-001", "video_segment", 1, "failed")
+
+    recompute_run_gate(db, run.id, "video_segment")
+    db.refresh(run)
+
+    assert run.status == "video_human_review_required"
     assert run.current_stage == "video_review"
 
 

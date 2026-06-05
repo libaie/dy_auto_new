@@ -26,6 +26,8 @@ describe('NAV_CATEGORIES', () => {
     expect(paths).toContain('/characters')
     expect(paths).toContain('/ai-config')
     expect(paths).toContain('/video-studio')
+    expect(paths).toContain('/image-creation')
+    expect(paths).toContain('/image-production/strategies')
   })
 
   it('every item has name, path, and icon', () => {
@@ -76,6 +78,14 @@ describe('getCategoryByRoute', () => {
 
   it('returns ai-video for /video-studio', () => {
     expect(getCategoryByRoute({ path: '/video-studio' })).toBe('ai-video')
+  })
+
+  it('returns ai-video for /image-creation', () => {
+    expect(getCategoryByRoute({ path: '/image-creation' })).toBe('ai-video')
+  })
+
+  it('returns ai-video for /image-production/strategies', () => {
+    expect(getCategoryByRoute({ path: '/image-production/strategies' })).toBe('ai-video')
   })
 
   it('returns system for /settings', () => {

@@ -188,6 +188,43 @@ var uiOperator = {
   },
 
   /**
+   * 显式等待元素出现（条件轮询，避免硬编码 sleep 赌页面加载）
+   * 在超时时间内一旦元素显现立刻返回，超时未显现返回 null
+   * @param {string} actionName - 选择器名称
+   * @param {number} timeout - 超时时间（毫秒），默认 5000
+   * @returns {Object|null} 找到的元素或 null
+   */
+  waitForElement: function (actionName, timeout) {
+    timeout = timeout || 5000;
+    var findTimeout = 1000;  // 单次 findElement 超时，短轮询保证总超时精度
+    var startTime = Date.now();
+    while (Date.now() - startTime < timeout) {
+      var el = this.findElement(actionName, findTimeout, true);
+      if (el) return el;
+      sleep(300);  // 轮询间隔
+    }
+    logger.warn(TAG, "等待超时: " + actionName + " (" + timeout + "ms)");
+    return null;
+  },
+
+  /**
+   * 显式等待页面指纹匹配（条件轮询 isOnPage，避免硬编码 sleep 赌页面加载）
+   * @param {string} pageKey - 页面指纹 key (如 "is_user_view", "is_comment_view")
+   * @param {number} timeout - 超时时间（毫秒），默认 5000
+   * @returns {boolean} 页面是否匹配
+   */
+  waitForPage: function (pageKey, timeout) {
+    timeout = timeout || 5000;
+    var startTime = Date.now();
+    while (Date.now() - startTime < timeout) {
+      if (this.isOnPage(pageKey)) return true;
+      sleep(300);
+    }
+    logger.warn(TAG, "等待页面超时: " + pageKey + " (" + timeout + "ms)");
+    return false;
+  },
+
+  /**
    * 按条件查找元素（支持 text/id/desc/className 类型 + match_mode）
    */
   _findByCondition: function (cond) {
@@ -543,60 +580,143 @@ var uiOperator = {
    */
   _findByImage: function (templateFile, threshold) {
     var res = device.width + "x" + device.height;
-    threshold = threshold || 0.8;
+    threshold = threshold || 0.75;
 
-    // Try resolution-specific template first, then "default" fallback
-    var candidates = [
-      "/sdcard/dy_auto/templates/" + res + "/" + templateFile,
-      "/sdcard/dy_auto/templates/default/" + templateFile,
-    ];
+    function addCandidate(list, seen, dir, name) {
+      if (!dir || !name) return;
+      var path = dir + name;
+      if (!seen[path]) {
+        seen[path] = true;
+        list.push({ path: path, name: name });
+      }
+    }
+
+    function _arTag(r) {
+      try {
+        var parts = r.split("x");
+        var _w = parseInt(parts[0]), _h = parseInt(parts[1]);
+        if (!_w || !_h) return "unknown";
+        var _a = _w, _b = _h, _t;
+        while (_b) { _t = _b; _b = _a % _b; _a = _t; }
+        return (_w / _a) + ":" + (_h / _a);
+      } catch (e) { return "unknown"; }
+    }
+    function _sameARDirs() {
+      var target = _arTag(res);
+      if (target === "unknown") return [];
+      var baseDir = "/sdcard/dy_auto/templates/";
+      var result = [];
+      try {
+        if (!files.isDir(baseDir)) return result;
+        var allDirs = files.listDir(baseDir);
+        for (var di = 0; di < allDirs.length; di++) {
+          var dn = allDirs[di];
+          if (dn === "default" || dn === res) continue;
+          if (_arTag(dn) === target && files.isDir(baseDir + dn)) {
+            result.push(baseDir + dn + "/");
+          }
+        }
+      } catch (e) {}
+      return result;
+    }
+
+    function collectCandidates(templateName) {
+      var dirs = [
+        "/sdcard/dy_auto/templates/" + res + "/",
+      ];
+      var arDirs = _sameARDirs();
+      for (var ad = 0; ad < arDirs.length; ad++) { dirs.push(arDirs[ad]); }
+      dirs.push("/sdcard/dy_auto/templates/default/");
+      var list = [];
+      var seen = {};
+      var dot = templateName.lastIndexOf(".");
+      var base = dot > 0 ? templateName.substring(0, dot) : templateName;
+      var ext = dot > 0 ? templateName.substring(dot) : "";
+      var imageExts = { ".png": true, ".jpg": true, ".jpeg": true };
+
+      for (var di = 0; di < dirs.length; di++) {
+        var dir = dirs[di];
+        addCandidate(list, seen, dir, templateName);
+        if (base.indexOf("@") === -1 && ext) {
+          addCandidate(list, seen, dir, base + "@" + res + ext);
+        }
+
+        try {
+          if (!files.isDir(dir)) continue;
+          var localFiles = files.listDir(dir);
+          for (var fi = 0; fi < localFiles.length; fi++) {
+            var fn = localFiles[fi];
+            var fnDot = fn.lastIndexOf(".");
+            var fnExt = fnDot > 0 ? fn.substring(fnDot).toLowerCase() : "";
+            if (!imageExts[fnExt]) continue;
+            if (fn.indexOf(base + "@") === 0 || fn.indexOf(base + "_") === 0) {
+              addCandidate(list, seen, dir, fn);
+            }
+          }
+        } catch (e) {}
+      }
+      return list;
+    }
+
+    var candidates = collectCandidates(templateFile);
+    if (candidates.length === 0) return null;
 
     var screen = images.captureScreen();
     if (!screen) return null;
 
-    for (var ci = 0; ci < candidates.length; ci++) {
-      var tpl = images.read(candidates[ci]);
-      if (!tpl) continue;
+    try {
+      for (var ci = 0; ci < candidates.length; ci++) {
+        var tpl = images.read(candidates[ci].path);
+        if (!tpl) continue;
 
-      // If template is from a different resolution, scale before matching
-      // Template filename format: name@1080x2400.png — extract original res
-      var scaleMatch = templateFile.match(/@(\d+x\d+)/);
-      if (scaleMatch) {
-        var origRes = scaleMatch[1];
-        if (origRes !== res) {
-          var origParts = origRes.split("x");
-          var origW = parseInt(origParts[0]) || 1;
-          var origH = parseInt(origParts[1]) || 1;
-          var scaleX = device.width / origW;
-          var scaleY = device.height / origH;
-          if (Math.abs(1 - scaleX) > 0.05 || Math.abs(1 - scaleY) > 0.05) {
-            var newW = Math.round(tpl.getWidth() * scaleX);
-            var newH = Math.round(tpl.getHeight() * scaleY);
-            try {
-              var scaled = images.scale(tpl, newW, newH);
-              if (scaled) { tpl.recycle(); tpl = scaled; threshold = threshold - 0.05; }
-            } catch (e) {
-              logger.warn(TAG, "模板缩放失败: " + e.message);
+        try {
+          // If template is from a different resolution, scale before matching
+          // Template filename format: name@1080x2400.png — extract original res
+          var matchThreshold = threshold;
+          var scaleMatch = candidates[ci].name.match(/@(\d+x\d+)/);
+          if (scaleMatch) {
+            var origRes = scaleMatch[1];
+            if (origRes !== res) {
+              var origParts = origRes.split("x");
+              var origW = parseInt(origParts[0]) || 1;
+              var origH = parseInt(origParts[1]) || 1;
+              var scaleX = device.width / origW;
+              var scaleY = device.height / origH;
+              if (Math.abs(1 - scaleX) > 0.05 || Math.abs(1 - scaleY) > 0.05) {
+                var newW = Math.round(tpl.getWidth() * scaleX);
+                var newH = Math.round(tpl.getHeight() * scaleY);
+                try {
+                  var scaled = images.scale(tpl, newW, newH);
+                  if (scaled) { tpl.recycle(); tpl = scaled; matchThreshold = matchThreshold - 0.05; }
+                } catch (e) {
+                  logger.warn(TAG, "模板缩放失败: " + e.message);
+                }
+              }
             }
           }
+
+          var thresholds = [matchThreshold];
+          var relaxed = Math.max(0.70, matchThreshold - 0.10);
+          if (relaxed < matchThreshold) thresholds.push(relaxed);
+
+          for (var ti = 0; ti < thresholds.length; ti++) {
+            var p = images.findImage(screen, tpl, { threshold: thresholds[ti] });
+            if (p) {
+              var cx = Math.round(p.x + tpl.getWidth() / 2);
+              var cy = Math.round(p.y + tpl.getHeight() / 2);
+              logger.debug(TAG, "图片匹配: " + candidates[ci].name + " threshold=" + thresholds[ti] + " (" + p.x + "," + p.y + ") 中心: (" + cx + "," + cy + ")");
+              return { isImage: true, x: cx, y: cy };
+            }
+          }
+        } finally {
+          tpl.recycle();
         }
       }
 
-      var p = images.findImage(screen, tpl, { threshold: threshold });
-      if (p) {
-        var cx = Math.round(p.x + tpl.getWidth() / 2);
-        var cy = Math.round(p.y + tpl.getHeight() / 2);
-        tpl.recycle();
-        screen.recycle();
-        logger.debug(TAG, "图片匹配: (" + p.x + "," + p.y + ") 中心: (" + cx + "," + cy + ")");
-        return { isImage: true, x: cx, y: cy };
-      }
-
-      tpl.recycle();
+      return null;
+    } finally {
+      screen.recycle();
     }
-
-    screen.recycle();
-    return null;
   },
 
   /**
@@ -920,27 +1040,28 @@ var uiOperator = {
       return false;
     }
 
-    var findOptions = { threshold: threshold };
-    if (options.region) {
-      findOptions.region = options.region;
-    }
+    try {
+      var findOptions = { threshold: threshold };
+      if (options.region) {
+        findOptions.region = options.region;
+      }
 
-    var p = images.findImage(screen, tpl, findOptions);
+      var p = images.findImage(screen, tpl, findOptions);
 
-    if (p) {
-      var cx = p.x + tpl.getWidth() / 2;
-      var cy = p.y + tpl.getHeight() / 2;
-      logger.info(TAG, "图片匹配: (" + p.x + "," + p.y + ") 点击: (" + cx + "," + cy + ")");
-      click(cx, cy);
+      if (p) {
+        var cx = p.x + tpl.getWidth() / 2;
+        var cy = p.y + tpl.getHeight() / 2;
+        logger.info(TAG, "图片匹配: (" + p.x + "," + p.y + ") 点击: (" + cx + "," + cy + ")");
+        click(cx, cy);
+        return true;
+      }
+
+      logger.warn(TAG, "图片未匹配: " + templatePath);
+      return false;
+    } finally {
       tpl.recycle();
       screen.recycle();
-      return true;
     }
-
-    logger.warn(TAG, "图片未匹配: " + templatePath);
-    tpl.recycle();
-    screen.recycle();
-    return false;
   },
 
   /**

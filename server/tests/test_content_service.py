@@ -121,8 +121,7 @@ class TestGenerateFromTemplate:
             db, name="gen-test", body="关于{keyword}的评论",
             category="comment", variables=["keyword"],
         )
-        with patch("app.services.ai_generator.AI_API_KEY", "test-key"), \
-             patch.object(content_service, "_generate_content", new_callable=AsyncMock, return_value="好内容"):
+        with patch.object(content_service, "_generate_content", new_callable=AsyncMock, return_value="好内容"):
             import asyncio
             result = asyncio.run(content_service.generate_from_template(
                 db, tpl.id, {"keyword": "美食"},
@@ -142,8 +141,7 @@ class TestGenerateFromTemplate:
             db, name="subst-test", body="{keyword}很好吃",
             category="comment", variables=["keyword"],
         )
-        with patch("app.services.ai_generator.AI_API_KEY", "test-key"), \
-             patch.object(content_service, "_generate_content", new_callable=AsyncMock) as mock_gen:
+        with patch.object(content_service, "_generate_content", new_callable=AsyncMock) as mock_gen:
             mock_gen.return_value = "result"
             import asyncio
             asyncio.run(content_service.generate_from_template(

@@ -4,6 +4,7 @@ var apiClient = require("./core/api-client");
 var selectorLoader = require("./core/selector-loader");
 var promptTemplateLoader = require("./core/prompt-template-loader");
 var taskExecutor = require("./core/task-executor");
+var taskTimeout = require("./core/task-timeout");
 var logger = require("./utils/logger");
 var updateChecker = require("./core/update-checker");
 var crashRecovery = require("./core/crash-recovery");
@@ -198,37 +199,47 @@ function startMainLoop(serverUrl, secret) {
   // 任务队列 — WS 推送的任务排队执行
   var _taskBusy = false;
   var _taskQueue = [];
+  var _needsRestart = false;  // watchdog 触发后拒绝新任务，防止双任务并发操作 UI
+  var _knownTaskIds = {};       // taskId→true: 当前运行中+已入队的 task id，防重复派发
+  var _recentlyFinished = [];   // 最近完成的 task id (最多 20 个)，防网络重放
+  var MAX_RECENT = 20;
+  _mainLoopRuntime.isIdle = function () { return !_taskBusy && _taskQueue.length === 0 && !_needsRestart; };
+  _mainLoopRuntime.catchUpPoll = function () { catchUpPoll(); };
+
+  function _isDuplicateTask(taskId) {
+    if (_knownTaskIds[taskId]) return true;
+    for (var i = 0; i < _recentlyFinished.length; i++) {
+      if (_recentlyFinished[i] === taskId) return true;
+    }
+    return false;
+  }
 
   function handleTask(task) {
+    if (!task || !task.id) return;
+    if (_isDuplicateTask(task.id)) {
+      logger.info(TAG, "忽略重复任务: " + task.id + " (已在队列/执行中/近期完成)");
+      return;
+    }
+    _knownTaskIds[task.id] = true;
     _taskQueue.push(task);
     processTaskQueue();
   }
 
   function processTaskQueue() {
-    if (_taskBusy || _taskQueue.length === 0) return;
+    if (_needsRestart || _taskBusy || _taskQueue.length === 0) return;
     _taskBusy = true;
     _idleTicks = 0;
     var task = _taskQueue.shift();
 
-    // Watchdog: 10min 超时 → 取消任务，不释放 busy 锁
-    // 旧线程检查 isCancelled() 后退出 → finally 块释放锁 → 防止并发执行
-    var TASK_TIMEOUT_MS = 600000;
-    var GRACE_PERIOD_MS = 120000;  // 2min 兜底——线程完全无响应时强制释放
+    // Watchdog: 10min 超时 → 取消任务，进入维护状态
+    // 不释放 busy 锁 → 旧线程最终退出后 finally 块释放 → 防止双任务并发操作 UI
+    var TASK_TIMEOUT_MS = taskTimeout.getTaskTimeoutMs(task);
     var _completed = false;
-    var _watchdogFired = false;
     var _watchdog = setTimeout(function () {
       if (!_completed) {
-        logger.error(TAG, "任务超时 (" + (TASK_TIMEOUT_MS / 60000) + "min): " + task.id + "，取消任务");
-        _watchdogFired = true;
+        logger.error(TAG, "任务超时 (" + (TASK_TIMEOUT_MS / 60000) + "min): " + task.id + "，取消任务，设备进入维护状态");
         taskExecutor.cancel(task.id);
-        // 2min 兜底: 如果线程仍不退出，强制释放锁（避免设备永久不可用）
-        setTimeout(function () {
-          if (!_completed) {
-            logger.error(TAG, "任务 " + task.id + " 取消后2min仍未退出，强制释放 busy 锁(需重启设备)");
-            _taskBusy = false;
-            _completed = true;
-          }
-        }, GRACE_PERIOD_MS);
+        _needsRestart = true;
       }
     }, TASK_TIMEOUT_MS);
 
@@ -253,7 +264,7 @@ function startMainLoop(serverUrl, secret) {
           }
         }
 
-        var reportResult = apiClient.report(task.id, result.status, result.result, uiSnapshot);
+        var reportResult = apiClient.report(task.id, result.status, result.result, uiSnapshot, task.lease_id);
         if (reportResult) {
           logger.info(TAG, "任务结果已上报: " + result.status);
         } else {
@@ -264,18 +275,43 @@ function startMainLoop(serverUrl, secret) {
         logger.error(TAG, "任务执行异常: " + e.message);
       } finally {
         if (_watchdog) clearTimeout(_watchdog);
+        // 去重维护: 无论何种退出路径，从活跃集移除并加入最近完成集
+        delete _knownTaskIds[task.id];
+        _recentlyFinished.push(task.id);
+        if (_recentlyFinished.length > MAX_RECENT) _recentlyFinished.shift();
         if (!_completed) {
           _completed = true;
           _taskBusy = false;
-          processTaskQueue();
-
-          if (_taskQueue.length === 0 && !_taskBusy) {
-            catchUpPoll();
+          if (!_needsRestart) {
+            processTaskQueue();
+            if (_taskQueue.length === 0 && !_taskBusy) {
+              catchUpPoll();
+            }
+          } else {
+            logger.error(TAG, "任务 " + task.id + " 被 watchdog 强杀后线程退出，设备状态不可靠，拒绝新任务，建议重启设备");
           }
         }
-        // 如果 _completed 已被 watchdog 设为 true，跳过重复的 unlock
       }
     });
+  }
+
+  function applyDMSequences(dmSequences) {
+    SearchBaseHandler.applyDMSequences(dmSequences || []);
+  }
+
+  function applyPollSideData(response) {
+    if (!response) return;
+    if (response.proxy) apiClient.setProxy(response.proxy);
+    if (response.device_config) applyServerConfig(response.device_config);
+    if (response.anti_detect_config) antiDetect.updateFromServer(response.anti_detect_config);
+    if (response.selectors_version) selectorLoader.checkAndUpdate(response.selectors_version);
+    if (response.prompt_templates_version) promptTemplateLoader.checkAndUpdate(response.prompt_templates_version);
+    if (response.dm_sequences !== undefined) applyDMSequences(response.dm_sequences);
+    if (response.server_date) SearchBaseHandler._serverDate = response.server_date;
+  }
+
+  function syncDMSequences() {
+    return SearchBaseHandler.syncDMSequences();
   }
 
   // 认证失败处理
@@ -322,10 +358,12 @@ function startMainLoop(serverUrl, secret) {
 
   // 注册 WS 推送回调
   deviceWs.setCallbacks({
-    onTask: handleTask,
+    onTask: function (task) {
+      syncDMSequences();
+      handleTask(task);
+    },
     onCancelTask: function (taskId) {
-      logger.info(TAG, "收到取消任务: " + taskId);
-      taskExecutor.cancel(taskId);
+      _handleCancelledTask(taskId);
     },
     onSelectorsUpdated: function (version) {
       logger.info(TAG, "选择器更新: v" + version);
@@ -428,6 +466,29 @@ function startMainLoop(serverUrl, secret) {
   }, config.heartbeatInterval);
 
   /**
+   * 处理服务端取消投递 — 区分"正在运行"和"已不在运行"两种情况。
+   * 正在运行时 handler 会在 isCancelled() 检测后 report CANCELLED；
+   * 已不在运行时（设备重启/任务已结束）需立即 ack，否则
+   * check_cancelled_running 会持续投递，设备卡在取消循环拿不到新任务。
+   */
+  function _handleCancelledTask(taskId) {
+    logger.info(TAG, "收到服务端取消任务: " + taskId);
+    var currentTaskId = taskExecutor.getCurrentTaskId();
+    if (currentTaskId === taskId) {
+      // Task is running — flag it; handler will exit via isCancelled() and report
+      taskExecutor.cancel(taskId);
+    } else {
+      // Task not running — ack immediately so server clears device_id
+      logger.info(TAG, "任务未在运行，直接确认取消: " + taskId);
+      try {
+        apiClient.report(taskId, "cancelled", { error: "Ack server cancel (task not running)" });
+      } catch (e) {
+        logger.warn(TAG, "确认取消上报失败: " + e.message);
+      }
+    }
+  }
+
+  /**
    * catch-up poll — 捕获离线期间积累的任务
    */
   function catchUpPoll() {
@@ -435,31 +496,17 @@ function startMainLoop(serverUrl, secret) {
       var response = apiClient.poll();
       if (!response) return;
 
-      if (response.proxy) apiClient.setProxy(response.proxy);
-      if (response.device_config) applyServerConfig(response.device_config);
-      if (response.anti_detect_config) antiDetect.updateFromServer(response.anti_detect_config);
-      if (response.selectors_version) selectorLoader.checkAndUpdate(response.selectors_version);
-      if (response.prompt_templates_version) promptTemplateLoader.checkAndUpdate(response.prompt_templates_version);
-      if (response.dm_sequences) {
-        var dmCache = {};
-        for (var dsi = 0; dsi < response.dm_sequences.length; dsi++) {
-          var ds = response.dm_sequences[dsi];
-          dmCache[ds.id] = ds;
-        }
-        SearchBaseHandler._dmSeqCache = dmCache;
-      }
-
-      if (response.server_date) {
-        SearchBaseHandler._serverDate = response.server_date;
-      }
+      applyPollSideData(response);
 
       if (response.cancelled_task_id) {
-        logger.info(TAG, "catch-up: 服务端取消任务: " + response.cancelled_task_id);
-        taskExecutor.cancel(response.cancelled_task_id);
+        _handleCancelledTask(response.cancelled_task_id);
       }
 
       if (response.task) {
         logger.info(TAG, "catch-up: 发现待执行任务: " + response.task.id);
+        if (response.task.params && response.task.params.dm_sequence_id) {
+          syncDMSequences();
+        }
         handleTask(response.task);
       }
     } catch (e) {
@@ -474,15 +521,18 @@ function startMainLoop(serverUrl, secret) {
 // 空闲时定时 poll — 即使 WS 通知丢失也能发现待执行任务
 // 轮询间隔使用服务端配置，首次默认 30s
 // 放在全局作用域，applyServerConfig 可调 _startIdlePoll() 重启轮询
+var _mainLoopRuntime = global.__mainLoopRuntime || { isIdle: null, catchUpPoll: null };
+global.__mainLoopRuntime = _mainLoopRuntime;
 var _idleTicks = 0;
 var _idlePollTimer = null;
 
 function _startIdlePoll() {
   if (_idlePollTimer) clearInterval(_idlePollTimer);
   _idlePollTimer = setInterval(function () {
-    if (!_taskBusy && _taskQueue.length === 0) {
-      catchUpPoll();
-      if (!_taskBusy && _taskQueue.length === 0) {
+    if (!_mainLoopRuntime.isIdle || !_mainLoopRuntime.catchUpPoll) return;
+    if (_mainLoopRuntime.isIdle()) {
+      _mainLoopRuntime.catchUpPoll();
+      if (_mainLoopRuntime.isIdle()) {
         _idleTicks++;
         // 连续 6 轮空闲才关抖音（避免短暂空闲反复开关）
         if (_idleTicks >= 6) {

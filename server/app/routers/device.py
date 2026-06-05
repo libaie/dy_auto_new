@@ -472,7 +472,41 @@ async def poll_tasks(
     from app.services.device_service import device_service
     device_service.update_heartbeat(db, device_id)
 
-    task = task_service.get_pending_task(db, device_id)
+    # Check cancellation FIRST — if there's a pending cancel, deliver it
+    # before dispatching any new task (prevents concurrent cancel+dispatch).
+    cancelled_task = task_service.check_cancelled_running(db, device_id)
+    if cancelled_task:
+        logger.info("[poll] device=%s delivering cancelled_task_id=%s (skipping dispatch)",
+            device_id, cancelled_task.id[:8])
+        return PollResponse(
+            task=None,
+            selectors_version=selector_service.get_version(db),
+            prompt_templates_version=prompt_template_service.get_version(db),
+            proxy=None,
+            cancelled_task_id=cancelled_task.id,
+            anti_detect_config=ANTI_DETECT_CONFIG,
+            anti_detect_config_version=ANTI_DETECT_CONFIG_VERSION,
+            device_config=DEVICE_CONFIG,
+            server_date=bj_now().strftime("%Y-%m-%d"),
+        )
+
+    # Resume running task on reconnect — device may have lost in-memory state.
+    # If this device already has a RUNNING task, return it so the device can
+    # resume execution instead of idling forever waiting for a new task.
+    from app.db_models import Task as DBTask
+    from app.models import TaskStatus
+    from app.services.task_service import _db_task_to_pydantic
+    running_task = db.query(DBTask).filter(
+        DBTask.device_id == device_id,
+        DBTask.status == TaskStatus.RUNNING.value,
+    ).order_by(DBTask.started_at.desc()).first()
+    if running_task:
+        task = _db_task_to_pydantic(running_task)
+        logger.info("[poll] device=%s resuming running task=%s type=%s",
+            device_id, running_task.id[:8], running_task.type)
+    else:
+        task = task_service.get_pending_task(db, device_id)
+
     version = selector_service.get_version(db)
     tmpl_version = prompt_template_service.get_version(db)
 
@@ -488,15 +522,14 @@ async def poll_tasks(
     device_info = device_service.get_device_status(db, device_id)
     proxy = device_info.get("proxy_config") if device_info else None
 
-    cancelled_task = task_service.check_cancelled_running(db, device_id)
-
-    # DM sequence templates for device sync — scoped by device owner
-    from app.db_models import DMSequence, Device
-    device = db.query(Device).filter(Device.id == device_id).first()
-    device_user_id = device.user_id if device else None
-    dm_seqs = db.query(DMSequence).filter(
-        (DMSequence.user_id == device_user_id) | (DMSequence.user_id == None)
-    ).all()
+    # DM sequence templates for device sync — include sequences referenced by this task.
+    from app.services.dm_sequence_visibility import get_device_visible_dm_sequences
+    task_seq_id = (task.params or {}).get("dm_sequence_id") if task else None
+    dm_seqs = get_device_visible_dm_sequences(
+        db,
+        device_id,
+        extra_sequence_ids=[task_seq_id] if task_seq_id else None,
+    )
     dm_sequences_list = [
         {
             "id": s.id,
@@ -529,7 +562,7 @@ async def poll_tasks(
         selectors_version=version,
         prompt_templates_version=tmpl_version,
         proxy=proxy,
-        cancelled_task_id=cancelled_task.id if cancelled_task else None,
+        cancelled_task_id=None,
         anti_detect_config=ANTI_DETECT_CONFIG,
         anti_detect_config_version=ANTI_DETECT_CONFIG_VERSION,
         ai_config=get_ai_config(db),
@@ -550,7 +583,10 @@ async def report_progress(
     db_task = db.query(DBTask).filter(DBTask.id == report.task_id).first()
     if not db_task:
         raise HTTPException(status_code=404, detail="Task not found")
-    if db_task.device_id != authed_device_id:
+    if report.lease_id and db_task.lease_id:
+        if db_task.lease_id != report.lease_id:
+            return {"ok": True, "stale": True, "message": "Progress ignored (stale lease)"}
+    elif db_task.device_id != authed_device_id:
         raise HTTPException(status_code=403, detail="Task does not belong to this device")
 
     await pair_ws_manager.broadcast_to_admins({
@@ -569,13 +605,18 @@ async def report_result(
     db: Session = Depends(get_db),
     authed_device_id: Optional[str] = Depends(verify_device_secret),
 ):
-    # Verify the task belongs to this device (reject if unassigned or mismatched)
+    # Verify lease: accept current lease, log stale reports, fall back to device_id
     if authed_device_id:
         from app.db_models import Task as DBTask
         db_task = db.query(DBTask).filter(DBTask.id == report.task_id).first()
         if not db_task:
             raise HTTPException(status_code=404, detail="Task not found")
-        if db_task.device_id != authed_device_id:
+        if report.lease_id and db_task.lease_id:
+            if db_task.lease_id != report.lease_id:
+                logger.warning("device=%s task=%s stale result report (lease mismatch: reported=%s current=%s) — result logged for audit, not applied",
+                    authed_device_id, report.task_id, report.lease_id[:8], db_task.lease_id[:8] if db_task.lease_id else "None")
+                return {"ok": True, "stale": True, "message": "Result recorded for audit (stale lease)"}
+        elif db_task.device_id != authed_device_id:
             raise HTTPException(status_code=403, detail="Task does not belong to this device")
 
     try:
@@ -586,6 +627,7 @@ async def report_result(
             result=report.result,
             ui_snapshot=report.ui_snapshot,
         )
+        db.commit()
     except ValueError:
         raise HTTPException(status_code=404, detail="Task not found")
 
@@ -620,12 +662,50 @@ async def report_result(
 def stats_increment(
     body: StatsIncrementRequest,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_device_secret),
+    authed_device_id: str = Depends(verify_device_secret),
 ):
-    """设备端增量统计上报——每完成一个子操作（回复/关注/私信）调用一次。
-    保证任务中途崩溃时，已完成操作的统计数据不丢失。
+    """设备端增量统计上报——idempotent: 同一 (task,device,type,target,op_index) 只计一次。
+    校验 task→account 归属和 task→device 归属，防止跨账号伪造统计。
     """
     from app.services.stats_service import stats_service
+    from app.db_models import Task as DBTask, StatsEvent
+
+    # 1. Validate task exists and belongs to the claimed account
+    db_task = db.query(DBTask).filter(DBTask.id == body.task_id).first()
+    if not db_task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if db_task.account_id != body.account_id:
+        raise HTTPException(status_code=403, detail="Task does not belong to this account")
+    if db_task.device_id != authed_device_id:
+        raise HTTPException(status_code=403, detail="Task not assigned to this device")
+
+    # 2. Idempotent insert — duplicate key → skip count increment
+    from sqlalchemy.exc import IntegrityError
+    import logging
+    _stats_log = logging.getLogger("device.stats_increment")
+    try:
+        evt = StatsEvent(
+            task_id=body.task_id,
+            device_id=authed_device_id,
+            account_id=body.account_id,
+            event_type=body.task_type,
+            target_id=body.target_id,
+            op_index=body.op_index,
+            count=body.count,
+        )
+        db.add(evt)
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        # Duplicate event — already counted, return success
+        return {"ok": True, "duplicate": True}
+    except Exception:
+        db.rollback()
+        _stats_log.exception("stats insert failed: task=%s type=%s target=%s",
+                             body.task_id, body.task_type, body.target_id)
+        raise HTTPException(status_code=500, detail="Stats insert failed")
+
+    # 3. Increment daily stats counter (only on first insert)
     stats_service.increment(db, body.account_id, body.task_type, count=body.count)
     db.commit()
     return {"ok": True}
@@ -905,15 +985,19 @@ def device_download_template(
     filename: str,
     device_id: str = Depends(verify_device_secret),
     db: Session = Depends(get_db),
+    resolution: str = Query(None),
 ):
-    """Download a single template image (binary). Falls back to 'default' resolution."""
+    """Download a single template image (binary).
+    Priority: explicit resolution query param > device resolution > default."""
+    from app.db_models import Device
     from app.services.template_service import template_service
     from fastapi.responses import FileResponse
-    resolution = "default"
-    if device_id:
-        device = db.query(Device).filter(Device.id == device_id).first()
-        if device and device.screen_resolution:
-            resolution = device.screen_resolution
+    if not resolution:
+        resolution = "default"
+        if device_id:
+            device = db.query(Device).filter(Device.id == device_id).first()
+            if device and device.screen_resolution:
+                resolution = device.screen_resolution
     filepath = template_service.get_template_path(filename, resolution=resolution)
     if not filepath:
         raise HTTPException(status_code=404, detail="模板文件不存在")
@@ -972,12 +1056,19 @@ async def device_calibrate(
                 UISelector.resolution_profile == "default",
             ).first()
             if default_sel:
+                # Clone strategies but update image template references to the
+                # newly uploaded file (original references default templates).
+                import copy
+                new_strategies = copy.deepcopy(default_sel.strategies)
+                for st in new_strategies:
+                    if st.get("type") == "image":
+                        st["template"] = item.filename
                 new_sel = UISelector(
                     action_name=item.action_name,
                     description=default_sel.description,
                     platform_version=default_sel.platform_version,
                     resolution_profile=resolution,
-                    strategies=default_sel.strategies,
+                    strategies=new_strategies,
                     version=1,
                     category=default_sel.category,
                     purpose=default_sel.purpose,
@@ -990,6 +1081,8 @@ async def device_calibrate(
                 db.add(new_sel)
         uploaded += 1
 
+    from app.services.selector_service import _bump_revision
+    _bump_revision(db)
     db.commit()
 
     # Broadcast version bump

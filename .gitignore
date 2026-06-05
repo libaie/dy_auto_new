@@ -1,5 +1,6 @@
 # Python
 __pycache__/
+.pytest_cache/
 *.py[cod]
 *.egg-info/
 dist/
@@ -27,15 +28,28 @@ Thumbs.db
 server/app/data/*.json
 server/app/data/*.log
 server/app/data/dy_auto.db
+server/app/data/*.db
+server/app/data/*.db.*
+server/app/data/*.bak
+server/app/data/*.backup*
+server/output/
+output/
+server/app/static/
 
 # Build artifacts
 *.zip
 
 # Brainstorm sessions (local)
 .superpowers/
+.codex-backups/
+.codex-logs/
+.understand-anything/
+memory/
+.tmp/
 
 # Local utility scripts
 web/_transform.py
+_*.py
 
 # Node (AutoJS6 device scripts don't use node_modules, but just in case)
 node_modules/

@@ -95,18 +95,25 @@
             </label>
             <label class="aicfg-field">
               <span class="aicfg-field-label">模型类型 <b class="text-red-400" v-if="isNew">*</b></span>
-              <select v-model="form.model_type" :disabled="!isNew" class="aicfg-input" :class="{ 'opacity-50': !isNew }">
-                <option value="llm">LLM · 脚本生成</option>
-                <option value="image">Image · 画面生成</option>
-                <option value="video">Video · 视频渲染</option>
-                <option value="tts">TTS · 语音合成</option>
-                <option value="audit">Audit · 质量审计</option>
+              <select v-model="form.model_type" :disabled="!isNew || !!form.scene_key" class="aicfg-input" :class="{ 'opacity-50': !isNew || !!form.scene_key }">
+                <option v-for="type in modelTypeOptions" :key="type.key" :value="type.key">
+                  {{ type.label }}
+                </option>
+              </select>
+            </label>
+            <label class="aicfg-field">
+              <span class="aicfg-field-label">应用场景 <b class="text-red-400" v-if="isNew">*</b></span>
+              <select v-model="form.scene_key" @change="onSceneChange" class="aicfg-input">
+                <option value="">按模型类型选择</option>
+                <option v-for="scene in sceneOptions" :key="scene.key" :value="scene.key">
+                  {{ scene.label }}
+                </option>
               </select>
             </label>
             <label class="aicfg-field">
               <span class="aicfg-field-label">服务商 (Provider) <b class="text-red-400">*</b></span>
               <select v-model="form.provider" class="aicfg-input">
-                <option v-for="p in providerOptions" :key="p" :value="p">{{ p }}</option>
+                <option v-for="p in providerOptions" :key="p" :value="p">{{ providerLabel(p) }}</option>
               </select>
             </label>
             <label class="aicfg-field">
@@ -167,6 +174,8 @@
                   <option value="1024x1024">1024×1024</option>
                   <option value="1792x1024">1792×1024</option>
                   <option value="1024x1792">1024×1792</option>
+                  <option value="1440x2560">1440×2560</option>
+                  <option value="2560x1440">2560×1440</option>
                 </select>
               </label>
               <label class="aicfg-field">
@@ -295,7 +304,7 @@
 
 <script setup>
 import { ref, reactive, computed, watch, onMounted } from 'vue'
-import { listModels, getModel, createModel, updateModel, deleteModel, testModelConnection } from '../api/aiConfig.js'
+import { listModels, fetchSchema, getModel, createModel, updateModel, deleteModel, testModelConnection } from '../api/aiConfig.js'
 
 const loading = ref(true)
 const saving = ref(false)
@@ -305,6 +314,7 @@ const selectedId = ref(null)
 const showDeleteConfirm = ref(false)
 const testResult = ref(null)
 const saveMsg = ref(null)
+const schema = ref({ scenes: [], providers: {} })
 
 const TYPE_GROUPS = [
   { key: 'llm', label: '脚本生成 (LLM)', color: 'sky' },
@@ -332,6 +342,65 @@ const DEFAULT_CONFIG = {
   audit: { audit_mode: 'single' },
 }
 
+const sceneOptions = computed(() => schema.value.scenes || [])
+
+const modelTypeOptions = computed(() => {
+  const sceneTypes = sceneOptions.value.map(scene => scene.model_type).filter(Boolean)
+  const typeKeys = sceneTypes.length ? [...new Set(sceneTypes)] : TYPE_GROUPS.map(group => group.key)
+  return typeKeys.map(key => ({
+    key,
+    label: TYPE_GROUPS.find(group => group.key === key)?.label || key,
+  }))
+})
+
+const currentScene = computed(() =>
+  sceneOptions.value.find(scene => scene.key === form.scene_key)
+)
+
+const providerOptions = computed(() => {
+  if (currentScene.value?.providers?.length) return currentScene.value.providers
+  const providersFromScenes = sceneOptions.value
+    .filter(scene => scene.model_type === form.model_type)
+    .flatMap(scene => scene.providers || [])
+  const uniqueProviders = [...new Set(providersFromScenes)]
+  return uniqueProviders.length ? uniqueProviders : (PROVIDERS[form.model_type] || [])
+})
+
+function providerLabel(providerKey) {
+  return schema.value.providers?.[providerKey]?.label || providerKey
+}
+
+function sceneDefaultConfig(scene) {
+  const defaults = { ...(DEFAULT_CONFIG[scene?.model_type] || {}) }
+  for (const field of scene?.fields || []) {
+    if ('default' in field) defaults[field.key] = field.default
+  }
+  if (scene?.key) defaults.scene_key = scene.key
+  if (scene?.key === 'llm_agency_expert_review') defaults.protocol = 'openai_chat_completions'
+  return defaults
+}
+
+function modelTypeDefaultConfig(modelType) {
+  return { ...(DEFAULT_CONFIG[modelType] || {}) }
+}
+
+function defaultSceneForModelType(modelType) {
+  return sceneOptions.value.find(scene => scene.model_type === modelType) || null
+}
+
+function applyScene(sceneKey) {
+  const scene = sceneOptions.value.find(item => item.key === sceneKey)
+  if (!scene) {
+    delete cfg.scene_key
+    return
+  }
+  form.scene_key = scene.key
+  form.model_type = scene.model_type
+  form.provider = scene.providers?.[0] || ''
+  Object.keys(cfg).forEach(key => delete cfg[key])
+  Object.assign(cfg, sceneDefaultConfig(scene))
+}
+
 const groupedModels = computed(() =>
   TYPE_GROUPS.map(g => ({
     ...g,
@@ -346,12 +415,10 @@ const isNew = computed(() => {
   return m && m.id.startsWith('__new__')
 })
 
-const providerOptions = computed(() => PROVIDERS[form.model_type] || [])
-
 const form = reactive({
   name: '', model_type: 'llm', provider: 'deepseek',
   base_url: '', api_key: '', api_secret: '',
-  model_name: '', enabled: true,
+  model_name: '', enabled: true, scene_key: '',
 })
 
 const cfg = reactive({ ...DEFAULT_CONFIG.llm })
@@ -366,11 +433,22 @@ watch(selectedId, async (id) => {
 
   if (m.id.startsWith('__new__')) {
     // New unsaved model — reset form
+    const scene = sceneOptions.value.find(item => item.key === m.config_json?.scene_key) || defaultSceneForModelType(m.model_type)
+    const modelType = scene?.model_type || m.model_type
+    const config = scene ? sceneDefaultConfig(scene) : modelTypeDefaultConfig(modelType)
     Object.assign(form, {
-      name: m.name, model_type: m.model_type, provider: PROVIDERS[m.model_type][0],
-      base_url: '', api_key: '', api_secret: '', model_name: '', enabled: true,
+      name: m.name,
+      model_type: modelType,
+      provider: scene?.providers?.[0] || PROVIDERS[modelType]?.[0] || '',
+      base_url: '',
+      api_key: '',
+      api_secret: '',
+      model_name: '',
+      enabled: true,
+      scene_key: scene?.key || '',
     })
-    Object.assign(cfg, { ...DEFAULT_CONFIG[m.model_type] })
+    Object.keys(cfg).forEach(key => delete cfg[key])
+    Object.assign(cfg, config)
     return
   }
 
@@ -379,16 +457,16 @@ watch(selectedId, async (id) => {
     const { data } = await getModel(id)
     if (data.ok) {
       const d = data.model
+      const configJson = d.config_json || {}
+      const scene = sceneOptions.value.find(item => item.key === configJson.scene_key)
       Object.assign(form, {
         name: d.name, model_type: d.model_type, provider: d.provider,
         base_url: d.base_url || '', api_key: d.api_key || '', api_secret: d.api_secret || '',
-        model_name: d.model_name || '', enabled: d.enabled,
+        model_name: d.model_name || '', enabled: d.enabled, scene_key: configJson.scene_key || '',
       })
-      if (d.config_json) {
-        Object.assign(cfg, { ...DEFAULT_CONFIG[d.model_type] || {}, ...d.config_json })
-      } else {
-        Object.assign(cfg, { ...DEFAULT_CONFIG[d.model_type] || {} })
-      }
+      const defaults = scene ? sceneDefaultConfig(scene) : modelTypeDefaultConfig(d.model_type)
+      Object.keys(cfg).forEach(key => delete cfg[key])
+      Object.assign(cfg, { ...defaults, ...configJson })
     }
   } catch (e) {
     saveMsg.value = { type: 'err', text: '加载详情失败: ' + (e.message || '未知错误') }
@@ -397,16 +475,28 @@ watch(selectedId, async (id) => {
 
 // Switch config defaults when model_type changes in new mode
 watch(() => form.model_type, (mt) => {
-  if (isNew.value) {
-    form.provider = PROVIDERS[mt]?.[0] || ''
-    Object.assign(cfg, { ...DEFAULT_CONFIG[mt] || {} })
+  if (isNew.value && !form.scene_key) {
+    form.provider = providerOptions.value[0] || ''
+    Object.keys(cfg).forEach(key => delete cfg[key])
+    Object.assign(cfg, modelTypeDefaultConfig(mt))
   }
 })
 
+function onSceneChange() {
+  applyScene(form.scene_key)
+}
+
 function startCreate() {
   const id = '__new__' + Date.now()
+  const scene = defaultSceneForModelType('llm')
   allModels.value.push({
-    id, name: '新模型', model_type: 'llm', provider: '', api_key_configured: false, enabled: true, config_json: {},
+    id,
+    name: '新模型',
+    model_type: scene?.model_type || 'llm',
+    provider: '',
+    api_key_configured: false,
+    enabled: true,
+    config_json: scene ? { scene_key: scene.key } : {},
   })
   selectedId.value = id
 }
@@ -436,6 +526,10 @@ async function save() {
   testResult.value = null
   saveMsg.value = null
 
+  const configJson = { ...cfg }
+  if (form.scene_key) configJson.scene_key = form.scene_key
+  if (form.scene_key === 'llm_agency_expert_review') configJson.protocol = 'openai_chat_completions'
+
   const payload = {
     name: form.name,
     model_type: form.model_type,
@@ -444,7 +538,7 @@ async function save() {
     api_key: form.api_key || '',
     api_secret: form.api_secret || '',
     model_name: form.model_name || '',
-    config_json: { ...cfg },
+    config_json: configJson,
   }
 
   try {
@@ -511,8 +605,16 @@ async function doDelete() {
 
 onMounted(async () => {
   try {
-    const { data } = await listModels()
-    if (data.ok) allModels.value = data.models || []
+    const [schemaResp, modelsResp] = await Promise.allSettled([fetchSchema(), listModels()])
+    if (schemaResp.status === 'fulfilled' && schemaResp.value.data?.ok) {
+      schema.value = {
+        scenes: schemaResp.value.data.scenes || [],
+        providers: schemaResp.value.data.providers || {},
+      }
+    }
+    if (modelsResp.status === 'fulfilled' && modelsResp.value.data?.ok) {
+      allModels.value = modelsResp.value.data.models || []
+    }
     if (allModels.value.length > 0) selectedId.value = allModels.value[0].id
   } catch (e) {
     saveMsg.value = { type: 'err', text: '加载模型列表失败' }

@@ -82,6 +82,21 @@ const routes = [
         component: () => import('../views/VideoStudio.vue'),
       },
       {
+        path: 'one-sentence-video',
+        name: 'OneSentenceVideo',
+        component: () => import('../views/OneSentenceVideoPage.vue'),
+      },
+      {
+        path: 'image-creation',
+        name: 'ImageCreation',
+        component: () => import('../views/ImageCreationPage.vue'),
+      },
+      {
+        path: 'image-production/strategies',
+        name: 'ImageProductionStrategies',
+        component: () => import('../views/ImageProductionStrategiesPage.vue'),
+      },
+      {
         path: 'videos',
         name: 'Videos',
         component: () => import('../views/VideosPage.vue'),
@@ -132,6 +147,11 @@ const routes = [
         component: () => import('../views/AgencyConsolePage.vue'),
       },
       {
+        path: 'series/:seriesId/collection-builder',
+        name: 'CollectionBuilder',
+        component: () => import('../views/CollectionBuilderPage.vue'),
+      },
+      {
         path: 'pipeline/:runId',
         name: 'PipelineMonitor',
         component: () => import('../views/PipelineMonitorPage.vue'),
@@ -172,7 +192,7 @@ const router = createRouter({
 const ADMIN_ONLY_PATHS = [
   '/accounts', '/account-groups', '/devices', '/chain-templates', '/chain-instances',
   '/selectors', '/settings', '/prompt-templates', '/ai-config', '/dict-manage',
-  '/characters', '/scenes', '/series', '/director', '/pipeline', '/ai-video-review', '/stats',
+  '/characters', '/scenes', '/series', '/director', '/pipeline', '/ai-video-review', '/one-sentence-video', '/image-creation', '/image-production/strategies', '/stats',
   '/users',
 ]
 

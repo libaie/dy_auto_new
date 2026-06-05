@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
 # Keys whose values are masked in GET responses (never sent to client)
-_SENSITIVE_KEYS = {"ai_api_key", "llm_api_key"}
+_SENSITIVE_KEYS = {"ai_api_key", "llm_api_key", "pixelle_api_key"}
 _MASKED_VALUE = "****"
 
 

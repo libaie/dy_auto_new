@@ -144,4 +144,6 @@ def test_build_rewrite_prompt_contains_instruction_industry_and_current_json():
     assert "Preserve the existing schema and all required fields." in prompt
     assert "Apply only the requested change." in prompt
     assert "Keep unrelated fields stable where possible." in prompt
+    assert "Do not return a no-op rewrite." in prompt
+    assert "make a concrete improvement" in prompt
     assert "Do not wrap the JSON in markdown fences." in prompt

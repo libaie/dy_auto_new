@@ -136,6 +136,10 @@ def _strip_json_fence(raw: str) -> str:
     return "\n".join(lines).strip()
 
 
+def _canonical_template_json(content: dict) -> str:
+    return json.dumps(content, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
 @router.post("/generate")
 async def generate_template(
     request: TemplateGenerateRequest,
@@ -302,6 +306,10 @@ async def rewrite_template_stream(
             raw = _strip_json_fence("".join(raw_chunks))
             rewritten = json.loads(raw)
             prompt_template_service.validate_rewrite_output(rewritten)
+            if _canonical_template_json(rewritten) == _canonical_template_json(request.content):
+                raise ValueError(
+                    "AI rewrite returned unchanged content; make the instruction more specific"
+                )
             logger.info("Prompt template rewrite succeeded industry=%s", request.industry)
             yield _sse({"type": "done", "content": rewritten})
         except json.JSONDecodeError as e:

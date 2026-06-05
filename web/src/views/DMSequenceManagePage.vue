@@ -19,6 +19,24 @@ const loadedVariants = ref(null)
 const variantCount = ref(3)
 const targetVariantCount = ref(0)
 const partialGenMsg = ref('')
+const editingVariantIdx = ref(-1)
+const originalVariantsJson = ref('[]')
+
+function deleteVariant(idx) {
+  if (!loadedVariants.value) return
+  loadedVariants.value.splice(idx, 1)
+  if (loadedVariants.value.length === 0) loadedVariants.value = null
+  if (editingVariantIdx.value === idx) editingVariantIdx.value = -1
+  else if (editingVariantIdx.value > idx) editingVariantIdx.value -= 1
+}
+
+function startEditVariant(idx) {
+  editingVariantIdx.value = idx
+}
+
+function doneEditVariant() {
+  editingVariantIdx.value = -1
+}
 
 let _savedFocusEl = null
 
@@ -45,6 +63,7 @@ function resetForm() {
   aiLinkUrl.value = ''
   generateStatus.value = ''
   loadedVariants.value = null
+  originalVariantsJson.value = '[]'
   targetVariantCount.value = 0
   partialGenMsg.value = ''
 }
@@ -88,7 +107,8 @@ function openEdit(seq) {
   form.name = seq.name
   form.industry = seq.industry || ''
   form.messages = JSON.parse(JSON.stringify(seq.messages))
-  loadedVariants.value = (seq.variants && seq.variants.length) ? seq.variants : null
+  loadedVariants.value = (seq.variants && seq.variants.length) ? JSON.parse(JSON.stringify(seq.variants)) : null
+  originalVariantsJson.value = JSON.stringify(loadedVariants.value || [])
   targetVariantCount.value = 0
   partialGenMsg.value = ''
   editingId.value = seq.id
@@ -101,9 +121,10 @@ async function handleSave() {
   if (valid.length === 0) { toast.error('请至少填写一条消息内容'); return }
   try {
     if (editingId.value) {
-      await updateDMSequence(editingId.value, {
-        name: form.name, industry: form.industry, messages: form.messages,
-      })
+      var payload = { name: form.name, industry: form.industry, messages: form.messages }
+      var currentVariants = loadedVariants.value || []
+      if (JSON.stringify(currentVariants) !== originalVariantsJson.value) { payload.variants = currentVariants }
+      await updateDMSequence(editingId.value, payload)
       toast.success('已更新')
     } else {
       await createDMSequence({
@@ -245,6 +266,7 @@ async function generateVariants() {
     var data = await res.json()
     if (data.ok) {
       loadedVariants.value = data.variants
+      originalVariantsJson.value = JSON.stringify(loadedVariants.value || [])
       var newTotal = loadedVariants.value.length
       if (newTotal < targetVariantCount.value) {
         partialGenMsg.value = '本次生成 ' + data.variants_count + ' 套，累计 ' + newTotal + '/' + targetVariantCount.value + ' 套，还差 ' + (targetVariantCount.value - newTotal) + ' 套，请再次点击生成'
@@ -346,7 +368,7 @@ onMounted(fetchData)
               <span v-if="generating">AI 正在生成...</span>
               <span v-else>AI 生成序列</span>
             </button>
-            <div v-if="generating" class="mt-2 text-xs text-slate-400">{{ generateStatus }}</div>
+            <div v-if="generateStatus" class="mt-2 text-xs text-slate-400">{{ generateStatus }}</div>
           </div>
 
           <div>
@@ -379,12 +401,31 @@ onMounted(fetchData)
           <h4 class="text-sm font-medium text-emerald-400 mb-3">{{ loadedVariants.length }} 套变体</h4>
           <div class="space-y-3">
             <div v-for="(variant, vi) in loadedVariants" :key="vi" class="p-3 rounded bg-slate-800/50 border border-white/5">
-              <div class="text-xs text-slate-500 mb-2">变体 {{ vi + 1 }}</div>
+              <div class="flex justify-between items-center mb-2">
+                <span class="text-xs text-slate-500">变体 {{ vi + 1 }}</span>
+                <div class="flex gap-1">
+                  <button @click="editingVariantIdx === vi ? doneEditVariant() : startEditVariant(vi)"
+                    class="text-xs px-2 py-0.5 rounded cursor-pointer transition"
+                    :class="editingVariantIdx === vi ? 'bg-sky-500/20 text-sky-400' : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'">
+                    {{ editingVariantIdx === vi ? '完成' : '编辑' }}
+                  </button>
+                  <button @click="deleteVariant(vi)"
+                    class="text-xs px-2 py-0.5 rounded text-red-400 hover:text-red-300 hover:bg-red-500/10 cursor-pointer transition">删除</button>
+                </div>
+              </div>
               <div class="space-y-1">
-                <div v-for="vm in variant" :key="vm.order" class="text-xs text-slate-300 flex gap-2">
-                  <span class="text-slate-500 shrink-0">{{ vm.order }}.</span>
-                  <span>{{ vm.content }}</span>
-                  <span class="text-slate-600 shrink-0">({{ vm.delay_ms || 0 }}ms)</span>
+                <div v-for="vm in variant" :key="vm.order" class="text-xs flex gap-2 items-start">
+                  <span class="text-slate-500 shrink-0 pt-0.5">{{ vm.order }}.</span>
+                  <template v-if="editingVariantIdx === vi">
+                    <textarea v-model="vm.content" rows="2"
+                      class="flex-1 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-white text-xs focus:outline-none focus:border-sky-500"></textarea>
+                    <input v-model.number="vm.delay_ms" type="number" min="0" max="60000" step="500"
+                      class="w-16 bg-slate-700 border border-slate-600 rounded px-1 py-1 text-white text-xs text-center focus:outline-none focus:border-sky-500 shrink-0" />
+                  </template>
+                  <template v-else>
+                    <span class="text-slate-300 flex-1">{{ vm.content }}</span>
+                    <span class="text-slate-600 shrink-0">({{ vm.delay_ms || 0 }}ms)</span>
+                  </template>
                 </div>
               </div>
             </div>
@@ -406,7 +447,7 @@ onMounted(fetchData)
                     <template v-else>生成 {{ variantCount }} 套变体</template>
                   </span>
                 </button>
-                <input v-model.number="variantCount" type="number" min="1" max="10"
+                <input v-model.number="variantCount" type="number" min="1" max="20"
                   class="w-14 bg-slate-700 border border-slate-600 rounded px-2 py-2 text-white text-sm text-center focus:outline-none focus:border-emerald-500" />
               </div>
               <p v-if="partialGenMsg" class="text-xs text-amber-400">{{ partialGenMsg }}</p>

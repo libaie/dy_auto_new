@@ -171,7 +171,7 @@ def get_current_user_id(user=Depends(verify_admin_token)) -> str:
 
 **模式 A — 全局共享表:** 不加过滤（reference_data, prompt_templates 等）
 
-**模式 B — 带 user_id 的表:** 
+**模式 B — 带 user_id 的表:**
 ```python
 # admin: 看全部
 # operator: WHERE user_id = current_user_id

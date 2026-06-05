@@ -32,6 +32,7 @@ const dmSequences = ref([])
 const keywordExpandCount = ref(8)
 const keywordGenerating = ref(false)
 const shareLinksText = ref('')  // 分享链接输入（collect 类型专用）
+const skipReply = ref(false)  // reply_comment: 跳过回复，仅关注+私信
 
 const form = reactive({ ...NURTURE_DEFAULT_FORM })
 
@@ -67,8 +68,58 @@ const isSearchType = computed(() =>
   ['search_comment', 'search_like', 'search_dm', 'reply_comment', 'collect'].includes(form.type)
 )
 
+const countInputMeta = computed(() => {
+  if (form.type === 'search_dm') {
+    return {
+      label: '私信数量',
+      tip: '要发送私信的目标数量，范围 1-50；私信任务不支持 -1 全量。',
+      min: 1,
+      max: 50,
+    }
+  }
+  if (form.type === 'search_like') {
+    return {
+      label: '点赞数',
+      tip: '要点赞的数量，范围 1-30。',
+      min: 1,
+      max: 30,
+    }
+  }
+  if (form.type === 'reply_comment') {
+    return {
+      label: '每视频评论数',
+      tip: '每个视频中要处理的评论数量，-1=全量。',
+      min: -1,
+      max: null,
+    }
+  }
+  if (form.type === 'collect') {
+    return {
+      label: '每视频采集数',
+      tip: '每个视频中要采集的数量，-1=全量。',
+      min: -1,
+      max: null,
+    }
+  }
+  return {
+    label: '处理数量',
+    tip: '每个视频中要处理的数量，-1=全量。',
+    min: -1,
+    max: null,
+  }
+})
+
+function validateCountBounds() {
+  if (form.type === 'search_dm' && (form.count < 1 || form.count > 50)) {
+    createError.value = '搜索私信数量需在 1-50 之间'
+    return false
+  }
+  return true
+}
+
 watch(() => form.type, (newType) => {
   if (newType === 'nurture') selectedTemplateId.value = ''
+  if (newType === 'search_dm' && form.count < 1) form.count = 10
 })
 
 watch(() => form.account_id, () => {
@@ -88,10 +139,16 @@ function buildParams() {
         duration: maxDuration.value,
       }
       const seeds = nurtureKeywords.value.split(/[,，\s]+/).map(s => s.trim()).filter(Boolean)
+      const editedMatrix = nurtureKeywordMatrix.value.map(s => String(s).trim()).filter(Boolean)
+      const matrix = [...new Set([...seeds, ...editedMatrix])]
       if (seeds.length > 0) { params.keywords = seeds; params.expand_count = nurtureKeywordExpandCount.value }
+      if (editedMatrix.length > 0) params.keyword_matrix = matrix
+      if (selectedPromptTemplateId.value) params.prompt_template_id = selectedPromptTemplateId.value
       return params
     }
-    return { duration: form.duration }
+    const params = { duration: form.duration }
+    if (selectedPromptTemplateId.value) params.prompt_template_id = selectedPromptTemplateId.value
+    return params
   }
 
   const params = { keyword: form.keyword, count: form.count }
@@ -115,6 +172,11 @@ function buildParams() {
   if (['reply_comment', 'search_comment', 'collect'].includes(form.type)) {
     params.video_count = form.video_count
     params.max_age_days = form.max_age_days
+    if (form.max_age_unit) params.max_age_unit = form.max_age_unit
+  }
+
+  if (form.type === 'reply_comment' && skipReply.value) {
+    params.skip_reply = true
   }
 
   return params
@@ -125,6 +187,9 @@ async function handleCreate() {
   if (selectionMode.value === 'single' && !form.account_id) { createError.value = '请选择账号'; return }
   if (selectionMode.value === 'group' && selectedGroupIds.value.length === 0) { createError.value = '请至少选择一个分组'; return }
   if (isSearchType.value && !form.keyword && !shareLinksText.value.trim()) { createError.value = '请输入搜索关键词或分享链接'; return }
+  if (form.type === 'reply_comment' && form.count === 0 && !skipReply.value) { createError.value = '每视频评论数为 0 时请开启"跳过回复"开关，或设置 count=-1(全量)/>0(指定数量)'; return }
+
+  if (!validateCountBounds()) return
 
   creating.value = true
   createError.value = null
@@ -380,8 +445,26 @@ watch(() => props.open, async (val) => {
                   </div>
 
                   <div>
-                    <label class="block text-sm font-medium text-slate-300">{{ form.type === 'reply_comment' ? '每视频评论数' : form.type === 'collect' ? '每视频采集数' : form.type === 'search_like' ? '点赞数' : '处理数量' }} <TipIcon text="每个视频中要处理的数量，-1=全量" /></label>
-                    <input v-model.number="form.count" type="number" min="-1" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200" />
+                    <label class="block text-sm font-medium text-slate-300">{{ countInputMeta.label }} <TipIcon :text="countInputMeta.tip" /></label>
+                    <input v-model.number="form.count" type="number" :min="countInputMeta.min" :max="countInputMeta.max || undefined" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200" />
+                  </div>
+
+                  <!-- skip_reply 开关（仅 reply_comment） -->
+                  <div v-if="form.type === 'reply_comment'" class="flex items-center justify-between p-3 rounded-lg border"
+                    :class="skipReply ? 'border-amber-500/30 bg-amber-500/5' : 'border-white/10 bg-white/[0.02]'">
+                    <div>
+                      <span class="text-sm font-medium" :class="skipReply ? 'text-amber-300' : 'text-slate-300'">跳过回复</span>
+                      <p class="text-xs text-slate-500 mt-0.5">
+                        {{ skipReply ? '仅关注+私信，不回复评论。每视频评论数=-1 直接跳过，每视频评论数>0 先完成指定回复' : '正常回复+关注+私信' }}
+                      </p>
+                    </div>
+                    <button type="button"
+                      @click="skipReply = !skipReply"
+                      class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0"
+                      :class="skipReply ? 'bg-amber-500' : 'bg-white/10'">
+                      <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
+                        :class="skipReply ? 'translate-x-6' : 'translate-x-1'" />
+                    </button>
                   </div>
 
                   <!-- 视频数（reply_comment / search_comment / collect 共用） -->
@@ -393,8 +476,16 @@ watch(() => props.open, async (val) => {
 
                 <!-- 评论最大天数（reply_comment / search_comment / collect 共用） -->
                 <div v-if="['reply_comment', 'search_comment', 'collect'].includes(form.type)">
-                  <label class="block text-sm font-medium text-slate-300">评论最大天数 <TipIcon text="只处理在此天数内发布的评论，-1=不限天数" /></label>
-                  <input v-model.number="form.max_age_days" type="number" min="-1" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200" />
+                  <label class="block text-sm font-medium text-slate-300">评论最大时间 <TipIcon text="只处理在此时间内发布的评论，-1=不限" /></label>
+                  <div class="mt-1 flex gap-2">
+                    <input v-model.number="form.max_age_days" type="number" min="-1" class="flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200" />
+                    <select v-model="form.max_age_unit" class="w-24 rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-sm text-slate-200">
+                      <option value="days">天</option>
+                      <option value="hours">时</option>
+                      <option value="minutes">分</option>
+                      <option value="seconds">秒</option>
+                    </select>
+                  </div>
                 </div>
 
                 <!-- Content template + DM sequence + text -->

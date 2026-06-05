@@ -38,6 +38,7 @@ def test_get_masks_sensitive_keys(client, db):
     """Sensitive keys (api_key) should return '****' in GET."""
     _clean_settings(db)
     _set_setting(db, "ai_api_key", "sk-secret-12345")
+    _set_setting(db, "pixelle_api_key", "stage-secret")
     _set_setting(db, "ai_base_url", "https://api.deepseek.com")
     _set_setting(db, "ai_model", "deepseek-chat")
 
@@ -47,6 +48,7 @@ def test_get_masks_sensitive_keys(client, db):
 
     # Sensitive fields masked
     assert data.get("ai_api_key") == "****"
+    assert data.get("pixelle_api_key") == "****"
     # Non-sensitive fields returned as-is
     assert data.get("ai_base_url") == "https://api.deepseek.com"
     assert data.get("ai_model") == "deepseek-chat"

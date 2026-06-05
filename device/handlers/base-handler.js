@@ -3,6 +3,7 @@ var uiOperator = require("../core/ui-operator");
 var antiDetect = require("../core/anti-detect");
 var selectorLoader = require("../core/selector-loader");
 var selectorResolver = require("../core/selector-resolver");
+var humanInput = require("../core/human-input");
 var logger = require("../utils/logger");
 
 var TAG = "处理器";
@@ -63,6 +64,11 @@ var BaseHandler = {
     var element = uiOperator.findElement(actionName, 5000);
     if (element) {
       return antiDetect.wrapAction("input_text", function () {
+        if (actionName === "dm_input") {
+          if (!uiOperator.clickElement(element)) return false;
+          sleep(500);
+          return humanInput.typeFocusedText(text, { requireVerification: true });
+        }
         return uiOperator.inputText(element, text);
       });
     }

@@ -7,6 +7,7 @@ var commentUtils = require("./comment-utils");
 var logger = require("../utils/logger");
 var flowContext = require("../core/flow-context");
 var taskExecutor = require("../core/task-executor");
+var apiClient = require("../core/api-client");
 
 var TAG = "养号";
 
@@ -40,6 +41,7 @@ NurtureHandler._executeV2 = function (params) {
 
   // Store keyword matrix for content filtering
   this._keywordMatrix = params.keyword_matrix || [];
+  this._initNurtureRuntime(params);
 
   // 加载服务端提示词模板
   aiAnalyzer.useTemplate(params.prompt_template_id);
@@ -58,6 +60,7 @@ NurtureHandler._executeV2 = function (params) {
       target: st.count,
       done: 0,
       contentTemplateId: st.content_template_id || null,
+      content: st.content || null,
     };
   });
 
@@ -67,7 +70,7 @@ NurtureHandler._executeV2 = function (params) {
       break;
     }
     // Find incomplete sub-tasks
-    var pending = progress.filter(function (p) { return p.done < p.target; });
+    var pending = progress.filter(function (p) { return p.done < p.target && !p.blocked; });
     if (pending.length === 0) {
       logger.info(TAG, "所有子任务已完成");
       break;
@@ -75,13 +78,21 @@ NurtureHandler._executeV2 = function (params) {
 
     // Randomly pick one incomplete sub-task
     var task = pending[Math.floor(Math.random() * pending.length)];
+    if (!this._hasNurtureQuota(task.type)) {
+      task.blocked = true;
+      logger.warn(TAG, "子任务额度不足，跳过: " + task.type);
+      continue;
+    }
 
     // 执行前确保在推荐页（防止误触跳转后所有操作都在错误页面）
     this._ensureOnFeed();
 
     try {
-      this._executeSubTask(task);
-      task.done++;
+      var acted = this._executeSubTask(task);
+      if (acted) {
+        task.done++;
+        this._recordNurtureAction(task.type, params.account_id);
+      }
     } catch (e) {
       logger.error(TAG, "子任务 '" + task.type + "' 出错: " + e.message);
     }
@@ -117,25 +128,62 @@ NurtureHandler._executeV2 = function (params) {
   return { success: true, result: stats };
 };
 
+NurtureHandler._initNurtureRuntime = function (params) {
+  params = params || {};
+  this._nurtureQuota = {
+    like: this._quotaValue(params.server_remaining_nurture_likes),
+    comment: this._quotaValue(params.server_remaining_comments),
+    follow: this._quotaValue(params.server_remaining_follows),
+  };
+};
+
+NurtureHandler._quotaValue = function (value) {
+  if (value === null || value === undefined || value === "") return null;
+  var n = Number(value);
+  if (!isFinite(n)) return null;
+  return n;
+};
+
+NurtureHandler._hasNurtureQuota = function (type) {
+  if (!this._nurtureQuota) return true;
+  var remaining = this._nurtureQuota[type];
+  return remaining === null || remaining > 0;
+};
+
+NurtureHandler._consumeNurtureQuota = function (type) {
+  if (!this._nurtureQuota) return;
+  var remaining = this._nurtureQuota[type];
+  if (remaining !== null && remaining > 0) this._nurtureQuota[type] = remaining - 1;
+};
+
+NurtureHandler._recordNurtureAction = function (type, accountId) {
+  var taskType = null;
+  if (type === "like") taskType = "nurture";
+  else if (type === "comment") taskType = "search_comment";
+  else if (type === "follow") taskType = "follow";
+  if (!taskType) return;
+  try {
+    apiClient.incrementStats(accountId, taskType, "", 1);
+    this._consumeNurtureQuota(type);
+  } catch (e) {
+    logger.warn(TAG, "养号统计上报失败: " + taskType + " err=" + e.message);
+  }
+};
+
 NurtureHandler._executeSubTask = function (task) {
   switch (task.type) {
     case "browse":
-      this._browseFeed();
-      break;
+      return this._browseFeed();
     case "watch":
-      this._watchVideo();
-      break;
+      return this._watchVideo();
     case "like":
-      this._likeCurrentVideo();
-      break;
+      return this._likeCurrentVideo();
     case "comment":
-      this._commentOnVideo(task.contentTemplateId);
-      break;
+      return this._commentOnVideo(task.contentTemplateId, task.content);
     case "follow":
-      this._followCurrentUser();
-      break;
+      return this._followCurrentUser();
     default:
-      this._browseFeed();
+      return this._browseFeed();
   }
 };
 
@@ -145,13 +193,14 @@ NurtureHandler._browseFeed = function () {
   var watchTime = this._humanDuration(2000, 8000, 4000);
   logger.debug(TAG, "浏览推荐页 " + Math.round(watchTime / 1000) + "s");
   sleep(watchTime);
+  return true;
 };
 
 NurtureHandler._watchVideo = function () {
   // 先检测是否是广告 — 广告直接跳过
   if (this._isAdContent()) {
     logger.info(TAG, "检测到广告，直接跳过");
-    return;
+    return false;
   }
 
   // 检测内容互动数据来判断质量
@@ -180,6 +229,7 @@ NurtureHandler._watchVideo = function () {
     logger.debug(TAG, "模拟浏览评论区 " + Math.round(commentPause / 1000) + "s");
     sleep(commentPause);
   }
+  return true;
 };
 
 /**
@@ -248,7 +298,7 @@ NurtureHandler._isAdContent = function () {
  */
 NurtureHandler._isKeywordRelevant = function (videoText) {
   if (!this._keywordMatrix || this._keywordMatrix.length === 0) return true;
-  if (!videoText || videoText.length < 2) return true;
+  if (!videoText || videoText.length < 2) return false;
 
   var t = videoText.toLowerCase();
 
@@ -270,7 +320,7 @@ NurtureHandler._isKeywordRelevant = function (videoText) {
   var content = aiAnalyzer._callAI(prompt, 100, 0.1);
   if (!content) {
     logger.warn(TAG, "关键词语义分析失败，默认放行");
-    return true;
+    return false;
   }
 
   try {
@@ -283,7 +333,7 @@ NurtureHandler._isKeywordRelevant = function (videoText) {
   } catch (e) {
     logger.warn(TAG, "关键词语义分析解析失败: " + e.message);
   }
-  return true;
+  return false;
 };
 
 /**
@@ -383,38 +433,39 @@ NurtureHandler._ensureOnFeed = function () {
 NurtureHandler._likeCurrentVideo = function () {
   if (this._isAdContent()) {
     logger.info(TAG, "广告内容，跳过点赞");
-    return;
+    return false;
   }
   var videoText = this._extractVideoText();
   if (!this._isKeywordRelevant(videoText)) {
     logger.info(TAG, "内容与关键词不相关，跳过点赞");
-    return;
+    return false;
   }
   if (!aiAnalyzer.checkHealthRelevance(videoText)) {
     logger.info(TAG, "内容与大健康不相关，跳过点赞");
-    return;
+    return false;
   }
   var clicked = this.safeClick("like_button", 2);
   if (clicked) {
     logger.info(TAG, "点赞成功");
   }
+  return !!clicked;
 };
 
-NurtureHandler._commentOnVideo = function (templateId) {
+NurtureHandler._commentOnVideo = function (templateId, templateContent) {
   if (this._isAdContent()) {
     logger.info(TAG, "广告内容，跳过评论");
-    return;
+    return false;
   }
   var videoText = this._extractVideoText();
   if (!this._isKeywordRelevant(videoText)) {
     logger.info(TAG, "内容与关键词不相关，跳过评论");
-    return;
+    return false;
   }
   // 1. AI 生成评论
-  var content = aiAnalyzer.generateVideoComment(videoText);
+  var content = templateContent || aiAnalyzer.generateVideoComment(videoText);
   if (!content) {
     logger.warn(TAG, "AI 生成评论失败，跳过评论");
-    return;
+    return false;
   }
   logger.info(TAG, "AI 生成评论: '" + content.substring(0, 20) + "'");
 
@@ -425,14 +476,14 @@ NurtureHandler._commentOnVideo = function (templateId) {
   logger.info(TAG, "评论数: " + (cc.count >= 0 ? cc.count : "未知"));
   if (cc.count === 0) {
     logger.info(TAG, "该视频无评论，跳过评论");
-    return;
+    return false;
   }
 
   // 2. 点击评论入口按钮，打开评论面板
   var opened = this.safeClick("video_comment_btn", 3);
   if (!opened) {
     logger.warn(TAG, "评论入口按钮未找到");
-    return;
+    return false;
   }
   sleep(1500);
 
@@ -442,7 +493,7 @@ NurtureHandler._commentOnVideo = function (templateId) {
     logger.warn(TAG, "评论输入框未找到");
     back();
     sleep(500);
-    return;
+    return false;
   }
   sleep(1000);
 
@@ -452,39 +503,46 @@ NurtureHandler._commentOnVideo = function (templateId) {
     logger.warn(TAG, "输入评论内容失败");
     back();
     sleep(500);
-    return;
+    return false;
   }
   sleep(500);
 
   // 5. 通过键盘回车提交评论
   sleep(500);
-  this.submitViaKeyboard("comment_submit");
+  var submitted = this.submitViaKeyboard("comment_submit");
   sleep(1000);
+  if (!submitted) {
+    logger.warn(TAG, "评论提交失败");
+    this.safeClick("back_btn", 2);
+    return false;
+  }
   logger.info(TAG, "评论成功");
 
   // 6. 关闭评论面板
   this.safeClick("back_btn", 2);
   sleep(800);
+  return true;
 };
 
 NurtureHandler._followCurrentUser = function () {
   if (this._isAdContent()) {
     logger.info(TAG, "广告内容，跳过关注");
-    return;
+    return false;
   }
   var videoText = this._extractVideoText();
   if (!this._isKeywordRelevant(videoText)) {
     logger.info(TAG, "内容与关键词不相关，跳过关注");
-    return;
+    return false;
   }
   if (!aiAnalyzer.checkHealthRelevance(videoText)) {
     logger.info(TAG, "内容与大健康不相关，跳过关注");
-    return;
+    return false;
   }
   var clicked = this.safeClick("follow_button", 2);
   if (clicked) {
     logger.info(TAG, "关注成功");
   }
+  return !!clicked;
 };
 
 // --- Legacy support ---
@@ -501,34 +559,44 @@ NurtureHandler._legacyExecute = function (params) {
   if (!this.ensureAppActive()) {
     return { success: false, error: "Failed to open Douyin" };
   }
+  this._initNurtureRuntime(params);
 
   var startTime = Date.now();
   var endTime = startTime + duration * 60 * 1000;
   var stats = { videos_watched: 0, likes: 0, follows: 0, errors: 0 };
 
   while (Date.now() < endTime) {
+    if (taskExecutor.isCancelled()) {
+      logger.info(TAG, "任务已取消，停止养号");
+      break;
+    }
     this._ensureOnFeed();
     var action = this._weightedRandom(actions);
     try {
       switch (action.type) {
         case "browse_feed":
-          this._browseFeed();
+          if (this._browseFeed()) stats.videos_watched++;
           break;
         case "like":
-          this._likeCurrentVideo();
+          if (this._hasNurtureQuota("like") && this._likeCurrentVideo()) {
+            stats.likes++;
+            this._recordNurtureAction("like", params.account_id);
+          }
           break;
         case "follow":
-          this._followCurrentUser();
+          if (this._hasNurtureQuota("follow") && this._followCurrentUser()) {
+            stats.follows++;
+            this._recordNurtureAction("follow", params.account_id);
+          }
           break;
         default:
-          this._browseFeed();
+          if (this._browseFeed()) stats.videos_watched++;
       }
     } catch (e) {
       logger.error(TAG, "养号操作 '" + action.type + "' 出错: " + e.message);
       stats.errors++;
     }
     antiDetect.humanSwipeUp();
-    stats.videos_watched++;
   }
 
   stats.success_count = stats.likes + stats.follows;

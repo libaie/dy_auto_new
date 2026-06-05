@@ -4,7 +4,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.db_models import Base, Task, ChainInstance, DailyStats, Account, AccountGroup, AccountGroupMember, Channel, ChannelItem, Character, Scene, Series, Episode, PipelineRun, GeneratedVideo, AuditReport, ReferenceData, AIModel, User, VideoProductionRun, VideoProductionAsset, VideoReviewRecord, series_characters, series_scenes
+from app.db_models import Base, Task, ChainInstance, DailyStats, Account, AccountGroup, AccountGroupMember, Channel, ChannelItem, Character, Scene, Series, Episode, PipelineRun, GeneratedVideo, AuditReport, ReferenceData, AIModel, User, VideoProductionRun, VideoProductionAsset, VideoReviewRecord, ImageProductionPolicyVersion, ImageProductionStrategy, ImageProductionStrategyVersion, ImageSelectionPreview, ImageCreationTask, ImageCreationAsset, ImageProductionCostEvent, ImageProductionAbAttempt, ImageProductionAbGroup, ImageProductionMetric, ImageCreationReviewRecord, AgencyExpertInvocation, ProductionAuditEvent, ProductionCostEvent, ProductionJob, ProductionSegment, ProductionShot, ProductionScene, ProductionEpisode, ProductionPlanVersion, ProductionPlan, VideoCollection, series_characters, series_scenes
 from app.database import get_db
 from app.main import app
 from app.config import ADMIN_USERNAME, ADMIN_PASSWORD
@@ -13,9 +13,16 @@ from app.seed import seed_accounts, seed_selectors
 # Tables to clean between tests (order matters for FK constraints)
 _CLEANUP_TABLES = [
     Task, DailyStats, AccountGroupMember, AccountGroup, ChainInstance,
-    ChannelItem, Channel, ReferenceData, AIModel,
-    VideoReviewRecord, VideoProductionAsset, VideoProductionRun,
-    AuditReport, GeneratedVideo, PipelineRun, Episode,
+    ChannelItem, Channel, ReferenceData,
+    ImageCreationReviewRecord, ImageProductionAbAttempt, ImageProductionAbGroup,
+    ImageProductionMetric, ImageProductionCostEvent, ImageCreationAsset, ImageCreationTask,
+    ImageSelectionPreview, ImageProductionStrategyVersion,
+    ImageProductionStrategy, ImageProductionPolicyVersion,
+    AIModel,
+    VideoReviewRecord, VideoProductionAsset, AgencyExpertInvocation, ProductionAuditEvent, VideoProductionRun,
+    ProductionCostEvent, ProductionJob, ProductionSegment, ProductionShot,
+    ProductionScene, ProductionEpisode, ProductionPlanVersion, VideoCollection,
+    ProductionPlan, AuditReport, GeneratedVideo, PipelineRun, Episode,
 ]
 _CLEANUP_M2M = [series_characters, series_scenes, Series, Character, Scene]  # M2M first, then parent tables
 

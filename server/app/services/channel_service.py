@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from app.config import bj_now
 from typing import Optional
 
-from sqlalchemy import update, and_, exists, select
+from sqlalchemy import update, and_, exists, select, or_
 from sqlalchemy.orm import Session
 
 from app.db_models import (
@@ -13,7 +13,68 @@ from app.db_models import (
 from app.models import TaskStatus
 
 
+def _busy_account_ids(db: Session) -> set[str]:
+    """Return account IDs currently locked by any assigned item or running task."""
+    busy = set()
+    for (aid,) in db.query(ChannelItem.account_id).filter(
+        ChannelItem.status == "assigned"
+    ).distinct().all():
+        busy.add(aid)
+    for (aid,) in db.query(DBTask.account_id).filter(
+        DBTask.status == TaskStatus.RUNNING.value
+    ).distinct().all():
+        busy.add(aid)
+    return busy
+
+
 MAX_KEYWORDS = 500
+
+
+def _unique_nonempty(values: list) -> list[str]:
+    result = []
+    seen = set()
+    for value in values:
+        if value is None:
+            continue
+        text = str(value).strip()
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        result.append(text)
+    return result
+
+
+def _inject_nurture_keyword_matrix(params: dict, keyword: str) -> dict:
+    if not isinstance(params, dict) or params.get("sub_tasks") is None:
+        return params
+    matrix = params.get("keyword_matrix") or []
+    if not isinstance(matrix, list):
+        matrix = []
+    params["keyword_matrix"] = _unique_nonempty([keyword] + matrix)
+    return params
+
+
+def _resolve_nurture_subtask_templates(db: Session, params: dict, keyword: str) -> dict:
+    sub_tasks = params.get("sub_tasks")
+    if not isinstance(sub_tasks, list):
+        return params
+    try:
+        from app.services.content_service import content_service as cs
+    except Exception:
+        return params
+    for sub_task in sub_tasks:
+        if not isinstance(sub_task, dict) or sub_task.get("type") != "comment":
+            continue
+        template_id = sub_task.get("content_template_id")
+        if not template_id or sub_task.get("content"):
+            continue
+        try:
+            tpl_body = cs.get_template_body(db, template_id)
+            if tpl_body:
+                sub_task["content"] = cs.substitute_variables(tpl_body, {"keyword": keyword or ""})
+        except Exception:
+            pass
+    return params
 
 
 def _get_active_accounts(db: Session, group_id: str) -> list[Account]:
@@ -165,19 +226,51 @@ class ChannelService:
             stale_channel_ids.add(si.channel_id)
         if stale_items:
             db.flush()
-            # Reset orphaned RUNNING tasks so they don't linger for 10 min
+            # Cancel orphaned tasks — channel will create fresh ones on re-claim.
+            # Must NOT reset to PENDING (would create duplicate direct-queue retry).
             if stale_task_ids:
+                import logging
+                _stale_log = logging.getLogger("channel_service")
+                _stale_log.info("Stale recovery: cancelling %d orphaned tasks for %d channel items",
+                               len(stale_task_ids), len(stale_items))
                 from app.models import TaskStatus as TS
                 db.query(DBTask).filter(
                     DBTask.id.in_(stale_task_ids),
-                    DBTask.status == TS.RUNNING.value,
+                    DBTask.status == TaskStatus.RUNNING.value,  # only cancel running tasks
                 ).update(
-                    {"status": TS.PENDING.value, "device_id": None, "started_at": None},
+                    {"status": TS.CANCELLED.value, "completed_at": bj_now()},
                     synchronize_session=False,
                 )
             for cid in stale_channel_ids:
                 self._reactivate_channel(db, cid)
         db.expire_all()
+
+        # Orphan cleanup: reset assigned items whose linked task is already terminal
+        # (cancelled/failed).  The regular stale-recovery above requires the device
+        # to be offline, but these items are stuck even when the device IS online
+        # because the task will never execute.  Without this the channel is deadlocked.
+        orphan_items = db.query(ChannelItem).join(
+            DBTask, ChannelItem.task_id == DBTask.id
+        ).filter(
+            ChannelItem.status == "assigned",
+            ChannelItem.task_id.isnot(None),
+            DBTask.status.in_([TaskStatus.CANCELLED.value, TaskStatus.FAILED.value]),
+        ).all()
+        if orphan_items:
+            import logging
+            _orphan_log = logging.getLogger("channel_service")
+            _orphan_log.info("Orphan cleanup: resetting %d assigned items with terminal tasks",
+                            len(orphan_items))
+            orphan_channel_ids = set()
+            for oi in orphan_items:
+                oi.status = "pending"
+                oi.assigned_device_id = None
+                oi.assigned_at = None
+                oi.task_id = None
+                orphan_channel_ids.add(oi.channel_id)
+            db.flush()
+            for cid in orphan_channel_ids:
+                self._reactivate_channel(db, cid)
 
         # Build routing filter based on device's bound_account_id
         device = db.query(DBDevice).filter(DBDevice.id == device_id).first()
@@ -196,9 +289,10 @@ class ChannelService:
             )
         active_channels = channel_query.all()
 
-        # Self-heal: re-activate completed/cancelled channels that still have pending items
+        # Self-heal: re-activate completed channels with remaining pending/assigned items.
+        # cancelled/deleted are terminal states — never auto-resurrect.
         stuck_query = db.query(Channel).filter(
-            Channel.status.in_(["completed", "cancelled"]),
+            Channel.status == "completed",
             Channel.deleted_at.is_(None),
         )
         if device_user_id:
@@ -241,6 +335,11 @@ class ChannelService:
             )
             query = query.filter(~ChannelItem.account_id.in_(bound_ids_subq))
 
+        # Level 1: pre-filter accounts already busy (assigned/running) at SQL level
+        busy_ids = _busy_account_ids(db)
+        if busy_ids:
+            query = query.filter(~ChannelItem.account_id.in_(busy_ids))
+
         candidates = query.order_by(ChannelItem.queue_position.asc()).limit(50).all()
 
         for item in candidates:
@@ -281,13 +380,32 @@ class ChannelService:
                         continue
 
             # Filter: daily quota（reply_comment 只在 reply 配额耗尽时阻塞，follow/DM 由 handler 优雅降级）
-            if not stats_service.check_quota(db, item.account_id, ch.task_type):
+            if not stats_service.check_quota(db, item.account_id, ch.task_type, ch.params_template):
                 continue
 
-            # Optimistic lock: claim the item
+            # Optimistic lock: claim the item + account-level atomic guard
+            # The WHERE clause includes two subqueries that ensure the account
+            # has no other assigned item or running task at the moment of UPDATE.
             result = db.execute(
                 update(ChannelItem)
-                .where(ChannelItem.id == item.id, ChannelItem.status == "pending")
+                .where(
+                    ChannelItem.id == item.id,
+                    ChannelItem.status == "pending",
+                    # Account-level: no other assigned ChannelItem for this account
+                    ~exists().where(
+                        and_(
+                            ChannelItem.account_id == item.account_id,
+                            ChannelItem.status == "assigned",
+                        )
+                    ),
+                    # Account-level: no running Task for this account
+                    ~exists().where(
+                        and_(
+                            DBTask.account_id == item.account_id,
+                            DBTask.status == TaskStatus.RUNNING.value,
+                        )
+                    ),
+                )
                 .values(
                     status="assigned",
                     assigned_device_id=device_id,
@@ -301,6 +419,9 @@ class ChannelService:
             # Task is created as RUNNING to prevent get_pending_task from stealing it
             params = dict(ch.params_template or {})
             params["keyword"] = item.keyword
+            if ch.task_type == "nurture":
+                params = _inject_nurture_keyword_matrix(params, item.keyword)
+                params = _resolve_nurture_subtask_templates(db, params, item.keyword)
             # Resolve dm_sequence_id into inline dm_messages (keep id for device cache/variants)
             seq_id = params.get("dm_sequence_id")
             if seq_id:
@@ -329,13 +450,33 @@ class ChannelService:
                         )
                 except Exception:
                     pass
-            # 注入账号剩余配额（reply_comment 设备端需要关注和私信上限）
+            # 注入账号配额和服务端每日计数（设备端日志和服务端同步）
             if ch.task_type == "reply_comment":
                 remaining = stats_service.get_remaining_quotas(db, item.account_id)
+                limits = stats_service._get_limits(db, item.account_id)
+                today_counts = stats_service.get_today_counts(db, item.account_id)
                 if "max_follows" not in params:
                     params["max_follows"] = remaining.get("follows", 20)
                 if "max_dms" not in params:
                     params["max_dms"] = remaining.get("dms", 10)
+                # 服务端每日配额上限（-1=不限）
+                params["server_daily_limit_reply"] = limits.get("replies", 200)
+                params["server_daily_limit_follow"] = limits.get("follows", 100)
+                params["server_daily_limit_dm"] = limits.get("dms", 75)
+                # 服务端今日已完成计数
+                params["server_today_reply"] = today_counts.get("replies", 0)
+                params["server_today_follow"] = today_counts.get("follows", 0)
+                params["server_today_dm"] = today_counts.get("dms", 0)
+            # Convert max_age_days + max_age_unit → max_age_seconds for device precision
+            _age_days = params.get("max_age_days")
+            if _age_days is not None and _age_days != -1:
+                _unit = params.get("max_age_unit") or "days"
+                _mult = {"seconds": 1, "minutes": 60, "hours": 3600, "days": 86400}.get(_unit, 86400)
+                params["max_age_seconds"] = _age_days * _mult
+            elif _age_days == -1:
+                params["max_age_seconds"] = -1
+            params = stats_service.inject_task_quota_params(db, item.account_id, ch.task_type, params)
+            import uuid
             task = DBTask(
                 type=ch.task_type,
                 account_id=item.account_id,
@@ -344,6 +485,7 @@ class ChannelService:
                 params=params,
                 status=TaskStatus.RUNNING.value,
                 started_at=now,
+                lease_id=str(uuid.uuid4()),
             )
             db.add(task)
             db.flush()
@@ -411,7 +553,11 @@ class ChannelService:
         db.expire_all()
 
     def update_channel_status(self, db: Session, channel_id: str, new_status: str, user_id: Optional[str] = None):
-        """Update channel status with validation."""
+        """Update channel status with validation.
+
+        On cancel: skips pending items AND cancels running tasks for assigned items
+        so devices receive cancellation via their next poll (cancelled_task_id).
+        """
         ch = self.get_channel(db, channel_id, user_id=user_id)
         if not ch:
             raise ValueError(f"通道 {channel_id} 不存在")
@@ -425,7 +571,16 @@ class ChannelService:
             raise ValueError(f"不允许从 {ch.status} 转换到 {new_status}")
 
         ch.status = new_status
-        if new_status == "cancelled":
+        if new_status in ("paused", "cancelled"):
+            # Collect assigned task IDs BEFORE changing ChannelItem status
+            assigned_task_ids = [
+                row[0] for row in db.query(ChannelItem.task_id).filter(
+                    ChannelItem.channel_id == channel_id,
+                    ChannelItem.status == "assigned",
+                    ChannelItem.task_id.isnot(None),
+                ).all()
+            ]
+            # Skip all pending items
             db.execute(
                 update(ChannelItem)
                 .where(
@@ -434,22 +589,75 @@ class ChannelService:
                 )
                 .values(status="skipped", completed_at=bj_now())
             )
+            # Skip assigned items — cancelled channel must leave no active items
+            db.execute(
+                update(ChannelItem)
+                .where(
+                    ChannelItem.channel_id == channel_id,
+                    ChannelItem.status == "assigned",
+                )
+                .values(status="skipped", completed_at=bj_now())
+            )
+            # Cancel running tasks for assigned items — devices pick this up
+            # via check_cancelled_running in their next poll.
+            # Keep device_id so the cancellation can be delivered; device acks
+            # via report_result(CANCELLED) which clears it then.
+            if assigned_task_ids:
+                db.execute(
+                    update(DBTask)
+                    .where(
+                        DBTask.id.in_(assigned_task_ids),
+                        DBTask.status == TaskStatus.RUNNING.value,
+                    )
+                    .values(status=TaskStatus.CANCELLED.value, completed_at=bj_now())
+                )
         db.commit()
 
     def soft_delete_channel(self, db: Session, channel_id: str, user_id: Optional[str] = None):
-        """Soft delete a channel."""
+        """Soft delete a channel — cancels pending + assigned items."""
         ch = self.get_channel(db, channel_id, user_id=user_id)
         if not ch:
             raise ValueError(f"通道 {channel_id} 不存在")
         ch.deleted_at = bj_now()
+        now = bj_now()
+        # Collect assigned task IDs BEFORE changing ChannelItem status
+        assigned_task_ids = [
+            row[0] for row in db.query(ChannelItem.task_id).filter(
+                ChannelItem.channel_id == channel_id,
+                ChannelItem.status == "assigned",
+                ChannelItem.task_id.isnot(None),
+            ).all()
+        ]
+        # Skip pending items
         db.execute(
             update(ChannelItem)
             .where(
                 ChannelItem.channel_id == channel_id,
                 ChannelItem.status == "pending",
             )
-            .values(status="skipped", completed_at=bj_now())
+            .values(status="skipped", completed_at=now)
         )
+        # Skip assigned items
+        db.execute(
+            update(ChannelItem)
+            .where(
+                ChannelItem.channel_id == channel_id,
+                ChannelItem.status == "assigned",
+            )
+            .values(status="skipped", completed_at=now)
+        )
+        # Cancel running tasks for assigned items.
+        # Keep device_id so the cancellation can be delivered; device acks
+        # via report_result(CANCELLED) which clears it then.
+        if assigned_task_ids:
+            db.execute(
+                update(DBTask)
+                .where(
+                    DBTask.id.in_(assigned_task_ids),
+                    DBTask.status == TaskStatus.RUNNING.value,
+                )
+                .values(status=TaskStatus.CANCELLED.value, completed_at=now)
+            )
         db.commit()
 
     def append_items(self, db: Session, channel_id: str, keywords: list[str], user_id: Optional[str] = None):
@@ -482,9 +690,10 @@ class ChannelService:
         db.commit()
 
     def _reactivate_channel(self, db: Session, channel_id: str):
-        """If channel is completed/cancelled but now has pending items, revert to active."""
+        """If channel is completed and has pending items, revert to active.
+        cancelled/deleted are terminal — never auto-resurrect."""
         ch = db.query(Channel).filter(Channel.id == channel_id).first()
-        if ch and ch.status in ("completed", "cancelled"):
+        if ch and ch.status == "completed":
             ch.status = "active"
             ch.completed_at = None
             db.flush()

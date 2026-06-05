@@ -1,12 +1,76 @@
 """Content template and sensitive word service -- DB-backed."""
 import json
 import re
+import time
+from collections import deque
 from typing import Optional
 
 from sqlalchemy.orm import Session
 
 from app.db_models import ContentTemplate as DBTemplate, SensitiveWord as DBWord
 from app.models import ContentTemplateResponse, SensitiveWordResponse
+
+
+def _build_ac_automaton(words: set[str]) -> list[dict]:
+    """Build Aho-Corasick automaton from a set of patterns.
+
+    Returns a list of node dicts, each with:
+      next: dict[char -> node_index]   (goto)
+      fail: int                         (failure link)
+      output: bool                      (True if a pattern ends here)
+
+    Scanning: walk `next` on match, follow `fail` on miss, check `output`.
+    O(N) scan regardless of pattern count.
+    """
+    # Phase 1: build trie
+    trie = [{"next": {}, "fail": 0, "output": False}]
+    for w in words:
+        if not w:
+            continue
+        node = 0
+        for ch in w:
+            nxt = trie[node]["next"]
+            if ch not in nxt:
+                nxt[ch] = len(trie)
+                trie.append({"next": {}, "fail": 0, "output": False})
+            node = nxt[ch]
+        trie[node]["output"] = True
+
+    # Phase 2: BFS to build failure links
+    q = deque()
+    root = trie[0]
+    for ch, nxt_idx in root["next"].items():
+        trie[nxt_idx]["fail"] = 0
+        q.append(nxt_idx)
+
+    while q:
+        cur = q.popleft()
+        cur_node = trie[cur]
+        for ch, nxt_idx in cur_node["next"].items():
+            q.append(nxt_idx)
+            # Follow failure links to find the deepest proper suffix
+            f = cur_node["fail"]
+            while f > 0 and ch not in trie[f]["next"]:
+                f = trie[f]["fail"]
+            if ch in trie[f]["next"]:
+                f = trie[f]["next"][ch]
+            trie[nxt_idx]["fail"] = f
+            trie[nxt_idx]["output"] = trie[nxt_idx]["output"] or trie[f]["output"]
+
+    return trie
+
+
+def _ac_contains(automaton: list[dict], text: str) -> bool:
+    """Scan `text` with Aho-Corasick automaton. Returns True on first match."""
+    node = 0
+    for ch in text:
+        while node > 0 and ch not in automaton[node]["next"]:
+            node = automaton[node]["fail"]
+        if ch in automaton[node]["next"]:
+            node = automaton[node]["next"][ch]
+        if automaton[node]["output"]:
+            return True
+    return False
 
 
 def _db_template_to_response(tpl: DBTemplate) -> ContentTemplateResponse:
@@ -32,6 +96,21 @@ def _db_word_to_response(word: DBWord) -> SensitiveWordResponse:
 
 class ContentService:
     """Content template and sensitive word management."""
+
+    def __init__(self):
+        self._sensitive_words: set[str] = set()
+        self._sensitive_fetched_at: float = 0.0
+        self._ac_automaton: list[dict] | None = None
+
+    def _get_ac_automaton(self, db: Session) -> list[dict]:
+        """Return Aho-Corasick automaton, rebuilt when word cache refreshes."""
+        now = time.monotonic()
+        if now - self._sensitive_fetched_at > 60 or self._ac_automaton is None:
+            rows = db.query(DBWord.word).all()
+            self._sensitive_words = {w for (w,) in rows}
+            self._ac_automaton = _build_ac_automaton(self._sensitive_words)
+            self._sensitive_fetched_at = now
+        return self._ac_automaton
 
     # --- Template CRUD ---
 
@@ -113,6 +192,8 @@ class ContentService:
         db.add(db_word)
         db.commit()
         db.refresh(db_word)
+        self._sensitive_fetched_at = 0.0
+        self._ac_automaton = None
         return _db_word_to_response(db_word)
 
     def list_sensitive_words(
@@ -128,18 +209,21 @@ class ContentService:
             return False
         db.delete(word)
         db.commit()
+        self._sensitive_fetched_at = 0.0
+        self._ac_automaton = None
         return True
 
     def contains_sensitive(self, db: Session, text: str) -> bool:
         """Check if text contains any sensitive word.
 
-        Loads all words from DB on each call (no cache) to ensure freshness.
-        Uses substring match (not word-boundary) -- intentional for Douyin's
-        aggressive content policy. False positives trigger a retry, which is
-        acceptable since the AI prompt already avoids sensitive content.
+        Uses Aho-Corasick automation for O(N) single-pass multi-pattern matching.
+        Automaton is rebuilt every 60s from DB (TTL-cached), same as before.
+        Substring match (not word-boundary) — intentional for Douyin policy.
         """
-        words = [w for (w,) in db.query(DBWord.word).all()]
-        return any(word in text for word in words)
+        automaton = self._get_ac_automaton(db)
+        if not automaton or len(automaton) <= 1:
+            return False
+        return _ac_contains(automaton, text)
 
     # --- Variable Substitution ---
 

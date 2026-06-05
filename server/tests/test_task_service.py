@@ -199,6 +199,39 @@ def test_quota_allows_non_exhausted_tasks(db):
     assert claimed.type == TaskType.SEARCH_COMMENT
 
 
+def test_nurture_direct_task_respects_follow_quota(db):
+    """Nurture tasks with follow subtasks should not be assigned after follow quota is exhausted."""
+    from app.services.stats_service import stats_service
+    from app.db_models import Task as DBTask, Account
+
+    account_id = "acc-nurture-follow-quota"
+    account = Account(id=account_id, nickname="nurture-follow-quota", daily_limits={
+        "likes": 50,
+        "comments": 20,
+        "follows": 1,
+        "dms": 10,
+        "replies": 15,
+        "nurture_likes": 200,
+    })
+    db.add(account)
+    db.commit()
+
+    stats_service.increment(db, account_id, "follow", count=1)
+    db.query(DBTask).filter(DBTask.status == TaskStatus.PENDING.value).update(
+        {"status": TaskStatus.CANCELLED.value}
+    )
+    db.commit()
+
+    task_service.create_task(db, TaskType.NURTURE, account_id, {
+        "sub_tasks": [{"type": "follow", "count": 1}],
+        "duration": 10,
+    })
+
+    claimed = task_service.get_pending_task(db, "dev-nurture-follow-quota")
+
+    assert claimed is None
+
+
 def test_report_completed_does_not_increment_stats(db):
     """report_result should NOT increment stats — device-side POST /api/device/stats/increment is the single source of truth.
     This prevents double-counting when both incremental and batch stats are reported."""

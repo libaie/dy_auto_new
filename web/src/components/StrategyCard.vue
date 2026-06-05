@@ -6,6 +6,7 @@ const props = defineProps({
   index: { type: Number, required: true },
   totalCount: { type: Number, required: true },
   actionName: { type: String, default: '' },
+  resolutionProfile: { type: String, default: 'default' },
   purpose: { type: String, default: 'locate' },
 })
 
@@ -145,7 +146,7 @@ async function onImageFileSelect(e) {
   if (!file) return
   const { uploadTemplate } = await import('../api/selectors.js')
   try {
-    const res = await uploadTemplate(file, props.actionName || 'template')
+    const res = await uploadTemplate(file, props.actionName || 'template', props.resolutionProfile || 'default')
     updateField('template', res.data.filename)
   } catch (err) {
     alert('上传失败: ' + (err.response?.data?.detail || err.message))

@@ -52,9 +52,17 @@ SearchCollectHandler._processComments = function (params, stats, videoIndex) {
   var keyword = params.keyword;
   var taskId = params.task_id || "";
   var maxComments = (params.count === -1) ? Infinity : (params.count || 50);
-  var maxAgeDays = (params.max_age_days === -1) ? Infinity : (params.max_age_days || 30);
+  var maxAgeSecs;
+  if (params.max_age_seconds !== undefined && params.max_age_seconds !== null) {
+    maxAgeSecs = params.max_age_seconds;
+  } else {
+    var days = params.max_age_days;
+    if (days === undefined || days === null) days = 30;
+    maxAgeSecs = (days === -1) ? -1 : days * 86400;
+  }
+  var maxAgeMs = (maxAgeSecs === -1) ? Infinity : maxAgeSecs * 1000;
   var now = new Date();
-  var cutoff = (maxAgeDays === Infinity) ? new Date(0) : new Date(now.getTime() - maxAgeDays * 24 * 60 * 60 * 1000);
+  var cutoff = (maxAgeMs === Infinity) ? new Date(0) : new Date(now.getTime() - maxAgeMs);
 
   var dataSourceType = uiOperator.findElement("is_shopping_cart", 500) ? 1 : 0;
   logger.info(TAG, "[耗时] 数据来源类型: " + (dataSourceType === 1 ? "带货视频" : "普通视频"));
@@ -95,7 +103,7 @@ SearchCollectHandler._processComments = function (params, stats, videoIndex) {
       var tItem = Date.now();
       var comment = commentUtils.parseCommentItem(items[i], this);
       if (!comment) { logger.debug(TAG, "  [" + i + "] 解析失败 (" + (Date.now() - tItem) + "ms)"); continue; }
-
+      if (comment.isAuthor) { logger.debug(TAG, "  [" + i + "] 作者评论，跳过"); continue; }
       if (!commentUtils.localPreFilter(comment.text)) {
         localSkipped++;
         logger.debug(TAG, "  [" + i + "] 本地淘汰(纯表情/短文本): " + comment.nickname);
@@ -263,7 +271,7 @@ SearchCollectHandler._reportCollection = function (taskId, keyword, commentData,
   if (userData) payload.user = userData;
   var result = apiClient.collectReport(payload);
   if (result && result.comment_saved) logger.debug(TAG, "已上报: " + commentData.nickname);
-  try { apiClient.incrementStats((this._params || {}).account_id, "collect", 1); } catch (e) {}
+  try { apiClient.incrementStats((this._params || {}).account_id, "collect", "", 1); } catch (e) {}
 };
 
 SearchCollectHandler.execute = function (params) {

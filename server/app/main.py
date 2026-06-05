@@ -8,15 +8,104 @@ if _server_dir not in sys.path:
     sys.path.insert(0, _server_dir)
 
 import asyncio
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 
 from app.config import bj_now
 from app.database import get_db, init_db, SessionLocal
 from app.seed import seed_all
-from app.routers import device, tasks, accounts, devices, auth, selectors, stats, content, account_groups, chains, settings, channels, prompt_templates, data, videos, pixelle, ai_config, characters, scenes, series, pipeline, audit, director, reference_data, dm_sequences, video_production
+from app.routers import device, tasks, accounts, devices, auth, selectors, stats, content, account_groups, chains, settings, channels, prompt_templates, data, videos, pixelle, ai_config, characters, scenes, series, pipeline, audit, director, reference_data, dm_sequences, video_production, agency
+from app.routers import image_creation, image_production
+from app.routers import system_health
 from app.services.ai_generator import ai_generator
+
+
+async def _style_lock_worker(interval_seconds: float | None = None, batch_size: int | None = None):
+    """Consume durable style-lock jobs so /style-lock does not depend on the page staying open."""
+    import logging
+    from app.routers import series as series_router
+
+    interval = interval_seconds
+    if interval is None:
+        interval = float(os.getenv("STYLE_LOCK_WORKER_INTERVAL_SECONDS", "5"))
+    interval = max(0.1, float(interval))
+    worker_batch_size = batch_size
+    if worker_batch_size is None:
+        worker_batch_size = int(os.getenv("STYLE_LOCK_WORKER_BATCH_SIZE", "1"))
+    worker_batch_size = max(1, min(int(worker_batch_size), 20))
+    lease_id = f"style-lock-worker:{os.getpid()}"
+    log = logging.getLogger("app.style_lock_worker")
+
+    while True:
+        db = SessionLocal()
+        try:
+            result = await series_router._run_style_lock_worker_step(
+                db,
+                lease_id=lease_id,
+                batch_size=worker_batch_size,
+            )
+            if result.get("processed", 0) <= 0:
+                await asyncio.sleep(interval)
+            else:
+                await asyncio.sleep(0)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            log.warning("style-lock worker cycle failed", exc_info=True)
+            await asyncio.sleep(interval)
+        finally:
+            db.close()
+
+
+async def _one_sentence_reference_worker(interval_seconds: float | None = None, batch_size: int | None = None):
+    """Resume one-sentence reference-generation jobs after page refresh or server restart."""
+    import logging
+    from app.db_models import VideoProductionRun
+    from app.services.one_sentence_video_service import (
+        ONE_SENTENCE_REFERENCE_RUNNING_STATUS,
+        complete_one_sentence_reference_generation,
+    )
+
+    interval = interval_seconds
+    if interval is None:
+        interval = float(os.getenv("ONE_SENTENCE_REFERENCE_WORKER_INTERVAL_SECONDS", "10"))
+    interval = max(1.0, float(interval))
+    worker_batch_size = batch_size
+    if worker_batch_size is None:
+        worker_batch_size = int(os.getenv("ONE_SENTENCE_REFERENCE_WORKER_BATCH_SIZE", "1"))
+    worker_batch_size = max(1, min(int(worker_batch_size), 5))
+    log = logging.getLogger("app.one_sentence_reference_worker")
+
+    while True:
+        db = SessionLocal()
+        processed = 0
+        try:
+            runs = (
+                db.query(VideoProductionRun)
+                .filter(VideoProductionRun.status == ONE_SENTENCE_REFERENCE_RUNNING_STATUS)
+                .order_by(VideoProductionRun.created_at.asc(), VideoProductionRun.id.asc())
+                .limit(worker_batch_size)
+                .all()
+            )
+            for run in runs:
+                trace = dict((run.model_trace_json or {}).get("one_sentence") or {})
+                autostart = bool(trace.get("autostart_images_after_references"))
+                try:
+                    await complete_one_sentence_reference_generation(db, run.id, autostart_images=autostart)
+                except Exception:
+                    log.warning("one-sentence reference completion failed for run %s", run.id, exc_info=True)
+                processed += 1
+            await asyncio.sleep(0 if processed else interval)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            log.warning("one-sentence reference worker cycle failed", exc_info=True)
+            await asyncio.sleep(interval)
+        finally:
+            db.close()
 
 
 async def _offline_checker():
@@ -137,8 +226,13 @@ async def lifespan(app: FastAPI):
         finally:
             db.close()
     task = asyncio.create_task(_offline_checker())
+    style_lock_task = asyncio.create_task(_style_lock_worker())
+    one_sentence_reference_task = asyncio.create_task(_one_sentence_reference_worker())
     yield
     task.cancel()
+    style_lock_task.cancel()
+    one_sentence_reference_task.cancel()
+    await asyncio.gather(task, style_lock_task, one_sentence_reference_task, return_exceptions=True)
     await ai_generator.aclose()
     from app.services import pixelle_client
     await pixelle_client.close_client()
@@ -157,6 +251,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+_static_dir = Path(__file__).resolve().parent / "static"
+_static_dir.mkdir(parents=True, exist_ok=True)
+if not any(route.path == "/static" for route in app.routes):
+    app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
 
 # Global exception log middleware — catches unhandled 500s with full traceback
 from fastapi import Request
@@ -200,6 +299,10 @@ app.include_router(pipeline.router)
 app.include_router(audit.router)
 app.include_router(director.router)
 app.include_router(video_production.router)
+app.include_router(agency.router)
+app.include_router(image_creation.router)
+app.include_router(image_production.router)
+app.include_router(system_health.router)
 app.include_router(reference_data.router)
 app.include_router(dm_sequences.router)
 

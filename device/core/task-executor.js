@@ -17,6 +17,9 @@ var handlers = {
 
 var taskExecutor = {
   _currentTaskId: null,
+  _currentLeaseId: null,
+  _currentAccountId: null,
+  _nextOpIndex: 0,
   _cancelled: false,
 
   /**
@@ -37,6 +40,34 @@ var taskExecutor = {
     return this._cancelled;
   },
 
+  /**
+   * 获取当前 task_id（供 apiClient 上报使用）
+   */
+  getCurrentTaskId: function () {
+    return this._currentTaskId;
+  },
+
+  /**
+   * 获取当前 lease_id（供 apiClient 上报使用）
+   */
+  getCurrentLeaseId: function () {
+    return this._currentLeaseId;
+  },
+
+  /**
+   * 获取下一个幂等操作序号（供 stats 上报使用）
+   */
+  getNextOpIndex: function () {
+    return this._nextOpIndex++;
+  },
+
+  /**
+   * 获取当前 account_id（供 stats 上报使用）
+   */
+  getCurrentAccountId: function () {
+    return this._currentAccountId;
+  },
+
   execute: function (task) {
     logger.info(TAG, "执行任务: " + task.id + " 类型=" + task.type);
 
@@ -47,6 +78,9 @@ var taskExecutor = {
     }
 
     this._currentTaskId = task.id;
+    this._currentLeaseId = task.lease_id || null;
+    this._currentAccountId = task.account_id || null;
+    this._nextOpIndex = 0;
     this._cancelled = false;
     task.params.task_id = task.id;  // 注入任务 ID 供 handler 上报进度
     task.params.account_id = task.account_id;  // 注入账号 ID 供 handler 使用
@@ -78,6 +112,9 @@ var taskExecutor = {
       clearInterval(watchdog);
 
       this._currentTaskId = null;
+      this._currentLeaseId = null;
+      this._currentAccountId = null;
+      this._nextOpIndex = 0;
 
       if (this._cancelled) {
         return { status: "cancelled", result: { error: "Task cancelled by server" } };
@@ -97,6 +134,9 @@ var taskExecutor = {
     } catch (e) {
       clearInterval(watchdog);
       this._currentTaskId = null;
+      this._currentLeaseId = null;
+      this._currentAccountId = null;
+      this._nextOpIndex = 0;
       logger.error(TAG, "任务 " + task.id + " 异常: " + e.message);
       return { status: "failed", result: { error: e.message } };
     }

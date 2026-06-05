@@ -1,0 +1,119 @@
+{
+  "source_repo": "https://github.com/jnMetaCode/agency-agents-zh",
+  "source_commit": "13b8800f6f666e8e10ac64f67f1194d2baeefbe0",
+  "team_version": "agency-agents-zh-video-production-v3",
+  "experts": [
+    {
+      "expert_id": "narrative_designer",
+      "name_zh": "叙事设计师",
+      "role_type": "core",
+      "source_path": "game-development/narrative-designer.md",
+      "phases": ["storyboard"],
+      "sha256": "378740928ecb8c75de61bf910801e988c6cfacfc5186f092e08ec03d5d64077e"
+    },
+    {
+      "expert_id": "visual_storyteller",
+      "name_zh": "视觉叙事师",
+      "role_type": "core",
+      "source_path": "design/design-visual-storyteller.md",
+      "phases": ["style_lock", "storyboard", "image_stage", "image_review", "video_stage"],
+      "sha256": "6dd5b1c9056ae3a413a06623f86688ffa9eee4ebe27a8ceab07a702f27470650"
+    },
+    {
+      "expert_id": "image_prompt_engineer",
+      "name_zh": "图像提示词工程师",
+      "role_type": "core",
+      "source_path": "design/design-image-prompt-engineer.md",
+      "phases": ["style_lock", "image_stage", "image_review"],
+      "sha256": "78400484719d2b3c6889735befe0d01215d2b51a86011a90222e4df70a70781d"
+    },
+    {
+      "expert_id": "prompt_engineer",
+      "name_zh": "提示词工程师",
+      "role_type": "core",
+      "source_path": "specialized/prompt-engineer.md",
+      "phases": ["image_stage", "video_stage"],
+      "sha256": "96abf6dc6efb74391c27248b440ba605f6954510193b1846c626f98ccac56b71"
+    },
+    {
+      "expert_id": "short_video_editing_coach",
+      "name_zh": "短视频剪辑指导师",
+      "role_type": "core",
+      "source_path": "marketing/marketing-short-video-editing-coach.md",
+      "phases": ["style_lock", "storyboard", "video_stage", "video_review", "compose_preflight", "compose"],
+      "sha256": "ac43113ca1c14ca26587c7223ff40a729fb58f980c29cadd6a18607c850e2c22"
+    },
+    {
+      "expert_id": "douyin_strategist",
+      "name_zh": "抖音策略师",
+      "role_type": "core",
+      "source_path": "marketing/marketing-douyin-strategist.md",
+      "phases": ["storyboard", "compose_preflight", "compose"],
+      "sha256": "7482d0758335fe95a6f6839e5efefeee4503a4aa83a1f1d07bd1b0f4f63c1de0"
+    },
+    {
+      "expert_id": "video_optimization_specialist",
+      "name_zh": "视频优化专家",
+      "role_type": "support",
+      "source_path": "marketing/marketing-video-optimization-specialist.md",
+      "phases": ["video_review", "compose_preflight", "compose"],
+      "sha256": "be248c25319a7a8aa96052b7fbd2b5d55bc5411aebe76cc29b30620d5c0db385"
+    },
+    {
+      "expert_id": "style_lock_quality_reviewer",
+      "name_zh": "风格锁定质量审查专家",
+      "role_type": "quality",
+      "source_path": "video-quality/style-lock-quality-reviewer.md",
+      "phases": ["style_lock"],
+      "sha256": "d5b536a1e3c018ec262da6524f6eb1fa1ea8ff59f2180f502ac73a1d318040d4"
+    },
+    {
+      "expert_id": "storyboard_quality_reviewer",
+      "name_zh": "分镜脚本质量审查专家",
+      "role_type": "quality",
+      "source_path": "video-quality/storyboard-quality-reviewer.md",
+      "phases": ["storyboard"],
+      "sha256": "4d93a47dc0bea2a432515b035cad27e934721f75c197075d418578ad22f35b5b"
+    },
+    {
+      "expert_id": "image_stage_quality_reviewer",
+      "name_zh": "图像生成质量审查专家",
+      "role_type": "quality",
+      "source_path": "video-quality/image-stage-quality-reviewer.md",
+      "phases": ["image_stage"],
+      "sha256": "2cbd923bae10f57455d3222831dc063dd6137ccce8d3e11e7b784ff311041b16"
+    },
+    {
+      "expert_id": "image_review_quality_reviewer",
+      "name_zh": "图像结果质量审查专家",
+      "role_type": "quality",
+      "source_path": "video-quality/image-review-quality-reviewer.md",
+      "phases": ["image_review"],
+      "sha256": "b206d2034cdef25aecd26c2cd948776352ef5b3b81e2b19e458e1d1f60a1b365"
+    },
+    {
+      "expert_id": "video_stage_quality_reviewer",
+      "name_zh": "视频生成质量审查专家",
+      "role_type": "quality",
+      "source_path": "video-quality/video-stage-quality-reviewer.md",
+      "phases": ["video_stage"],
+      "sha256": "74c587298681d84924744829aea4ddedc15324bbcca0c27bd708cf60abde1edc"
+    },
+    {
+      "expert_id": "video_review_quality_reviewer",
+      "name_zh": "视频结果质量审查专家",
+      "role_type": "quality",
+      "source_path": "video-quality/video-review-quality-reviewer.md",
+      "phases": ["video_review"],
+      "sha256": "fb21dade2d250baf4fd335f68f32f91ea420eef5d7e59491082ef54bc517b093"
+    },
+    {
+      "expert_id": "compose_quality_reviewer",
+      "name_zh": "合成交付质量审查专家",
+      "role_type": "quality",
+      "source_path": "video-quality/compose-quality-reviewer.md",
+      "phases": ["compose"],
+      "sha256": "ea5b41fec9fca933f978df61952b296154a1e42a988d08eff04cf129dc75d479"
+    }
+  ]
+}

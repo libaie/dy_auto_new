@@ -1,7 +1,7 @@
 """场景管理 API."""
 import json
 import logging
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from typing import Optional
 from sqlalchemy.orm import Session
@@ -9,6 +9,12 @@ from app.database import get_db
 from app.deps import verify_admin_token
 from app.db_models import Scene
 from app.services.ai_generator import ai_generator
+from app.services.asset_ai_rewrite_service import (
+    AssetAiRewriteError,
+    generate_scene_rewrite_candidate,
+)
+from app.services.asset_lifecycle_service import AssetLifecycleError, archive_character_or_scene
+from app.services.reference_asset_service import ReferenceAssetError, generate_scene_reference_images
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/scenes", tags=["scenes"])
@@ -27,6 +33,14 @@ class AutoGenerateInput(BaseModel):
     genre: str = "drama"
     count: int = Field(default=5, ge=1, le=10)
 
+
+class ReferenceGenerateInput(BaseModel):
+    slot: str = "all"
+
+
+class AiRewriteInput(BaseModel):
+    instruction: str = ""
+
 SCENE_GEN_SYSTEM = """你是一位资深的电影导演和场景设计师。根据用户提供的故事概要，生成详细的拍摄场景描述。
 
 输出要求：
@@ -39,8 +53,12 @@ SCENE_GEN_SYSTEM = """你是一位资深的电影导演和场景设计师。根�
 
 @router.get("")
 def list_scenes(db: Session = Depends(get_db),
+                include_archived: bool = Query(False),
                 _: str = Depends(verify_admin_token)):
-    return {"ok": True, "scenes": [_to_dict(s) for s in db.query(Scene).all()]}
+    scenes = db.query(Scene).all()
+    if not include_archived:
+        scenes = [s for s in scenes if not (s.meta_json or {}).get("archived")]
+    return {"ok": True, "scenes": [_to_dict(s) for s in scenes]}
 
 
 @router.post("")
@@ -67,9 +85,71 @@ def update_scene(scene_id: str, body: dict, db: Session = Depends(get_db),
 @router.delete("/{scene_id}")
 def delete_scene(scene_id: str, db: Session = Depends(get_db),
                  user = Depends(verify_admin_token)):
-    db.query(Scene).filter(Scene.id == scene_id).delete()
-    db.commit()
-    return {"ok": True}
+    try:
+        result = archive_character_or_scene(db, "scene", scene_id)
+    except AssetLifecycleError as exc:
+        status_code = 404 if exc.code == "ASSET_NOT_FOUND" else 409
+        raise HTTPException(status_code, exc.message)
+    return {"ok": True, **result}
+
+
+def _reference_asset_http_error(exc: ReferenceAssetError) -> HTTPException:
+    status_code = 400
+    if exc.code == "SCENE_NOT_FOUND":
+        status_code = 404
+    elif exc.code in ("MODEL_SCENE_NOT_CONFIGURED", "MODEL_API_KEY_MISSING"):
+        status_code = 503
+    elif exc.code in ("REFERENCE_PROVIDER_EMPTY_RESULT", "REFERENCE_PROVIDER_REQUEST_FAILED"):
+        status_code = 502
+    return HTTPException(status_code, {"code": exc.code, "message": exc.message, "details": exc.details})
+
+
+def _ai_rewrite_http_error(exc: AssetAiRewriteError) -> HTTPException:
+    status_code = 409
+    if exc.code == "SCENE_NOT_FOUND":
+        status_code = 404
+    elif exc.code == "AI_REWRITE_INVALID_OUTPUT":
+        status_code = 502
+    return HTTPException(status_code, {"code": exc.code, "message": exc.message, "details": exc.details})
+
+
+@router.post("/{scene_id}/reference-images/generate")
+async def generate_scene_reference_images_endpoint(
+    scene_id: str,
+    body: ReferenceGenerateInput | None = None,
+    db: Session = Depends(get_db),
+    user = Depends(verify_admin_token),
+):
+    try:
+        return await generate_scene_reference_images(db, scene_id, slot=(body.slot if body else "all"))
+    except ReferenceAssetError as exc:
+        raise _reference_asset_http_error(exc)
+
+
+@router.post("/{scene_id}/ai-rewrite-candidate")
+@router.post("/{scene_id}/ai-rewrite")
+async def generate_scene_ai_rewrite_endpoint(
+    scene_id: str,
+    body: AiRewriteInput | None = None,
+    db: Session = Depends(get_db),
+    user = Depends(verify_admin_token),
+):
+    try:
+        return await generate_scene_rewrite_candidate(
+            db, scene_id, instruction=(body.instruction if body else "")
+        )
+    except AssetAiRewriteError as exc:
+        raise _ai_rewrite_http_error(exc)
+    except Exception as exc:
+        logger.warning("Scene AI rewrite failed: %s", exc)
+        raise HTTPException(
+            500,
+            {
+                "code": "AI_REWRITE_FAILED",
+                "message": "Scene AI rewrite failed",
+                "details": {},
+            },
+        )
 
 
 @router.post("/auto-generate")

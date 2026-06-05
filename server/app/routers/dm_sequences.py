@@ -1,6 +1,7 @@
 """DM 私信序列模板 CRUD API."""
 import json
 import logging
+import random
 import re
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -12,6 +13,121 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import verify_admin_token, require_role, verify_device_secret
 from app.db_models import DMSequence
+from app.services.dm_sequence_visibility import get_device_visible_dm_sequences
+
+
+def _jitter(delay_ms: int) -> int:
+    """Apply ±25% random jitter to break fixed timing fingerprint across devices."""
+    if delay_ms <= 0:
+        return delay_ms
+    delta = int(delay_ms * 0.25)
+    return max(0, delay_ms + random.randint(-delta, delta))
+
+
+def _jitter_messages(messages: list[dict]) -> list[dict]:
+    """Return a shallow copy of messages with jittered delay_ms values."""
+    return [
+        {**m, "delay_ms": _jitter(m.get("delay_ms", 0))}
+        for m in messages
+    ]
+
+
+def _variant_delay_ms() -> int:
+    return random.randint(1500, 3000)
+
+
+def _randomize_variant_delays(variant: list[dict]) -> list[dict]:
+    return [{**message, "delay_ms": _variant_delay_ms()} for message in variant]
+
+
+def _randomize_variants(variants: list[list[dict]]) -> list[list[dict]]:
+    return [_randomize_variant_delays(variant) for variant in variants]
+
+
+def _robust_parse_variant_json(raw: str) -> dict | None:
+    """Extract and parse JSON from AI response, correcting common LLM formatting errors.
+
+    Handles: markdown code fences, key typos (msg_1→msg1, message1→msg1, etc.),
+    and trailing markdown artifacts.
+    """
+    if not raw:
+        return None
+
+    clean = raw.strip()
+
+    # Strip markdown code fences (any language tag)
+    fence_match = re.match(r"```(?:\w+)?\s*\n?(.*?)```", clean, re.DOTALL)
+    if fence_match:
+        clean = fence_match.group(1).strip()
+    elif clean.startswith("```"):
+        lines = clean.split("\n")
+        if len(lines) > 1:
+            clean = "\n".join(lines[1:])
+        if clean.endswith("```"):
+            clean = clean[:clean.rfind("```")].strip()
+
+    # Extract JSON object — greedy match for outermost braces
+    match = re.search(r"\{[\s\S]*\}", clean)
+    if not match:
+        return None
+    candidate = match.group()
+
+    # Known key typos from LLM outputs — normalize before parsing
+    _key_fixes = [
+        ("msg_1", "msg1"), ("msg_3", "msg3"),
+        ("message1", "msg1"), ("message3", "msg3"),
+        ("message_1", "msg1"), ("message_3", "msg3"),
+        ("hook", "msg1"), ("cta", "msg3"),
+    ]
+
+    result = None
+    # Attempt 1: parse as-is
+    try:
+        result = json.loads(candidate)
+    except (json.JSONDecodeError, TypeError):
+        pass
+
+    # Attempt 2: parse after key correction
+    if result is None:
+        fixed = candidate
+        for wrong, right in _key_fixes:
+            fixed = fixed.replace(f'"{wrong}"', f'"{right}"')
+        try:
+            result = json.loads(fixed)
+        except (json.JSONDecodeError, TypeError):
+            return None
+
+    # Post-parse normalization: remap known wrong keys in a successfully-parsed dict
+    for wrong, right in _key_fixes:
+        if wrong in result:
+            result[right] = result.pop(wrong)
+
+    # Ensure at least one expected key exists
+    if not result or ("msg1" not in result and "msg3" not in result):
+        return None
+    return result
+
+
+def _normalize_generated_sequence_messages(messages: list) -> list[dict]:
+    """Normalize common LLM key variants to the frontend SequenceMessage shape."""
+    normalized = []
+    for idx, msg in enumerate(messages):
+        if not isinstance(msg, dict):
+            raise ValueError("AI 返回的消息格式异常")
+        content = (
+            msg.get("content")
+            or msg.get("message")
+            or msg.get("text")
+            or msg.get("msg")
+        )
+        if not isinstance(content, str) or not content.strip():
+            raise ValueError("AI 返回的消息缺少内容字段")
+        normalized.append({
+            "order": int(msg.get("order") or idx + 1),
+            "content": content.strip(),
+            "delay_ms": int(msg.get("delay_ms") or msg.get("delayMs") or 0),
+        })
+    return normalized
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +150,7 @@ class SequenceUpdate(BaseModel):
     name: Optional[str] = Field(default=None, min_length=1, max_length=100)
     messages: Optional[list[SequenceMessage]] = Field(default=None, min_length=1)
     industry: Optional[str] = None
+    variants: Optional[list] = None
 
 
 class DMSequenceGenerateRequest(BaseModel):
@@ -43,7 +160,7 @@ class DMSequenceGenerateRequest(BaseModel):
 
 
 class VariantsGenerateRequest(BaseModel):
-    count: int = Field(default=3, ge=1, le=10, description="生成变体套数")
+    count: int = Field(default=3, ge=1, le=20, description="生成变体套数")
 
 
 def _to_dict(s: DMSequence) -> dict:
@@ -61,8 +178,11 @@ def _to_dict(s: DMSequence) -> dict:
 
 
 def _to_device_dict(s: DMSequence) -> dict:
-    """Device-facing: id + messages + variants for poll/sync."""
-    return {"id": s.id, "messages": s.messages, "variants": s.variants}
+    """Device-facing: id + messages + variants for poll/sync.
+    Applies ±25% jitter to base messages and 1500-3000ms random delays to variants."""
+    msgs = _jitter_messages(s.messages) if s.messages else None
+    vars_ = _randomize_variants(s.variants) if s.variants else None
+    return {"id": s.id, "messages": msgs, "variants": vars_}
 
 
 @router.get("")
@@ -139,14 +259,21 @@ def update_sequence(
     if body.name is not None:
         seq.name = body.name
     if body.messages is not None:
-        seq.messages = [
+        new_messages = [
             {"order": i + 1, "content": m.content, "delay_ms": m.delay_ms}
             for i, m in enumerate(sorted(body.messages, key=lambda x: x.order))
         ]
-        seq.variants = None  # 消息变了，旧变体失效
+        # 只有消息内容/延迟实际变化时才清除旧变体
+        if new_messages != seq.messages:
+            seq.variants = None
+        seq.messages = new_messages
     if body.industry is not None:
+        old_industry = seq.industry
         seq.industry = body.industry or None
-        seq.variants = None  # 行业变了，合规约束不同，旧变体失效
+        if body.industry != (old_industry or None):
+            seq.variants = None  # 行业变了，合规约束不同，旧变体失效
+    if body.variants is not None:
+        seq.variants = body.variants
 
     db.commit()
     db.refresh(seq)
@@ -237,7 +364,7 @@ async def generate_dm_sequence(
                 yield f"data: {json.dumps({'type': 'error', 'message': 'AI 返回格式异常，请重试'})}\n\n"
                 return
 
-            messages = json.loads(match.group())
+            messages = _normalize_generated_sequence_messages(json.loads(match.group()))
 
             for msg in messages:
                 content_text = msg.get("content", "")
@@ -250,6 +377,7 @@ async def generate_dm_sequence(
                         yield f"data: {json.dumps({'type': 'error', 'message': f'生成内容含极限词: {word}'})}\n\n"
                         return
 
+            messages = _jitter_messages(messages)
             yield f"data: {json.dumps({'type': 'done', 'messages': messages})}\n\n"
 
         except json.JSONDecodeError:
@@ -331,18 +459,10 @@ async def generate_variants(
                 db, variant_system_prompt, variant_prompt, max_tokens=1024
             )
 
-            clean = response.strip()
-            if clean.startswith("```"):
-                lines = clean.split("\n")
-                clean = "\n".join(lines[1:])
-                if clean.endswith("```"):
-                    clean = clean[: clean.rfind("```")].strip()
-
-            match = re.search(r"\{[\s\S]*\}", clean)
-            if match:
-                result = json.loads(match.group())
-            else:
-                result = json.loads(clean)
+            result = _robust_parse_variant_json(response)
+            if not result:
+                logger.warning("Variant attempt %d JSON parse failed, skipping", vi + 1)
+                continue
 
             rewritten_msg1 = result.get("msg1", original_msg1)
             rewritten_msg3 = result.get("msg3", original_msg3)
@@ -377,7 +497,7 @@ async def generate_variants(
                     ),
                 },
             ]
-            variants.append(variant)
+            variants.append(_randomize_variant_delays(variant))
         except Exception as e:
             logger.warning(
                 "Variant generation attempt %d failed: %s", vi + 1, e
@@ -400,13 +520,5 @@ def device_sync(
     device_id: Optional[str] = Depends(verify_device_secret),
 ):
     """设备端同步 DM 序列模板 — 按设备所属用户过滤，NULL=共享模板"""
-    from app.db_models import Device
-    query = db.query(DMSequence)
-    if device_id:
-        device = db.query(Device).filter(Device.id == device_id).first()
-        device_user_id = device.user_id if device else None
-        query = query.filter(
-            (DMSequence.user_id == device_user_id) | (DMSequence.user_id == None)
-        )
-    sequences = query.all()
+    sequences = get_device_visible_dm_sequences(db, device_id)
     return {"dm_sequences": [_to_device_dict(s) for s in sequences]}

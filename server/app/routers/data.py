@@ -42,6 +42,19 @@ def _paginate(query, skip: int, limit: int) -> dict:
     return {"items": items, "total": total}
 
 
+def _apply_user_sort(query, sort_by: Optional[str], sort_order: Optional[str]):
+    numeric_sort_fields = {
+        "fans_count": func.coalesce(cast(CollectedUser.fans_count, Integer), 0),
+        "likes_count": func.coalesce(cast(CollectedUser.likes_count, Integer), 0),
+        "follow_count": func.coalesce(cast(CollectedUser.follow_count, Integer), 0),
+        "works_count": func.coalesce(cast(CollectedUser.works_count, Integer), 0),
+        "created_at": CollectedUser.created_at,
+    }
+    order_col = numeric_sort_fields.get(sort_by, CollectedUser.created_at)
+    order_fn = desc if sort_order == "desc" else asc
+    return query.order_by(order_fn(order_col), CollectedUser.id.asc())
+
+
 @router.get("/comments")
 def list_comments(
     keyword: Optional[str] = Query(None),
@@ -61,17 +74,16 @@ def list_comments(
         device_ids = db.query(Device.id).filter(Device.bound_account_id == account_id).subquery()
         query = query.filter(CollectedComment.device_id.in_(device_ids))
     if search:
-        pattern = f"%{search}%"
         query = query.filter(or_(
-            CollectedComment.nickname.like(pattern),
-            CollectedComment.content.like(pattern),
+            _like_contains(CollectedComment.nickname, search),
+            _like_contains(CollectedComment.content, search),
         ))
     if task_id:
         query = query.filter(CollectedComment.task_id == task_id)
     user_id, role = user
     if role != 'admin':
         query = query.join(Task, CollectedComment.task_id == Task.id).filter(Task.user_id == user_id)
-    query = query.order_by(CollectedComment.created_at.desc())
+    query = query.order_by(CollectedComment.created_at.desc(), CollectedComment.id.asc())
     return _paginate(query, skip, limit)
 
 
@@ -94,17 +106,15 @@ def list_users(
     limit = min(limit, 100)
     query = db.query(CollectedUser)
     if keyword:
-        pattern = _build_like(keyword)
-        query = query.filter(CollectedUser.keyword.like(pattern))
+        query = query.filter(_like_contains(CollectedUser.keyword, keyword))
     if account_id:
         device_ids = db.query(Device.id).filter(Device.bound_account_id == account_id).subquery()
         query = query.filter(CollectedUser.device_id.in_(device_ids))
     if search:
-        pattern = _build_like(search)
         query = query.filter(or_(
-            CollectedUser.nickname.like(pattern),
-            CollectedUser.douyin_id.like(pattern),
-            CollectedUser.ip_location.like(pattern),
+            _like_contains(CollectedUser.nickname, search),
+            _like_contains(CollectedUser.douyin_id, search),
+            _like_contains(CollectedUser.ip_location, search),
         ))
     if task_id:
         query = query.filter(CollectedUser.task_id == task_id)
@@ -132,17 +142,7 @@ def list_users(
         except ValueError:
             pass
 
-    # Sort: numeric fields cast to Integer, COALESCE NULL→0 for stable ordering
-    numeric_sort_fields = {
-        "fans_count": func.coalesce(cast(CollectedUser.fans_count, Integer), 0),
-        "likes_count": func.coalesce(cast(CollectedUser.likes_count, Integer), 0),
-        "follow_count": func.coalesce(cast(CollectedUser.follow_count, Integer), 0),
-        "works_count": func.coalesce(cast(CollectedUser.works_count, Integer), 0),
-        "created_at": CollectedUser.created_at,
-    }
-    order_col = numeric_sort_fields.get(sort_by, CollectedUser.created_at)
-    order_fn = desc if sort_order == "desc" else asc
-    query = query.order_by(order_fn(order_col))
+    query = _apply_user_sort(query, sort_by, sort_order)
 
     return _paginate(query, skip, limit)
 
@@ -168,18 +168,17 @@ def list_conversations(
     if status:
         query = query.filter(Conversation.status == status)
     if search:
-        pattern = f"%{search}%"
         query = query.filter(or_(
-            Conversation.recipient_nickname.like(pattern),
-            Conversation.last_dm_content.like(pattern),
-            Conversation.recipient_douyin_id.like(pattern),
+            _like_contains(Conversation.recipient_nickname, search),
+            _like_contains(Conversation.last_dm_content, search),
+            _like_contains(Conversation.recipient_douyin_id, search),
         ))
     if task_id:
         query = query.filter(Conversation.task_id == task_id)
     user_id, role = user
     if role != 'admin':
         query = query.join(Task, Conversation.task_id == Task.id).filter(Task.user_id == user_id)
-    query = query.order_by(Conversation.updated_at.desc())
+    query = query.order_by(Conversation.updated_at.desc(), Conversation.id.asc())
     return _paginate(query, skip, limit)
 
 
@@ -195,6 +194,10 @@ def _escape_like(value: str) -> str:
 
 def _build_like(pattern: str) -> str:
     return f"%{_escape_like(pattern)}%"
+
+
+def _like_contains(column, value: str):
+    return column.like(_build_like(value), escape="\\")
 
 
 @router.get("/export/comments")
@@ -217,10 +220,9 @@ def export_comments(
         device_ids = db.query(Device.id).filter(Device.bound_account_id == account_id).subquery()
         query = query.filter(CollectedComment.device_id.in_(device_ids))
     if search:
-        pattern = _build_like(search)
         query = query.filter(or_(
-            CollectedComment.nickname.like(pattern),
-            CollectedComment.content.like(pattern),
+            _like_contains(CollectedComment.nickname, search),
+            _like_contains(CollectedComment.content, search),
         ))
     if task_id:
         query = query.filter(CollectedComment.task_id == task_id)
@@ -242,7 +244,7 @@ def export_comments(
     if role != 'admin':
         query = query.join(Task, CollectedComment.task_id == Task.id).filter(Task.user_id == user_id)
 
-    query = query.order_by(CollectedComment.created_at.desc())
+    query = query.order_by(CollectedComment.created_at.desc(), CollectedComment.id.asc())
     is_paged = limit is not None
     if is_paged:
         if skip: query = query.offset(skip)
@@ -271,8 +273,11 @@ def export_users(
     account_id: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
     task_id: Optional[str] = Query(None),
+    is_private: Optional[str] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
+    sort_by: Optional[str] = Query(None),
+    sort_order: Optional[str] = Query("desc"),
     skip: Optional[int] = Query(None),
     limit: Optional[int] = Query(None),
     db: Session = Depends(get_db),
@@ -280,19 +285,25 @@ def export_users(
 ):
     query = db.query(CollectedUser)
     if keyword:
-        pattern = _build_like(keyword)
-        query = query.filter(CollectedUser.keyword.like(pattern))
+        query = query.filter(_like_contains(CollectedUser.keyword, keyword))
     if account_id:
         device_ids = db.query(Device.id).filter(Device.bound_account_id == account_id).subquery()
         query = query.filter(CollectedUser.device_id.in_(device_ids))
     if search:
-        pattern = _build_like(search)
         query = query.filter(or_(
-            CollectedUser.nickname.like(pattern),
-            CollectedUser.douyin_id.like(pattern),
+            _like_contains(CollectedUser.nickname, search),
+            _like_contains(CollectedUser.douyin_id, search),
+            _like_contains(CollectedUser.ip_location, search),
         ))
     if task_id:
         query = query.filter(CollectedUser.task_id == task_id)
+    if is_private == "yes":
+        query = query.filter(CollectedUser.is_private == "是")
+    elif is_private == "no":
+        query = query.filter(or_(
+            CollectedUser.is_private.is_(None),
+            CollectedUser.is_private == "否",
+        ))
     if date_from:
         try:
             d = datetime.strptime(date_from, "%Y-%m-%d")
@@ -311,7 +322,7 @@ def export_users(
     if role != 'admin':
         query = query.join(Task, CollectedUser.task_id == Task.id).filter(Task.user_id == user_id)
 
-    query = query.order_by(CollectedUser.created_at.desc())
+    query = _apply_user_sort(query, sort_by, sort_order)
     is_paged = limit is not None
     if is_paged:
         if skip: query = query.offset(skip)
@@ -357,11 +368,10 @@ def export_conversations(
     if status:
         query = query.filter(Conversation.status == status)
     if search:
-        pattern = _build_like(search)
         query = query.filter(or_(
-            Conversation.recipient_nickname.like(pattern),
-            Conversation.last_dm_content.like(pattern),
-            Conversation.recipient_douyin_id.like(pattern),
+            _like_contains(Conversation.recipient_nickname, search),
+            _like_contains(Conversation.last_dm_content, search),
+            _like_contains(Conversation.recipient_douyin_id, search),
         ))
     if task_id:
         query = query.filter(Conversation.task_id == task_id)
@@ -383,7 +393,7 @@ def export_conversations(
     if role != 'admin':
         query = query.join(Task, Conversation.task_id == Task.id).filter(Task.user_id == user_id)
 
-    query = query.order_by(Conversation.last_dm_at.desc().nullslast())
+    query = query.order_by(Conversation.updated_at.desc(), Conversation.id.asc())
     is_paged = limit is not None
     if is_paged:
         if skip: query = query.offset(skip)

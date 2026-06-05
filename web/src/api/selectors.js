@@ -12,20 +12,27 @@ export function updateSelector(actionName, data) {
   return client.put(`/selectors/${actionName}`, data)
 }
 
-export function deleteSelector(actionName) {
-  return client.delete(`/selectors/${actionName}`)
+export function deleteSelector(actionName, platformVersion, resolutionProfile) {
+  var params = {}
+  if (platformVersion) params.platform_version = platformVersion
+  if (resolutionProfile) params.resolution_profile = resolutionProfile
+  return client.delete(`/selectors/${actionName}`, { params })
 }
 
-export function toggleSelector(actionName, enabled) {
-  return client.patch(`/selectors/${actionName}/toggle`, { enabled })
+export function toggleSelector(actionName, enabled, platformVersion, resolutionProfile) {
+  var params = {}
+  if (platformVersion) params.platform_version = platformVersion
+  if (resolutionProfile) params.resolution_profile = resolutionProfile
+  return client.patch(`/selectors/${actionName}/toggle`, { enabled }, { params })
 }
 
-export function uploadTemplate(file, actionName) {
+export function uploadTemplate(file, actionName, resolution = 'default') {
   const formData = new FormData()
   formData.append('file', file)
   formData.append('action_name', actionName)
   return client.post('/selectors/templates/upload', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
+    params: { resolution: resolution || 'default' },
   })
 }
 

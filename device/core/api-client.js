@@ -12,10 +12,26 @@ var netConfig = config.network || {
   offlineQueueMax: 100,
 };
 
+function getTaskExecutor() {
+  return require("./task-executor");
+}
+
 // 离线队列 — 网络失败时缓存待上报数据
 var offlineQueue = [];
 var isOnline = true;
 var _lastRequestWas4xx = false;  // 4xx = 客户端错误，不应重试
+
+function _ensureDirPath(dir) {
+  if (!dir) return false;
+  try {
+    var f = new java.io.File(String(dir));
+    if (!f.exists()) f.mkdirs();
+    return f.exists() && f.isDirectory();
+  } catch (e) {
+    logger.warn(TAG, "目录创建失败: " + dir + " - " + e.message);
+    return false;
+  }
+}
 
 var apiClient = {
   _onAuthFailure: null,
@@ -268,6 +284,10 @@ var apiClient = {
     return this.get("/api/device/poll", { device_id: config.deviceId });
   },
 
+  fetchDMSequences: function () {
+    return this.get("/api/dm-sequences/device/sync");
+  },
+
   fetchTemplateList: function (resolution) {
     var path = "/api/device/templates";
     if (resolution) path += "?resolution=" + encodeURIComponent(resolution);
@@ -289,21 +309,34 @@ var apiClient = {
     return this.post("/api/device/calibrate", body);
   },
 
-  downloadTemplate: function (filename) {
+  downloadTemplate: function (filename, resolution) {
     var url = config.serverUrl + "/api/device/templates/" + encodeURIComponent(filename);
+    if (resolution) url += "?resolution=" + encodeURIComponent(resolution);
     return this._downloadWithRetry(url);
   },
 
-  _pushToOfflineQueue: function (path, body, label) {
+  _pushToOfflineQueue: function (path, body, label, critical) {
     if (offlineQueue.length >= netConfig.offlineQueueMax) {
-      logger.warn(TAG, "离线队列已满，丢弃最旧项");
-      offlineQueue.shift();
+      // Prefer evicting non-critical items (stats) over critical (task reports, collect)
+      var evicted = false;
+      for (var i = 0; i < offlineQueue.length; i++) {
+        if (!offlineQueue[i].critical) {
+          logger.warn(TAG, "离线队列已满，驱逐非关键项: " + offlineQueue[i].path);
+          offlineQueue.splice(i, 1);
+          evicted = true;
+          break;
+        }
+      }
+      if (!evicted) {
+        logger.warn(TAG, "离线队列已满且全为关键项，拒绝入队: " + label);
+        return;
+      }
     }
     logger.info(TAG, label + "加入离线队列");
-    offlineQueue.push({ path: path, body: body, retries: 0 });
+    offlineQueue.push({ path: path, body: body, retries: 0, critical: !!critical });
   },
 
-  report: function (taskId, status, result, uiSnapshot) {
+  report: function (taskId, status, result, uiSnapshot, leaseId) {
     _lastRequestWas4xx = false;
     var body = {
       task_id: taskId,
@@ -311,10 +344,11 @@ var apiClient = {
       result: result || {},
       ui_snapshot: uiSnapshot || null,
     };
+    if (leaseId) body.lease_id = leaseId;
     var response = this.post("/api/device/report", body);
     if (!response && !_lastRequestWas4xx) {
       logger.warn(TAG, "任务结果上报失败(status=" + status + ")，加入离线队列重试");
-      this._pushToOfflineQueue("/api/device/report", body, "任务结果");
+      this._pushToOfflineQueue("/api/device/report", body, "任务结果", true);
     }
     return response;
   },
@@ -322,7 +356,7 @@ var apiClient = {
   collectReport: function (payload) {
     _lastRequestWas4xx = false;
     var response = this.post("/api/device/collect-report", payload);
-    if (!response && !_lastRequestWas4xx) this._pushToOfflineQueue("/api/device/collect-report", payload, "采集数据");
+    if (!response && !_lastRequestWas4xx) this._pushToOfflineQueue("/api/device/collect-report", payload, "采集数据", true);
     return response;
   },
 
@@ -331,12 +365,16 @@ var apiClient = {
   },
 
   reportProgress: function (taskId, step, detail, progress) {
-    return this.post("/api/device/progress", {
+    var body = {
       task_id: taskId,
       step: step || "",
       detail: detail || "",
       progress: progress || 0,
-    });
+    };
+    var taskExecutor = getTaskExecutor();
+    var leaseId = taskExecutor.getCurrentLeaseId();
+    if (leaseId) body.lease_id = leaseId;
+    return this.post("/api/device/progress", body);
   },
 
   fetchSelectors: function (currentVersion) {
@@ -359,22 +397,30 @@ var apiClient = {
       logger.error(TAG, "脚本下载所有重试均失败");
       return false;
     }
-    // Android 10+ 外部存储写入受限 — 优先用 app 私有目录
+    logger.info(TAG, "脚本下载成功, size=" + body.length);
+    // 用 Java FileOutputStream 直接写，绕过 AutoJS files API 的 byte array bug
     var baseDir = null;
-    try { baseDir = context.getExternalFilesDir(null).getAbsolutePath(); } catch (e) {}
+    try { baseDir = context.getFilesDir().getAbsolutePath(); } catch (e) {}
+    if (!baseDir) { try { baseDir = context.getExternalFilesDir(null).getAbsolutePath(); } catch (e2) {} }
     if (!baseDir) { baseDir = files.cwd(); }
     var updateDir = baseDir + "/update";
     var zipPath = updateDir + "/device-script.zip";
     var wrote = false;
     for (var attempt = 0; attempt < 3; attempt++) {
+      var fos = null;
       try {
-        files.ensureDir(updateDir);
-        if (!files.isDir(updateDir)) { sleep(300); continue; }
-        files.writeBytes(zipPath, body);
+        if (!_ensureDirPath(updateDir)) { sleep(300); continue; }
+        fos = new java.io.FileOutputStream(zipPath);
+        fos.write(body);
+        fos.close();
+        fos = null;
         if (files.exists(zipPath)) { wrote = true; break; }
+        sleep(200);
       } catch (e) {
         logger.warn(TAG, "写入更新包失败(尝试" + (attempt + 1) + "/3): " + e.message);
         sleep(500);
+      } finally {
+        try { if (fos) fos.close(); } catch (e2) {}
       }
     }
     if (!wrote) {
@@ -483,11 +529,23 @@ var apiClient = {
    * @param {string} taskType — "reply_comment" | "follow" | "search_dm" | ...
    * @param {number} count — 操作次数，默认 1
    */
-  incrementStats: function (accountId, taskType, count) {
-    var body = { account_id: accountId, task_type: taskType, count: count || 1 };
+  incrementStats: function (accountId, taskType, targetId, count) {
+    var taskExecutor = getTaskExecutor();
+    var tid = taskExecutor.getCurrentTaskId();
+    if (!tid) return null;  // 无活跃任务，拒绝上报
+    _lastRequestWas4xx = false;
+    var body = {
+      task_id: tid,
+      account_id: accountId || taskExecutor.getCurrentAccountId(),
+      task_type: taskType,
+      target_id: targetId || "",
+      op_index: taskExecutor.getNextOpIndex(),
+      count: count || 1,
+    };
     var resp = this.post("/api/device/stats/increment", body);
-    if (!resp) {
-      logger.debug(TAG, "增量统计上报失败: " + taskType + " x" + (count || 1));
+    if (!resp && !_lastRequestWas4xx) {
+      logger.warn(TAG, "增量统计上报失败: " + taskType + " #" + (body.op_index) + " target=" + (targetId || "") + " → 加入离线队列");
+      this._pushToOfflineQueue("/api/device/stats/increment", body, "统计(" + taskType + ")", false);
     }
     return resp;
   },

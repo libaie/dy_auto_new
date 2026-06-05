@@ -22,7 +22,7 @@ SearchLikeHandler._interactWithVideo = function (content, stats) {
   if (clicked) {
     logger.info(TAG, "Liked video");
     stats.details.push("liked");
-    try { apiClient.incrementStats(params.account_id, "search_like", 1); } catch (e) {}
+    try { apiClient.incrementStats(params.account_id, "search_like", "", 1); } catch (e) {}
     return true;
   }
   logger.warn(TAG, "Failed to like video");

@@ -25,6 +25,64 @@ class TestPixelleRequest:
         assert mock_client.request.call_count == 1
 
     @pytest.mark.asyncio
+    async def test_sends_pixelle_api_key_from_system_settings_when_env_empty(self, monkeypatch):
+        from app.services import pixelle_client
+
+        monkeypatch.setattr("app.config.PIXELLE_API_KEY", "")
+        pixelle_client._base_url = ""
+
+        resp = MagicMock()
+        resp.raise_for_status = MagicMock()
+        resp.json = MagicMock(return_value={"ok": True})
+        resp.status_code = 200
+        mock_client = AsyncMock()
+        mock_client.request = AsyncMock(return_value=resp)
+
+        class FakeQuery:
+            def __init__(self):
+                self.key = None
+
+            def filter(self, expression):
+                self.key = str(expression.right.value)
+                return self
+
+            def first(self):
+                values = {
+                    "pixelle_video_url": "http://pixelle:8505",
+                    "pixelle_api_key": "stage-secret",
+                }
+                value = values.get(self.key)
+                return type("Row", (), {"value": value})() if value else None
+
+        class FakeDB:
+            def query(self, *_args, **_kwargs):
+                return FakeQuery()
+
+        with patch("app.services.pixelle_client._get_client", return_value=mock_client):
+            await _pixelle_request("POST", "/api/stages/images/create", FakeDB(), json={})
+
+        headers = mock_client.request.call_args.kwargs["headers"]
+        assert headers["X-API-Key"] == "stage-secret"
+        pixelle_client._base_url = ""
+
+    def test_client_disables_environment_proxy(self, monkeypatch):
+        from app.services import pixelle_client
+
+        created = {}
+
+        class FakeAsyncClient:
+            def __init__(self, **kwargs):
+                created.update(kwargs)
+
+        monkeypatch.setattr("app.services.pixelle_client.httpx.AsyncClient", FakeAsyncClient)
+        pixelle_client._client = None
+
+        pixelle_client._get_client()
+
+        assert created["trust_env"] is False
+        pixelle_client._client = None
+
+    @pytest.mark.asyncio
     async def test_retry_on_5xx_then_success(self):
         fail_resp = MagicMock()
         fail_resp.raise_for_status = MagicMock(side_effect=httpx.HTTPStatusError("err", request=MagicMock(), response=MagicMock(status_code=500)))
@@ -119,5 +177,23 @@ class TestGetBaseUrl:
         from app.services import pixelle_client
         pixelle_client._base_url = "http://custom:9999/api"
         url = _get_base_url(db=None)
-        assert url == "http://custom:9999/api"
+        assert url == "http://custom:9999"
         pixelle_client._base_url = ""  # reset
+
+    def test_strips_api_suffix_from_configured_url(self):
+        from app.services import pixelle_client
+        pixelle_client._base_url = ""
+
+        class FakeQuery:
+            def filter(self, *_args, **_kwargs):
+                return self
+
+            def first(self):
+                return type("Row", (), {"value": "http://pixelle:8500/api/"})()
+
+        class FakeDB:
+            def query(self, *_args, **_kwargs):
+                return FakeQuery()
+
+        assert _get_base_url(FakeDB()) == "http://pixelle:8500"
+        pixelle_client._base_url = ""

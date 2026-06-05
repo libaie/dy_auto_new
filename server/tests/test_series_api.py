@@ -2,6 +2,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app
+from app.db_models import VideoProductionRun
 
 
 @pytest.fixture
@@ -85,6 +86,53 @@ class TestSeriesAPI:
         assert detail.json()["episodes"][0]["episode_number"] == 1
         assert detail.json()["episodes"][0]["status"] == "pending"
 
+    def test_get_series_marks_episode_active_video_run(self, client, db):
+        resp = self._create_series(client)
+        series_id = resp.json()["series"]["id"]
+        detail = client.get(f"/api/series/{series_id}")
+        episode_id = detail.json()["episodes"][0]["id"]
+        run = VideoProductionRun(
+            series_id=series_id,
+            episode_id=episode_id,
+            status="image_batch_running",
+            current_stage="image_generation",
+        )
+        db.add(run)
+        db.commit()
+
+        detail = client.get(f"/api/series/{series_id}")
+
+        episode = detail.json()["episodes"][0]
+        assert episode["active_video_run_id"] == run.id
+        assert episode["video_run_status"] == "image_batch_running"
+        assert episode["video_run_route"] == f"/video-production/{run.id}"
+
+    def test_get_series_includes_linked_assets_with_reference_urls(self, client):
+        series_id = self._create_series(client).json()["series"]["id"]
+        char_id = client.post("/api/characters", json={
+            "name": "林岚", "role_type": "protagonist", "gender": "female",
+        }).json()["character"]["id"]
+        scene_id = client.post("/api/scenes", json={
+            "name": "办公室", "scene_type": "indoor",
+        }).json()["scene"]["id"]
+        client.put(f"/api/characters/{char_id}", json={
+            "avatar_front_url": "https://cdn.test/front.png",
+        })
+        client.put(f"/api/scenes/{scene_id}", json={
+            "reference_wideshot_url": "/static/refs/wide.png",
+        })
+        client.post(f"/api/series/{series_id}/characters/{char_id}")
+        client.post(f"/api/series/{series_id}/scenes/{scene_id}")
+
+        detail = client.get(f"/api/series/{series_id}")
+
+        assert detail.status_code == 200
+        series = detail.json()["series"]
+        assert series["characters"][0]["id"] == char_id
+        assert series["characters"][0]["avatar_front_url"] == "https://cdn.test/front.png"
+        assert series["scenes"][0]["id"] == scene_id
+        assert series["scenes"][0]["reference_wideshot_url"] == "/static/refs/wide.png"
+
     def test_list_series(self, client):
         self._create_series(client, "S1")
         self._create_series(client, "S2")
@@ -100,6 +148,54 @@ class TestSeriesAPI:
         resp = client.post(f"/api/series/{series_id}/characters/{char_id}")
         assert resp.status_code == 200
         assert resp.json()["ok"] is True
+
+    def test_update_series(self, client):
+        series_id = self._create_series(client).json()["series"]["id"]
+
+        resp = client.put(f"/api/series/{series_id}", json={
+            "title": "Updated",
+            "logline": "Updated logline",
+            "total_episodes": 12,
+        })
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["ok"] is True
+        assert data["series"]["title"] == "Updated"
+        assert data["series"]["logline"] == "Updated logline"
+        assert data["series"]["total_episodes"] == 12
+
+    def test_unlink_character_from_series(self, client):
+        series_id = self._create_series(client).json()["series"]["id"]
+        char_id = client.post("/api/characters", json={
+            "name": "Lead", "role_type": "protagonist", "gender": "male",
+        }).json()["character"]["id"]
+        client.post(f"/api/series/{series_id}/characters/{char_id}")
+
+        resp = client.delete(f"/api/series/{series_id}/characters/{char_id}")
+
+        assert resp.status_code == 200
+        assert resp.json() == {"ok": True, "action": "unlinked"}
+
+    def test_unlink_scene_from_series(self, client):
+        series_id = self._create_series(client).json()["series"]["id"]
+        scene_id = client.post("/api/scenes", json={
+            "name": "Office", "scene_type": "indoor",
+        }).json()["scene"]["id"]
+        client.post(f"/api/series/{series_id}/scenes/{scene_id}")
+
+        resp = client.delete(f"/api/series/{series_id}/scenes/{scene_id}")
+
+        assert resp.status_code == 200
+        assert resp.json() == {"ok": True, "action": "unlinked"}
+
+    def test_delete_empty_series_returns_deleted_action(self, client):
+        series_id = self._create_series(client).json()["series"]["id"]
+
+        resp = client.delete(f"/api/series/{series_id}")
+
+        assert resp.status_code == 200
+        assert resp.json() == {"ok": True, "action": "deleted"}
 
     def test_update_episode(self, client):
         series_id = self._create_series(client).json()["series"]["id"]

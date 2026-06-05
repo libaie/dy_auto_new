@@ -2,7 +2,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.db_models import Episode, PipelineRun, Series
+from app.db_models import AgencyExpertInvocation, AIModel, Episode, PipelineRun, Series
+from app.services.agency_runtime import AgencyRuntimeResult
+from app.services.crypto import encrypt
 
 
 client = TestClient(app)
@@ -37,11 +39,76 @@ def _series_with_storyboard(db):
     return series, episode
 
 
+def _expert_review_model(db):
+    model = AIModel(
+        name="Pipeline Expert Review",
+        model_type="llm",
+        provider="openai-compatible",
+        base_url="https://llm.test/v1",
+        api_key=encrypt("expert-key"),
+        model_name="expert-review-model",
+        enabled=True,
+        config_json={
+            "scene_key": "llm_agency_expert_review",
+            "protocol": "openai_chat_completions",
+        },
+    )
+    db.add(model)
+    db.commit()
+    return model
+
+
+async def _agency_pass(self, **kwargs):
+    return AgencyRuntimeResult(
+        result_status="passed",
+        output_summary={
+            "decision": f"{kwargs['stage']} passed",
+            "findings": [],
+            "recommendations": [],
+            "required_changes": [],
+        },
+        evidence=[],
+        token_usage={},
+        model_config_snapshot={"provider": "test"},
+    )
+
+
+@pytest.mark.asyncio
+async def test_pipeline_start_blocks_when_expert_review_model_missing(db, monkeypatch):
+    from app.routers import pipeline
+
+    series, episode = _series_with_storyboard(db)
+    captured = {}
+
+    async def fake_submit_and_poll(payload, request_db):
+        captured["called"] = True
+        return {"task_id": "pixelle-task-1", "video_path": "output/final.mp4", "duration": 5}
+
+    monkeypatch.setattr(pipeline, "_submit_and_poll", fake_submit_and_poll)
+
+    resp = client.post("/api/pipeline/start", json={
+        "series_id": series.id,
+        "episode_id": episode.id,
+        "director_plan": None,
+    })
+
+    assert resp.status_code == 409
+    detail = resp.json()["detail"]
+    assert detail["code"] == "EXPERT_MODEL_CONFIG_MISSING"
+    assert detail["stage"] == "storyboard"
+    assert detail["run_id"]
+    assert captured == {}
+    run = db.query(PipelineRun).filter_by(id=detail["run_id"]).one()
+    assert run.status == "blocked"
+    assert run.layers_json["1"]["agency_trace"]["error_code"] == "EXPERT_MODEL_CONFIG_MISSING"
+
+
 @pytest.mark.asyncio
 async def test_pipeline_start_loads_saved_storyboard_when_director_plan_missing(db, monkeypatch):
     from app.routers import pipeline
 
     series, episode = _series_with_storyboard(db)
+    _expert_review_model(db)
     captured = {}
 
     async def fake_submit_and_poll(payload, request_db):
@@ -53,6 +120,7 @@ async def test_pipeline_start_loads_saved_storyboard_when_director_plan_missing(
         }
 
     monkeypatch.setattr(pipeline, "_submit_and_poll", fake_submit_and_poll)
+    monkeypatch.setattr("app.services.agency_runtime.AgencySkillRuntime.invoke", _agency_pass)
 
     resp = client.post("/api/pipeline/start", json={
         "series_id": series.id,
@@ -62,8 +130,13 @@ async def test_pipeline_start_loads_saved_storyboard_when_director_plan_missing(
 
     assert resp.status_code == 200
     assert resp.json()["run_id"]
+    assert resp.json()["agency_trace_status"] == "complete"
     assert captured["payload"]["frames"][0]["frame_id"] == "frame-001"
     assert captured["payload"]["frames"][0]["reference_urls"] == ["https://cdn.test/ref.png"]
+    run_id = resp.json()["run_id"]
+    invocations = db.query(AgencyExpertInvocation).filter_by(pipeline_run_id=run_id).all()
+    assert invocations
+    assert {item.stage for item in invocations} == {"storyboard"}
 
 
 def test_pipeline_run_lookup_routes_exist(db):
@@ -87,3 +160,4 @@ def test_pipeline_run_lookup_routes_exist(db):
     assert by_pair.status_code == 200
     assert by_id.status_code == 200
     assert by_id.json()["run"]["id"] == run.id
+    assert by_id.json()["run"]["agency_trace_status"] == "missing"

@@ -84,11 +84,18 @@ def _serialize_ai_models(db: Session) -> dict:
     from app.db_models import AIModel
     from app.services.crypto import decrypt
 
-    models = db.query(AIModel).filter(AIModel.enabled == True).all()
+    models = db.query(AIModel).filter(AIModel.enabled == True).order_by(
+        AIModel.sort_order.asc(),
+        AIModel.created_at.asc(),
+    ).all()
     scenes: dict = {}
     for m in models:
-        scene_key = (m.config_json or {}).get("scene_key")
-        if not scene_key:
+        config = m.config_json or {}
+        scene_keys = config.get("scene_keys")
+        if not isinstance(scene_keys, list):
+            scene_keys = [config.get("scene_key")]
+        scene_keys = [scene_key for scene_key in scene_keys if scene_key]
+        if not scene_keys:
             continue
         ak = ""
         if m.api_key:
@@ -96,12 +103,16 @@ def _serialize_ai_models(db: Session) -> dict:
                 ak = decrypt(m.api_key)
             except Exception:
                 pass
-        scenes[scene_key] = {
+        payload = {
             "provider": m.provider,
             "model": m.model_name or "",
             "api_key": ak,
             "base_url": m.base_url or "",
         }
+        for scene_key in scene_keys:
+            if scene_key in scenes:
+                continue
+            scenes[scene_key] = dict(payload)
     return {"scenes": scenes}
 
 

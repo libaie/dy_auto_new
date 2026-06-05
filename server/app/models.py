@@ -37,6 +37,7 @@ class Task(BaseModel):
     retry_count: int = 0
     chain_instance_id: Optional[str] = None
     step_order: Optional[int] = None
+    lease_id: Optional[str] = None
 
 
 class AccountConfig(BaseModel):
@@ -104,6 +105,7 @@ class ActionWeight(BaseModel):
 
 class NurtureParams(BaseModel):
     duration: int = Field(default=30, ge=1, le=120, description="养号时长(分钟)")
+    prompt_template_id: Optional[str] = Field(None, description="Prompt template ID")
     actions: list[ActionWeight] = Field(default_factory=lambda: [
         ActionWeight(type="browse_feed", weight=70),
         ActionWeight(type="like", weight=20),
@@ -122,6 +124,8 @@ class SearchCommentParams(BaseModel):
     video_count: int = Field(default=5, ge=-1, description="处理视频数, -1=全量")
     sort_by: Optional[str] = Field(None, pattern="^(latest|most_liked)$")
     max_age_days: int = Field(default=30, ge=-1, description="评论最大天数, -1=不限")
+    max_age_unit: Optional[str] = Field(None, pattern="^(seconds|minutes|hours|days)$",
+                                        description="时间单位, 默认 days")
 
 
 class SearchLikeParams(BaseModel):
@@ -154,6 +158,8 @@ class ReplyCommentParams(BaseModel):
     video_count: int = Field(default=3, ge=-1, description="处理视频数, -1=全量")
     sort_by: Optional[str] = Field(None, pattern="^(latest|most_liked)$")
     max_age_days: int = Field(default=5, ge=-1, description="评论最大天数, -1=不限")
+    max_age_unit: Optional[str] = Field(None, pattern="^(seconds|minutes|hours|days)$",
+                                        description="时间单位, 默认 days")
     max_follows: int = Field(default=20, ge=1, le=50, description="每日关注上限")
     max_dms: int = Field(default=10, ge=1, le=30, description="每日私信上限")
 
@@ -181,6 +187,7 @@ TASK_PARAMS_VALIDATORS = {
 
 class TaskProgressReport(BaseModel):
     task_id: str
+    lease_id: Optional[str] = None
     step: str = ""          # 当前步骤描述，如 "处理视频 2/3"
     detail: str = ""        # 详情，如 "已回复 5/15 条评论"
     progress: float = 0.0   # 0.0-1.0 进度
@@ -188,6 +195,7 @@ class TaskProgressReport(BaseModel):
 
 class TaskResultReport(BaseModel):
     task_id: str
+    lease_id: Optional[str] = None
     status: TaskStatus
     result: Optional[dict[str, Any]] = None
     ui_snapshot: Optional[dict[str, Any]] = None
@@ -450,6 +458,8 @@ class NurtureParamsV2(BaseModel):
     duration: int = Field(default=60, ge=1, le=240, description="最大时长(分钟)")
     keywords: Optional[list[str]] = Field(default=None, description="种子关键词，AI 扩展为关键词矩阵")
     keyword_matrix: Optional[list[str]] = Field(default=None, description="AI 扩展后的关键词矩阵（自动生成）")
+    expand_count: Optional[int] = Field(default=None, ge=1, le=100, description="Keyword expansion count")
+    prompt_template_id: Optional[str] = Field(None, description="Prompt template ID")
 
 
 # --- 关键词矩阵 ---
@@ -607,10 +617,13 @@ class CollectReportRequest(BaseModel):
 
 
 class StatsIncrementRequest(BaseModel):
-    """设备端增量统计上报——每个子操作完成后调用，保证中途崩溃不丢数据"""
+    """设备端增量统计上报——每个子操作完成后调用，idempotent per (task,device,type,target,index)"""
+    task_id: str
     account_id: str
     task_type: str                          # search_like / search_comment / reply_comment / follow / search_dm / nurture / collect
-    count: int = 1                          # 操作次数（通常 1）
+    target_id: str = ""                     # 操作目标标识（评论昵称/用户ID），幂等 key 的一部分
+    op_index: int = 0                       # 任务内操作序号，幂等 key 的一部分
+    count: int = 1
 
 
 # --- DM / Conversation models ---

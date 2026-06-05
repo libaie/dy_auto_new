@@ -3,6 +3,18 @@ var logger = require("../utils/logger");
 
 var TAG = "选择器";
 
+function ensureDirPath(dir) {
+  if (!dir) return false;
+  try {
+    var f = new java.io.File(String(dir));
+    if (!f.exists()) f.mkdirs();
+    return f.exists() && f.isDirectory();
+  } catch (e) {
+    logger.warn(TAG, "目录创建失败: " + dir + " - " + e.message);
+    return false;
+  }
+}
+
 // 使用 global 确保所有 require 路径拿到同一个实例（和 config 一样的模式）
 var selectorLoader = global.__selectorLoader || {
 
@@ -183,7 +195,7 @@ var selectorLoader = global.__selectorLoader || {
     }
 
     function _versionDist(v1, v2) {
-      if (!v1 || !v2 || v1 === "default" || v2 === "default") return 9999;
+      if (!v1 || !v2 || v1 === "default" || v2 === "default") return 999999999;
       var p1 = String(v1).split("."), p2 = String(v2).split(".");
       var maxLen = Math.max(p1.length, p2.length);
       var dist = 0;
@@ -191,6 +203,25 @@ var selectorLoader = global.__selectorLoader || {
         dist = dist * 1000 + Math.abs((+p1[i] || 0) - (+p2[i] || 0));
       }
       return dist;
+    }
+
+    function _versionCompare(v1, v2) {
+      var p1 = String(v1 || "").split(".");
+      var p2 = String(v2 || "").split(".");
+      var maxLen = Math.max(p1.length, p2.length);
+      for (var i = 0; i < maxLen; i++) {
+        var a = +p1[i] || 0;
+        var b = +p2[i] || 0;
+        if (a !== b) return a > b ? 1 : -1;
+      }
+      return 0;
+    }
+
+    function _prefersNotFutureVersion(v1, v2, target) {
+      var v1Future = _versionCompare(v1, target) > 0;
+      var v2Future = _versionCompare(v2, target) > 0;
+      if (v1Future !== v2Future) return !v1Future;
+      return false;
     }
 
     function _aspectTag(resolution) {
@@ -208,22 +239,63 @@ var selectorLoader = global.__selectorLoader || {
       var p = _priority(s.platform_version);
       var ep = _priority(existing.platform_version);
       if (p !== ep) return p > ep;
-      // Same platform priority: resolution_profile breaks tie
+
+      // Same platform priority: actual Douyin version proximity wins first.
+      // Example: device 38.7.0 should choose selector 38.6.0 over 38.5.0.
+      if (p === 2) {
+        var sVer = s.platform_version || "";
+        var exVer = existing.platform_version || "";
+        var sDist = _versionDist(sVer, douyinVersion);
+        var exDist = _versionDist(exVer, douyinVersion);
+        if (sDist !== exDist) return sDist < exDist;
+        if (_prefersNotFutureVersion(sVer, exVer, douyinVersion)) return true;
+        if (_prefersNotFutureVersion(exVer, sVer, douyinVersion)) return false;
+      }
+
+      // Exact/default platform tie, or equal version distance: prefer resolution fit.
       var rs = _resProfileScore(s);
       var ers = _resProfileScore(existing);
       if (rs !== ers) return rs > ers;
-      // Same resolution profile: version distance breaks tie
-      var sVer = s.platform_version || "";
-      var exVer = existing.platform_version || "";
-      return _versionDist(sVer, douyinVersion) < _versionDist(exVer, douyinVersion);
+      return false;
     }
 
+    // Rebuild cache from full authoritative list.
+    // Server is the single source of truth — old cache is only consulted
+    // for _isBetter to disambiguate duplicates within the server response.
+    // Old entries are NEVER carried forward into newCache.
+    var oldCache = this._cache;
+    var newCache = {};
     for (var i = 0; i < selectors.length; i++) {
       var s = selectors[i];
-      var existing = this._cache[s.action_name];
-      if (!existing || _isBetter(s, existing)) {
-        this._cache[s.action_name] = s;
+      var fromNew = newCache[s.action_name];
+      var fromOld = oldCache[s.action_name];
+      if (fromNew) {
+        // Duplicate in server response — keep the better match
+        if (_isBetter(s, fromNew)) newCache[s.action_name] = s;
+      } else if (fromOld) {
+        // Server returned a replacement for a previously-cached selector.
+        // Old cache helps disambiguate only; server is authoritative.
+        if (_isBetter(fromOld, s)) {
+          // Server's selector is authoritative — log the downgrade but use it.
+          // The old entry was a better platform/resolution match, but the
+          // server content (strategies, templates) is the source of truth.
+          logger.info(TAG, "selector " + s.action_name +
+            " replaced by server (old platform=" + (fromOld.platform_version || "default") +
+            "→new platform=" + (s.platform_version || "default") +
+            ", old resol=" + (fromOld.resolution_profile || "default") +
+            "→new resol=" + (s.resolution_profile || "default") + ")");
+        }
+        newCache[s.action_name] = s;
+      } else {
+        // First occurrence of this action_name
+        newCache[s.action_name] = s;
       }
+    }
+    this._cache = newCache;
+    if (this._cache.sort_latest) {
+      logger.info(TAG, "sort_latest选择器: 平台=" + (this._cache.sort_latest.platform_version || "default") +
+        ", 分辨率=" + (this._cache.sort_latest.resolution_profile || "default") +
+        ", 策略=" + JSON.stringify(this._cache.sort_latest.strategies || []));
     }
     logger.info(TAG, "已应用选择器配置，_cache " + Object.keys(this._cache).length + " 个选择器 (抖音 " + douyinVersion + ", 分辨率 " + devRes + ")");
   },
@@ -241,7 +313,7 @@ var selectorLoader = global.__selectorLoader || {
 
       var remoteList = response.templates;
       var baseDir = "/sdcard/dy_auto/templates/";
-      files.ensureDir(baseDir);
+      ensureDirPath(baseDir);
 
       // Group remote templates by resolution
       var byResolution = {};
@@ -258,8 +330,9 @@ var selectorLoader = global.__selectorLoader || {
       for (var res in byResolution) {
         if (!byResolution.hasOwnProperty(res)) continue;
         var resDir = baseDir + res + "/";
-        files.ensureDir(resDir);
+        ensureDirPath(resDir);
         var resFiles = byResolution[res];
+        var failed = 0;
 
         // Download missing templates for this resolution
         for (var fn in resFiles) {
@@ -267,15 +340,21 @@ var selectorLoader = global.__selectorLoader || {
           var tpl = resFiles[fn];
           var localPath = resDir + fn;
           if (!files.exists(localPath)) {
-            var data = apiClient.downloadTemplate(fn);
+            var data = apiClient.downloadTemplate(fn, res);
             if (data) {
               files.writeBytes(localPath, data);
               downloaded++;
               logger.info(TAG, "模板已下载: " + res + "/" + fn + " (" + data.length + " bytes)");
             } else {
+              failed++;
               logger.warn(TAG, "模板下载失败: " + fn);
             }
           }
+        }
+
+        if (failed > 0) {
+          logger.warn(TAG, "模板下载未完成，跳过清理旧模板: " + res + " failed=" + failed);
+          continue;
         }
 
         // Clean stale local templates for this resolution
@@ -293,6 +372,33 @@ var selectorLoader = global.__selectorLoader || {
             }
           }
         }
+      }
+
+      // Clean resolution directories that are no longer in the server manifest.
+      // The loop above only visits resolutions the server returned; a previously-
+      // synced resolution (e.g. 1080x2340) that the server no longer lists would
+      // otherwise persist and be used by _findByImage before the default fallback.
+      try {
+        if (files.isDir(baseDir)) {
+          var allResDirs = files.listDir(baseDir);
+          for (var di = 0; di < allResDirs.length; di++) {
+            var dn = allResDirs[di];
+            if (dn === "default" || byResolution[dn]) continue;
+            var staleDir = baseDir + dn;
+            if (!files.isDir(staleDir)) continue;
+            var staleFiles = files.listDir(staleDir);
+            for (var sf = 0; sf < staleFiles.length; sf++) {
+              try {
+                files.remove(staleDir + "/" + staleFiles[sf]);
+                cleaned++;
+                logger.info(TAG, "清理过期分辨率模板: " + dn + "/" + staleFiles[sf]);
+              } catch (e2) {}
+            }
+            try { files.remove(staleDir); } catch (e3) {}
+          }
+        }
+      } catch (e4) {
+        logger.warn(TAG, "清理过期分辨率目录失败: " + e4.message);
       }
 
       if (downloaded > 0 || cleaned > 0) {

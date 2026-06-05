@@ -44,13 +44,35 @@ const totals = computed(() => {
     const limits = acc.daily_limits || {}
     for (const m of METRICS) {
       result[m.key].used += acc[m.key] || 0
-      result[m.key].limit += limits[m.key] || 0
+      // -1 = unlimited — skip accumulation (otherwise sum of -1's = negative)
+      const v = limits[m.key]
+      if (v != null && v !== -1) {
+        result[m.key].limit += v
+      }
     }
   }
   return result
 })
 
+// Overall progress — excludes -1 (unlimited) items from the total
+const overallUsed = computed(() => {
+  if (!totals.value) return 0
+  return METRICS.reduce((s, m) => {
+    const t = totals.value[m.key]
+    return t && t.limit > 0 ? s + (t.used || 0) : s
+  }, 0)
+})
+const overallLimit = computed(() => {
+  if (!totals.value) return 0
+  return METRICS.reduce((s, m) => {
+    const t = totals.value[m.key]
+    return t && t.limit > 0 ? s + (t.limit || 0) : s
+  }, 0)
+})
+
 function pct(used, limit) {
+  // -1 = unlimited → 100% as long as something was done
+  if (limit === -1) return used > 0 ? 100 : 0
   if (!limit || limit === 0) return 0
   return Math.min(Math.round((used / limit) * 100), 100)
 }
@@ -76,8 +98,8 @@ function buildCharts() {
     // Donut chart — overall task completion
     if (donutCanvas.value) {
       if (donutChart) donutChart.destroy()
-      const totalUsed = METRICS.reduce((s, m) => s + (totals.value?.[m.key]?.used || 0), 0)
-      const totalLimit = METRICS.reduce((s, m) => s + (totals.value?.[m.key]?.limit || 0), 0)
+      const totalUsed = overallUsed.value
+      const totalLimit = overallLimit.value
       const remaining = Math.max(totalLimit - totalUsed, 0)
       donutChart = new Chart(donutCanvas.value, {
         type: 'doughnut',
@@ -238,7 +260,7 @@ onUnmounted(() => {
                 {{ pct(totals[m.key].used, totals[m.key].limit) }}%
               </span>
             </div>
-            <p class="text-sm text-slate-400 mt-1.5">/ {{ totals[m.key].limit }}</p>
+            <p class="text-sm text-slate-400 mt-1.5">/ {{ totals[m.key].limit || '不限' }}</p>
           </div>
         </div>
       </div>
@@ -284,7 +306,7 @@ onUnmounted(() => {
             <canvas ref="donutCanvas"></canvas>
             <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
               <span class="text-4xl font-bold text-white">
-                {{ (() => { const t = totals; if (!t) return 0; const u = METRICS.reduce((s,m) => s + (t[m.key]?.used||0), 0); const l = METRICS.reduce((s,m) => s + (t[m.key]?.limit||0), 0); return pct(u,l); })() }}%
+                {{ pct(overallUsed, overallLimit) }}%
               </span>
               <span class="text-sm text-slate-400 mt-1.5">完成率</span>
             </div>
@@ -335,7 +357,7 @@ onUnmounted(() => {
                 </div>
                 <span class="text-sm w-16 text-right tabular-nums flex-shrink-0 font-semibold"
                   :style="{ color: pctColor(pct(acc[m.key], (acc.daily_limits || {})[m.key])) }">
-                  {{ acc[m.key] || 0 }}/{{ (acc.daily_limits || {})[m.key] || 0 }}
+                  {{ acc[m.key] || 0 }}/{{ (acc.daily_limits || {})[m.key] === -1 ? '不限' : ((acc.daily_limits || {})[m.key] || 0) }}
                 </span>
               </div>
             </div>

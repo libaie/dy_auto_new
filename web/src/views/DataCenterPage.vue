@@ -74,27 +74,14 @@ const { connect: wsConnect } = useWebSocket(wsUrl, {
 async function fetchData() {
   loading.value = true
   try {
-    const params = { skip: (page.value - 1) * pageSize, limit: pageSize }
-    if (searchQuery.value) params.search = searchQuery.value
-    if (filterTaskId.value) params.task_id = filterTaskId.value
+    const params = buildDataParams({ includePagination: true })
 
     let resp
     if (activeTab.value === 'comments') {
-      if (filterKeyword.value) params.keyword = filterKeyword.value
-      if (filterAccountId.value) params.account_id = filterAccountId.value
       resp = await listComments(params)
     } else if (activeTab.value === 'users') {
-      if (filterKeyword.value) params.keyword = filterKeyword.value
-      if (filterAccountId.value) params.account_id = filterAccountId.value
-      if (filterPrivate.value) params.is_private = filterPrivate.value
-      if (filterDateFrom.value) params.date_from = filterDateFrom.value
-      if (filterDateTo.value) params.date_to = filterDateTo.value
-      if (sortBy.value) { params.sort_by = sortBy.value; params.sort_order = sortOrder.value }
       resp = await listUsers(params)
     } else {
-      if (filterAccountId.value) params.account_id = filterAccountId.value
-      if (filterStage.value) params.stage = filterStage.value
-      if (filterStatus.value) params.status = filterStatus.value
       resp = await listConversations(params)
     }
     items.value = resp.data.items || []
@@ -109,33 +96,38 @@ async function fetchData() {
 function handlePageChange(p) { page.value = p; fetchData() }
 function handleSearch() { page.value = 1; fetchData() }
 
+function buildDataParams({ includePagination = false } = {}) {
+  const params = {}
+  if (includePagination) {
+    params.skip = (page.value - 1) * pageSize
+    params.limit = pageSize
+  }
+  if (filterTaskId.value) params.task_id = filterTaskId.value
+  if (searchQuery.value) params.search = searchQuery.value
+
+  if (activeTab.value === 'comments') {
+    if (filterKeyword.value) params.keyword = filterKeyword.value
+    if (filterAccountId.value) params.account_id = filterAccountId.value
+  } else if (activeTab.value === 'users') {
+    if (filterKeyword.value) params.keyword = filterKeyword.value
+    if (filterAccountId.value) params.account_id = filterAccountId.value
+    if (filterPrivate.value) params.is_private = filterPrivate.value
+    if (filterDateFrom.value) params.date_from = filterDateFrom.value
+    if (filterDateTo.value) params.date_to = filterDateTo.value
+    if (sortBy.value) { params.sort_by = sortBy.value; params.sort_order = sortOrder.value }
+  } else if (activeTab.value === 'conversations') {
+    if (filterAccountId.value) params.account_id = filterAccountId.value
+    if (filterStage.value) params.stage = filterStage.value
+    if (filterStatus.value) params.status = filterStatus.value
+  }
+  return params
+}
+
 const exporting = ref(false)
 async function doExport(all) {
   exporting.value = true
   try {
-    const params = {}
-    if (filterTaskId.value) params.task_id = filterTaskId.value
-    if (searchQuery.value) params.search = searchQuery.value
-
-    if (activeTab.value === 'comments') {
-      if (filterKeyword.value) params.keyword = filterKeyword.value
-      if (filterAccountId.value) params.account_id = filterAccountId.value
-    } else if (activeTab.value === 'users') {
-      if (filterKeyword.value) params.keyword = filterKeyword.value
-      if (filterAccountId.value) params.account_id = filterAccountId.value
-      if (filterPrivate.value) params.is_private = filterPrivate.value
-      if (filterDateFrom.value) params.date_from = filterDateFrom.value
-      if (filterDateTo.value) params.date_to = filterDateTo.value
-      if (sortBy.value) { params.sort_by = sortBy.value; params.sort_order = sortOrder.value }
-    } else if (activeTab.value === 'conversations') {
-      if (filterAccountId.value) params.account_id = filterAccountId.value
-      if (filterStage.value) params.stage = filterStage.value
-    }
-
-    if (!all) {
-      params.skip = (page.value - 1) * pageSize
-      params.limit = pageSize
-    }
+    const params = buildDataParams({ includePagination: !all })
 
     const token = localStorage.getItem('token') || ''
     const resp = await fetch(`/api/data/export/${activeTab.value}?${new URLSearchParams(params)}`, {

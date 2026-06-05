@@ -96,12 +96,31 @@ SearchBaseHandler.execute = function (params) {
     logger.info(TAG, "处理第 " + (i + 1) + "/" + videoCount + " 个结果");
 
     if (i === 0) {
-      // 第一个视频：从搜索结果点击
-      if (!this._clickSearchResult(0)) {
-        logger.warn(TAG, "点击第一个视频失败，停止处理");
+      // ==== 首视频：前置弹窗清洗 + 状态断言 + 失败重试 ====
+      // 排序弹窗残留会拦截视频点击——不能用 back()（抖音搜索结果页 back 直接回首页）
+      var popupOpen = uiOperator.findElement("sort_latest", 800) || uiOperator.findElement("sort_most_liked", 800);
+      if (popupOpen) {
+        logger.warn(TAG, "检测到残留排序弹窗，点击 sort_button 切换关闭");
+        this.safeClick("sort_button", 2);
+        sleep(400);
+      }
+
+      var firstVideoOpened = false;
+      for (var attempt = 0; attempt < 2; attempt++) {
+        if (!this._clickSearchResult(0)) break;
+        // 状态断言：显式等待视频详情页特征元素，严禁无脑 sleep
+        if (uiOperator.waitForElement("video_comment_btn", 5000)) {
+          firstVideoOpened = true;
+          break;
+        }
+        logger.warn(TAG, "视频详情页未加载 (尝试 " + (attempt + 1) + "/2)");
+        // 只在确实进入了视频页时才 back——若仍在搜索页，back 会直接回首页
+        if (uiOperator.isOnPage("is_video_view")) { back(); sleep(800); }
+      }
+      if (!firstVideoOpened) {
+        logger.warn(TAG, "首视频两次尝试均失败，停止处理");
         break;
       }
-      sleep(2000);
     } else {
       // 后续视频：暂停 → 滑动切换
       back(); sleep(500);
@@ -132,6 +151,11 @@ SearchBaseHandler.execute = function (params) {
  * 先尝试直接点击搜索入口，失败则 back() 后重试
  */
 SearchBaseHandler._openSearch = function () {
+  // 0. 确保抖音在前台——设备重启或 crash 恢复后抖音可能不在前台
+  if (!uiOperator.openApp()) {
+    logger.error(TAG, "无法启动抖音");
+    return false;
+  }
   // 1. 首页可能还在加载，多等几秒，重试 3 次（safeClick 内部 findElement 等 3s × 退避 2s/4s ≈ 最多 17s）
   var clicked = this.safeClick("search_tab", 3);
   if (clicked) {
@@ -271,23 +295,93 @@ SearchBaseHandler._sortResults = function (sortBy) {
     logger.warn(TAG, "排序按钮未找到");
     return false;
   }
-  sleep(1500);
+  // 等待弹窗动画渲染完成（抖音排序弹窗下滑动画约 200-400ms，500ms 足够）
+  sleep(500);
 
-  // 以图找图验证弹窗是否打开，没找到则关闭后重新打开再试
+  // 以图找图定位排序选项
   var optionEl = uiOperator.findElement(actionName, 3000);
   if (!optionEl) {
     logger.info(TAG, "排序弹窗未检测到 " + sortBy + "，关闭后重新打开弹窗重试");
     this.safeClick("sort_button", 1);
     sleep(800);
     this.safeClick("sort_button", 1);
-    sleep(1500);
+    sleep(500);
     optionEl = uiOperator.findElement(actionName, 3000);
   }
 
   if (!optionEl) {
-    logger.warn(TAG, "排序选项未找到: " + sortBy);
-    this.safeClick("sort_button", 1);
-    return false;
+    // ==== OCR 降级：以图找图失败后，PaddleOCR 全屏文本检索排序选项 ====
+    var ocrTexts = { "latest": ["最新发布", "最新"], "most_liked": ["最多点赞", "最多"], "default": ["综合排序", "综合"] };
+    var ocrKeywords = ocrTexts[sortBy] || ocrTexts["default"];
+    logger.info(TAG, "图像匹配失败，启动 OCR 降级检索: " + ocrKeywords.join(", "));
+
+    var ocrScreen = images.captureScreen();
+    if (ocrScreen) {
+      try {
+        var ocrResult = null;
+        if (typeof images.paddleOcr === "function") {
+          try { ocrResult = images.paddleOcr(ocrScreen); } catch (e) {}
+        }
+        if (!ocrResult && typeof images.mlKitOcr === "function") {
+          try { ocrResult = images.mlKitOcr(ocrScreen); } catch (e) {}
+        }
+        // ocr.recognizeText() 返回结构化数组，优先于 ocr() 字符串
+        if (!ocrResult && typeof ocr === "object" && typeof ocr.recognizeText === "function") {
+          try { ocrResult = ocr.recognizeText(ocrScreen); } catch (e) {}
+        }
+        if (!ocrResult && typeof ocr === "function") {
+          try { ocrResult = ocr(ocrScreen); } catch (e) {}
+        }
+
+        if (ocrResult) {
+          if (Array.isArray(ocrResult)) {
+            // paddleOcr / mlKitOcr / ocr.recognizeText: 结构化数组
+            for (var oi = 0; oi < ocrResult.length; oi++) {
+              var item = ocrResult[oi];
+              var itemText = (item.text || "").replace(/\s/g, "");
+              for (var kj = 0; kj < ocrKeywords.length; kj++) {
+                if (itemText.indexOf(ocrKeywords[kj]) !== -1) {
+                  var ocrX, ocrY;
+                  if (item.bounds) {
+                    ocrX = (item.bounds.left + item.bounds.right) / 2;
+                    ocrY = (item.bounds.top + item.bounds.bottom) / 2;
+                  } else if (item.x != null && item.y != null) {
+                    ocrX = item.x; ocrY = item.y;
+                  }
+                  if (ocrX && ocrY) {
+                    logger.info(TAG, "OCR 命中: '" + itemText + "' 坐标(" + ocrX + "," + ocrY + ")");
+                    optionEl = { isCoordinate: true, x: ocrX, y: ocrY };
+                    break;
+                  }
+                }
+              }
+              if (optionEl) break;
+            }
+          } else if (typeof ocrResult === "string") {
+            // ocr() 返回拼接文本字符串，无坐标信息
+            var cleanAll = ocrResult.replace(/\s/g, "");
+            for (var kk = 0; kk < ocrKeywords.length; kk++) {
+              if (cleanAll.indexOf(ocrKeywords[kk]) !== -1) {
+                // OCR 确认弹窗存在，用排序弹窗典型布局近似定位（右上方区域）
+                logger.info(TAG, "OCR 字符串命中: '" + ocrKeywords[kk] + "'，使用排序弹窗近似坐标");
+                optionEl = { isCoordinate: true, x: Math.round(device.width * 0.72), y: Math.round(device.height * 0.28) };
+                break;
+              }
+            }
+          }
+        }
+        if (!optionEl) {
+          logger.warn(TAG, "OCR 也未找到排序选项: " + sortBy);
+        }
+      } finally {
+        ocrScreen.recycle();
+      }
+    }
+
+    if (!optionEl) {
+      this.safeClick("sort_button", 1);
+      return false;
+    }
   }
 
   // 点击排序选项
@@ -507,46 +601,113 @@ SearchBaseHandler._interactWithVideo = function (content, stats) {
  * 复用 api-client.js 的路径策略: 优先 getExternalFilesDir, 回退 /sdcard/
  */
 SearchBaseHandler._getCacheDir = function () {
+  var dirs = this._getCacheDirCandidates();
+  for (var i = 0; i < dirs.length; i++) {
+    if (this._ensureCacheDir(dirs[i])) return dirs[i];
+  }
+  return dirs[0] || "/sdcard/dy_auto/cache";
+};
+
+SearchBaseHandler._getCacheDirCandidates = function () {
+  var dirs = [];
+  function add(dir) {
+    if (dir && dirs.indexOf(dir) === -1) dirs.push(dir);
+  }
   try {
     var intDir = context.getFilesDir();
-    if (intDir) {
-      var intCache = intDir.getAbsolutePath() + "/dy_auto_cache";
-      files.ensureDir(intCache);
-      return intCache;
-    }
+    if (intDir) add(intDir.getAbsolutePath() + "/dy_auto_cache");
   } catch (e) {}
   try {
     var extDir = context.getExternalFilesDir(null);
-    if (extDir) {
-      var extCache = extDir.getAbsolutePath() + "/dy_auto_cache";
-      files.ensureDir(extCache);
-      return extCache;
-    }
+    if (extDir) add(extDir.getAbsolutePath() + "/dy_auto_cache");
   } catch (e2) {}
-  var fallback = "/sdcard/dy_auto/cache";
-  try { files.ensureDir(fallback); } catch (e3) {}
-  return fallback;
+  add("/sdcard/dy_auto/cache");
+  return dirs;
+};
+
+SearchBaseHandler._ensureCacheDir = function (dir) {
+  try {
+    var f = new java.io.File(String(dir));
+    if (!f.exists()) f.mkdirs();
+    return f.exists() && f.isDirectory();
+  } catch (e) {
+    logger.warn(TAG, "缓存目录创建失败: " + dir + " err=" + e.message);
+    return false;
+  }
 };
 
 SearchBaseHandler._storageGet = function (key, defaultVal) {
-  try {
-    var path = this._getCacheDir() + "/" + key + ".txt";
-    if (files.exists(path)) {
-      return parseInt(files.read(path).trim()) || defaultVal;
+  var dirs = this._getCacheDirCandidates();
+  for (var i = 0; i < dirs.length; i++) {
+    try {
+      if (!this._ensureCacheDir(dirs[i])) continue;
+      var path = dirs[i] + "/" + key + ".txt";
+      if (files.exists(path)) {
+        var parsed = parseInt(files.read(path).trim(), 10);
+        return isNaN(parsed) ? defaultVal : parsed;
+      }
+    } catch (e) {
+      logger.warn(TAG, "storageGet 读取失败: " + key + " err=" + e.message);
     }
-  } catch (e) {}
+  }
   return defaultVal;
 };
 
 SearchBaseHandler._storageSet = function (key, val) {
-  try {
-    var path = this._getCacheDir() + "/" + key + ".txt";
-    files.write(path, String(val));
-  } catch (e) {}
+  var dirs = this._getCacheDirCandidates();
+  var lastErr = "";
+  for (var i = 0; i < dirs.length; i++) {
+    try {
+      if (!this._ensureCacheDir(dirs[i])) continue;
+      var path = dirs[i] + "/" + key + ".txt";
+      files.write(path, String(val));
+      return true;
+    } catch (e) {
+      lastErr = e.message;
+    }
+  }
+  logger.warn(TAG, "storageSet 写入失败: " + key + "=" + val + " err=" + lastErr);
+  return false;
 };
 
 
 // ==== DM 序列发送方法 (search-dm / reply-comment 共用) ====
+
+SearchBaseHandler.applyDMSequences = function (dmSequences) {
+  var dmCache = {};
+  var ids = [];
+  dmSequences = dmSequences || [];
+  for (var dsi = 0; dsi < dmSequences.length; dsi++) {
+    var ds = dmSequences[dsi];
+    if (ds && ds.id) {
+      dmCache[ds.id] = ds;
+      ids.push(ds.id);
+    }
+  }
+  SearchBaseHandler._dmSeqCache = dmCache;
+  SearchBaseHandler._dmSeqMissSynced = {};
+  SearchBaseHandler._dmSeqCacheSyncedAt = Date.now();
+  logger.info(TAG, "DM序列缓存已同步: count=" + ids.length + (ids.length ? " ids=" + ids.join(",") : ""));
+  return dmCache;
+};
+
+SearchBaseHandler.syncDMSequences = function () {
+  try {
+    var apiClient = require("../core/api-client");
+    var response = apiClient.fetchDMSequences();
+    if (response && response.dm_sequences !== undefined) {
+      return this.applyDMSequences(response.dm_sequences);
+    }
+    logger.warn(TAG, "DM序列同步返回为空，保留现有缓存");
+  } catch (e) {
+    logger.warn(TAG, "DM序列同步失败: " + e.message);
+  }
+  return this._dmSeqCache || {};
+};
+
+SearchBaseHandler._getDMCachedSequence = function (seqId) {
+  return this._dmSeqCache && this._dmSeqCache[seqId];
+};
 
 /**
  * 解析消息序列，返回 [{order, content, delay_ms}]
@@ -556,7 +717,16 @@ SearchBaseHandler._storageSet = function (key, val) {
 SearchBaseHandler.resolveMessages = function (params) {
   // 1. dm_sequence_id — 查 poll 缓存 (含 variants, 优先于内联 dm_messages)
   if (params.dm_sequence_id) {
-    var cached = this._dmSeqCache && this._dmSeqCache[params.dm_sequence_id];
+    var cached = this._getDMCachedSequence(params.dm_sequence_id);
+    if (!cached) {
+      this._dmSeqMissSynced = this._dmSeqMissSynced || {};
+      if (!this._dmSeqMissSynced[params.dm_sequence_id]) {
+        this._dmSeqMissSynced[params.dm_sequence_id] = true;
+        logger.warn(TAG, "DM序列模板缓存未命中: " + params.dm_sequence_id + "，重新同步序列缓存");
+        this.syncDMSequences();
+        cached = this._getDMCachedSequence(params.dm_sequence_id);
+      }
+    }
     if (cached) {
       // 有变体 → 轮替选取
       if (cached.variants && cached.variants.length > 0) {
@@ -564,16 +734,24 @@ SearchBaseHandler.resolveMessages = function (params) {
         var idx = this._storageGet(storageKey, 0);
         var picked = cached.variants[idx % cached.variants.length];
         this._storageSet(storageKey, (idx + 1) % cached.variants.length);
+        logger.info(TAG, "DM变体轮替: seq=" + params.dm_sequence_id + " idx=" + idx + "/" + cached.variants.length + " msg1=" + (picked[0] ? (picked[0].content || "").substring(0, 30) : ""));
         return picked;
       }
       // 无变体 → 返回缓存消息
+      logger.info(TAG, "DM使用缓存消息(无变体): seq=" + params.dm_sequence_id);
       return cached.messages;
     }
-    logger.warn(TAG, "DM序列模板缓存未命中: " + params.dm_sequence_id + "，回退到内联消息");
+    var available = this._dmSeqCache ? Object.keys(this._dmSeqCache) : [];
+    logger.warn(TAG, "DM序列模板同步后仍未命中: " + params.dm_sequence_id + "，available=" + available.join(",") + "，回退到内联消息");
     // 缓存未命中时继续往下走，用 dm_messages 作为回退
   }
   // 2. dm_messages — 内联消息 (服务端展开的回退，或手动指定)
   if (params.dm_messages && params.dm_messages.length > 0) {
+    if (params.dm_sequence_id) {
+      logger.info(TAG, "DM使用内联消息(dm_sequence_id缓存未命中): seq=" + params.dm_sequence_id + " msgs=" + params.dm_messages.length);
+    } else {
+      logger.info(TAG, "DM使用内联消息(无dm_sequence_id): msgs=" + params.dm_messages.length);
+    }
     return params.dm_messages;
   }
   // 3. content — 单条消息

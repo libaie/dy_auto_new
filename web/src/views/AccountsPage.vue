@@ -26,7 +26,7 @@ const DAILY_LIMIT_FIELDS = [
   { key: 'comments', label: '评论', max: 100 },
   { key: 'follows', label: '关注', max: 100 },
   { key: 'dms', label: '私信', max: 100 },
-  { key: 'replies', label: '回复', max: 100 },
+  { key: 'replies', label: '回复', max: 500 },
 ]
 
 const DEFAULT_LIMITS = { likes: 50, comments: 20, follows: 20, dms: 10, replies: 15 }
@@ -439,13 +439,14 @@ onMounted(fetchAccounts)
                           :id="'limit-' + f.key"
                           v-model.number="form.limits[f.key]"
                           type="number"
-                          min="0"
+                          min="-1"
                           :max="f.max"
+                          title="-1 表示不限制"
                           class="w-16 rounded-lg border border-white/10 bg-white/[0.06] px-2 py-1.5 text-sm font-semibold text-white text-center focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-transparent transition-shadow shrink-0"
                         />
                         <div class="flex-1 h-1.5 rounded-full bg-white/5 overflow-hidden">
                           <div class="h-full rounded-full transition-all duration-300"
-                            :style="{ width: Math.min(100, (form.limits[f.key] || 0) / f.max * 100) + '%' }"
+                            :style="{ width: Math.min(100, Math.max(0, (form.limits[f.key] || 0)) / f.max * 100) + '%' }"
                             :class="[
                               f.key === 'likes' ? 'bg-gradient-to-r from-pink-500 to-pink-300' :
                               f.key === 'comments' ? 'bg-gradient-to-r from-emerald-500 to-emerald-300' :

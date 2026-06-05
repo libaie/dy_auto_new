@@ -19,6 +19,18 @@ var logger = require("../utils/logger");
 
 var TAG = "标定";
 
+function ensureDirPath(dir) {
+  if (!dir) return false;
+  try {
+    var f = new java.io.File(String(dir));
+    if (!f.exists()) f.mkdirs();
+    return f.exists() && f.isDirectory();
+  } catch (e) {
+    logger.warn(TAG, "目录创建失败: " + dir + " - " + e.message);
+    return false;
+  }
+}
+
 var calibrator = {
   /**
    * 运行标定流程
@@ -201,7 +213,7 @@ var calibrator = {
 
       var filename = actionName + "@" + resolution + ".png";
       var tmpPath = "/sdcard/dy_auto/templates/" + resolution + "/" + filename;
-      files.ensureDir("/sdcard/dy_auto/templates/" + resolution + "/");
+      ensureDirPath("/sdcard/dy_auto/templates/" + resolution + "/");
       images.save(tpl, tmpPath, "png", 80);
       var data = files.readBytes(tmpPath);
       tpl.recycle();

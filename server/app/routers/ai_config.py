@@ -22,7 +22,8 @@ SEEDANCE_ARK_BASE_URL = "https://ark.cn-beijing.volces.com/api/plan/v3"
 SEEDREAM_IMAGE_MODEL = "doubao-seedream-5.0-lite"
 SEEDANCE_VIDEO_MODEL = "doubao-seedance-2.0"
 BAILIAN_COMPATIBLE_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
-BAILIAN_EXPERT_REVIEW_MODEL = "qwen-plus"
+BAILIAN_QWEN_37_PLUS_MODEL = "qwen3.7-plus"
+BAILIAN_EXPERT_REVIEW_MODEL = BAILIAN_QWEN_37_PLUS_MODEL
 LEGACY_SEEDANCE_ARK_BASE_URL = "https://ark.cn-beijing.volces.com" + "/api/v3"
 LEGACY_SEEDANCE_MODEL_NAMES = {
     "image": ("seedance-image", "doubao-seedance-image"),
@@ -308,7 +309,7 @@ def test_connection(model_id: str, db: Session = Depends(get_db),
 DEFAULT_MODELS = [
     {"name":"DeepSeek V3","model_type":"llm","provider":"deepseek","base_url":"https://api.deepseek.com/v1","model_name":"deepseek-chat","config_json":{"thinking_enabled":False,"thinking_budget":8192,"max_tokens":4096,"temperature":0.7}},
     {"name":"GPT-4o","model_type":"llm","provider":"openai","base_url":"https://api.openai.com/v1","model_name":"gpt-4o","config_json":{"thinking_enabled":False,"thinking_budget":8192,"max_tokens":4096,"temperature":0.7}},
-    {"name":"Bailian Qwen Expert Review","model_type":"llm","provider":"bailian","base_url":BAILIAN_COMPATIBLE_BASE_URL,"model_name":BAILIAN_EXPERT_REVIEW_MODEL,"config_json":{"scene_key":"llm_agency_expert_review","protocol":"openai_chat_completions","thinking_enabled":False,"thinking_budget":8192,"max_tokens":8192,"temperature":0.2}},
+    {"name":"Bailian Qwen 3.7 Plus","model_type":"llm","provider":"bailian","base_url":BAILIAN_COMPATIBLE_BASE_URL,"model_name":BAILIAN_QWEN_37_PLUS_MODEL,"sort_order":-100,"config_json":{"scene_key":"llm_agency_expert_review","scene_keys":["script_generation","llm_agency_expert_review"],"protocol":"openai_chat_completions","thinking_enabled":False,"thinking_budget":8192,"max_tokens":8192,"temperature":0.2}},
     {"name":"Qwen Max","model_type":"llm","provider":"openai","base_url":"https://dashscope.aliyuncs.com/compatible-mode/v1","model_name":"qwen-max","config_json":{"thinking_enabled":False,"thinking_budget":8192,"max_tokens":4096,"temperature":0.7}},
     {"name":"Claude Opus","model_type":"llm","provider":"anthropic","base_url":"https://api.anthropic.com/v1/messages","model_name":"claude-opus-4-7","config_json":{"thinking_enabled":True,"thinking_budget":8192,"max_tokens":4096,"temperature":0.7}},
     {"name":"Seedream 5.0 Lite","model_type":"image","provider":"seedance","base_url":SEEDANCE_ARK_BASE_URL,"model_name":SEEDREAM_IMAGE_MODEL,"config_json":{"scene_key":"image_generation","scene_keys":["image_generation","image_editing"],"default_size":"3K","default_quality":"hd","capabilities":{"text_to_image":True,"image_to_image":True,"multi_reference_to_image":True,"text_to_image_set":True,"image_to_image_set":True,"multi_reference_to_image_set":True},"limits":{"min_reference_images":1,"max_reference_images":14,"max_output_images":15,"max_reference_plus_output_images":15,"max_input_image_mb":30,"max_input_pixels":36000000,"aspect_ratio_range":[0.0625,16]},"provider_options_schema":{"sequential_image_generation":{"type":"select","options":["disabled","auto"]},"max_images":{"type":"number","min":1,"max":15},"stream":{"type":"boolean"},"response_format":{"type":"select","options":["url","b64_json"]},"output_format":{"type":"select","options":["jpeg","png"]},"watermark":{"type":"boolean"},"optimize_prompt_mode":{"type":"select","options":["standard","fast"]},"web_search":{"type":"boolean"}}}},
@@ -323,6 +324,7 @@ DEFAULT_MODELS = [
     {"name":"Spark-TTS","model_type":"tts","provider":"spark-tts","base_url":"","model_name":"spark-tts","config_json":{"default_voice":"","default_language":"zh-CN","default_speed":1.0}},
     {"name":"GPT-4o Audit","model_type":"audit","provider":"openai","base_url":"https://api.openai.com/v1","model_name":"gpt-4o","config_json":{"audit_mode":"single"}},
     {"name":"Gemini Audit","model_type":"audit","provider":"gemini","base_url":"","model_name":"gemini-2.5-pro","config_json":{"audit_mode":"single"}},
+    {"name":"Bailian Qwen 3.7 Quality Audit","model_type":"audit","provider":"bailian","base_url":BAILIAN_COMPATIBLE_BASE_URL,"model_name":BAILIAN_QWEN_37_PLUS_MODEL,"sort_order":-100,"config_json":{"scene_key":"quality_audit","audit_mode":"single","protocol":"openai_chat_completions","thinking_enabled":False,"thinking_budget":8192,"max_tokens":8192,"temperature":0.1}},
     {"name":"Skip Audit","model_type":"audit","provider":"none","base_url":"","model_name":"","config_json":{"audit_mode":"skip"}},
 ]
 

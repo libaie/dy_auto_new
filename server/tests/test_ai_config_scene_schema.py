@@ -229,19 +229,38 @@ def test_default_qwen_image_model_uses_bailian_multimodal_generation_endpoint():
     ]
 
 
-def test_default_bailian_expert_review_model_uses_chat_completions_endpoint():
+def test_default_bailian_qwen_37_plus_model_covers_script_and_expert_review():
     from app.routers.ai_config import DEFAULT_MODELS
 
-    expert = next(m for m in DEFAULT_MODELS if m["name"] == "Bailian Qwen Expert Review")
+    expert = next(m for m in DEFAULT_MODELS if m["name"] == "Bailian Qwen 3.7 Plus")
 
     assert expert["model_type"] == "llm"
     assert expert["provider"] == "bailian"
     assert expert["base_url"] == "https://dashscope.aliyuncs.com/compatible-mode/v1"
-    assert expert["model_name"] == "qwen-plus"
-    assert expert["config_json"]["scene_key"] == "llm_agency_expert_review"
+    assert expert["model_name"] == "qwen3.7-plus"
+    assert expert["sort_order"] < 0
+    assert expert["config_json"]["scene_keys"] == [
+        "script_generation",
+        "llm_agency_expert_review",
+    ]
     assert expert["config_json"]["protocol"] == "openai_chat_completions"
     assert expert["config_json"]["max_tokens"] == 8192
     assert expert["config_json"]["temperature"] == 0.2
+
+
+def test_default_bailian_qwen_37_quality_audit_model_uses_chat_completions_endpoint():
+    from app.routers.ai_config import DEFAULT_MODELS
+
+    audit = next(m for m in DEFAULT_MODELS if m["name"] == "Bailian Qwen 3.7 Quality Audit")
+
+    assert audit["model_type"] == "audit"
+    assert audit["provider"] == "bailian"
+    assert audit["base_url"] == "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    assert audit["model_name"] == "qwen3.7-plus"
+    assert audit["sort_order"] < 0
+    assert audit["config_json"]["scene_key"] == "quality_audit"
+    assert audit["config_json"]["protocol"] == "openai_chat_completions"
+    assert audit["config_json"]["max_tokens"] == 8192
 
 
 def test_seed_ai_models_upgrades_unconfigured_legacy_expert_review_default(db):
@@ -269,11 +288,12 @@ def test_seed_ai_models_upgrades_unconfigured_legacy_expert_review_default(db):
     seed_ai_models(db)
     db.refresh(legacy)
 
-    assert legacy.name == "Bailian Qwen Expert Review"
+    assert legacy.name == "Bailian Qwen 3.7 Plus"
     assert legacy.provider == "bailian"
     assert legacy.base_url == "https://dashscope.aliyuncs.com/compatible-mode/v1"
-    assert legacy.model_name == "qwen-plus"
-    assert legacy.config_json["scene_key"] == "llm_agency_expert_review"
+    assert legacy.model_name == "qwen3.7-plus"
+    assert "llm_agency_expert_review" in legacy.config_json["scene_keys"]
+    assert "script_generation" in legacy.config_json["scene_keys"]
     assert legacy.config_json["max_tokens"] == 8192
 
 

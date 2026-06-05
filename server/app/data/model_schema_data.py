@@ -10,7 +10,7 @@ SCENES = [
         "label": "LLM · 脚本生成",
         "model_type": "llm",
         "description": "用于导演分镜、旁白、标题、提示词生成",
-        "providers": ["deepseek", "openai", "anthropic", "custom"],
+        "providers": ["bailian", "deepseek", "openai", "anthropic", "custom"],
         "fields": [
             {"key": "temperature", "label": "Temperature", "type": "number", "default": 0.7, "min": 0, "max": 2, "step": 0.1},
             {"key": "max_tokens", "label": "Max Tokens", "type": "number", "default": 4096, "min": 1, "max": 131072},
@@ -101,7 +101,7 @@ SCENES = [
         "label": "Audit · 质量审计",
         "model_type": "audit",
         "description": "用于图像/视频质量审计",
-        "providers": ["openai", "anthropic", "gemini", "custom"],
+        "providers": ["bailian", "openai", "anthropic", "gemini", "custom"],
         "fields": [
             {"key": "max_tokens", "label": "Max Tokens", "type": "number", "default": 4096, "min": 1, "max": 131072},
         ],

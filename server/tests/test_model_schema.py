@@ -94,6 +94,17 @@ def test_agency_expert_review_scene_supports_bailian_provider(client):
     assert bailian["test_strategy"] == "list_models"
 
 
+def test_script_generation_and_quality_audit_support_bailian_provider(client):
+    resp = client.get("/api/ai-models/schema")
+    data = resp.json()
+
+    script_scene = next(item for item in data["scenes"] if item["key"] == "script_generation")
+    audit_scene = next(item for item in data["scenes"] if item["key"] == "quality_audit")
+
+    assert "bailian" in script_scene["providers"]
+    assert "bailian" in audit_scene["providers"]
+
+
 def test_scene_key_unknown_raises(client):
     from app.data.model_schema_data import scene_key_to_model_type
     with pytest.raises(ValueError, match="Unknown scene key"):

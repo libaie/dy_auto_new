@@ -9,13 +9,26 @@ class RuntimeModelConfigError(ValueError):
     pass
 
 
+def _configured_scene_keys(model: AIModel) -> list[str]:
+    config = model.config_json or {}
+    configured_scenes = config.get("scene_keys")
+    if isinstance(configured_scenes, list):
+        return [scene for scene in configured_scenes if isinstance(scene, str) and scene]
+    scene = config.get("scene_key")
+    return [scene] if isinstance(scene, str) and scene else []
+
+
+def _model_supports_scene(model: AIModel, scene_key: str) -> bool:
+    return scene_key in _configured_scene_keys(model)
+
+
 def resolve_runtime_model_config(db: Session, scene_key: str, explicit_model_id: str | None = None) -> dict:
     query = db.query(AIModel).filter(AIModel.enabled == True)
     if explicit_model_id:
         query = query.filter(AIModel.id == explicit_model_id)
-    else:
-        query = query.filter(AIModel.config_json["scene_key"].as_string() == scene_key)
-    model = query.order_by(AIModel.sort_order.asc(), AIModel.created_at.asc()).first()
+
+    models = query.order_by(AIModel.sort_order.asc(), AIModel.created_at.asc()).all()
+    model = next((candidate for candidate in models if _model_supports_scene(candidate, scene_key)), None)
     if not model:
         raise RuntimeModelConfigError(f"No enabled model configured for scene '{scene_key}'")
 
@@ -38,10 +51,7 @@ def resolve_runtime_model_config(db: Session, scene_key: str, explicit_model_id:
 
 def _model_supports_capability(model: AIModel, scene_key: str, capability_key: str) -> bool:
     config = model.config_json or {}
-    configured_scenes = config.get("scene_keys")
-    if not isinstance(configured_scenes, list):
-        configured_scenes = [config.get("scene_key")]
-    if scene_key not in configured_scenes:
+    if not _model_supports_scene(model, scene_key):
         return False
 
     capabilities_by_scene = config.get("capabilities_by_scene")

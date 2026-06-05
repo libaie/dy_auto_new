@@ -17,11 +17,14 @@ from app.database import SessionLocal
 from app.db_models import Episode, GeneratedVideo, VideoProductionAsset, VideoProductionRun
 from app.services.one_sentence_video_service import create_one_sentence_video
 from app.services.production_worker_service import run_real_worker_step
+from app.services.runtime_model_config import redact_runtime_model_config, resolve_runtime_model_config
 from app.services.video_production_run_types import REAL_SHORT_E2E
 from app.services.video_production_service import approve_asset, start_compose_stage, start_video_stage
 
 
 ALLOW_ENV = "DY_AUTO_ALLOW_REAL_PROVIDER_E2E"
+EXPECTED_EXPERT_GATE_PROVIDER = "bailian"
+EXPECTED_EXPERT_GATE_MODEL = "qwen3.7-plus"
 
 
 def _log(event: str, **payload) -> None:
@@ -37,6 +40,11 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--worker-batch-size", type=int, default=1)
     parser.add_argument("--max-worker-rounds", type=int, default=80)
     parser.add_argument("--resume-run-id", default="")
+    parser.add_argument(
+        "--bypass-expert-gates",
+        action="store_true",
+        help="Use smoke-only pass-through expert gates instead of real LLM expert review.",
+    )
     return parser.parse_args()
 
 
@@ -58,6 +66,35 @@ def _install_smoke_gate_overrides() -> None:
 
     one_sentence_service.AgencyOrchestrator = _SmokePassAgencyOrchestrator
     video_service._guard_provider_stage = _smoke_pass_provider_stage
+
+
+def _preflight_expert_gate_model(db) -> dict:
+    resolved = resolve_runtime_model_config(db, "llm_agency_expert_review")
+    redacted = redact_runtime_model_config(resolved)
+    if (
+        resolved["provider"] != EXPECTED_EXPERT_GATE_PROVIDER
+        or resolved["model"] != EXPECTED_EXPERT_GATE_MODEL
+    ):
+        _log(
+            "expert_gate_model_mismatch",
+            expected_provider=EXPECTED_EXPERT_GATE_PROVIDER,
+            expected_model=EXPECTED_EXPERT_GATE_MODEL,
+            resolved=redacted,
+        )
+        raise RuntimeError(
+            "Expert gates must resolve to Bailian qwen3.7-plus; "
+            f"got provider={resolved['provider']} model={resolved['model']}"
+        )
+    _log("expert_gate_model_ready", resolved=redacted)
+    return resolved
+
+
+def _prepare_expert_gates(db, args: argparse.Namespace) -> dict | None:
+    if args.bypass_expert_gates:
+        _install_smoke_gate_overrides()
+        _log("expert_gates_bypassed")
+        return None
+    return _preflight_expert_gate_model(db)
 
 
 def _run_worker_rounds(db, run_id: str, *, lease_prefix: str, batch_size: int, max_rounds: int) -> list[dict]:
@@ -191,11 +228,11 @@ def _main() -> None:
     if os.getenv(ALLOW_ENV) != "1":
         raise SystemExit(f"Set {ALLOW_ENV}=1 to run paid provider smoke.")
     os.environ.setdefault("DY_AUTO_PROVIDER_SUBMIT_WORKER_COUNT", "1")
-    _install_smoke_gate_overrides()
     args = _parse_args()
 
     db = SessionLocal()
     try:
+        _prepare_expert_gates(db, args)
         if args.resume_run_id:
             run = db.query(VideoProductionRun).filter(VideoProductionRun.id == args.resume_run_id).one()
             episode = db.query(Episode).filter(Episode.id == run.episode_id).one()

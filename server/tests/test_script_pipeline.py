@@ -271,3 +271,31 @@ async def test_script_pipeline_resume_skips_completed_stage(db):
 
     assert result.dramatic_beats.beats[0].beat_type == DramaticBeatType.HOOK
     assert len(pipeline.model_client.calls) == 2
+
+
+@pytest.mark.asyncio
+async def test_script_pipeline_persists_structured_script_and_snapshots(db):
+    series, episode = _series_episode(db)
+    beats, scenes, shots = _stage_outputs()
+    manager = PipelineManager(pipeline=ScriptGenerationPipeline(
+        model_client=FakeModelClient([beats, scenes, shots]),
+        gate_runner=FakeGate(["completed", "completed"]),
+    ))
+
+    await manager.start_or_resume(
+        db,
+        series_id=series.id,
+        episode_id=episode.id,
+        source_prompt="她被逼下跪，却亮出集团继承人身份",
+        tags=["都市逆袭"],
+        target_duration_seconds=60,
+    )
+
+    saved_script = db.query(DbEpisodeScript).filter_by(episode_id=episode.id).one()
+    assert saved_script.status == "completed"
+    assert db.query(ScriptDramaticBeat).filter_by(script_id=saved_script.id).count() == 5
+    assert db.query(ScriptSceneOutline).filter_by(script_id=saved_script.id).count() == 1
+    assert db.query(ScriptVisualShot).filter_by(script_id=saved_script.id).count() == 1
+    db.refresh(episode)
+    assert episode.script_json["source"] == "dramatic_script_pipeline"
+    assert episode.storyboard_json["frames"][0]["image_prompt"] == "女主站在雨夜门口，破碎茶杯在脚边。"

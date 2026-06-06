@@ -9,7 +9,14 @@ from typing import Any
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
-from app.db_models import Episode, PipelineRun
+from app.db_models import (
+    Episode,
+    EpisodeScript as DbEpisodeScript,
+    PipelineRun,
+    ScriptDramaticBeat,
+    ScriptSceneOutline,
+    ScriptVisualShot,
+)
 from app.models.script import (
     DramaticBeatList,
     DramaticBeatType,
@@ -537,11 +544,111 @@ class PipelineManager:
         return traces
 
     def _write_snapshots(self, db: Session, run: PipelineRun, script: EpisodeScript) -> None:
-        _ = script
+        db_script = (
+            db.query(DbEpisodeScript)
+            .filter(
+                DbEpisodeScript.pipeline_run_id == run.id,
+                DbEpisodeScript.episode_id == script.episode_id,
+            )
+            .first()
+        )
+        if not db_script:
+            db_script = DbEpisodeScript(
+                series_id=script.series_id,
+                episode_id=script.episode_id,
+                pipeline_run_id=run.id,
+                source_prompt=script.source_prompt,
+                tags_json=list(script.tags),
+                target_duration_seconds=script.target_duration_seconds,
+                status="completed",
+                agency_trace_json=script.agency_trace,
+            )
+            db.add(db_script)
+            db.flush()
+        else:
+            db_script.source_prompt = script.source_prompt
+            db_script.tags_json = list(script.tags)
+            db_script.target_duration_seconds = script.target_duration_seconds
+            db_script.status = "completed"
+            db_script.agency_trace_json = script.agency_trace
+            db.query(ScriptVisualShot).filter(ScriptVisualShot.script_id == db_script.id).delete()
+            db.query(ScriptSceneOutline).filter(ScriptSceneOutline.script_id == db_script.id).delete()
+            db.query(ScriptDramaticBeat).filter(ScriptDramaticBeat.script_id == db_script.id).delete()
+            db.flush()
+
+        for index, beat in enumerate(script.dramatic_beats.beats, start=1):
+            db.add(ScriptDramaticBeat(
+                script_id=db_script.id,
+                order_index=index,
+                beat_type=beat.beat_type.value,
+                emotional_value=beat.emotional_value,
+                plot_summary=beat.plot_summary,
+            ))
+        for scene in script.scene_outlines.scenes:
+            db.add(ScriptSceneOutline(
+                script_id=db_script.id,
+                scene_number=scene.scene_number,
+                dramatic_beat_type=scene.dramatic_beat_type.value,
+                location=scene.location,
+                characters_json=list(scene.characters),
+                conflict=scene.conflict,
+                emotional_turn=scene.emotional_turn,
+                visual_mandate=scene.visual_mandate,
+            ))
+        for shot in script.visual_shots.shots:
+            db.add(ScriptVisualShot(
+                script_id=db_script.id,
+                shot_number=shot.shot_number,
+                scene_number=shot.scene_number,
+                beat_type=shot.beat_type.value,
+                narration=shot.narration,
+                visual_prompt=shot.visual_prompt,
+                video_prompt=shot.video_prompt,
+                duration=shot.duration,
+            ))
+
+        episode = db.query(Episode).filter(Episode.id == script.episode_id).one()
+        episode.script_json = self._script_snapshot(script, db_script.id)
+        episode.storyboard_json = self._storyboard_snapshot(script)
+        flag_modified(episode, "script_json")
+        flag_modified(episode, "storyboard_json")
         state = _script_state(run)
         state["current_stage"] = PipelineStage.VISUAL_SHOTS.value
         run.status = "completed"
         _persist_run_state(db, run)
+
+    def _script_snapshot(self, script: EpisodeScript, db_script_id: str) -> dict[str, Any]:
+        return {
+            "source": "dramatic_script_pipeline",
+            "script_id": db_script_id,
+            "source_prompt": script.source_prompt,
+            "tags": script.tags,
+            "target_duration_seconds": script.target_duration_seconds,
+            "dramatic_beats": script.dramatic_beats.model_dump(mode="json"),
+            "scene_outlines": script.scene_outlines.model_dump(mode="json"),
+            "visual_shots": script.visual_shots.model_dump(mode="json"),
+            "agency_trace": script.agency_trace,
+        }
+
+    def _storyboard_snapshot(self, script: EpisodeScript) -> dict[str, Any]:
+        frames = []
+        for shot in script.visual_shots.shots:
+            frames.append({
+                "frame_id": f"shot-{shot.shot_number:03d}",
+                "image_prompt": shot.visual_prompt,
+                "video_prompt": shot.video_prompt,
+                "narration": shot.narration,
+                "duration": shot.duration,
+                "action": shot.beat_type.value,
+                "emotion": shot.beat_type.value,
+                "shot_type": "dramatic_script_pipeline",
+            })
+        return {
+            "source": "dramatic_script_pipeline",
+            "frames": frames,
+            "frame_count": len(frames),
+            "total_duration": sum(frame["duration"] for frame in frames),
+        }
 
     def mark_stage_completed_for_test(
         self,

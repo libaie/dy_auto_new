@@ -654,3 +654,14 @@ class DMReleaseRecipientRequest(BaseModel):
 class DMReleaseRecipientResponse(BaseModel):
     released: bool
 
+from app.models.script import (
+    DramaticBeat,
+    DramaticBeatList,
+    DramaticBeatType,
+    EpisodeScript,
+    PipelineStage,
+    SceneOutline,
+    SceneOutlineList,
+    VisualShot,
+    VisualShotList,
+)

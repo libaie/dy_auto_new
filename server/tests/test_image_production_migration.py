@@ -29,7 +29,7 @@ def test_image_production_revision_depends_on_image_creation_workbench():
     phase3_revision = script.get_revision("2b3c4d5e6f70")
     phase4_revision = script.get_revision("3c4d5e6f7081")
 
-    assert script.get_heads() == ["5e6f708192a3"]
+    assert script.get_heads() == ["0a1b2c3d4e5f"]
     assert revision is not None
     assert revision.down_revision == "f6a7b8c9d0e1"
     assert phase3_revision is not None
@@ -45,7 +45,7 @@ def test_image_production_phase4_revision_depends_on_phase3():
     revision = script.get_revision("3c4d5e6f7081")
 
     assert revision.down_revision == "2b3c4d5e6f70"
-    assert script.get_heads() == ["5e6f708192a3"]
+    assert script.get_heads() == ["0a1b2c3d4e5f"]
 
 
 def test_image_production_tables_exist(test_db):

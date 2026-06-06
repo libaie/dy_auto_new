@@ -30,7 +30,7 @@ def test_agency_invocation_migration_depends_on_control_plane_convergence():
     assert agency_invocations_revision is not None
     assert agency_invocations_revision.down_revision == "d4e5f6a7b8c9"
     assert control_plane_revision is not None
-    assert script.get_heads() == ["5e6f708192a3"]
+    assert script.get_heads() == ["0a1b2c3d4e5f"]
 
 
 def test_agency_invocation_table_shape(test_db):

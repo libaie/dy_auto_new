@@ -4,7 +4,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.db_models import Base, Task, ChainInstance, DailyStats, Account, AccountGroup, AccountGroupMember, Channel, ChannelItem, Character, Scene, Series, Episode, PipelineRun, GeneratedVideo, AuditReport, ReferenceData, AIModel, User, VideoProductionRun, VideoProductionAsset, VideoReviewRecord, ImageProductionPolicyVersion, ImageProductionStrategy, ImageProductionStrategyVersion, ImageSelectionPreview, ImageCreationTask, ImageCreationAsset, ImageProductionCostEvent, ImageProductionAbAttempt, ImageProductionAbGroup, ImageProductionMetric, ImageCreationReviewRecord, AgencyExpertInvocation, ProductionAuditEvent, ProductionCostEvent, ProductionJob, ProductionSegment, ProductionShot, ProductionScene, ProductionEpisode, ProductionPlanVersion, ProductionPlan, VideoCollection, series_characters, series_scenes
+from app.db_models import Base, Task, ChainInstance, DailyStats, Account, AccountGroup, AccountGroupMember, Channel, ChannelItem, Character, Scene, Series, Episode, PipelineRun, GeneratedVideo, AuditReport, ReferenceData, AIModel, User, VideoProductionRun, VideoProductionAsset, VideoReviewRecord, ImageProductionPolicyVersion, ImageProductionStrategy, ImageProductionStrategyVersion, ImageSelectionPreview, ImageCreationTask, ImageCreationAsset, ImageProductionCostEvent, ImageProductionAbAttempt, ImageProductionAbGroup, ImageProductionMetric, ImageCreationReviewRecord, AgencyExpertInvocation, ProductionAuditEvent, ProductionCostEvent, ProductionJob, ProductionSegment, ProductionShot, ProductionScene, ProductionEpisode, ProductionPlanVersion, ProductionPlan, VideoCollection, EpisodeScript, ScriptDramaticBeat, ScriptSceneOutline, ScriptVisualShot, series_characters, series_scenes
 from app.database import get_db
 from app.main import app
 from app.config import ADMIN_USERNAME, ADMIN_PASSWORD
@@ -22,6 +22,7 @@ _CLEANUP_TABLES = [
     VideoReviewRecord, VideoProductionAsset, AgencyExpertInvocation, ProductionAuditEvent, VideoProductionRun,
     ProductionCostEvent, ProductionJob, ProductionSegment, ProductionShot,
     ProductionScene, ProductionEpisode, ProductionPlanVersion, VideoCollection,
+    ScriptVisualShot, ScriptSceneOutline, ScriptDramaticBeat, EpisodeScript,
     ProductionPlan, AuditReport, GeneratedVideo, PipelineRun, Episode,
 ]
 _CLEANUP_M2M = [series_characters, series_scenes, Series, Character, Scene]  # M2M first, then parent tables

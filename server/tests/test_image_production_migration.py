@@ -13,6 +13,7 @@ from app.db_models import ImageProductionMetric
 
 
 SERVER_DIR = Path(__file__).resolve().parents[1]
+CURRENT_ALEMBIC_HEAD = "5f60718293a4"
 
 
 def _alembic_config():
@@ -28,14 +29,29 @@ def test_image_production_revision_depends_on_image_creation_workbench():
     revision = script.get_revision("1a2b3c4d5e6f")
     phase3_revision = script.get_revision("2b3c4d5e6f70")
     phase4_revision = script.get_revision("3c4d5e6f7081")
+    asset_anchor_revision = script.get_revision("1b2c3d4e5f60")
+    ai_video_core_revision = script.get_revision("8f9a0b1c2d3e")
+    video_revision = script.get_revision("9f1a2b3c4d5e")
+    creative_patch_revision = script.get_revision("2c3d4e5f6071")
+    stage_length_revision = script.get_revision("3d4e5f607182")
 
-    assert script.get_heads() == ["0a1b2c3d4e5f"]
+    assert script.get_heads() == [CURRENT_ALEMBIC_HEAD]
+    assert ai_video_core_revision is not None
+    assert ai_video_core_revision.down_revision == "8e4f5d6a7b9c"
+    assert video_revision is not None
+    assert video_revision.down_revision == "8f9a0b1c2d3e"
     assert revision is not None
     assert revision.down_revision == "f6a7b8c9d0e1"
     assert phase3_revision is not None
     assert phase3_revision.down_revision == "1a2b3c4d5e6f"
     assert phase4_revision is not None
     assert phase4_revision.down_revision == "2b3c4d5e6f70"
+    assert asset_anchor_revision is not None
+    assert asset_anchor_revision.down_revision == "0a1b2c3d4e5f"
+    assert creative_patch_revision is not None
+    assert creative_patch_revision.down_revision == "1b2c3d4e5f60"
+    assert stage_length_revision is not None
+    assert stage_length_revision.down_revision == "2c3d4e5f6071"
 
 
 def test_image_production_phase4_revision_depends_on_phase3():
@@ -45,7 +61,15 @@ def test_image_production_phase4_revision_depends_on_phase3():
     revision = script.get_revision("3c4d5e6f7081")
 
     assert revision.down_revision == "2b3c4d5e6f70"
-    assert script.get_heads() == ["0a1b2c3d4e5f"]
+    assert script.get_heads() == [CURRENT_ALEMBIC_HEAD]
+
+
+def test_production_job_stage_downgrade_guards_long_repair_stage_values():
+    migration = SERVER_DIR / "alembic" / "versions" / "3d4e5f607182_expand_production_job_stage_length.py"
+    content = migration.read_text(encoding="utf-8")
+
+    assert "length(stage) > 40" in content
+    assert "Cannot downgrade production_jobs.stage" in content
 
 
 def test_image_production_tables_exist(test_db):
@@ -154,6 +178,12 @@ def test_image_production_alembic_upgrade_and_downgrade(tmp_path, monkeypatch):
 
     engine = create_engine(database_url)
     inspector = inspect(engine)
+    assert "series" in inspector.get_table_names()
+    assert "episodes" in inspector.get_table_names()
+    assert "characters" in inspector.get_table_names()
+    assert "scenes" in inspector.get_table_names()
+    assert "pipeline_runs" in inspector.get_table_names()
+    assert "ai_models" in inspector.get_table_names()
     assert "image_production_strategies" in inspector.get_table_names()
     assert "image_production_cost_events" in inspector.get_table_names()
     assert "image_production_ab_groups" in inspector.get_table_names()

@@ -12,6 +12,7 @@ DATA_ROOT = Path(__file__).resolve().parents[1] / "data" / "agency_agents_zh"
 MANIFEST_PATH = DATA_ROOT / "manifest.json"
 
 EXPERT_IDS = (
+    "story_generator",
     "narrative_designer",
     "visual_storyteller",
     "image_prompt_engineer",

@@ -352,6 +352,7 @@ async def test_style_lock_generates_missing_assets_and_records_missing_reference
     agency_team = data["story_bible"]["style_lock"]["agency_team"]
     assert agency_team["version"]
     assert [role["id"] for role in agency_team["core_roles"]] == [
+        "story_generator",
         "narrative_designer",
         "visual_storyteller",
         "image_prompt_engineer",
@@ -372,7 +373,7 @@ async def test_style_lock_generates_missing_assets_and_records_missing_reference
     assert status["ok"] is True
     assert status["locked"] is True
     assert status["agency_team_status"]["enabled"] is True
-    assert status["agency_team_status"]["core_role_count"] == 6
+    assert status["agency_team_status"]["core_role_count"] == 7
     assert status["reference_status"]["characters"]["total"] == 1
     assert status["reference_status"]["characters"]["ready"] == 0
 
@@ -748,6 +749,7 @@ def test_style_lock_get_replaces_stored_legacy_agency_team(client, db):
     team = data["story_bible"]["style_lock"]["agency_team"]
     role_ids = [role["id"] for role in team["core_roles"] + team["support_roles"] + team["quality_roles"]]
     assert role_ids == [
+        "story_generator",
         "narrative_designer",
         "visual_storyteller",
         "image_prompt_engineer",
@@ -763,7 +765,7 @@ def test_style_lock_get_replaces_stored_legacy_agency_team(client, db):
         "video_review_quality_reviewer",
         "compose_quality_reviewer",
     ]
-    assert data["agency_team_status"]["core_role_count"] == 6
+    assert data["agency_team_status"]["core_role_count"] == 7
     assert data["agency_team_status"]["support_role_count"] == 1
     assert data["agency_team_status"]["quality_role_count"] == 7
     assert not {"ai_engineer", "software_architect", "product_manager", "model_qa_specialist"} & set(role_ids)

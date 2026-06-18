@@ -18,6 +18,9 @@ from app.services.agency_contracts import (
 )
 
 
+CURRENT_ALEMBIC_HEAD = "5f60718293a4"
+
+
 def test_agency_invocation_migration_depends_on_control_plane_convergence():
     server_dir = Path(__file__).resolve().parents[1]
     config = Config(str(server_dir / "alembic.ini"))
@@ -30,7 +33,7 @@ def test_agency_invocation_migration_depends_on_control_plane_convergence():
     assert agency_invocations_revision is not None
     assert agency_invocations_revision.down_revision == "d4e5f6a7b8c9"
     assert control_plane_revision is not None
-    assert script.get_heads() == ["0a1b2c3d4e5f"]
+    assert script.get_heads() == [CURRENT_ALEMBIC_HEAD]
 
 
 def test_agency_invocation_table_shape(test_db):

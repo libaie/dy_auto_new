@@ -570,12 +570,14 @@ def test_video_agency_team_contains_current_quality_roles_without_legacy():
 
     assert "reality_checker" not in role_ids
     assert role_ids == list(EXPERT_IDS)
-    assert len(team["core_roles"]) == 6
+    assert len(team["core_roles"]) == 7
     assert len(team["support_roles"]) == 1
     assert len(team["quality_roles"]) == 7
-    assert team["version"] >= "2026-06-02"
+    assert team["version"] >= "2026-06-14"
+    assert team["core_roles"][0]["id"] == "story_generator"
     assert team["support_roles"][0]["id"] == "video_optimization_specialist"
     assert any(role["id"] == "compose_quality_reviewer" for role in team["quality_roles"])
+    assert team["quality_gates"]["story_planning"]
 
 
 def test_agency_context_includes_quality_role_briefs_for_stage_prompts():
@@ -612,7 +614,7 @@ def test_video_agency_team_phase_metadata_matches_manifest_and_stage_dag():
     assert {role["id"] for role in roles} == set(manifest_by_id)
     for role in roles:
         assert role["phase"] == manifest_by_id[role["id"]].phases
-    assert set(team["quality_gates"]) == set(STAGE_DAG)
+    assert set(team["quality_gates"]) == set(STAGE_DAG) | {"story_planning"}
 
 
 def test_stage_dag_assigned_experts_are_listed_in_manifest_phases():

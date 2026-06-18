@@ -26,8 +26,15 @@ from app.models.script import (
     VisualShotList,
 )
 from app.services.agency_orchestrator import AgencyOrchestrator
+from app.services.ai_text_artifact_service import AITextArtifactService
 from app.services.agency_runtime import _default_model_client
 from app.services.runtime_model_config import resolve_runtime_model_config
+from app.services.storyboard_timing import (
+    annotate_storyboard_with_timing,
+    build_detailed_image_prompt,
+    build_detailed_video_prompt,
+    timed_storyboard_lines,
+)
 
 
 TEMPLATE_DIR = Path(__file__).resolve().parents[1] / "prompts" / "templates"
@@ -176,7 +183,16 @@ async def default_gate_runner(
     runtime_config: dict[str, Any],
 ) -> dict[str, Any]:
     orchestrator = AgencyOrchestrator()
-    if gate_name == PipelineStage.DRAMATIC_BEATS.value:
+    if gate_name in {PipelineStage.DRAMATIC_BEATS.value, PipelineStage.SCENE_OUTLINES.value}:
+        return await orchestrator.run_story_planning_review(
+            db,
+            series_id=series_id,
+            episode_id=episode_id,
+            pipeline_run_id=pipeline_run_id,
+            stage_context=stage_context,
+            runtime_config=runtime_config,
+        )
+    if gate_name == PipelineStage.VISUAL_SHOTS.value:
         return await orchestrator.run_storyboard_review(
             db,
             series_id=series_id,
@@ -185,14 +201,7 @@ async def default_gate_runner(
             stage_context=stage_context,
             runtime_config=runtime_config,
         )
-    return await orchestrator.run_style_lock_review(
-        db,
-        series_id=series_id,
-        episode_id=episode_id,
-        pipeline_run_id=pipeline_run_id,
-        stage_context=stage_context,
-        runtime_config=runtime_config,
-    )
+    raise ValueError(f"unknown script gate: {gate_name}")
 
 
 def _input_hash(
@@ -335,6 +344,7 @@ class PipelineManager:
         tags: list[str],
         target_duration_seconds: int,
         explicit_model_id: str | None = None,
+        episode_asset_scope: dict[str, Any] | None = None,
     ) -> EpisodeScript:
         run = self.get_or_create_run(db, series_id=series_id, episode_id=episode_id)
         runtime_config = self._runtime_config(db, "script_generation", explicit_model_id, self.pipeline.uses_default_model_client)
@@ -385,6 +395,7 @@ class PipelineManager:
             source_prompt=source_prompt,
             tags=tags,
             target_duration_seconds=target_duration_seconds,
+            episode_asset_scope=episode_asset_scope or {},
             dramatic_beats=beats,
             scene_outlines=scenes,
             visual_shots=shots,
@@ -441,6 +452,7 @@ class PipelineManager:
         }
         stages[stage.value] = record
         state["current_stage"] = stage.value
+        run.status = "running"
 
         allowed_attempts = MAX_STAGE_RETRIES + 1
         last_error: Exception | None = None
@@ -477,6 +489,7 @@ class PipelineManager:
 
         state["human_intervention_required"] = True
         record["status"] = "failed"
+        run.status = "failed"
         _persist_run_state(db, run)
         raise ScriptGenerationError(
             str(last_error or "script generation failed"),
@@ -510,6 +523,8 @@ class PipelineManager:
             stage_context=stage_context,
             runtime_config=runtime_config,
         )
+        state = _script_state(run)
+        record = state["stages"].setdefault(stage.value, {})
         record["gate_trace"] = trace
         status = trace.get("stage_status")
         if status in {"blocked", "failed"}:
@@ -612,10 +627,60 @@ class PipelineManager:
         episode.storyboard_json = self._storyboard_snapshot(script)
         flag_modified(episode, "script_json")
         flag_modified(episode, "storyboard_json")
+        self._write_ai_text_artifacts(db, run, episode, script)
         state = _script_state(run)
         state["current_stage"] = PipelineStage.VISUAL_SHOTS.value
         run.status = "completed"
         _persist_run_state(db, run)
+
+    def _write_ai_text_artifacts(
+        self,
+        db: Session,
+        run: PipelineRun,
+        episode: Episode,
+        script: EpisodeScript,
+    ) -> None:
+        service = AITextArtifactService(db)
+        script_json = episode.script_json if isinstance(episode.script_json, dict) else {}
+        storyboard_json = episode.storyboard_json if isinstance(episode.storyboard_json, dict) else {}
+        frames = storyboard_json.get("frames") if isinstance(storyboard_json.get("frames"), list) else []
+        dialogue_lines = [str(frame.get("narration")) for frame in frames if isinstance(frame, dict) and frame.get("narration")]
+        image_prompts = [str(frame.get("image_prompt")) for frame in frames if isinstance(frame, dict) and frame.get("image_prompt")]
+        video_prompts = [str(frame.get("video_prompt")) for frame in frames if isinstance(frame, dict) and frame.get("video_prompt")]
+        storyboard_lines = timed_storyboard_lines(storyboard_json)
+        specs = [
+            ("episode_script", script_json, json.dumps(script_json, ensure_ascii=False)),
+            ("storyboard", storyboard_json, "\n".join(storyboard_lines)),
+            ("dialogue", {"lines": dialogue_lines}, "\n".join(dialogue_lines)),
+            ("image_prompt", {"prompts": image_prompts}, "\n".join(image_prompts)),
+            ("video_prompt", {"prompts": video_prompts}, "\n".join(video_prompts)),
+        ]
+        for artifact_type, content_json, content_text in specs:
+            artifact = service.create_artifact(
+                series_id=script.series_id,
+                episode_id=script.episode_id,
+                run_id=run.id,
+                target_type="episode",
+                target_id=script.episode_id,
+                artifact_type=artifact_type,
+                source_type="ai",
+                input_json={
+                    "source": "dramatic_script_pipeline",
+                    "source_prompt": script.source_prompt,
+                    "tags": list(script.tags),
+                    "target_duration_seconds": script.target_duration_seconds,
+                },
+                content_json=content_json,
+                content_text=content_text,
+                model_trace_json={
+                    "source": "dramatic_script_pipeline",
+                    "pipeline_run_id": run.id,
+                    "artifact_type": artifact_type,
+                },
+                review_trace_json=script.agency_trace,
+                created_by="script_pipeline",
+            )
+            service.approve_artifact(artifact.id, actor_user_id="script_pipeline")
 
     def _script_snapshot(self, script: EpisodeScript, db_script_id: str) -> dict[str, Any]:
         return {
@@ -624,16 +689,43 @@ class PipelineManager:
             "source_prompt": script.source_prompt,
             "tags": script.tags,
             "target_duration_seconds": script.target_duration_seconds,
+            "episode_asset_scope": dict(script.episode_asset_scope or {}),
             "dramatic_beats": script.dramatic_beats.model_dump(mode="json"),
             "scene_outlines": script.scene_outlines.model_dump(mode="json"),
             "visual_shots": script.visual_shots.model_dump(mode="json"),
             "agency_trace": script.agency_trace,
         }
 
+    def _frame_asset_ids(self, script: EpisodeScript, shot: VisualShot) -> tuple[str, list[str]]:
+        scope = script.episode_asset_scope if isinstance(script.episode_asset_scope, dict) else {}
+        scene_ids = [str(value) for value in (scope.get("scene_ids") or []) if value]
+        character_ids = [str(value) for value in (scope.get("character_ids") or []) if value]
+        if not scene_ids or not character_ids:
+            raise ScriptGenerationError(
+                "Episode asset scope must include at least one scene and one character before storyboard export.",
+                stage=PipelineStage.VISUAL_SHOTS.value,
+                pipeline_run_id="",
+                attempts=0,
+                error_code="EPISODE_ASSET_SCOPE_MISSING",
+            )
+        scene_map = scope.get("scene_by_scene_number") if isinstance(scope.get("scene_by_scene_number"), dict) else {}
+        mapped_scene_id = scene_map.get(str(shot.scene_number)) or scene_map.get(shot.scene_number)
+        if len(scene_ids) > 1 and not mapped_scene_id:
+            raise ScriptGenerationError(
+                "Episode asset scope has multiple scenes; storyboard export requires scene_by_scene_number for every shot.",
+                stage=PipelineStage.VISUAL_SHOTS.value,
+                pipeline_run_id="",
+                attempts=0,
+                error_code="EPISODE_ASSET_SCOPE_MISSING",
+            )
+        return str(mapped_scene_id or scene_ids[0]), list(dict.fromkeys(character_ids))
+
     def _storyboard_snapshot(self, script: EpisodeScript) -> dict[str, Any]:
         frames = []
+        scope = script.episode_asset_scope if isinstance(script.episode_asset_scope, dict) else {}
+        has_asset_scope = bool(scope.get("scene_ids")) and bool(scope.get("character_ids"))
         for shot in script.visual_shots.shots:
-            frames.append({
+            frame = {
                 "frame_id": f"shot-{shot.shot_number:03d}",
                 "image_prompt": shot.visual_prompt,
                 "video_prompt": shot.video_prompt,
@@ -642,13 +734,68 @@ class PipelineManager:
                 "action": shot.beat_type.value,
                 "emotion": shot.beat_type.value,
                 "shot_type": "dramatic_script_pipeline",
-            })
-        return {
+            }
+            if has_asset_scope:
+                scene_id, character_ids = self._frame_asset_ids(script, shot)
+                frame["scene_id"] = scene_id
+                frame["character_ids"] = character_ids
+            frames.append(frame)
+        storyboard = annotate_storyboard_with_timing({
             "source": "dramatic_script_pipeline",
             "frames": frames,
-            "frame_count": len(frames),
-            "total_duration": sum(frame["duration"] for frame in frames),
+        })
+        scenes_by_number = {scene.scene_number: scene for scene in script.scene_outlines.scenes}
+        shot_type_by_beat = {
+            DramaticBeatType.HOOK: "wide-to-close",
+            DramaticBeatType.CONFLICT_1: "medium",
+            DramaticBeatType.REVERSAL: "close_up",
+            DramaticBeatType.CLIMAX: "low_angle_close_up",
+            DramaticBeatType.CLIFFHANGER: "detail_close_up",
         }
+        camera_by_beat = {
+            DramaticBeatType.HOOK: "快速推进",
+            DramaticBeatType.CONFLICT_1: "手持跟拍",
+            DramaticBeatType.REVERSAL: "低角度推进",
+            DramaticBeatType.CLIMAX: "压迫式推近",
+            DramaticBeatType.CLIFFHANGER: "慢速悬停",
+        }
+        for frame, shot in zip(storyboard["frames"], script.visual_shots.shots):
+            scene = scenes_by_number.get(shot.scene_number)
+            subject = "、".join(scene.characters) if scene and scene.characters else "核心角色"
+            location = scene.location if scene else "锁定场景"
+            emotion = " / ".join(part for part in [
+                shot.beat_type.value,
+                scene.emotional_turn if scene else "",
+            ] if part)
+            continuity = scene.visual_mandate if scene else "承接上一镜头动作和情绪。"
+            shot_type = shot_type_by_beat.get(shot.beat_type, "medium")
+            camera_movement = camera_by_beat.get(shot.beat_type, "稳定跟拍")
+            frame["shot_type"] = shot_type
+            frame["camera_movement"] = camera_movement
+            frame["action"] = shot.video_prompt
+            frame["emotion"] = emotion
+            frame["detailed_image_prompt"] = build_detailed_image_prompt(
+                time_range=frame["time_range"],
+                subject=subject,
+                scene=location,
+                action=shot.video_prompt,
+                shot_type=shot_type,
+                emotion=emotion,
+                raw_prompt=shot.visual_prompt,
+                continuity=continuity,
+            )
+            frame["detailed_video_prompt"] = build_detailed_video_prompt(
+                time_range=frame["time_range"],
+                subject=subject,
+                scene=location,
+                action=shot.video_prompt,
+                shot_type=shot_type,
+                camera_movement=camera_movement,
+                emotion=emotion,
+                raw_prompt=shot.video_prompt,
+                continuity=continuity,
+            )
+        return storyboard
 
     def mark_stage_completed_for_test(
         self,

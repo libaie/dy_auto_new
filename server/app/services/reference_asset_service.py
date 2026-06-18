@@ -40,6 +40,10 @@ SCENE_REFERENCE_SLOTS = (
     ("reference_midshot_url", "mid-shot scene lighting reference"),
     ("reference_aerial_url", "high-angle environment layout reference"),
 )
+SCENE_EMPTY_PLATE_INSTRUCTION = (
+    "Empty environment plate only: show architecture, props, layout, lighting, atmosphere, and mood. "
+    "No people, no humans, no characters, no faces, no bodies, no silhouettes, no crowds."
+)
 
 USABLE_REFERENCE_ASSET_STATUSES = {"generated", "review_pending", "approved"}
 FAILED_REFERENCE_TASK_STATUSES = {"failed", "blocked", "rejected", "error"}
@@ -273,6 +277,12 @@ async def generate_reference_url(
         _raise_failed_reference_task(task)
 
     image_asset = _latest_reference_asset(db, task.id)
+    if not image_asset and str(task.status or "").lower() in IN_PROGRESS_REFERENCE_TASK_STATUSES:
+        raise ReferenceAssetError(
+            "REFERENCE_PROVIDER_STILL_RUNNING",
+            "Reference image provider is still running",
+            {"image_task_id": task.id, "status": task.status, "scene_key": scene_key},
+        )
     if not image_asset or not image_asset.url:
         raise ReferenceAssetError(
             "REFERENCE_PROVIDER_EMPTY_RESULT",
@@ -323,7 +333,8 @@ def _scene_prompt(scene: Scene, label: str, visual_style: dict | None = None) ->
     prompt = (
         f"{label}, consistent palette, lighting, environment design, and series style. "
         f"Scene: {scene.name}. Type: {scene.scene_type}. Location: {scene.location_desc or ''}. "
-        f"Lighting: {scene.lighting or ''}. Mood: {scene.mood or ''}."
+        f"Lighting: {scene.lighting or ''}. Mood: {scene.mood or ''}. "
+        f"{SCENE_EMPTY_PLATE_INSTRUCTION}"
     )
     return append_visual_style_constraints(prompt, visual_style)
 
@@ -373,6 +384,8 @@ def _to_dict(row) -> dict:
 
 
 async def generate_character_reference_images(db: Session, character_id: str, slot: str = "all") -> dict:
+    from app.services.anchor_service import AssetAnchorManager
+
     character = db.query(Character).filter(Character.id == character_id).first()
     if not character:
         raise ReferenceAssetError("CHARACTER_NOT_FOUND", "Character not found", {"character_id": character_id})
@@ -398,6 +411,7 @@ async def generate_character_reference_images(db: Session, character_id: str, sl
         )
         setattr(character, field, url)
         _record_generation(character, field, prompt, url)
+        await AssetAnchorManager(db).ensure_character_anchor(character.id, reference_slot=field)
         generated.append({"slot": field, "url": url})
 
     db.commit()
@@ -413,6 +427,8 @@ async def generate_character_reference_images(db: Session, character_id: str, sl
 
 
 async def generate_scene_reference_images(db: Session, scene_id: str, slot: str = "all") -> dict:
+    from app.services.anchor_service import AssetAnchorManager
+
     scene = db.query(Scene).filter(Scene.id == scene_id).first()
     if not scene:
         raise ReferenceAssetError("SCENE_NOT_FOUND", "Scene not found", {"scene_id": scene_id})
@@ -437,6 +453,7 @@ async def generate_scene_reference_images(db: Session, scene_id: str, slot: str 
         )
         setattr(scene, field, url)
         _record_generation(scene, field, prompt, url)
+        await AssetAnchorManager(db).ensure_scene_anchor(scene.id, reference_slot=field)
         generated.append({"slot": field, "url": url})
 
     db.commit()

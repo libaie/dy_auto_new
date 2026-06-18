@@ -1,7 +1,7 @@
 """add_video_production_tables
 
 Revision ID: 9f1a2b3c4d5e
-Revises: 8e4f5d6a7b9c
+Revises: 8f9a0b1c2d3e
 Create Date: 2026-05-25
 """
 from typing import Sequence, Union
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 
 revision: str = "9f1a2b3c4d5e"
-down_revision: Union[str, Sequence[str], None] = "8e4f5d6a7b9c"
+down_revision: Union[str, Sequence[str], None] = "8f9a0b1c2d3e"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

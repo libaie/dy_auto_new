@@ -106,6 +106,7 @@ class EpisodeScript(BaseModel):
     source_prompt: str = Field(..., min_length=1)
     tags: list[str] = Field(default_factory=list)
     target_duration_seconds: int = Field(..., ge=1)
+    episode_asset_scope: dict[str, Any] = Field(default_factory=dict)
     dramatic_beats: DramaticBeatList
     scene_outlines: SceneOutlineList
     visual_shots: VisualShotList

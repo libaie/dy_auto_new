@@ -6,7 +6,7 @@ from typing import Any
 
 from app.services.agency_manifest import EXPERT_IDS, get_expert, load_manifest
 
-VIDEO_AGENCY_TEAM_VERSION = "2026-06-02.1"
+VIDEO_AGENCY_TEAM_VERSION = "2026-06-14.1"
 
 
 def _source_metadata(expert_id: str) -> dict[str, str]:
@@ -24,6 +24,19 @@ def _phases(expert_id: str) -> list[str]:
 
 
 _CORE_ROLES = [
+    {
+        "id": "story_generator",
+        "name": "Story Generator",
+        "source_role": "story-generator",
+        **_source_metadata("story_generator"),
+        "phase": _phases("story_generator"),
+        "mission": "Generate whole-season story plans, episode cards, continuity handoffs, and foreshadowing ledgers.",
+        "directives": [
+            "Use locked character and scene IDs instead of inventing untracked assets.",
+            "Create episode hooks, goals, conflicts, reversals, and cliffhangers that connect across the season.",
+            "Stop at story planning; do not generate second-by-second storyboard shots.",
+        ],
+    },
     {
         "id": "narrative_designer",
         "name": "Narrative Designer",
@@ -182,6 +195,11 @@ _QUALITY_ROLES = [
 ]
 
 _QUALITY_GATES = {
+    "story_planning": [
+        "The season story plan has a clear mainline, promise, and target episode count.",
+        "Every episode outline has hook, goal, conflict, reversal, cliffhanger, and previous/next handoff.",
+        "Character and scene IDs come from locked assets or approved series links.",
+    ],
     "style_lock": [
         "Locked character rules include stable identity, appearance, outfit, voice policy, and reference URLs.",
         "Locked scene rules include location identity, lighting, mood, and reference URLs.",

@@ -393,6 +393,7 @@ class CollectedUser(Base):
     nickname = Column(String(100), nullable=False)
     douyin_id = Column(String(100), nullable=False, unique=True, index=True)  # 抖音数字ID，去重键
     keyword = Column(String(200), nullable=True, index=True)  # 采集关键词/行业
+    source_comment_content = Column(Text, nullable=True)  # 触发用户采集的入口评论内容
     likes_count = Column(String(20), nullable=True)     # 获赞数
     follow_count = Column(String(20), nullable=True)    # 关注数
     fans_count = Column(String(20), nullable=True)      # 粉丝数
@@ -500,6 +501,7 @@ class Character(Base):
     meta_json = Column(JSON, nullable=True, default=dict)
     created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
     updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
+    anchors = relationship("CharacterAnchor", back_populates="character", cascade="all, delete-orphan")
 
 
 class Scene(Base):
@@ -517,6 +519,57 @@ class Scene(Base):
     meta_json = Column(JSON, nullable=True, default=dict)
     created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
     updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
+    anchors = relationship("SceneAnchor", back_populates="scene", cascade="all, delete-orphan")
+
+
+class CharacterAnchor(Base):
+    __tablename__ = "character_anchors"
+    __table_args__ = (
+        UniqueConstraint("character_id", "reference_slot", name="uq_character_anchor_slot"),
+        Index("idx_character_anchors_character_id", "character_id"),
+        Index("idx_character_anchors_status", "status"),
+    )
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    character_id = Column(String(36), ForeignKey("characters.id", ondelete="CASCADE"), nullable=False)
+    name = Column(String(100), nullable=False, default="")
+    reference_slot = Column(String(80), nullable=False, default="avatar_front_url")
+    base_prompt = Column(Text, nullable=False, default="")
+    anchor_image_url = Column(Text, nullable=True)
+    seed = Column(Integer, nullable=True)
+    ref_mode = Column(String(80), nullable=False, default="character_face")
+    provider_options_json = Column(JSON, nullable=True, default=dict)
+    status = Column(String(30), nullable=False, default="draft")
+    metadata_json = Column(JSON, nullable=True, default=dict)
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
+    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
+
+    character = relationship("Character", back_populates="anchors")
+
+
+class SceneAnchor(Base):
+    __tablename__ = "scene_anchors"
+    __table_args__ = (
+        UniqueConstraint("scene_id", "reference_slot", name="uq_scene_anchor_slot"),
+        Index("idx_scene_anchors_scene_id", "scene_id"),
+        Index("idx_scene_anchors_status", "status"),
+    )
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    scene_id = Column(String(36), ForeignKey("scenes.id", ondelete="CASCADE"), nullable=False)
+    scene_name = Column(String(100), nullable=False, default="")
+    reference_slot = Column(String(80), nullable=False, default="reference_wideshot_url")
+    environment_prompt = Column(Text, nullable=False, default="")
+    anchor_image_url = Column(Text, nullable=True)
+    seed = Column(Integer, nullable=True)
+    ref_mode = Column(String(80), nullable=False, default="scene_environment")
+    provider_options_json = Column(JSON, nullable=True, default=dict)
+    status = Column(String(30), nullable=False, default="draft")
+    metadata_json = Column(JSON, nullable=True, default=dict)
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
+    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
+
+    scene = relationship("Scene", back_populates="anchors")
 
 
 class Series(Base):
@@ -718,7 +771,7 @@ class ProductionJob(Base):
     plan_id = Column(String(36), ForeignKey("production_plans.id", ondelete="CASCADE"), nullable=False)
     target_type = Column(String(30), nullable=False)
     target_id = Column(String(36), nullable=False)
-    stage = Column(String(40), nullable=False)
+    stage = Column(String(80), nullable=False)
     status = Column(String(30), nullable=False, default="queued")
     provider_task_id = Column(String(120), nullable=True)
     attempt_count = Column(Integer, nullable=False, default=0)
@@ -883,6 +936,96 @@ class AgencyExpertInvocation(Base):
     created_at = Column(DateTime, nullable=False, default=bj_now)
     started_at = Column(DateTime, nullable=True)
     finished_at = Column(DateTime, nullable=True)
+
+
+class AgencyCreativePatch(Base):
+    __tablename__ = "agency_creative_patches"
+    __table_args__ = (
+        Index("idx_agency_creative_patches_series_created", "series_id", "created_at"),
+        Index("idx_agency_creative_patches_run_status", "run_id", "status"),
+        Index("idx_agency_creative_patches_invocation", "source_invocation_id"),
+        Index("idx_agency_creative_patches_target_status", "target_type", "target_id", "status"),
+        Index("idx_agency_creative_patches_plan_stage_status", "production_plan_id", "stage", "status"),
+    )
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    series_id = Column(String(36), ForeignKey("series.id", ondelete="CASCADE"), nullable=False)
+    episode_id = Column(String(36), ForeignKey("episodes.id", ondelete="SET NULL"), nullable=True)
+    run_id = Column(String(36), ForeignKey("video_production_runs.id", ondelete="SET NULL"), nullable=True)
+    production_plan_id = Column(String(36), ForeignKey("production_plans.id", ondelete="SET NULL"), nullable=True)
+    production_episode_id = Column(String(36), ForeignKey("production_episodes.id", ondelete="SET NULL"), nullable=True)
+    production_segment_id = Column(String(36), ForeignKey("production_segments.id", ondelete="SET NULL"), nullable=True)
+    source_invocation_id = Column(String(36), ForeignKey("agency_expert_invocations.id", ondelete="SET NULL"), nullable=True)
+    stage = Column(String(40), nullable=False)
+    expert_id = Column(String(80), nullable=False, default="")
+    patch_type = Column(String(40), nullable=False)
+    target_type = Column(String(40), nullable=False)
+    target_id = Column(String(100), nullable=False)
+    title = Column(String(200), nullable=False, default="")
+    reason = Column(Text, nullable=False, default="")
+    before_json = Column(JSON, nullable=False, default=dict)
+    after_json = Column(JSON, nullable=False, default=dict)
+    status = Column(String(30), nullable=False, default="proposed")
+    priority = Column(String(20), nullable=False, default="normal")
+    reviewer_user_id = Column(String(36), nullable=True)
+    applied_at = Column(DateTime, nullable=True)
+    rejected_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
+    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
+
+
+class AITextArtifact(Base):
+    __tablename__ = "ai_text_artifacts"
+    __table_args__ = (
+        UniqueConstraint("target_type", "target_id", "artifact_type", "version", name="uq_ai_text_artifact_version"),
+        Index("idx_ai_text_artifacts_series_type_status", "series_id", "artifact_type", "status"),
+        Index("idx_ai_text_artifacts_episode_type_status", "episode_id", "artifact_type", "status"),
+        Index("idx_ai_text_artifacts_target_type", "target_type", "target_id", "artifact_type"),
+        Index("idx_ai_text_artifacts_parent", "parent_artifact_id"),
+    )
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    series_id = Column(String(36), ForeignKey("series.id", ondelete="CASCADE"), nullable=False)
+    episode_id = Column(String(36), ForeignKey("episodes.id", ondelete="SET NULL"), nullable=True)
+    run_id = Column(String(36), ForeignKey("video_production_runs.id", ondelete="SET NULL"), nullable=True)
+    production_plan_id = Column(String(36), ForeignKey("production_plans.id", ondelete="SET NULL"), nullable=True)
+    target_type = Column(String(80), nullable=False)
+    target_id = Column(String(120), nullable=False)
+    artifact_type = Column(String(80), nullable=False)
+    version = Column(Integer, nullable=False, default=1)
+    status = Column(String(30), nullable=False, default="review_pending")
+    source_type = Column(String(30), nullable=False, default="ai")
+    parent_artifact_id = Column(String(36), ForeignKey("ai_text_artifacts.id", ondelete="SET NULL"), nullable=True)
+    input_json = Column(JSON, nullable=True, default=dict)
+    content_json = Column(JSON, nullable=True, default=dict)
+    content_text = Column(Text, nullable=True)
+    model_trace_json = Column(JSON, nullable=True, default=dict)
+    review_trace_json = Column(JSON, nullable=True, default=dict)
+    consumer_trace_json = Column(JSON, nullable=True, default=dict)
+    created_by = Column(String(36), nullable=True)
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
+    approved_at = Column(DateTime, nullable=True)
+    superseded_at = Column(DateTime, nullable=True)
+    stale_reason = Column(Text, nullable=True)
+
+
+class AITextArtifactConsumer(Base):
+    __tablename__ = "ai_text_artifact_consumers"
+    __table_args__ = (
+        Index("idx_ai_text_artifact_consumers_artifact", "artifact_id"),
+        Index("idx_ai_text_artifact_consumers_consumer", "consumer_type", "consumer_id"),
+        Index("idx_ai_text_artifact_consumers_run", "run_id"),
+    )
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    artifact_id = Column(String(36), ForeignKey("ai_text_artifacts.id", ondelete="CASCADE"), nullable=False)
+    consumer_type = Column(String(80), nullable=False)
+    consumer_id = Column(String(120), nullable=False)
+    series_id = Column(String(36), ForeignKey("series.id", ondelete="CASCADE"), nullable=False)
+    episode_id = Column(String(36), ForeignKey("episodes.id", ondelete="SET NULL"), nullable=True)
+    run_id = Column(String(36), ForeignKey("video_production_runs.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
+    metadata_json = Column(JSON, nullable=True, default=dict)
 
 
 class ProductionAuditEvent(Base):

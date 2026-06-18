@@ -102,7 +102,7 @@ def test_agency_console_returns_pending_steps_without_style_lock(db):
     assert data["ok"] is True
     assert data["style_lock"]["locked"] is False
     assert data["agency_trace_status"] == "missing"
-    assert len(data["expert_team"]) == 14
+    assert len(data["expert_team"]) == 15
     assert "reality_checker" not in [item["expert_id"] for item in data["expert_team"]]
     stage_graph = data["stage_graph"]
     assert [node["stage"] for node in stage_graph] == list(STAGE_DAG)
@@ -123,15 +123,15 @@ def test_agency_console_returns_pending_steps_without_style_lock(db):
         assert node["qa"] == expected_stage["qa"]
     assert data["expert_invocations"] == []
     assert data["decision_log"] == []
-    assert data["agency_team_status"]["core_role_count"] == 6
+    assert data["agency_team_status"]["core_role_count"] == 7
     assert data["agency_team_status"]["support_role_count"] == 1
     assert data["agency_team_status"]["quality_role_count"] == 7
     agency_team_json = json.dumps(data["agency_team"], ensure_ascii=False)
     assert "Short Video Editing Coach" not in agency_team_json
     assert "Control pacing" not in agency_team_json
     assert "Keep every frame" not in agency_team_json
-    assert len(data["agency_team"]["core_roles"]) == 6
-    assert data["agency_team"]["core_roles"][0]["id"] == "narrative_designer"
+    assert len(data["agency_team"]["core_roles"]) == 7
+    assert data["agency_team"]["core_roles"][0]["id"] == "story_generator"
     assert len(data["agency_team"]["support_roles"]) == 1
     assert data["agency_team"]["support_roles"][0]["id"] == "video_optimization_specialist"
     assert len(data["agency_team"]["quality_roles"]) == 7

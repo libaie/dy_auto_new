@@ -16,6 +16,7 @@ from scripts.import_agency_agents_zh import DATA_ROOT, _safe_data_path
 def test_manifest_contains_exact_video_expert_team():
     experts = list_experts()
     assert [expert.expert_id for expert in experts] == [
+        "story_generator",
         "narrative_designer",
         "visual_storyteller",
         "image_prompt_engineer",
@@ -67,7 +68,7 @@ def test_legacy_reality_checker_is_read_only_and_not_current_manifest():
 def test_manifest_hashes_match_vendored_markdown():
     report = verify_manifest()
     assert report["ok"] is True
-    assert report["checked_count"] == 14
+    assert report["checked_count"] == 15
     assert report["errors"] == []
 
 
@@ -136,3 +137,15 @@ def test_read_expert_markdown_is_allowlisted():
     assert expert.source_path == "specialized/prompt-engineer.md"
     assert len(text) > 500
     assert "prompt" in text.lower() or "提示" in text
+
+
+def test_story_generator_expert_is_available_for_story_planning():
+    expert = get_expert("story_generator")
+    text = read_expert_markdown("story_generator")
+
+    assert expert.name_zh == "故事生成专家"
+    assert expert.role_type == "core"
+    assert expert.source_path == "creative/story-generator.md"
+    assert expert.phases == ["story_planning"]
+    assert len(text) > 500
+    assert "故事" in text

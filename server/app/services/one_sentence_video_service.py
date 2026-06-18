@@ -355,7 +355,8 @@ def _refresh_segment_references_from_storyboard(
     if not run.production_episode_id:
         return
     frames = _storyboard_frames_by_id(storyboard)
-    if not frames:
+    ordered_frames = [frame for frame in (storyboard.get("frames") or []) if isinstance(frame, dict)]
+    if not frames and not ordered_frames:
         return
     rows = (
         db.query(ProductionSegment, ProductionShot)
@@ -364,13 +365,18 @@ def _refresh_segment_references_from_storyboard(
             db.query(ProductionScene.id)
             .filter(ProductionScene.episode_plan_id == run.production_episode_id)
         ))
+        .order_by(ProductionShot.order_index.asc(), ProductionSegment.order_index.asc())
         .all()
     )
     for segment, shot in rows:
         frame = frames.get(str(shot.shot_id))
+        if not frame and ordered_frames:
+            frame_index = max(0, int(shot.order_index or 1) - 1)
+            frame = ordered_frames[min(frame_index, len(ordered_frames) - 1)]
         if not frame:
             continue
         segment.reference_roles_json = production_plan_service._reference_roles(frame, style_lock)
+        flag_modified(segment, "reference_roles_json")
         segment.image_prompt = str(frame.get("image_prompt") or segment.image_prompt or "")
         segment.video_prompt = str(frame.get("video_prompt") or segment.video_prompt or "")
         segment.narration = frame.get("narration") or segment.narration

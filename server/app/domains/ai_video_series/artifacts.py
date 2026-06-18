@@ -4,7 +4,7 @@ import json
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
-from app.db_models import Episode, Series
+from app.db.models.ai_video_series import Episode, Series
 from app.services.ai_text_artifact_service import AITextArtifactService
 
 

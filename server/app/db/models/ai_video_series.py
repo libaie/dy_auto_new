@@ -1,0 +1,41 @@
+"""AI video series ORM compatibility facade."""
+
+from app.db_models import (
+    AITextArtifact,
+    AITextArtifactConsumer,
+    Base,
+    Episode,
+    EpisodeScript,
+    ProductionAuditEvent,
+    ProductionEpisode,
+    ProductionJob,
+    ProductionPlan,
+    ProductionPlanVersion,
+    ProductionScene,
+    ProductionSegment,
+    ProductionShot,
+    Series,
+    VideoProductionRun,
+    series_characters,
+    series_scenes,
+)
+
+__all__ = [
+    "AITextArtifact",
+    "AITextArtifactConsumer",
+    "Base",
+    "Episode",
+    "EpisodeScript",
+    "ProductionAuditEvent",
+    "ProductionEpisode",
+    "ProductionJob",
+    "ProductionPlan",
+    "ProductionPlanVersion",
+    "ProductionScene",
+    "ProductionSegment",
+    "ProductionShot",
+    "Series",
+    "VideoProductionRun",
+    "series_characters",
+    "series_scenes",
+]

@@ -3,7 +3,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import require_role, verify_admin_token
-from app.db_models import Series, Episode, Character, Scene
+from app.db.models.ai_video_series import Episode, Series
+# Cross-domain model: keep on app.db_models until its owning domain exists.
+from app.db_models import Character, Scene
 from app.domains.ai_video_series import story_planning, style_lock
 from app.domains.ai_video_series.artifacts import (
     actor_id,

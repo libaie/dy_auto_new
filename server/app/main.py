@@ -26,7 +26,7 @@ from app.services.ai_generator import ai_generator
 async def _style_lock_worker(interval_seconds: float | None = None, batch_size: int | None = None):
     """Consume durable style-lock jobs so /style-lock does not depend on the page staying open."""
     import logging
-    from app.routers import series as series_router
+    from app.domains.ai_video_series import style_lock
 
     interval = interval_seconds
     if interval is None:
@@ -42,7 +42,7 @@ async def _style_lock_worker(interval_seconds: float | None = None, batch_size: 
     while True:
         db = SessionLocal()
         try:
-            result = await series_router._run_style_lock_worker_step(
+            result = await style_lock.run_style_lock_worker_step(
                 db,
                 lease_id=lease_id,
                 batch_size=worker_batch_size,
@@ -55,6 +55,43 @@ async def _style_lock_worker(interval_seconds: float | None = None, batch_size: 
             raise
         except Exception:
             log.warning("style-lock worker cycle failed", exc_info=True)
+            await asyncio.sleep(interval)
+        finally:
+            db.close()
+
+
+async def _story_plan_worker(interval_seconds: float | None = None, batch_size: int | None = None):
+    """Consume durable story-planning jobs so the series page can safely refresh."""
+    import logging
+    from app.domains.ai_video_series import story_planning
+
+    interval = interval_seconds
+    if interval is None:
+        interval = float(os.getenv("STORY_PLAN_WORKER_INTERVAL_SECONDS", "5"))
+    interval = max(0.1, float(interval))
+    worker_batch_size = batch_size
+    if worker_batch_size is None:
+        worker_batch_size = int(os.getenv("STORY_PLAN_WORKER_BATCH_SIZE", "1"))
+    worker_batch_size = max(1, min(int(worker_batch_size), 20))
+    lease_id = f"story-plan-worker:{os.getpid()}"
+    log = logging.getLogger("app.story_plan_worker")
+
+    while True:
+        db = SessionLocal()
+        try:
+            result = await story_planning.run_story_plan_worker_step(
+                db,
+                lease_id=lease_id,
+                batch_size=worker_batch_size,
+            )
+            if result.get("processed", 0) <= 0:
+                await asyncio.sleep(interval)
+            else:
+                await asyncio.sleep(0)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            log.warning("story-plan worker cycle failed", exc_info=True)
             await asyncio.sleep(interval)
         finally:
             db.close()
@@ -227,12 +264,14 @@ async def lifespan(app: FastAPI):
             db.close()
     task = asyncio.create_task(_offline_checker())
     style_lock_task = asyncio.create_task(_style_lock_worker())
+    story_plan_task = asyncio.create_task(_story_plan_worker())
     one_sentence_reference_task = asyncio.create_task(_one_sentence_reference_worker())
     yield
     task.cancel()
     style_lock_task.cancel()
+    story_plan_task.cancel()
     one_sentence_reference_task.cancel()
-    await asyncio.gather(task, style_lock_task, one_sentence_reference_task, return_exceptions=True)
+    await asyncio.gather(task, style_lock_task, story_plan_task, one_sentence_reference_task, return_exceptions=True)
     await ai_generator.aclose()
     from app.services import pixelle_client
     await pixelle_client.close_client()

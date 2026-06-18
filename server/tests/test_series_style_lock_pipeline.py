@@ -1,4 +1,5 @@
 """Style-lock, auto-plan, and pipeline persistence tests."""
+import asyncio
 import json
 from unittest.mock import AsyncMock
 
@@ -6,8 +7,9 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import sessionmaker
 
+from app.domains.ai_video_series import story_planning, style_lock
 from app.main import app
-from app.db_models import AIModel, Character, Episode, GeneratedVideo, PipelineRun, ProductionJob, Scene, Series
+from app.db_models import AIModel, AITextArtifact, Character, Episode, GeneratedVideo, PipelineRun, ProductionJob, Scene, Series
 from app.services.agency_runtime import AgencyRuntimeResult
 from app.services.crypto import encrypt
 
@@ -39,6 +41,14 @@ async def _agency_pass(self, **kwargs):
             "findings": [],
             "recommendations": [],
             "required_changes": [],
+            "scorecard": {
+                "overall_score": 95,
+                "pass_threshold": 80,
+                "verdict": "pass",
+                "dimensions": [{"key": "quality", "score": 95, "threshold": 80}],
+                "repair_intent": "none",
+                "confidence": 0.9,
+            },
         },
         evidence=[],
         token_usage={},
@@ -131,7 +141,7 @@ async def test_style_lock_fills_multi_angle_character_and_scene_references(db, m
         calls.append(prompt)
         return f"https://cdn.test/ref-{len(calls)}.png"
 
-    monkeypatch.setattr(series_router, "_generate_reference_image", fake_generate_reference_image)
+    monkeypatch.setattr(style_lock, "generate_reference_image", fake_generate_reference_image)
 
     missing = await series_router._fill_reference_assets(parent, db)
 
@@ -149,6 +159,14 @@ async def test_style_lock_fills_multi_angle_character_and_scene_references(db, m
     ]
     assert "three-quarter character anchor" in calls[1]
     assert "mid-shot scene lighting" in calls[5]
+    scene_prompts = calls[4:]
+    assert len(scene_prompts) == 3
+    for prompt in scene_prompts:
+        lowered = prompt.lower()
+        assert "empty environment plate" in lowered
+        assert "no people" in lowered
+        assert "no humans" in lowered
+        assert "no characters" in lowered
 
 
 @pytest.mark.asyncio
@@ -183,7 +201,7 @@ async def test_style_lock_infers_live_action_style_from_reality_health_logline(d
         calls.append(prompt)
         return f"https://cdn.test/ref-{len(calls)}.png"
 
-    monkeypatch.setattr(series_router, "_generate_reference_image", fake_generate_reference_image)
+    monkeypatch.setattr(style_lock, "generate_reference_image", fake_generate_reference_image)
 
     missing = await series_router._fill_reference_assets(parent, db)
     story_bible = series_router._build_story_bible(parent, version=1, missing_assets=missing)
@@ -245,7 +263,7 @@ async def test_style_lock_regenerates_usable_references_when_inferred_medium_cha
         calls.append(prompt)
         return f"https://cdn.test/new-live-action-{len(calls)}.png"
 
-    monkeypatch.setattr(series_router, "_generate_reference_image", fake_generate_reference_image)
+    monkeypatch.setattr(style_lock, "generate_reference_image", fake_generate_reference_image)
 
     missing = await series_router._fill_reference_assets(parent, db)
 
@@ -296,7 +314,7 @@ async def test_style_lock_regenerates_expired_reference_urls(db, monkeypatch):
         calls.append(prompt)
         return f"https://cdn.test/regenerated-{len(calls)}.png"
 
-    monkeypatch.setattr(series_router, "_generate_reference_image", fake_generate_reference_image)
+    monkeypatch.setattr(style_lock, "generate_reference_image", fake_generate_reference_image)
 
     missing = await series_router._fill_reference_assets(parent, db)
 
@@ -337,7 +355,7 @@ async def test_style_lock_generates_missing_assets_and_records_missing_reference
         }),
     ]
     monkeypatch.setattr(
-        "app.routers.series.ai_generator.generate_custom",
+        "app.domains.ai_video_series.style_lock.ai_generator.generate_custom",
         AsyncMock(side_effect=generated),
     )
     resp = client.post(f"/api/series/{series.id}/style-lock")
@@ -368,6 +386,15 @@ async def test_style_lock_generates_missing_assets_and_records_missing_reference
     assert saved.story_bible_json["style_lock"]["characters"][0]["name"] == "Lin"
     assert db.query(Character).count() == 1
     assert db.query(Scene).count() == 1
+    series_bible_artifact = db.query(AITextArtifact).filter_by(
+        series_id=series.id,
+        target_type="series",
+        target_id=series.id,
+        artifact_type="series_bible",
+    ).one()
+    assert series_bible_artifact.status == "approved"
+    assert series_bible_artifact.content_json["style_lock"]["characters"][0]["name"] == "Lin"
+    assert series_bible_artifact.review_trace_json["error_code"] == "EXPERT_MODEL_CONFIG_MISSING"
 
     status = client.get(f"/api/series/{series.id}/style-lock").json()
     assert status["ok"] is True
@@ -397,6 +424,31 @@ def test_style_lock_get_reports_locking_status(client, db):
     assert data["locked"] is False
     assert data["status"] == "locking"
     assert data["version"] == 3
+
+
+def test_style_lock_get_exposes_reference_progress_for_live_polling(client, db):
+    series, _ = _create_series(db, with_episode=False)
+    progress = [{
+        "asset_type": "character",
+        "asset_id": "char-live",
+        "slot": "avatar_front_url",
+        "status": "ready",
+        "url": "/static/image-creation/outputs/live-front.png",
+    }]
+    series.story_bible_json = {
+        "style_lock": {
+            "locked": False,
+            "status": "locking",
+            "version": 3,
+            "reference_progress": progress,
+        }
+    }
+    db.commit()
+
+    resp = client.get(f"/api/series/{series.id}/style-lock")
+
+    assert resp.status_code == 200
+    assert resp.json()["reference_progress"] == progress
 
 
 def test_style_lock_post_allows_recovery_from_stale_locking_state(client, db):
@@ -495,7 +547,7 @@ async def test_style_lock_worker_step_processes_persisted_job(db, monkeypatch):
     async def fake_generate_reference_image(db_session, prompt, **kwargs):
         return f"https://cdn.test/{len(prompt)}.png"
 
-    monkeypatch.setattr(series_router, "_generate_reference_image", fake_generate_reference_image)
+    monkeypatch.setattr(style_lock, "generate_reference_image", fake_generate_reference_image)
     result = await series_router._run_style_lock_worker_step(db, lease_id="style-worker", batch_size=1)
 
     assert result["processed"] == 1
@@ -515,12 +567,57 @@ async def test_style_lock_worker_claims_jobs_with_long_lease(db, monkeypatch):
         claim_kwargs.update(kwargs)
         return None
 
-    monkeypatch.setattr(series_router, "claim_next_job", fake_claim_next_job)
+    monkeypatch.setattr(style_lock, "claim_next_job", fake_claim_next_job)
 
     result = await series_router._run_style_lock_worker_step(db, lease_id="style-worker", batch_size=1)
 
     assert result["processed"] == 0
     assert claim_kwargs["stage"] == "style_lock"
+    assert claim_kwargs["lease_seconds"] == 3600
+
+
+@pytest.mark.asyncio
+async def test_story_plan_worker_step_processes_persisted_job(db, monkeypatch):
+    from app.routers import series as series_router
+
+    series, _ = _create_series(db, with_episode=False)
+    client = TestClient(app)
+    resp = client.post(f"/api/series/{series.id}/story-plan")
+    assert resp.status_code == 200
+    calls = []
+
+    async def fake_generate_series_story_plan(db_session, series_id, force=False):
+        calls.append((db_session, series_id, force))
+        return {"series_id": series_id}
+
+    monkeypatch.setattr(story_planning, "generate_series_story_plan", fake_generate_series_story_plan)
+
+    result = await series_router._run_story_plan_worker_step(db, lease_id="story-worker", batch_size=1)
+
+    assert result["processed"] == 1
+    assert calls == [(db, series.id, False)]
+    job = db.query(ProductionJob).filter_by(target_type="series", target_id=series.id, stage="story_planning").one()
+    assert job.status == "completed"
+    saved = db.query(Series).filter(Series.id == series.id).one()
+    assert saved.story_bible_json["story_planning"]["status"] == "completed"
+
+
+@pytest.mark.asyncio
+async def test_story_plan_worker_claims_jobs_with_long_lease(db, monkeypatch):
+    from app.routers import series as series_router
+
+    claim_kwargs = {}
+
+    def fake_claim_next_job(db_session, **kwargs):
+        claim_kwargs.update(kwargs)
+        return None
+
+    monkeypatch.setattr(story_planning, "claim_next_job", fake_claim_next_job)
+
+    result = await series_router._run_story_plan_worker_step(db, lease_id="story-worker", batch_size=1)
+
+    assert result["processed"] == 0
+    assert claim_kwargs["stage"] == "story_planning"
     assert claim_kwargs["lease_seconds"] == 3600
 
 
@@ -554,7 +651,7 @@ async def test_style_lock_worker_records_reference_slot_progress(db, monkeypatch
             return None
         return f"https://cdn.test/{len(prompt)}.png"
 
-    monkeypatch.setattr(series_router, "_generate_reference_image", fake_generate_reference_image)
+    monkeypatch.setattr(style_lock, "generate_reference_image", fake_generate_reference_image)
 
     await series_router._run_style_lock_job(series.id, db=db)
 
@@ -595,7 +692,7 @@ async def test_style_lock_reference_generation_uses_slot_scoped_idempotency_cont
         contexts.append(kwargs.get("destination_context"))
         return f"https://cdn.test/{len(contexts)}.png"
 
-    monkeypatch.setattr(series_router, "generate_reference_url", fake_generate_reference_url)
+    monkeypatch.setattr(style_lock, "generate_reference_url", fake_generate_reference_url)
 
     missing = await series_router._fill_reference_assets(series, db)
 
@@ -616,6 +713,39 @@ async def test_style_lock_reference_generation_uses_slot_scoped_idempotency_cont
         "asset_id": scene.id,
         "slot": "reference_wideshot_url",
     }
+
+
+@pytest.mark.asyncio
+async def test_style_lock_reference_generation_runs_slots_in_parallel(db, monkeypatch):
+    from app.routers import series as series_router
+
+    series, _ = _create_series(db, with_episode=False)
+    character = Character(name="Lin", role_type="protagonist")
+    scene = Scene(name="Clinic", scene_type="indoor")
+    db.add_all([character, scene])
+    db.flush()
+    series.characters.append(character)
+    series.scenes.append(scene)
+    series.story_bible_json = {"style_lock": {"status": "locking", "version": 1}}
+    db.commit()
+
+    in_flight = 0
+    max_in_flight = 0
+
+    async def fake_generate_reference_image(db_session, prompt, **kwargs):
+        nonlocal in_flight, max_in_flight
+        in_flight += 1
+        max_in_flight = max(max_in_flight, in_flight)
+        await asyncio.sleep(0.01)
+        in_flight -= 1
+        return f"https://cdn.test/{kwargs['destination_context']['slot']}.png"
+
+    monkeypatch.setattr(style_lock, "generate_reference_image", fake_generate_reference_image)
+
+    missing = await series_router._fill_reference_assets(series, db)
+
+    assert missing == []
+    assert max_in_flight > 1
 
 
 @pytest.mark.asyncio
@@ -655,7 +785,7 @@ async def test_style_lock_blocked_agency_trace_does_not_mark_series_locked(clien
         }
 
     monkeypatch.setattr(
-        "app.routers.series.AgencyOrchestrator.run_style_lock_review",
+        "app.domains.ai_video_series.style_lock.AgencyOrchestrator.run_style_lock_review",
         blocked_style_review,
     )
     resp = client.post(f"/api/series/{series.id}/style-lock")
@@ -668,6 +798,14 @@ async def test_style_lock_blocked_agency_trace_does_not_mark_series_locked(clien
     db.expire_all()
     saved = db.query(Series).filter(Series.id == series.id).one()
     assert saved.story_bible_json["style_lock"]["locked"] is False
+    artifact = db.query(AITextArtifact).filter_by(
+        series_id=series.id,
+        target_type="series",
+        target_id=series.id,
+        artifact_type="series_bible",
+    ).one()
+    assert artifact.status == "review_pending"
+    assert artifact.review_trace_json["stage_status"] == "blocked"
 
 
 @pytest.mark.asyncio
@@ -702,9 +840,9 @@ async def test_style_lock_review_timeout_completes_with_partial_trace(client, db
         await asyncio.sleep(1)
         return {"stage": "style_lock", "stage_status": "passed"}
 
-    monkeypatch.setattr(series_router, "STYLE_LOCK_AGENCY_REVIEW_TIMEOUT_SECONDS", 0.01)
+    monkeypatch.setattr(style_lock, "STYLE_LOCK_AGENCY_REVIEW_TIMEOUT_SECONDS", 0.01)
     monkeypatch.setattr(
-        "app.routers.series.AgencyOrchestrator.run_style_lock_review",
+        "app.domains.ai_video_series.style_lock.AgencyOrchestrator.run_style_lock_review",
         slow_style_review,
     )
 
@@ -816,12 +954,12 @@ def test_director_auto_plan_persists_storyboard_with_references(client, db, monk
     }
     db.commit()
     generate = AsyncMock(return_value=json.dumps({
-            "frames": [{
-                "narration": "Lin enters the clinic.",
-                "image_prompt": "Lin walks through neon rain into the clinic.",
-                "duration": 5,
-                "audio_mode": "tts",
-            }]
+        "frames": [{
+            "narration": "Lin enters the clinic.",
+            "image_prompt": "Lin walks through neon rain into the clinic.",
+            "duration": 5,
+            "audio_mode": "tts",
+        }]
         }))
     monkeypatch.setattr("app.routers.director.ai_generator.generate_custom", generate)
 

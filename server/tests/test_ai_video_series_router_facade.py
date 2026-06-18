@@ -47,10 +47,12 @@ def test_legacy_series_router_module_is_domain_router_module():
     assert legacy_router.router is domain_router.router
 
 
-def test_legacy_monkeypatch_paths_share_domain_globals():
+def test_legacy_private_helper_names_alias_owning_modules():
     legacy_router = importlib.import_module("app.routers.series")
-    domain_router = importlib.import_module("app.domains.ai_video_series.router")
+    story_planning = importlib.import_module("app.domains.ai_video_series.story_planning")
+    style_lock = importlib.import_module("app.domains.ai_video_series.style_lock")
 
-    assert legacy_router._run_style_lock_job.__globals__ is domain_router.__dict__
-    assert legacy_router._run_story_plan_worker_step.__globals__ is domain_router.__dict__
-    assert legacy_router._fill_reference_assets.__globals__ is domain_router.__dict__
+    assert legacy_router._run_style_lock_job is style_lock.run_style_lock_job
+    assert legacy_router._run_style_lock_worker_step is style_lock.run_style_lock_worker_step
+    assert legacy_router._run_story_plan_worker_step is story_planning.run_story_plan_worker_step
+    assert legacy_router._fill_reference_assets is style_lock.fill_reference_assets

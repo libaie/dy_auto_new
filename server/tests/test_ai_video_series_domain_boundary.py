@@ -19,12 +19,27 @@ def test_legacy_series_router_stays_thin_after_migration():
     assert _line_count(router_path) <= 30
 
 
-def test_domain_router_exists_as_copied_migration_router_until_task_6():
-    """Task 6 tightens this to route assembly after schemas/read models/workers split."""
+def test_domain_router_is_route_assembly_not_business_logic_home():
     domain_router_path = REPO_ROOT / "server/app/domains/ai_video_series/router.py"
 
     assert domain_router_path.exists()
-    assert _line_count(domain_router_path) <= 1900
+    assert _line_count(domain_router_path) <= 400
+
+
+def test_domain_non_router_modules_do_not_import_fastapi():
+    module_paths = [
+        "server/app/domains/ai_video_series/read_models.py",
+        "server/app/domains/ai_video_series/artifacts.py",
+        "server/app/domains/ai_video_series/story_planning.py",
+        "server/app/domains/ai_video_series/style_lock.py",
+    ]
+    for module_path in module_paths:
+        text = (REPO_ROOT / module_path).read_text(encoding="utf-8")
+        assert "from fastapi" not in text
+        assert "import fastapi" not in text
+        assert "from starlette" not in text
+        assert "import starlette" not in text
+        assert "HTTPException" not in text
 
 
 def test_services_do_not_reverse_import_ai_video_series_domain():
@@ -45,8 +60,19 @@ def test_app_import_smoke_after_domain_skeleton():
     assert app is not None
 
 
-def _line_count(path: Path) -> int:
-    return len(path.read_text(encoding="utf-8").splitlines())
+def test_worker_modules_expose_patchable_dependency_points():
+    from app.domains.ai_video_series import story_planning, style_lock
+
+    assert hasattr(style_lock, "claim_next_job")
+    assert hasattr(style_lock, "generate_reference_url")
+    assert hasattr(style_lock, "AgencyOrchestrator")
+    assert hasattr(story_planning, "claim_next_job")
+    assert hasattr(story_planning, "generate_series_story_plan")
+
+
+def _line_count(path: Path | str) -> int:
+    resolved = path if isinstance(path, Path) else REPO_ROOT / path
+    return len(resolved.read_text(encoding="utf-8").splitlines())
 
 
 def _imports_ai_video_series_domain(tree: ast.AST) -> bool:

@@ -1,9 +1,11 @@
 """AI video series ORM compatibility facade."""
 
 from app.db_models import (
+    Base,
+    series_characters,
+    series_scenes,
     AITextArtifact,
     AITextArtifactConsumer,
-    Base,
     Episode,
     EpisodeScript,
     ProductionAuditEvent,
@@ -16,14 +18,14 @@ from app.db_models import (
     ProductionShot,
     Series,
     VideoProductionRun,
-    series_characters,
-    series_scenes,
 )
 
 __all__ = [
+    "Base",
+    "series_characters",
+    "series_scenes",
     "AITextArtifact",
     "AITextArtifactConsumer",
-    "Base",
     "Episode",
     "EpisodeScript",
     "ProductionAuditEvent",
@@ -36,6 +38,4 @@ __all__ = [
     "ProductionShot",
     "Series",
     "VideoProductionRun",
-    "series_characters",
-    "series_scenes",
 ]

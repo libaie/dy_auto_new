@@ -1,22 +1,15 @@
 """SQLAlchemy ORM models — database persistence layer."""
-import uuid
 from datetime import datetime, timezone
+
 from app.config import bj_now
+from app.db.base import Base, _uuid
 
 from sqlalchemy import (
     Column, String, Integer, Float, DateTime, Text, Boolean,
     JSON, ForeignKey, UniqueConstraint, Index, Table,
     func,
 )
-from sqlalchemy.orm import DeclarativeBase, relationship
-
-
-def _uuid() -> str:
-    return str(uuid.uuid4())
-
-
-class Base(DeclarativeBase):
-    pass
+from sqlalchemy.orm import relationship
 
 
 class Account(Base):

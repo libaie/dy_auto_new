@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from app.db_models import (
     AITextArtifact,
     AITextArtifactConsumer,
@@ -17,6 +19,9 @@ from app.db_models import (
     series_characters,
     series_scenes,
 )
+
+
+SERVER_ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_ai_video_series_model_facade_reexports_legacy_classes():
@@ -50,3 +55,39 @@ def test_ai_video_series_model_facade_uses_one_metadata_object():
     assert "series" in Base.metadata.tables
     assert "episodes" in Base.metadata.tables
     assert "video_production_runs" in Base.metadata.tables
+
+
+def test_base_is_owned_by_app_db_base():
+    from app.db.base import Base as SharedBase
+    from app.db_models import Base as LegacyBase
+
+    assert SharedBase is LegacyBase
+
+
+def test_db_models_reexports_ai_video_series_facade_names():
+    import app.db_models as legacy
+    from app.db.models import ai_video_series as models
+
+    for name in models.__all__:
+        assert getattr(legacy, name) is getattr(models, name)
+
+
+def test_ai_video_series_model_boundary_imports_in_clean_process():
+    import subprocess
+    import sys
+
+    code = (
+        "from app.db.models.ai_video_series import ProductionJob, Series; "
+        "import app.db_models as legacy; "
+        "assert legacy.Series is Series; "
+        "assert legacy.ProductionJob is ProductionJob"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        cwd=SERVER_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    assert result.returncode == 0, result.stderr

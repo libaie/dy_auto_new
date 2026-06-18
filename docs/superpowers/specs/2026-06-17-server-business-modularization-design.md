@@ -277,6 +277,8 @@ Half-migrated confusion:
 
 The full server modularization goal is complete only when the main business areas live under domain packages and the old flat technical folders no longer accumulate new business logic.
 
+- Implementation plan: `docs/superpowers/plans/2026-06-18-server-business-modularization.md`.
+
 The first implementation plan should target this narrower milestone:
 
 - `app/domains/ai_video_series` exists and owns the series route-level business flow.

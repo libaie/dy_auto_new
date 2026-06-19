@@ -10,7 +10,7 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from app.db_models import Episode, Series
 from app.services.ai_text_artifact_service import AITextArtifactService
-from app.services.episode_asset_scope_service import normalize_episode_asset_scope
+from app.domains.ai_video_series.episode_asset_scope_service import normalize_episode_asset_scope
 from app.services.story_generator_expert import generate_story_plan_with_expert
 
 

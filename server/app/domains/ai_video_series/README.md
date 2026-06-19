@@ -32,6 +32,7 @@ This domain will own the multi-episode AI video series business flow.
 |---|---|---|---|
 | `app.routers.series` | `app.domains.ai_video_series.router` | PR2 | All imports and monkeypatches use domain paths or explicit compatibility exports. |
 | `app.services.series_planning_service` | `app.domains.ai_video_series.series_planning_service` | PR5 | Production code and tests import the domain service path directly, except explicit compatibility tests. |
+| `app.services.episode_asset_scope_service` | `app.domains.ai_video_series.episode_asset_scope_service` | PR5 | Production code and tests import the domain service path directly, except explicit compatibility tests. |
 | `app.db_models` series ORM names | `app.db.models.ai_video_series` | PR4 | All production code imports series/video-series ORM names through `app.db.models.ai_video_series`; tests still prove legacy imports. |
 
 ## Migration Checklist
@@ -79,6 +80,12 @@ Do not remove `app.services.series_planning_service` until all of these are true
 - `rg "app\.services\.series_planning_service|from app\.services import series_planning_service" server/app server/tests` returns only compatibility tests and migration docs.
 - `test_ai_video_series_planning_service_facade.py` has been replaced with tests for direct domain imports.
 - Production orchestration services import `app.domains.ai_video_series.series_planning_service` directly.
+
+Do not remove `app.services.episode_asset_scope_service` until all of these are true:
+
+- `rg "app\.services\.episode_asset_scope_service" server/app server/tests` returns only compatibility tests and migration docs.
+- `test_ai_video_series_episode_asset_scope_service_facade.py` has been replaced with tests for direct domain imports.
+- Series planning code imports `app.domains.ai_video_series.episode_asset_scope_service` directly.
 
 Do not remove `app.db_models` re-exports until all of these are true:
 

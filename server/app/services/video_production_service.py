@@ -965,7 +965,7 @@ def run_ai_audit_for_assets(db: Session, run: VideoProductionRun, assets: list[V
             continue
 
         try:
-            from app.routers.audit import _do_audit
+            from app.domains.quality_audit.audit_router import _do_audit
             result = _do_audit(audit_model, audit_url, None)
         except Exception as exc:
             logger.warning("AI audit failed for asset %s: %s", asset.id, exc)
@@ -1653,7 +1653,7 @@ def run_final_audit_for_asset(db: Session, run: VideoProductionRun, asset: Video
         result = {"score": 0.0, "pass_fail": False, "issues": ["Final audit model not configured"]}
     else:
         try:
-            from app.routers.audit import _do_audit
+            from app.domains.quality_audit.audit_router import _do_audit
             result = _do_audit(audit_model, _controlled_asset_url(asset), None)
         except Exception as exc:
             result = {"score": 0.0, "pass_fail": False, "issues": [str(exc)]}

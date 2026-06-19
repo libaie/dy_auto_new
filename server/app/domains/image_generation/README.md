@@ -12,6 +12,8 @@ plus image production strategy business logic.
 
 - `image_creation_router.py` owns upload, Pixelle file proxy, task create/read,
   task sync/dispatch, asset list/review, and asset edit endpoints.
+- `image_creation_errors.py` owns `image_error` and structured image API error
+  payload construction.
 - `image_production_router.py` owns image strategies, metrics refresh, selection
   preview, A/B tests, winner decisions, image-to-video promotion, and strategy
   recommendations.
@@ -51,6 +53,7 @@ plus image production strategy business logic.
 |---|---|---|
 | `app.routers.image_creation` | `app.domains.image_generation.image_creation_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
 | `app.routers.image_production` | `app.domains.image_generation.image_production_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
+| `app.services.image_creation_errors` | `app.domains.image_generation.image_creation_errors` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.image_ab_test_service` | `app.domains.image_generation.image_ab_test_service` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.image_asset_bridge_service` | `app.domains.image_generation.image_asset_bridge_service` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.image_review_gate_service` | `app.domains.image_generation.image_review_gate_service` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
@@ -83,6 +86,12 @@ Do not remove legacy router facades until all of these are true:
 - Existing image creation and image production API tests pass.
 - Import inventory shows no unapproved production imports of
   `app.routers.image_creation` or `app.routers.image_production`.
+
+Do not remove the legacy image error helper facade until all of these are true:
+
+- `rg "app\.services\.image_creation_errors" server/app server/tests` returns only compatibility tests, migration docs, or service modules whose domains have not moved yet.
+- `test_image_generation_error_helper_facade.py` has been replaced with tests for direct domain imports.
+- Domain-owned production modules import `app.domains.image_generation.image_creation_errors` directly.
 
 Do not remove the legacy image A/B test service facade until all of these are true:
 

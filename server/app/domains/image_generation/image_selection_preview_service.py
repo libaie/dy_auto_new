@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.config import bj_now
 from app.db_models import AIModel, ImageProductionStrategy, ImageSelectionPreview
-from app.services.image_creation_errors import image_error
+from app.domains.image_generation.image_creation_errors import image_error
 from app.services.image_creation_service import MODE_TO_SCENE_CAPABILITY, contains_protected_provider_option_key
 from app.domains.image_generation.image_model_selection_service import resolve_image_model_selection
 from app.domains.image_generation.image_production_policy_runtime import estimate_image_cost, preview_image_capacity, preview_review_gate

@@ -11,7 +11,7 @@ from app.db_models import (
     ImageProductionMetric,
     ImageProductionStrategy,
 )
-from app.services.image_creation_errors import image_error
+from app.domains.image_generation.image_creation_errors import image_error
 from app.domains.image_generation.image_production_metrics_service import aggregate_strategy_metrics_payload
 
 

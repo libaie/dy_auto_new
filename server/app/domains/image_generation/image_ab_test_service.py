@@ -19,7 +19,7 @@ from app.db_models import (
     ImageProductionStrategy,
     ProductionAuditEvent,
 )
-from app.services.image_creation_errors import image_error
+from app.domains.image_generation.image_creation_errors import image_error
 from app.services.image_creation_service import (
     _apply_strategy_defaults,
     _resolve_reference_images,

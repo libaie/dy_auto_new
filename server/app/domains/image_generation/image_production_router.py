@@ -17,7 +17,7 @@ from app.services.image_ab_test_service import (
     refresh_ab_group,
     serialize_ab_group,
 )
-from app.services.image_asset_bridge_service import (
+from app.domains.image_generation.image_asset_bridge_service import (
     promote_image_asset_to_video_asset,
     video_asset_payload,
 )

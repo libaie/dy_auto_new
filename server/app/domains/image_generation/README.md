@@ -15,6 +15,9 @@ plus image production strategy business logic.
 - `image_production_router.py` owns image strategies, metrics refresh, selection
   preview, A/B tests, winner decisions, image-to-video promotion, and strategy
   recommendations.
+- `image_asset_bridge_service.py` owns `promote_image_asset_to_video_asset`,
+  `video_asset_payload`, image review gate enforcement, scope validation, and
+  video asset promotion metadata.
 - `image_production_strategy_service.py` owns `seed_default_image_strategies`,
   strategy validation, CRUD/version writes, status transitions, and
   `strategy_payload`.
@@ -43,6 +46,7 @@ plus image production strategy business logic.
 |---|---|---|
 | `app.routers.image_creation` | `app.domains.image_generation.image_creation_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
 | `app.routers.image_production` | `app.domains.image_generation.image_production_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
+| `app.services.image_asset_bridge_service` | `app.domains.image_generation.image_asset_bridge_service` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.image_production_strategy_service` | `app.domains.image_generation.image_production_strategy_service` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.image_production_policy_runtime` | `app.domains.image_generation.image_production_policy_runtime` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.image_production_metrics_service` | `app.domains.image_generation.image_production_metrics_service` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
@@ -72,6 +76,12 @@ Do not remove legacy router facades until all of these are true:
 - Existing image creation and image production API tests pass.
 - Import inventory shows no unapproved production imports of
   `app.routers.image_creation` or `app.routers.image_production`.
+
+Do not remove the legacy image asset bridge service facade until all of these are true:
+
+- `rg "app\.services\.image_asset_bridge_service" server/app server/tests` returns only compatibility tests, migration docs, or service modules whose domains have not moved yet.
+- `test_image_generation_asset_bridge_facade.py` has been replaced with tests for direct domain imports.
+- Domain-owned production modules import `app.domains.image_generation.image_asset_bridge_service` directly.
 
 Do not remove the legacy image strategy service facade until all of these are true:
 

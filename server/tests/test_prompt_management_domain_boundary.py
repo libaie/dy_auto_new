@@ -61,11 +61,12 @@ def test_prompt_management_legacy_router_file_is_thin_facade():
     assert _line_count(LEGACY_PROMPT_TEMPLATES_PATH) <= 20
 
 
-def test_prompt_management_main_wiring_remains_legacy_until_pr4():
+def test_prompt_management_main_wires_domain_router():
     text = MAIN_PATH.read_text(encoding="utf-8")
 
-    assert "prompt_templates" in text
-    assert "app.include_router(prompt_templates.router)" in text
+    assert "from app.domains.prompt_management import prompt_templates_router" in text
+    assert "app.include_router(prompt_templates_router.router)" in text
+    assert "app.include_router(prompt_templates.router)" not in text
 
 
 def test_app_import_smoke_keeps_prompt_management_routes_registered_once():

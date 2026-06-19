@@ -23,6 +23,8 @@ from app.domains.creative_library import characters_router, reference_data_route
 from app.domains.device_operations import admin_router, device_router
 from app.domains.identity_access import auth_router
 from app.domains.image_generation import image_creation_router, image_production_router
+from app.domains.model_configuration import ai_models_router
+from app.domains.model_configuration.ai_models_router import seed_ai_models
 from app.domains.prompt_management import prompt_templates_router
 from app.domains.reporting import stats_router
 from app.domains.selector_management import selectors_router
@@ -31,7 +33,7 @@ from app.domains.system_operations import system_health_router
 from app.domains.system_configuration import settings_router
 from app.domains.task_operations import tasks_router
 from app.domains.video_library import videos_router
-from app.routers import pixelle, ai_config, series, audit, director, video_production, agency
+from app.routers import pixelle, series, audit, director, video_production, agency
 from app.services.ai_generator import ai_generator
 
 
@@ -173,7 +175,6 @@ async def lifespan(app: FastAPI):
         try:
             from app.domains.creative_library.reference_data_router import seed_reference_data
             seed_reference_data(db)
-            from app.routers.ai_config import seed_ai_models
             seed_ai_models(db)
         finally:
             db.close()
@@ -245,7 +246,7 @@ app.include_router(videos_router.router)
 app.include_router(pixelle.router)
 app.include_router(pixelle.proxy_router)
 
-app.include_router(ai_config.router)
+app.include_router(ai_models_router.router)
 app.include_router(characters_router.router)
 app.include_router(scenes_router.router)
 app.include_router(series.router)

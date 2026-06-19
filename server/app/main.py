@@ -33,6 +33,7 @@ from app.domains.prompt_management import prompt_templates_router
 from app.domains.quality_audit import audit_router
 from app.domains.reporting import stats_router
 from app.domains.selector_management import selectors_router
+from app.domains.seedance_integration import seedance_router
 from app.domains.script_pipeline import pipeline_router
 from app.domains.storyboard_images import storyboard_images_router
 from app.domains.system_operations import system_health_router
@@ -251,6 +252,8 @@ app.include_router(data_router.router)
 app.include_router(videos_router.router)
 app.include_router(pixelle_router.router)
 app.include_router(pixelle_router.proxy_router)
+app.include_router(seedance_router.api_router)
+app.include_router(seedance_router.proxy_router)
 
 app.include_router(ai_models_router.router)
 app.include_router(characters_router.router)

@@ -22,7 +22,7 @@ from app.db_models import (
 from app.domains.video_production.production_errors import ProductionErrorCode, ProductionRepairableError, to_http_detail
 from app.domains.video_production.production_review_service import apply_bulk_review_action
 from app.domains.video_production.production_segment_service import retry_segment
-from app.services.production_tree_service import get_run_tree
+from app.domains.video_production.production_tree_service import get_run_tree
 from app.services.review_asset_edit_service import (
     ReviewAssetEditError,
     edit_image_asset,

@@ -1,6 +1,7 @@
 # Image Generation Domain
 
-This domain owns the admin image creation and image production route boundary.
+This domain owns the admin image creation and image production route boundary,
+plus image production strategy business logic.
 
 ## Owned Routes
 
@@ -14,6 +15,9 @@ This domain owns the admin image creation and image production route boundary.
 - `image_production_router.py` owns image strategies, metrics refresh, selection
   preview, A/B tests, winner decisions, image-to-video promotion, and strategy
   recommendations.
+- `image_production_strategy_service.py` owns `seed_default_image_strategies`,
+  strategy validation, CRUD/version writes, status transitions, and
+  `strategy_payload`.
 
 ## Facade Register
 
@@ -21,13 +25,14 @@ This domain owns the admin image creation and image production route boundary.
 |---|---|---|
 | `app.routers.image_creation` | `app.domains.image_generation.image_creation_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
 | `app.routers.image_production` | `app.domains.image_generation.image_production_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
+| `app.services.image_production_strategy_service` | `app.domains.image_generation.image_production_strategy_service` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 
 ## Boundaries
 
 - Keep image route paths, methods, auth dependencies, response shapes, and route
   function names stable.
-- Keep service implementations in `app.services.*` until a service-split plan is
-  approved.
+- Keep remaining service implementations in `app.services.*` until their
+  service-split plans are approved.
 - Keep ORM models in `app.db_models` during this route-boundary migration.
 - Do not move video production, agency review, AI config, or Pixelle proxy
   ownership into this domain unless a later plan explicitly expands scope.
@@ -43,3 +48,9 @@ Do not remove legacy router facades until all of these are true:
 - Existing image creation and image production API tests pass.
 - Import inventory shows no unapproved production imports of
   `app.routers.image_creation` or `app.routers.image_production`.
+
+Do not remove the legacy image strategy service facade until all of these are true:
+
+- `rg "app\.services\.image_production_strategy_service" server/app server/tests` returns only compatibility tests and migration docs.
+- `test_image_generation_strategy_service_facade.py` has been replaced with tests for direct domain imports.
+- Domain-owned production modules import `app.domains.image_generation.image_production_strategy_service` directly.

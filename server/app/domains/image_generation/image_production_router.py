@@ -27,7 +27,7 @@ from app.services.image_production_metrics_service import (
     refresh_all_image_strategy_metrics,
 )
 from app.services.image_production_recommendation_service import strategy_recommendation_payload
-from app.services.image_production_strategy_service import (
+from app.domains.image_generation.image_production_strategy_service import (
     create_strategy,
     get_strategy,
     list_strategies,

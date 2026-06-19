@@ -6,6 +6,7 @@ from fastapi.routing import APIRoute
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PLAN_PATH = REPO_ROOT / "docs/superpowers/plans/2026-06-18-content-collection-domain-plan.md"
 FUTURE_DOMAIN_PATH = REPO_ROOT / "server/app/domains/content_collection"
+FUTURE_DOMAIN_README_PATH = FUTURE_DOMAIN_PATH / "README.md"
 CONTENT_ROUTER_PATH = REPO_ROOT / "server/app/routers/content.py"
 DATA_ROUTER_PATH = REPO_ROOT / "server/app/routers/data.py"
 DM_SEQUENCES_ROUTER_PATH = REPO_ROOT / "server/app/routers/dm_sequences.py"
@@ -35,8 +36,29 @@ def test_content_collection_future_contract_is_documented_in_plan():
         assert term in text
 
 
-def test_content_collection_domain_package_is_not_created_in_pr1():
-    assert not FUTURE_DOMAIN_PATH.exists()
+def test_content_collection_domain_package_exports_metadata_only_skeleton():
+    import app.domains.content_collection as domain
+
+    assert domain.DOMAIN_NAME == "content_collection"
+    assert domain.PUBLIC_ROUTE_PREFIXES == ("/api/content", "/api/data", "/api/dm-sequences")
+
+
+def test_content_collection_readme_documents_facades_and_cleanup_gates():
+    text = FUTURE_DOMAIN_README_PATH.read_text(encoding="utf-8")
+
+    required_terms = [
+        "Facade Register",
+        "app.routers.content",
+        "app.domains.content_collection.content_router",
+        "app.routers.data",
+        "app.domains.content_collection.data_router",
+        "app.routers.dm_sequences",
+        "app.domains.content_collection.dm_sequences_router",
+        "app.domains.device_operations.content_bridge",
+        "Compatibility Cleanup Gates",
+    ]
+    for term in required_terms:
+        assert term in text
 
 
 def test_content_collection_legacy_router_files_still_own_behavior_in_pr1():

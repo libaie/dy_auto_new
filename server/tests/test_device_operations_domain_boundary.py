@@ -132,6 +132,33 @@ def test_device_operations_pr4b_extracts_polling_and_reporting_modules():
     assert "app.domains.device_operations.reporting.report_risk" in endpoint_modules
 
 
+def test_device_operations_pr4c_extracts_script_assets_module():
+    import app.domains.device_operations.device_router as device_router
+    import app.domains.device_operations.script_assets as script_assets
+
+    assert hasattr(script_assets, "get_selectors")
+    assert hasattr(script_assets, "get_prompt_templates")
+    assert hasattr(script_assets, "script_version")
+    assert hasattr(script_assets, "script_download")
+    assert hasattr(script_assets, "script_upload")
+    assert hasattr(script_assets, "device_list_templates")
+    assert hasattr(script_assets, "device_download_template")
+    assert hasattr(script_assets, "device_calibrate")
+    endpoint_modules = {
+        f"{route.endpoint.__module__}.{route.endpoint.__qualname__}"
+        for route in device_router.router.routes
+        if hasattr(route, "endpoint")
+    }
+    assert "app.domains.device_operations.script_assets.get_selectors" in endpoint_modules
+    assert "app.domains.device_operations.script_assets.get_prompt_templates" in endpoint_modules
+    assert "app.domains.device_operations.script_assets.script_version" in endpoint_modules
+    assert "app.domains.device_operations.script_assets.script_download" in endpoint_modules
+    assert "app.domains.device_operations.script_assets.script_upload" in endpoint_modules
+    assert "app.domains.device_operations.script_assets.device_list_templates" in endpoint_modules
+    assert "app.domains.device_operations.script_assets.device_download_template" in endpoint_modules
+    assert "app.domains.device_operations.script_assets.device_calibrate" in endpoint_modules
+
+
 def test_main_continues_to_wire_legacy_device_routers_during_migration():
     text = MAIN_PATH.read_text(encoding="utf-8")
 

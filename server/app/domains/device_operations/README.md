@@ -60,6 +60,18 @@ device reporting, script assets, and the admin device management surface.
 - Do not move `server/app/main.py::_offline_checker` yet.
 - Do not change admin device management routes yet.
 
+## PR4c Allowed
+
+- Move selector sync, prompt-template sync, script version/download/upload, template image sync, and calibration routes to `script_assets.py`.
+- Keep `device_router.py` as the `/api/device/*` route aggregator.
+- Keep route order, public paths, methods, auth dependencies, and response shapes unchanged.
+
+## PR4c Not Allowed
+
+- Do not move device registration, AI proxy, content bridge, DM bridge, user profile, or avatar handlers yet.
+- Do not move `server/app/main.py::_offline_checker` yet.
+- Do not change admin device management routes yet.
+
 ## Ownership Rules
 
 - `app.domains.device_operations` owns the target migration boundary for `/api/device/*` and `/api/devices/*`.
@@ -69,6 +81,7 @@ device reporting, script assets, and the admin device management surface.
 - `app.domains.device_operations.status_ws` owns the device status websocket and pending-task websocket notification helper.
 - `app.domains.device_operations.polling` owns device task polling, cancellation delivery, DM sequence sync, and poll response shaping.
 - `app.domains.device_operations.reporting` owns task progress, task result, stats increment, heartbeat, and risk-control reporting.
+- `app.domains.device_operations.script_assets` owns selectors, prompt-template sync, script packages, template images, and calibration uploads.
 - `server/app/main.py::_offline_checker` remains in `app.main` until lifecycle behavior is moved behind `status_lifecycle.py`.
 - Content, collection, and DM endpoints under `/api/device/*` are a temporary bridge; final business ownership belongs to a future `content_collection` domain.
 - Domain non-router modules must avoid FastAPI imports unless they are route assembly modules.

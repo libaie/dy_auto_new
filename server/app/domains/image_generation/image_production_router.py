@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.db_models import ImageProductionMetric, ImageProductionStrategy
 from app.deps import require_role, verify_admin_token
-from app.services.image_ab_test_service import (
+from app.domains.image_generation.image_ab_test_service import (
     adopt_ab_winner,
     create_ab_group,
     get_ab_group,

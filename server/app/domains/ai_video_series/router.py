@@ -45,7 +45,10 @@ from app.services.asset_lifecycle_service import (
     unlink_scene_from_series,
 )
 from app.services.production_run_service import generate_episode_script_storyboard
-from app.services.series_planning_service import ensure_episode_placeholders, ensure_series_continuity_artifacts
+from app.domains.ai_video_series.series_planning_service import (
+    ensure_episode_placeholders,
+    ensure_series_continuity_artifacts,
+)
 
 router = APIRouter(prefix="/api/series", tags=["series"])
 

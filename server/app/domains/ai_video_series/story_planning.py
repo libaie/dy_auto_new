@@ -20,7 +20,7 @@ from app.services.production_status import (
     PLAN_COMPLETED,
     PLAN_READY,
 )
-from app.services.series_planning_service import generate_series_story_plan
+from app.domains.ai_video_series.series_planning_service import generate_series_story_plan
 
 
 logger = logging.getLogger(__name__)

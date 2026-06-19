@@ -70,10 +70,12 @@ def test_identity_access_legacy_router_file_is_thin_facade():
     assert _line_count(LEGACY_AUTH_PATH) <= 20
 
 
-def test_identity_access_main_keeps_legacy_router_until_direct_wiring():
+def test_identity_access_main_wires_domain_router():
     text = MAIN_PATH.read_text(encoding="utf-8")
 
-    assert "app.include_router(auth.router)" in text
+    assert "from app.domains.identity_access import auth_router" in text
+    assert "app.include_router(auth_router.router)" in text
+    assert "app.include_router(auth.router)" not in text
 
 
 def test_identity_access_keeps_device_operations_separate():

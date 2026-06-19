@@ -14,7 +14,7 @@ from app.services.asset_ai_rewrite_service import (
     generate_scene_rewrite_candidate,
 )
 from app.services.asset_lifecycle_service import AssetLifecycleError, archive_character_or_scene
-from app.services.reference_asset_service import ReferenceAssetError, generate_scene_reference_images
+from app.domains.creative_library.reference_asset_service import ReferenceAssetError, generate_scene_reference_images
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/scenes", tags=["scenes"])

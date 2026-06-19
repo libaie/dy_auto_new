@@ -1,7 +1,7 @@
 # Creative Library Domain
 
 This domain owns reusable creative asset routes for characters, scenes, and
-reference dictionaries.
+reference dictionaries, plus character and scene reference asset generation.
 
 ## Owned Routes
 
@@ -18,6 +18,10 @@ reference dictionaries.
   image generation, and scene AI rewrite endpoints.
 - `reference_data_router.py` owns reference category/item CRUD and default seed
   data.
+- `reference_asset_service.py` owns `ReferenceAssetError`,
+  `generate_character_reference_images`, `generate_scene_reference_images`,
+  `generate_reference_url`, reference URL usability checks, provider task reuse,
+  and character/scene reference row updates.
 
 ## Facade Register
 
@@ -26,12 +30,15 @@ reference dictionaries.
 | `app.routers.characters` | `app.domains.creative_library.characters_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
 | `app.routers.scenes` | `app.domains.creative_library.scenes_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
 | `app.routers.reference_data` | `app.domains.creative_library.reference_data_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
+| `app.services.reference_asset_service` | `app.domains.creative_library.reference_asset_service` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 
 ## Boundaries
 
 - Keep series character/scene linking in `ai_video_series`.
-- Keep asset reference generation and AI rewrite service bodies in
-  `app.services.*` until a service-split plan is approved.
+- Keep AI rewrite service bodies in `app.services.*` until a service-split plan
+  is approved.
+- Non-domain service modules may keep importing
+  `app.services.reference_asset_service` until their owning domains move.
 - Keep ORM models in `app.db_models` during this route-boundary migration.
 - Keep startup reference data seeding behavior unchanged.
 
@@ -48,3 +55,9 @@ Do not remove legacy router facades until all of these are true:
 - Import inventory shows no unapproved production imports of
   `app.routers.characters`, `app.routers.scenes`, or
   `app.routers.reference_data`.
+
+Do not remove the legacy reference asset service facade until all of these are true:
+
+- `rg "app\.services\.reference_asset_service" server/app server/tests` returns only compatibility tests and migration docs.
+- `test_creative_library_reference_asset_service_facade.py` has been replaced with tests for direct domain imports.
+- Domain-owned production modules import `app.domains.creative_library.reference_asset_service` directly.

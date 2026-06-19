@@ -19,6 +19,7 @@ from app.database import get_db, init_db, SessionLocal
 from app.seed import seed_all
 from app.domains.account_operations import accounts_router, account_groups_router, chains_router, channels_router
 from app.domains.agency_operations import agency_router
+from app.domains.ai_text_artifacts import ai_text_artifacts_router
 from app.domains.content_collection import content_router, data_router, dm_sequences_router
 from app.domains.creative_library import characters_router, reference_data_router, scenes_router
 from app.domains.device_operations import admin_router, device_router
@@ -259,6 +260,7 @@ app.include_router(audit_router.router)
 app.include_router(director_router.router)
 app.include_router(video_production.router)
 app.include_router(agency_router.router)
+app.include_router(ai_text_artifacts_router.router)
 app.include_router(image_creation_router.router)
 app.include_router(image_production_router.router)
 app.include_router(system_health_router.router)

@@ -77,16 +77,17 @@ def test_creative_library_legacy_router_files_are_thin_facades():
         assert _line_count(path) <= 20
 
 
-def test_creative_library_main_wiring_remains_legacy_until_pr4():
+def test_creative_library_main_wires_domain_routers():
     text = MAIN_PATH.read_text(encoding="utf-8")
 
-    assert "from app.routers import" in text
-    assert "characters" in text
-    assert "scenes" in text
-    assert "reference_data" in text
-    assert "app.include_router(characters.router)" in text
-    assert "app.include_router(scenes.router)" in text
-    assert "app.include_router(reference_data.router)" in text
+    assert "from app.domains.creative_library import characters_router, reference_data_router, scenes_router" in text
+    assert "from app.domains.creative_library.reference_data_router import seed_reference_data" in text
+    assert "app.include_router(characters_router.router)" in text
+    assert "app.include_router(scenes_router.router)" in text
+    assert "app.include_router(reference_data_router.router)" in text
+    assert "app.include_router(characters.router)" not in text
+    assert "app.include_router(scenes.router)" not in text
+    assert "app.include_router(reference_data.router)" not in text
 
 
 def test_app_import_smoke_keeps_creative_library_routes_registered_once():

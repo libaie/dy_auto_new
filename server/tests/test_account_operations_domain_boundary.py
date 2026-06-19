@@ -86,14 +86,18 @@ def test_account_operations_pr1_keeps_legacy_router_files_active():
         assert _line_count(path) <= 20
 
 
-def test_account_operations_pr1_does_not_wire_domain_in_main():
+def test_main_wires_account_operation_domain_routers_after_cleanup_gate():
     text = MAIN_PATH.read_text(encoding="utf-8")
 
-    assert "app.domains.account_operations" not in text
-    assert "app.include_router(accounts.router)" in text
-    assert "app.include_router(account_groups.router)" in text
-    assert "app.include_router(channels.router)" in text
-    assert "app.include_router(chains.router)" in text
+    assert "from app.domains.account_operations import accounts_router, account_groups_router, chains_router, channels_router" in text
+    assert "app.include_router(accounts_router.router)" in text
+    assert "app.include_router(account_groups_router.router)" in text
+    assert "app.include_router(channels_router.router)" in text
+    assert "app.include_router(chains_router.router)" in text
+    assert "app.include_router(accounts.router)" not in text
+    assert "app.include_router(account_groups.router)" not in text
+    assert "app.include_router(channels.router)" not in text
+    assert "app.include_router(chains.router)" not in text
 
 
 def test_tasks_router_remains_outside_account_operations_pr1():

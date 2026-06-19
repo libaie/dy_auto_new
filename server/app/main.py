@@ -17,9 +17,10 @@ from contextlib import asynccontextmanager
 from app.config import bj_now
 from app.database import get_db, init_db, SessionLocal
 from app.seed import seed_all
+from app.domains.account_operations import accounts_router, account_groups_router, chains_router, channels_router
 from app.domains.content_collection import content_router, data_router, dm_sequences_router
 from app.domains.device_operations import admin_router, device_router
-from app.routers import tasks, accounts, auth, selectors, stats, account_groups, chains, settings, channels, prompt_templates, videos, pixelle, ai_config, characters, scenes, series, pipeline, audit, director, reference_data, video_production, agency
+from app.routers import tasks, auth, selectors, stats, settings, prompt_templates, videos, pixelle, ai_config, characters, scenes, series, pipeline, audit, director, reference_data, video_production, agency
 from app.routers import image_creation, image_production
 from app.routers import system_health
 from app.services.ai_generator import ai_generator
@@ -219,16 +220,16 @@ async def _catch_unhandled_errors(request: Request, call_next):
 
 app.include_router(device_router.router)
 app.include_router(tasks.router)
-app.include_router(accounts.router)
+app.include_router(accounts_router.router)
 app.include_router(admin_router.router)
 app.include_router(auth.router)
 app.include_router(selectors.router)
 app.include_router(stats.router)
 app.include_router(content_router.router)
-app.include_router(account_groups.router)
-app.include_router(chains.router)
+app.include_router(account_groups_router.router)
+app.include_router(chains_router.router)
 app.include_router(settings.router)
-app.include_router(channels.router)
+app.include_router(channels_router.router)
 app.include_router(prompt_templates.router)
 app.include_router(data_router.router)
 app.include_router(videos.router)

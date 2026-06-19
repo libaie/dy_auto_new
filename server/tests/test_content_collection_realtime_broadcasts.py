@@ -10,7 +10,10 @@ HEADERS = {"X-Device-Secret": SECRET}
 
 
 def test_content_template_mutation_broadcasts_content_changed():
-    with patch("app.routers.content.pair_ws_manager.broadcast_to_admins", new_callable=AsyncMock) as broadcast:
+    with patch(
+        "app.domains.content_collection.content_router.pair_ws_manager.broadcast_to_admins",
+        new_callable=AsyncMock,
+    ) as broadcast:
         with TestClient(app) as client:
             response = client.post(
                 "/api/content/templates",
@@ -27,7 +30,10 @@ def test_content_template_mutation_broadcasts_content_changed():
 
 
 def test_sensitive_word_mutation_broadcasts_content_changed():
-    with patch("app.routers.content.pair_ws_manager.broadcast_to_admins", new_callable=AsyncMock) as broadcast:
+    with patch(
+        "app.domains.content_collection.content_router.pair_ws_manager.broadcast_to_admins",
+        new_callable=AsyncMock,
+    ) as broadcast:
         with TestClient(app) as client:
             response = client.post(
                 "/api/content/sensitive-words",

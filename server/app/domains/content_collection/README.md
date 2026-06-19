@@ -22,6 +22,21 @@ this domain provides stable use cases and compatibility tests for that handoff.
 - Do not move ORM model ownership or persistence class bodies.
 - Do not modify frontend code.
 
+## PR3 Allowed
+
+- Create `content_router.py` from the current `app.routers.content` behavior.
+- Create `data_router.py` from the current `app.routers.data` behavior.
+- Create `dm_sequences_router.py` from the current `app.routers.dm_sequences` behavior.
+- Replace legacy router files with compatibility facades.
+- Keep route paths, methods, auth dependencies, response shapes, export streams, and realtime payloads unchanged.
+
+## PR3 Not Allowed
+
+- Do not split handler internals yet.
+- Do not move device bridge use cases yet.
+- Do not change application wiring away from legacy imports yet.
+- Do not move ORM model ownership or persistence class bodies.
+
 ## Ownership Rules
 
 - `app.domains.content_collection` owns the target migration boundary for `/api/content/*`, `/api/data/*`, and `/api/dm-sequences/*`.
@@ -36,9 +51,9 @@ this domain provides stable use cases and compatibility tests for that handoff.
 
 | Facade | Target | Introduced | Exit condition |
 |---|---|---|---|
-| `app.routers.content` | `app.domains.content_collection.content_router` | Planned PR3 | Route/auth snapshots and existing content API tests pass with the domain router and all callers have an explicit compatibility path. |
-| `app.routers.data` | `app.domains.content_collection.data_router` | Planned PR3 | Data read/export snapshots pass with the domain router and streaming export behavior is unchanged. |
-| `app.routers.dm_sequences` | `app.domains.content_collection.dm_sequences_router` | Planned PR3 | DM sequence CRUD, generation, variant, and device-sync tests pass with the domain router. |
+| `app.routers.content` | `app.domains.content_collection.content_router` | PR3 | Route/auth snapshots and existing content API tests pass with the domain router and all callers have an explicit compatibility path. |
+| `app.routers.data` | `app.domains.content_collection.data_router` | PR3 | Data read/export snapshots pass with the domain router and streaming export behavior is unchanged. |
+| `app.routers.dm_sequences` | `app.domains.content_collection.dm_sequences_router` | PR3 | DM sequence CRUD, generation, variant, and device-sync tests pass with the domain router. |
 | `app.domains.device_operations.content_bridge` | `app.domains.content_collection` use cases | Planned PR5 | Device bridge tests prove `/api/device/*` auth, response shape, and realtime events are unchanged. |
 
 ## Migration Checklist

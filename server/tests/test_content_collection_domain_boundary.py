@@ -61,17 +61,26 @@ def test_content_collection_readme_documents_facades_and_cleanup_gates():
         assert term in text
 
 
-def test_content_collection_legacy_router_files_still_own_behavior_in_pr1():
+def test_content_collection_migration_keeps_legacy_router_files_active():
     content_text = CONTENT_ROUTER_PATH.read_text(encoding="utf-8")
     data_text = DATA_ROUTER_PATH.read_text(encoding="utf-8")
     dm_text = DM_SEQUENCES_ROUTER_PATH.read_text(encoding="utf-8")
 
-    assert "APIRouter(prefix=\"/api/content\"" in content_text
-    assert "APIRouter(prefix=\"/api/data\"" in data_text
-    assert "APIRouter(prefix=\"/api/dm-sequences\"" in dm_text
-    assert "app.domains.content_collection" not in content_text
-    assert "app.domains.content_collection" not in data_text
-    assert "app.domains.content_collection" not in dm_text
+    assert "app.domains.content_collection" in content_text
+    assert "app.domains.content_collection" in data_text
+    assert "app.domains.content_collection" in dm_text
+    assert "sys.modules[_LEGACY_MODULE_NAME]" in content_text
+    assert "sys.modules[_LEGACY_MODULE_NAME]" in data_text
+    assert "sys.modules[_LEGACY_MODULE_NAME]" in dm_text
+    assert _line_count(CONTENT_ROUTER_PATH) <= 20
+    assert _line_count(DATA_ROUTER_PATH) <= 20
+    assert _line_count(DM_SEQUENCES_ROUTER_PATH) <= 20
+
+
+def test_content_collection_pr3_owns_router_modules():
+    assert (FUTURE_DOMAIN_PATH / "content_router.py").exists()
+    assert (FUTURE_DOMAIN_PATH / "data_router.py").exists()
+    assert (FUTURE_DOMAIN_PATH / "dm_sequences_router.py").exists()
 
 
 def test_app_import_smoke_keeps_content_collection_routes_registered():
@@ -85,3 +94,7 @@ def test_app_import_smoke_keeps_content_collection_routes_registered():
     assert "/api/dm-sequences" in paths
     assert "/api/dm-sequences/device/sync" in paths
     assert "/api/device/collect-report" in paths
+
+
+def _line_count(path):
+    return len(path.read_text(encoding="utf-8").splitlines())

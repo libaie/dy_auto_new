@@ -243,7 +243,7 @@ async def test_lifespan_starts_and_cancels_offline_checker_task(monkeypatch):
 
 
 async def _run_offline_checker_one_cycle(monkeypatch, session, manager, now):
-    import app.main as main
+    import app.domains.device_operations.status_lifecycle as lifecycle
     import app.ws_manager as ws_manager_module
 
     sleep_calls = 0
@@ -255,10 +255,10 @@ async def _run_offline_checker_one_cycle(monkeypatch, session, manager, now):
             return None
         raise asyncio.CancelledError()
 
-    monkeypatch.setattr(main.asyncio, "sleep", fake_sleep)
-    monkeypatch.setattr(main, "SessionLocal", lambda: session)
-    monkeypatch.setattr(main, "bj_now", lambda: now)
+    monkeypatch.setattr(lifecycle.asyncio, "sleep", fake_sleep)
+    monkeypatch.setattr(lifecycle, "SessionLocal", lambda: session)
+    monkeypatch.setattr(lifecycle, "bj_now", lambda: now)
     monkeypatch.setattr(ws_manager_module, "pair_ws_manager", manager)
 
     with pytest.raises(asyncio.CancelledError):
-        await main._offline_checker()
+        await lifecycle.offline_checker()

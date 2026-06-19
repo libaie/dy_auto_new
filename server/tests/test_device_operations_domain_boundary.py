@@ -81,10 +81,9 @@ def test_device_operations_readme_documents_facades_and_cleanup_gates():
         assert term in text
 
 
-def test_device_operations_pr3_owns_router_modules_but_not_lifecycle_module():
+def test_device_operations_pr3_owns_router_modules():
     assert (FUTURE_DOMAIN_PATH / "device_router.py").exists()
     assert (FUTURE_DOMAIN_PATH / "admin_router.py").exists()
-    assert not (FUTURE_DOMAIN_PATH / "status_lifecycle.py").exists()
 
 
 def test_device_operations_pr4a_extracts_pairing_and_status_ws_modules():
@@ -194,13 +193,28 @@ def test_device_operations_pr4d_extracts_content_bridge_module():
     assert "app.domains.device_operations.content_bridge.get_user_avatar" in endpoint_modules
 
 
+def test_device_operations_pr5_extracts_status_lifecycle_module():
+    import inspect
+
+    import app.main as main
+    import app.domains.device_operations.status_lifecycle as status_lifecycle
+
+    assert hasattr(status_lifecycle, "offline_checker")
+    assert (FUTURE_DOMAIN_PATH / "status_lifecycle.py").exists()
+    main_checker_source = inspect.getsource(main._offline_checker)
+    assert "status_lifecycle import offline_checker" in main_checker_source
+    assert "drain_heartbeats" not in main_checker_source
+    assert "TASK_STALE_MINUTES" not in main_checker_source
+
+
 def test_main_continues_to_wire_legacy_device_routers_during_migration():
     text = MAIN_PATH.read_text(encoding="utf-8")
 
     assert "from app.routers import device" in text
     assert "app.include_router(device.router)" in text
     assert "app.include_router(devices.router)" in text
-    assert "device_operations" not in text
+    assert "app.domains.device_operations.device_router" not in text
+    assert "app.domains.device_operations.admin_router" not in text
 
 
 def test_app_import_smoke_keeps_device_routes_registered():

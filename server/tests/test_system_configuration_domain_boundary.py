@@ -70,10 +70,12 @@ def test_system_configuration_legacy_router_file_is_thin_facade():
     assert _line_count(LEGACY_SETTINGS_PATH) <= 20
 
 
-def test_system_configuration_main_keeps_legacy_router_until_direct_wiring():
+def test_system_configuration_main_wires_domain_router():
     text = MAIN_PATH.read_text(encoding="utf-8")
 
-    assert "app.include_router(settings.router)" in text
+    assert "from app.domains.system_configuration import settings_router" in text
+    assert "app.include_router(settings_router.router)" in text
+    assert "app.include_router(settings.router)" not in text
 
 
 def test_system_configuration_stays_separate_from_system_operations():

@@ -1,7 +1,6 @@
 """Device-facing API — poll, report, heartbeat, selectors."""
 import logging
 from fastapi import APIRouter, HTTPException, Query, Depends, UploadFile, File as FastAPIFile, Request
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from typing import Optional
 from sqlalchemy.orm import Session
@@ -10,311 +9,29 @@ import io
 logger = logging.getLogger(__name__)
 
 from app.models import (
-    TaskProgressReport, TaskResultReport, PollResponse, DeviceRegisterRequest,
-    DeviceRegisterResponse, RiskReport, DeviceGenerateRequest, DeviceGenerateResponse,
+    DeviceRegisterRequest,
+    DeviceRegisterResponse, DeviceGenerateRequest, DeviceGenerateResponse,
     DeviceAIProxyRequest, DeviceAIProxyResponse,
     CollectReportRequest, CollectCommentData, CollectUserData,
     DMClaimRecipientRequest, DMClaimRecipientResponse,
     DMSendReportRequest, DMReleaseRecipientRequest, DMReleaseRecipientResponse,
-    StatsIncrementRequest,
 )
 from app.database import get_db
 from app.deps import verify_device_secret, verify_admin_token
-from app.services.task_service import task_service
 from app.config import ANTI_DETECT_CONFIG, ANTI_DETECT_CONFIG_VERSION, DEVICE_CONFIG, bj_now
 from app.services.selector_service import selector_service
 from app.services.prompt_template_service import prompt_template_service
 from app.ws_manager import pair_ws_manager
-from app.domains.device_operations import pairing, status_ws
-from app.domains.device_operations.status_ws import _notify_pending_tasks
+from app.domains.device_operations import pairing, polling, reporting, status_ws
 
 router = APIRouter(prefix="/api/device", tags=["device"])
 
 router.include_router(pairing.router)
 router.include_router(status_ws.router)
 
-@router.get("/poll", response_model=PollResponse)
-async def poll_tasks(
-    device_id: str = Query(...),
-    db: Session = Depends(get_db),
-    authed_device_id: Optional[str] = Depends(verify_device_secret),
-):
-    # Per-device secret: use the verified device_id, reject mismatch
-    if authed_device_id and authed_device_id != device_id:
-        raise HTTPException(status_code=403, detail="Device ID mismatch")
-    if authed_device_id:
-        device_id = authed_device_id
+router.include_router(polling.router)
+router.include_router(reporting.router)
 
-    # HTTP poll itself is a heartbeat — update last_seen_at
-    from app.services.device_service import device_service
-    device_service.update_heartbeat(db, device_id)
-
-    # Check cancellation FIRST — if there's a pending cancel, deliver it
-    # before dispatching any new task (prevents concurrent cancel+dispatch).
-    cancelled_task = task_service.check_cancelled_running(db, device_id)
-    if cancelled_task:
-        logger.info("[poll] device=%s delivering cancelled_task_id=%s (skipping dispatch)",
-            device_id, cancelled_task.id[:8])
-        return PollResponse(
-            task=None,
-            selectors_version=selector_service.get_version(db),
-            prompt_templates_version=prompt_template_service.get_version(db),
-            proxy=None,
-            cancelled_task_id=cancelled_task.id,
-            anti_detect_config=ANTI_DETECT_CONFIG,
-            anti_detect_config_version=ANTI_DETECT_CONFIG_VERSION,
-            device_config=DEVICE_CONFIG,
-            server_date=bj_now().strftime("%Y-%m-%d"),
-        )
-
-    # Resume running task on reconnect — device may have lost in-memory state.
-    # If this device already has a RUNNING task, return it so the device can
-    # resume execution instead of idling forever waiting for a new task.
-    from app.db_models import Task as DBTask
-    from app.models import TaskStatus
-    from app.services.task_service import _db_task_to_pydantic
-    running_task = db.query(DBTask).filter(
-        DBTask.device_id == device_id,
-        DBTask.status == TaskStatus.RUNNING.value,
-    ).order_by(DBTask.started_at.desc()).first()
-    if running_task:
-        task = _db_task_to_pydantic(running_task)
-        logger.info("[poll] device=%s resuming running task=%s type=%s",
-            device_id, running_task.id[:8], running_task.type)
-    else:
-        task = task_service.get_pending_task(db, device_id)
-
-    version = selector_service.get_version(db)
-    tmpl_version = prompt_template_service.get_version(db)
-
-    # 设备领到任务 → 通知前端任务列表更新
-    if task:
-        await pair_ws_manager.broadcast_to_admins({
-            "event": "task_updated",
-            "task_id": task.id,
-            "status": task.status.value if hasattr(task.status, 'value') else str(task.status),
-        })
-
-    from app.services.device_service import device_service
-    device_info = device_service.get_device_status(db, device_id)
-    proxy = device_info.get("proxy_config") if device_info else None
-
-    # DM sequence templates for device sync — include sequences referenced by this task.
-    from app.services.dm_sequence_visibility import get_device_visible_dm_sequences
-    task_seq_id = (task.params or {}).get("dm_sequence_id") if task else None
-    dm_seqs = get_device_visible_dm_sequences(
-        db,
-        device_id,
-        extra_sequence_ids=[task_seq_id] if task_seq_id else None,
-    )
-    dm_sequences_list = [
-        {
-            "id": s.id,
-            "messages": s.messages,
-            "variants": s.variants,
-        }
-        for s in dm_seqs
-    ] if dm_seqs else None
-    logger.info("[poll] device=%s dm_sequences count=%s ids=%s",
-        device_id,
-        len(dm_sequences_list) if dm_sequences_list else 0,
-        [s["id"][:8] for s in dm_sequences_list] if dm_sequences_list else [])
-    if dm_sequences_list:
-        for ds in dm_sequences_list:
-            msgs = ds.get("messages", [])
-            logger.info("[poll] dm_seq id=%s msg_count=%s msg_preview=%s",
-                ds["id"][:8], len(msgs),
-                [m.get("content","")[:30] for m in msgs[:2]] if msgs else [])
-
-    from app.config import get_ai_config
-
-    if task:
-        logger.info("[poll] device=%s dispatching task_id=%s type=%s dm_seq_id=%s dm_messages=%s",
-            device_id, task.id[:8], task.type,
-            (task.params or {}).get("dm_sequence_id", "NONE"),
-            "PRESENT" if (task.params or {}).get("dm_messages") else "NONE")
-
-    return PollResponse(
-        task=task,
-        selectors_version=version,
-        prompt_templates_version=tmpl_version,
-        proxy=proxy,
-        cancelled_task_id=None,
-        anti_detect_config=ANTI_DETECT_CONFIG,
-        anti_detect_config_version=ANTI_DETECT_CONFIG_VERSION,
-        ai_config=get_ai_config(db),
-        device_config=DEVICE_CONFIG,
-        dm_sequences=dm_sequences_list,
-        server_date=bj_now().strftime("%Y-%m-%d"),
-    )
-
-
-@router.post("/progress")
-async def report_progress(
-    report: TaskProgressReport,
-    db: Session = Depends(get_db),
-    authed_device_id: str = Depends(verify_device_secret),
-):
-    """Device reports task execution progress. Broadcast to admin WS for real-time UI."""
-    from app.db_models import Task as DBTask
-    db_task = db.query(DBTask).filter(DBTask.id == report.task_id).first()
-    if not db_task:
-        raise HTTPException(status_code=404, detail="Task not found")
-    if report.lease_id and db_task.lease_id:
-        if db_task.lease_id != report.lease_id:
-            return {"ok": True, "stale": True, "message": "Progress ignored (stale lease)"}
-    elif db_task.device_id != authed_device_id:
-        raise HTTPException(status_code=403, detail="Task does not belong to this device")
-
-    await pair_ws_manager.broadcast_to_admins({
-        "event": "task_progress",
-        "task_id": report.task_id,
-        "step": report.step,
-        "detail": report.detail,
-        "progress": report.progress,
-    })
-    return {"ok": True}
-
-
-@router.post("/report")
-async def report_result(
-    report: TaskResultReport,
-    db: Session = Depends(get_db),
-    authed_device_id: Optional[str] = Depends(verify_device_secret),
-):
-    # Verify lease: accept current lease, log stale reports, fall back to device_id
-    if authed_device_id:
-        from app.db_models import Task as DBTask
-        db_task = db.query(DBTask).filter(DBTask.id == report.task_id).first()
-        if not db_task:
-            raise HTTPException(status_code=404, detail="Task not found")
-        if report.lease_id and db_task.lease_id:
-            if db_task.lease_id != report.lease_id:
-                logger.warning("device=%s task=%s stale result report (lease mismatch: reported=%s current=%s) — result logged for audit, not applied",
-                    authed_device_id, report.task_id, report.lease_id[:8], db_task.lease_id[:8] if db_task.lease_id else "None")
-                return {"ok": True, "stale": True, "message": "Result recorded for audit (stale lease)"}
-        elif db_task.device_id != authed_device_id:
-            raise HTTPException(status_code=403, detail="Task does not belong to this device")
-
-    try:
-        task, channel_broadcast_info = task_service.report_result(
-            db=db,
-            task_id=report.task_id,
-            status=report.status,
-            result=report.result,
-            ui_snapshot=report.ui_snapshot,
-        )
-        db.commit()
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Task not found")
-
-    # Broadcast task status update to admin WS
-    await pair_ws_manager.broadcast_to_admins({
-        "event": "task_updated",
-        "task_id": str(report.task_id),
-        "status": str(report.status.value),
-        "result": report.result or {},
-    })
-
-    # 通知所有在线设备有新任务可领取（通道内可能有下一批待执行 item）
-    if report.status.value in ("completed", "failed"):
-        await pair_ws_manager.broadcast_to_devices({"event": "new_task_available"})
-
-    # Broadcast channel progress via WS (BackgroundTasks runs after response)
-    if channel_broadcast_info:
-        from fastapi import BackgroundTasks
-        bg = BackgroundTasks()
-        bg.add_task(pair_ws_manager.broadcast_channel_progress,
-                    channel_broadcast_info["channel_id"], channel_broadcast_info["stats"])
-        if channel_broadcast_info.get("channel_completed"):
-            bg.add_task(pair_ws_manager.broadcast_channel_completed,
-                        channel_broadcast_info["channel_id"])
-        from fastapi.encoders import jsonable_encoder
-        return JSONResponse(content=jsonable_encoder(task), background=bg)
-
-    return task
-
-
-@router.post("/stats/increment")
-def stats_increment(
-    body: StatsIncrementRequest,
-    db: Session = Depends(get_db),
-    authed_device_id: str = Depends(verify_device_secret),
-):
-    """设备端增量统计上报——idempotent: 同一 (task,device,type,target,op_index) 只计一次。
-    校验 task→account 归属和 task→device 归属，防止跨账号伪造统计。
-    """
-    from app.services.stats_service import stats_service
-    from app.db_models import Task as DBTask, StatsEvent
-
-    # 1. Validate task exists and belongs to the claimed account
-    db_task = db.query(DBTask).filter(DBTask.id == body.task_id).first()
-    if not db_task:
-        raise HTTPException(status_code=404, detail="Task not found")
-    if db_task.account_id != body.account_id:
-        raise HTTPException(status_code=403, detail="Task does not belong to this account")
-    if db_task.device_id != authed_device_id:
-        raise HTTPException(status_code=403, detail="Task not assigned to this device")
-
-    # 2. Idempotent insert — duplicate key → skip count increment
-    from sqlalchemy.exc import IntegrityError
-    import logging
-    _stats_log = logging.getLogger("device.stats_increment")
-    try:
-        evt = StatsEvent(
-            task_id=body.task_id,
-            device_id=authed_device_id,
-            account_id=body.account_id,
-            event_type=body.task_type,
-            target_id=body.target_id,
-            op_index=body.op_index,
-            count=body.count,
-        )
-        db.add(evt)
-        db.flush()
-    except IntegrityError:
-        db.rollback()
-        # Duplicate event — already counted, return success
-        return {"ok": True, "duplicate": True}
-    except Exception:
-        db.rollback()
-        _stats_log.exception("stats insert failed: task=%s type=%s target=%s",
-                             body.task_id, body.task_type, body.target_id)
-        raise HTTPException(status_code=500, detail="Stats insert failed")
-
-    # 3. Increment daily stats counter (only on first insert)
-    stats_service.increment(db, body.account_id, body.task_type, count=body.count)
-    db.commit()
-    return {"ok": True}
-
-
-@router.post("/heartbeat")
-async def heartbeat(
-    body: dict,
-    raw_request: Request,
-    db: Session = Depends(get_db),
-    authed_device_id: Optional[str] = Depends(verify_device_secret),
-):
-    device_id = body.get("device_id", "")
-    # Per-device secret: use the verified device_id, reject mismatch
-    if authed_device_id and authed_device_id != device_id:
-        raise HTTPException(status_code=403, detail="Device ID mismatch")
-    if authed_device_id:
-        device_id = authed_device_id
-
-    client_ip = raw_request.headers.get("x-forwarded-for", "").split(",")[0].strip()
-    if not client_ip:
-        client_ip = raw_request.client.host if raw_request.client else ""
-    from app.services.device_service import device_service
-    status_changed = device_service.update_heartbeat(db, device_id, ip=client_ip)
-    if status_changed:
-        await pair_ws_manager.broadcast_to_admins({
-            "event": "device_status_changed",
-            "device_id": device_id,
-            "status": "online",
-        })
-        await _notify_pending_tasks(db, device_id)
-    return {"status": "ok", "device_id": device_id}
 
 
 @router.post("/register", response_model=DeviceRegisterResponse)
@@ -441,26 +158,7 @@ async def script_upload(
     return {"version": new_version, "size": len(content)}
 
 
-@router.post("/risk-report")
-async def report_risk(
-    report: RiskReport,
-    db: Session = Depends(get_db),
-    _: None = Depends(verify_device_secret),
-):
-    """Device reports risk control detection. Marks account as risk_controlled."""
-    from app.db_models import Account
-    account = db.query(Account).filter(Account.id == report.account_id).first()
-    if not account:
-        return {"status": "ignored", "account_status": "unknown"}
-    if account.status == "active":
-        account.status = "risk_controlled"
-        # Skip pending channel items for this account
-        from app.services.channel_service import channel_service
-        channel_service.on_risk_control(db, report.account_id)
-        db.commit()
-        await pair_ws_manager.broadcast_to_admins({"event": "accounts_changed"})
-    return {"status": "acknowledged", "account_status": account.status}
-
+router.include_router(reporting.risk_router)
 
 class CommentRepliedRequest(BaseModel):
     author: str = Field(..., description="评论作者")

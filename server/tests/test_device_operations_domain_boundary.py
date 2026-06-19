@@ -108,6 +108,30 @@ def test_device_operations_pr4a_extracts_pairing_and_status_ws_modules():
     assert "app.domains.device_operations.status_ws.ws_device_status" in endpoint_modules
 
 
+def test_device_operations_pr4b_extracts_polling_and_reporting_modules():
+    import app.domains.device_operations.device_router as device_router
+    import app.domains.device_operations.polling as polling
+    import app.domains.device_operations.reporting as reporting
+
+    assert hasattr(polling, "poll_tasks")
+    assert hasattr(reporting, "report_progress")
+    assert hasattr(reporting, "report_result")
+    assert hasattr(reporting, "stats_increment")
+    assert hasattr(reporting, "heartbeat")
+    assert hasattr(reporting, "report_risk")
+    endpoint_modules = {
+        f"{route.endpoint.__module__}.{route.endpoint.__qualname__}"
+        for route in device_router.router.routes
+        if hasattr(route, "endpoint")
+    }
+    assert "app.domains.device_operations.polling.poll_tasks" in endpoint_modules
+    assert "app.domains.device_operations.reporting.report_progress" in endpoint_modules
+    assert "app.domains.device_operations.reporting.report_result" in endpoint_modules
+    assert "app.domains.device_operations.reporting.stats_increment" in endpoint_modules
+    assert "app.domains.device_operations.reporting.heartbeat" in endpoint_modules
+    assert "app.domains.device_operations.reporting.report_risk" in endpoint_modules
+
+
 def test_main_continues_to_wire_legacy_device_routers_during_migration():
     text = MAIN_PATH.read_text(encoding="utf-8")
 

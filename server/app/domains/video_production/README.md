@@ -21,6 +21,9 @@ This domain owns the video production control-plane HTTP routes.
   HTTP detail serialization.
 - `production_errors.py` owns `ProductionErrorCode`,
   `ProductionRepairableError`, and `to_http_detail`.
+- `production_state_contract.py` owns provider task status constants, cost
+  reservation status constants, `asset_is_reviewable`,
+  `provider_task_is_active`, and `validate_transition`.
 - `video_production_router.py` owns route request models such as
   `StartRunRequest` and `OneSentenceVideoRequest`, payload helpers such as
   `_run_payload`, `_asset_payload`, and `_provider_stage_task_payload`,
@@ -33,6 +36,7 @@ This domain owns the video production control-plane HTTP routes.
 | `app.routers.video_production` | `app.domains.video_production.video_production_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
 | `app.services.production_action_result` | `app.domains.video_production.production_action_result` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.production_errors` | `app.domains.video_production.production_errors` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
+| `app.services.production_state_contract` | `app.domains.video_production.production_state_contract` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 
 ## Boundaries
 
@@ -62,6 +66,12 @@ Do not remove the legacy production action result facade until all of these are 
 - `rg "app\.services\.production_action_result" server/app server/tests` returns only compatibility tests, migration docs, or service modules whose domains have not moved yet.
 - `test_video_production_action_result_facade.py` has been replaced with tests for direct domain imports.
 - Domain-owned production modules import `app.domains.video_production.production_action_result` directly.
+
+Do not remove the legacy production state contract facade until all of these are true:
+
+- `rg "app\.services\.production_state_contract" server/app server/tests` returns only compatibility tests, migration docs, or service modules whose domains have not moved yet.
+- `test_video_production_state_contract_facade.py` has been replaced with tests for direct domain imports.
+- Domain-owned production modules import `app.domains.video_production.production_state_contract` directly.
 
 Do not remove the legacy production errors facade until all of these are true:
 

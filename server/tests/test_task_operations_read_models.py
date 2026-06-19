@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 
+from app.domains.task_operations import read_models
 from app.main import app
 
 
@@ -91,3 +92,10 @@ def test_task_batch_delete_response_shape():
     assert created.status_code == 200
     assert response.status_code == 200
     assert response.json() == {"deleted": 1}
+
+
+def test_task_operations_read_model_helpers_preserve_payload_shapes():
+    assert read_models.task_list_response(["task"], 1) == {"tasks": ["task"], "total": 1}
+    assert read_models.batch_create_response(2, "direct") == {"created": 2, "mode": "direct"}
+    assert read_models.batch_delete_response(3) == {"deleted": 3}
+    assert read_models.delete_response("task-001") == {"deleted": True, "task_id": "task-001"}

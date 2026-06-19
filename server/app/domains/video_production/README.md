@@ -34,6 +34,9 @@ This domain owns the video production control-plane HTTP routes.
 - `production_status.py` owns plan, job, segment, stage, continuity, and
   reference constants such as `JOB_QUEUED` and
   `REFERENCE_CHARACTER_ANCHOR`.
+- `video_production_run_types.py` owns `REAL_SHORT_E2E`,
+  `MOCK_SERIES_SCALE`, `LEGACY_EPISODE_RUN`, `validate_run_type`, and run type
+  classification helpers.
 - `provider_cost_reservation_service.py` owns
   `_ACTIVE_RESERVATION_STATUSES`, `_PLAN_LOCKS`, `active_reserved_cost`,
   `create_cost_reservation`, `settle_reservation`, and reservation lifecycle
@@ -63,6 +66,7 @@ This domain owns the video production control-plane HTTP routes.
 | `app.services.production_errors` | `app.domains.video_production.production_errors` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.production_review_service` | `app.domains.video_production.production_review_service` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.production_status` | `app.domains.video_production.production_status` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, approved cross-domain consumers, or service modules whose domains have not moved yet. |
+| `app.services.video_production_run_types` | `app.domains.video_production.video_production_run_types` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.provider_capability_service` | `app.domains.video_production.provider_capability_service` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, approved cross-domain consumers, or service modules whose domains have not moved yet. |
 | `app.services.provider_cost_reservation_service` | `app.domains.video_production.provider_cost_reservation_service` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, approved cross-domain consumers, or service modules whose domains have not moved yet. |
 | `app.services.provider_stage_task_service` | `app.domains.video_production.provider_stage_task_service` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
@@ -128,6 +132,14 @@ Do not remove the legacy production status facade until all of these are true:
 - Domain-owned production modules import `app.domains.video_production.production_status` directly.
 - Direct domain status coverage proves representative constants such as
   `JOB_QUEUED` and `REFERENCE_CHARACTER_ANCHOR` without legacy imports.
+
+Do not remove the legacy video production run types facade until all of these are true:
+
+- `rg "app\.services\.video_production_run_types" server/app server/tests` returns only compatibility tests, migration docs, or service modules whose domains have not moved yet.
+- `test_video_production_run_types_facade.py` has been replaced with tests for direct domain imports.
+- Domain-owned production modules import `app.domains.video_production.video_production_run_types` directly.
+- Direct domain run type coverage proves `REAL_SHORT_E2E`,
+  `MOCK_SERIES_SCALE`, and `validate_run_type` behavior without legacy imports.
 
 Do not remove the legacy production state contract facade until all of these are true:
 

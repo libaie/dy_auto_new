@@ -65,11 +65,12 @@ def test_selector_management_legacy_router_file_is_thin_facade():
     assert _line_count(LEGACY_SELECTORS_PATH) <= 20
 
 
-def test_selector_management_main_wiring_remains_legacy_until_pr4():
+def test_selector_management_main_wires_domain_router():
     text = MAIN_PATH.read_text(encoding="utf-8")
 
-    assert "selectors" in text
-    assert "app.include_router(selectors.router)" in text
+    assert "from app.domains.selector_management import selectors_router" in text
+    assert "app.include_router(selectors_router.router)" in text
+    assert "app.include_router(selectors.router)" not in text
 
 
 def test_selector_management_keeps_device_selector_routes_in_device_operations():

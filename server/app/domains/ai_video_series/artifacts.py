@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.db.models.ai_video_series import Episode, Series
-from app.services.ai_text_artifact_service import AITextArtifactService
+from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
 
 
 PLACEHOLDER_STORY_PLAN_SOURCES = {"system_backfill", "legacy_run_backfill"}

@@ -25,7 +25,7 @@ from app.domains.ai_video_series.read_models import (
 )
 from app.services.ai_generator import ai_generator
 from app.services.agency_orchestrator import AgencyOrchestrator
-from app.services.ai_text_artifact_service import AITextArtifactService
+from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
 from app.services.reference_asset_service import (
     ReferenceAssetError,
     SCENE_EMPTY_PLATE_INSTRUCTION,

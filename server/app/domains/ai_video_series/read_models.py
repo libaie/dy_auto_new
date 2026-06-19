@@ -4,7 +4,7 @@ from app.db.models.ai_video_series import Episode, Series, VideoProductionRun
 # Cross-domain model: keep on app.db_models until its owning domain exists.
 from app.db_models import Character, GeneratedVideo, PipelineRun, Scene
 from app.services.agency_console import build_agency_console_payload
-from app.services.ai_text_artifact_service import AITextArtifactService
+from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
 from app.services.reference_asset_service import reference_url_is_usable
 
 

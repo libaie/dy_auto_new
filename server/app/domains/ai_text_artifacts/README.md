@@ -1,7 +1,7 @@
 # AI Text Artifacts Domain
 
-This domain owns AI text artifact review, edit, approval, lineage, and
-regeneration routes.
+This domain owns AI text artifact review, edit, approval, lineage,
+regeneration routes, and the `AITextArtifactService` business logic.
 
 ## Owned Routes
 
@@ -17,8 +17,8 @@ regeneration routes.
 - `AITextArtifact` ORM definitions stay in `app.db_models`.
 - Database session helpers stay in `app.database`.
 - Auth dependencies stay in `app.deps`.
-- Versioning, lineage, approval, and AI regeneration business logic stay in
-  `app.services.ai_text_artifact_service`.
+- Non-domain service modules may keep importing
+  `app.services.ai_text_artifact_service` until their owning domains move.
 
 ## Current Modules
 
@@ -26,12 +26,16 @@ regeneration routes.
   `ArtifactRegenerateRequest`, `_actor_id`, `_artifact_dict`, missing artifact
   HTTP mapping, stale approval mapping, and all `/api/ai-text-artifacts/*`
   route handlers.
+- `ai_text_artifact_service.py` owns `AITextArtifactService`, artifact
+  versioning, approval, lineage, regeneration, consumer binding, and legacy run
+  backfill.
 
 ## Facade Register
 
 | Facade | Target | Exit condition |
 |---|---|---|
 | `app.routers.ai_text_artifacts` | `app.domains.ai_text_artifacts.ai_text_artifacts_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
+| `app.services.ai_text_artifact_service` | `app.domains.ai_text_artifacts.ai_text_artifact_service` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 
 ## Boundaries
 
@@ -54,3 +58,9 @@ Do not remove the legacy router facade until all of these are true:
 - Existing AI text artifact API and service tests pass.
 - Import inventory shows no unapproved production imports of
   `app.routers.ai_text_artifacts`.
+
+Do not remove the legacy service facade until all of these are true:
+
+- `rg "app\.services\.ai_text_artifact_service" server/app server/tests` returns only compatibility tests and migration docs.
+- `test_ai_text_artifact_service_domain_facade.py` has been replaced with tests for direct domain imports.
+- Domain-owned production modules import `app.domains.ai_text_artifacts.ai_text_artifact_service` directly.

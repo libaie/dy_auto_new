@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.db_models import AITextArtifact
 from app.deps import require_role, verify_admin_token
-from app.services.ai_text_artifact_service import AITextArtifactService
+from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
 
 
 router = APIRouter(prefix="/api/ai-text-artifacts", tags=["ai-text-artifacts"])

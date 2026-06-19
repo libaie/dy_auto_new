@@ -213,7 +213,7 @@ def _run_payload(run: VideoProductionRun, db: Session | None = None) -> dict:
         "updated_at": run.updated_at.isoformat() if run.updated_at else None,
     }
     if db is not None:
-        from app.services.ai_text_artifact_service import AITextArtifactService
+        from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
 
         payload["consumed_text_artifacts"] = AITextArtifactService(db).consumed_artifacts_for_run(run.id)
     else:
@@ -505,7 +505,7 @@ def backfill_run_text_artifacts(
     db: Session = Depends(get_db),
     user=Depends(require_role("admin")),
 ):
-    from app.services.ai_text_artifact_service import AITextArtifactService
+    from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
 
     run = db.query(VideoProductionRun).filter(VideoProductionRun.id == run_id).first()
     if not run:

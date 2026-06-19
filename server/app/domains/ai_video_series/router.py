@@ -28,6 +28,7 @@ from app.domains.ai_video_series.read_models import (
     series_dict,
     series_scene_dict,
 )
+from app.domains.ai_video_series.status_read_model import build_episode_status_matrix
 from app.domains.ai_video_series.schemas import (
     EpisodeScriptGenerationRequest,
     EpisodeUpdate,
@@ -65,6 +66,7 @@ _series_dict = series_dict
 _series_scene_dict = series_scene_dict
 _story_plan_artifact_summary = story_plan_artifact_summary
 _storyboard_text_values = storyboard_text_values
+_build_episode_status_matrix = build_episode_status_matrix
 
 _missing_agency_trace = style_lock.missing_agency_trace
 _timeout_agency_trace = style_lock.timeout_agency_trace
@@ -204,10 +206,12 @@ def get_series(series_id: str, db: Session = Depends(get_db),
         Episode.series_id == series_id
     ).order_by(Episode.episode_number).all()
     active_runs = active_video_runs_by_episode(db, series_id)
+    status_matrix = build_episode_status_matrix(db, series_id)
     episode_payloads = []
     for episode in episodes:
         payload = episode_dict_with_video_run(episode, active_runs.get(episode.id))
         payload["asset_scope"] = episode_asset_scope_payload(db, episode)
+        payload["production_status"] = status_matrix.get(episode.id, {})
         episode_payloads.append(payload)
     return {"ok": True, "series": series_dict(s, include_linked_assets=True),
             "episodes": episode_payloads}

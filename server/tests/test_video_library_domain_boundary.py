@@ -69,10 +69,12 @@ def test_video_library_legacy_router_file_is_thin_facade():
     assert _line_count(LEGACY_VIDEOS_PATH) <= 20
 
 
-def test_video_library_main_keeps_legacy_router_until_direct_wiring():
+def test_video_library_main_wires_domain_router():
     text = MAIN_PATH.read_text(encoding="utf-8")
 
-    assert "app.include_router(videos.router)" in text
+    assert "from app.domains.video_library import videos_router" in text
+    assert "app.include_router(videos_router.router)" in text
+    assert "app.include_router(videos.router)" not in text
 
 
 def test_video_library_does_not_own_production_or_provider_routes():

@@ -27,7 +27,8 @@ from app.domains.reporting import stats_router
 from app.domains.selector_management import selectors_router
 from app.domains.system_operations import system_health_router
 from app.domains.task_operations import tasks_router
-from app.routers import auth, settings, videos, pixelle, ai_config, series, pipeline, audit, director, video_production, agency
+from app.domains.video_library import videos_router
+from app.routers import auth, settings, pixelle, ai_config, series, pipeline, audit, director, video_production, agency
 from app.services.ai_generator import ai_generator
 
 
@@ -237,7 +238,7 @@ app.include_router(settings.router)
 app.include_router(channels_router.router)
 app.include_router(prompt_templates_router.router)
 app.include_router(data_router.router)
-app.include_router(videos.router)
+app.include_router(videos_router.router)
 app.include_router(pixelle.router)
 app.include_router(pixelle.proxy_router)
 

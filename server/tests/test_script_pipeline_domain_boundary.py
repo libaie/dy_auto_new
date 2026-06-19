@@ -73,14 +73,12 @@ def test_script_pipeline_legacy_router_file_is_thin_facade():
     assert _line_count(LEGACY_PIPELINE_PATH) <= 20
 
 
-def test_script_pipeline_main_keeps_legacy_router_until_direct_wiring_step():
+def test_script_pipeline_main_wires_domain_router():
     text = MAIN_PATH.read_text(encoding="utf-8")
 
-    assert "from app.routers import" in text
-    assert "pipeline" in text
-    assert "app.include_router(pipeline.router)" in text
-    assert "from app.domains.script_pipeline import pipeline_router" not in text
-    assert "app.include_router(pipeline_router.router)" not in text
+    assert "from app.domains.script_pipeline import pipeline_router" in text
+    assert "app.include_router(pipeline_router.router)" in text
+    assert "app.include_router(pipeline.router)" not in text
 
 
 def test_script_pipeline_service_layer_stays_router_free():

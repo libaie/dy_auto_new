@@ -95,6 +95,7 @@ _fill_reference_assets = style_lock.fill_reference_assets
 _run_style_lock_job = style_lock.run_style_lock_job
 _run_style_lock_worker_step = style_lock.run_style_lock_worker_step
 _run_story_plan_worker_step = story_planning.run_story_plan_worker_step
+ai_generator = style_lock.ai_generator
 STYLE_LOCK_STAGE = style_lock.STYLE_LOCK_STAGE
 STYLE_LOCK_ACTIVE_JOB_STATUSES = style_lock.STYLE_LOCK_ACTIVE_JOB_STATUSES
 STYLE_LOCK_JOB_LEASE_SECONDS = style_lock.STYLE_LOCK_JOB_LEASE_SECONDS

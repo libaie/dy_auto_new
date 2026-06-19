@@ -62,6 +62,17 @@ def test_legacy_private_helper_names_alias_owning_modules():
     assert legacy_router._fill_reference_assets is style_lock.fill_reference_assets
 
 
+def test_legacy_auto_asset_generation_facade_aliases_style_lock_dependencies():
+    legacy_router = importlib.import_module("app.routers.series")
+    style_lock = importlib.import_module("app.domains.ai_video_series.style_lock")
+
+    assert legacy_router.ai_generator is style_lock.ai_generator
+    assert (
+        legacy_router.AUTO_GENERATE_ASSET_MODEL_TIMEOUT_SECONDS
+        == style_lock.AUTO_GENERATE_ASSET_MODEL_TIMEOUT_SECONDS
+    )
+
+
 def test_router_facade_cleanup_gates_are_documented():
     readme = (REPO_ROOT / "server/app/domains/ai_video_series/README.md").read_text(encoding="utf-8")
 

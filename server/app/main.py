@@ -20,7 +20,8 @@ from app.seed import seed_all
 from app.domains.account_operations import accounts_router, account_groups_router, chains_router, channels_router
 from app.domains.content_collection import content_router, data_router, dm_sequences_router
 from app.domains.device_operations import admin_router, device_router
-from app.routers import tasks, auth, selectors, stats, settings, prompt_templates, videos, pixelle, ai_config, characters, scenes, series, pipeline, audit, director, reference_data, video_production, agency
+from app.domains.task_operations import tasks_router
+from app.routers import auth, selectors, stats, settings, prompt_templates, videos, pixelle, ai_config, characters, scenes, series, pipeline, audit, director, reference_data, video_production, agency
 from app.routers import image_creation, image_production
 from app.routers import system_health
 from app.services.ai_generator import ai_generator
@@ -219,7 +220,7 @@ async def _catch_unhandled_errors(request: Request, call_next):
 
 
 app.include_router(device_router.router)
-app.include_router(tasks.router)
+app.include_router(tasks_router.router)
 app.include_router(accounts_router.router)
 app.include_router(admin_router.router)
 app.include_router(auth.router)

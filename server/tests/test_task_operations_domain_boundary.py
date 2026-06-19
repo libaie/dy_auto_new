@@ -77,12 +77,13 @@ def test_task_operations_pr1_keeps_legacy_router_file_active():
     assert _line_count(LEGACY_TASKS_ROUTER_PATH) <= 20
 
 
-def test_task_operations_pr1_does_not_wire_domain_in_main():
+def test_task_operations_pr5_wires_domain_router_in_main():
     text = MAIN_PATH.read_text(encoding="utf-8")
 
-    assert "app.domains.task_operations" not in text
-    assert "from app.routers import tasks" in text
-    assert "app.include_router(tasks.router)" in text
+    assert "from app.domains.task_operations import tasks_router" in text
+    assert "from app.routers import tasks" not in text
+    assert "app.include_router(tasks_router.router)" in text
+    assert "app.include_router(tasks.router)" not in text
 
 
 def test_task_operations_explicitly_stays_out_of_neighbor_domains():

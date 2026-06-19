@@ -37,12 +37,26 @@ this domain provides stable use cases and compatibility tests for that handoff.
 - Do not change application wiring away from legacy imports yet.
 - Do not move ORM model ownership or persistence class bodies.
 
+## PR4a Allowed
+
+- Move `/api/data/*` comment, user, conversation, and export payload shaping to `read_models.py`.
+- Keep `data_router.py` as the FastAPI route and dependency boundary.
+- Preserve pagination, filtering, sorting, XLSX streaming, and export headers.
+
+## PR4a Not Allowed
+
+- Do not move content template or sensitive-word mutations yet.
+- Do not move DM sequence mutation or generation behavior yet.
+- Do not move device bridge use cases yet.
+- Do not move ORM model ownership or persistence class bodies.
+
 ## Ownership Rules
 
 - `app.domains.content_collection` owns the target migration boundary for `/api/content/*`, `/api/data/*`, and `/api/dm-sequences/*`.
 - `app.routers.content` remains the active route implementation until the router facade gate lands.
 - `app.routers.data` remains the active route implementation until the router facade gate lands.
 - `app.routers.dm_sequences` remains the active route implementation until the router facade gate lands.
+- `app.domains.content_collection.read_models` owns collected comment/user/conversation list and export payload shaping.
 - `app.domains.device_operations.content_bridge` remains the device-authenticated route boundary for `/api/device/*` content, collection, DM, profile, and avatar paths until this domain provides handoff use cases.
 - `content_collection` must preserve `content_changed` and `data_changed` websocket payloads when logic moves.
 - Domain non-router use-case modules must avoid FastAPI imports unless they are route assembly modules.
@@ -77,6 +91,12 @@ Run the current compatibility checks:
 
 ```powershell
 .\server\.venv\Scripts\python.exe -m pytest server/tests/test_content_api.py server/tests/test_content_service.py server/tests/test_collection_builder.py server/tests/test_data_export.py server/tests/test_dm_sequences_api.py server/tests/test_device_api.py server/tests/test_device_endpoints.py server/tests/test_tasks_api.py -q
+```
+
+Run the read model extraction checks:
+
+```powershell
+.\server\.venv\Scripts\python.exe -m pytest server/tests/test_content_collection_read_models.py server/tests/test_data_export.py -q
 ```
 
 ## Compatibility Cleanup Gates

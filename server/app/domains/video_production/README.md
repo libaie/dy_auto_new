@@ -29,6 +29,10 @@ This domain owns the video production control-plane HTTP routes.
   `apply_bulk_review_action`.
 - `production_cost_summary_service.py` owns `_ZERO_RESERVATION_COSTS`,
   `_ACTIVE_RESERVATION_STATUSES`, and `get_run_costs`.
+- `provider_cost_reservation_service.py` owns
+  `_ACTIVE_RESERVATION_STATUSES`, `_PLAN_LOCKS`, `active_reserved_cost`,
+  `create_cost_reservation`, `settle_reservation`, and reservation lifecycle
+  transitions.
 - `asset_storage_guard.py` owns `ALLOWED_PROVIDER_SCHEMES`,
   `ALLOWED_IMAGE_MAGIC`, `ALLOWED_VIDEO_MAGIC`, and
   `persist_provider_asset`.
@@ -53,6 +57,7 @@ This domain owns the video production control-plane HTTP routes.
 | `app.services.production_errors` | `app.domains.video_production.production_errors` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.production_review_service` | `app.domains.video_production.production_review_service` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.provider_capability_service` | `app.domains.video_production.provider_capability_service` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, approved cross-domain consumers, or service modules whose domains have not moved yet. |
+| `app.services.provider_cost_reservation_service` | `app.domains.video_production.provider_cost_reservation_service` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, approved cross-domain consumers, or service modules whose domains have not moved yet. |
 | `app.services.provider_stage_task_service` | `app.domains.video_production.provider_stage_task_service` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.production_state_contract` | `app.domains.video_production.production_state_contract` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 
@@ -122,6 +127,15 @@ Do not remove the legacy provider stage task service facade until all of these a
 - Domain-owned production modules import `app.domains.video_production.provider_stage_task_service` directly.
 - Direct domain task helper coverage proves `get_or_create_stage_task` and
   `claim_stage_task_for_submit` behavior without legacy imports.
+
+Do not remove the legacy provider cost reservation service facade until all of these are true:
+
+- `rg "app\.services\.provider_cost_reservation_service" server/app server/tests` returns only compatibility tests, migration docs, approved cross-domain consumers, or service modules whose domains have not moved yet.
+- `test_video_production_provider_cost_reservation_service_facade.py` has been replaced with tests for direct domain imports.
+- Domain-owned production modules import `app.domains.video_production.provider_cost_reservation_service` directly.
+- Direct domain reservation coverage proves `_PLAN_LOCKS`,
+  `active_reserved_cost`, and `settle_reservation` behavior without legacy
+  imports.
 
 Do not remove the legacy provider capability service facade until all of these are true:
 

@@ -54,12 +54,13 @@ this domain provides stable use cases and compatibility tests for that handoff.
 
 - Move content template and sensitive-word mutation orchestration to `mutations.py`.
 - Move content, keyword, regex, and clean-prompt generation calls to `content_generation.py`.
+- Move DM sequence CRUD, generation, variants, and device sync use cases to `mutations.py`.
 - Move content websocket broadcast helper to `realtime_events.py`.
 - Keep `content_router.py` as the FastAPI route and HTTP error mapping boundary.
+- Keep `dm_sequences_router.py` as the FastAPI schema, route, dependency, and StreamingResponse boundary.
 
 ## PR4b Not Allowed
 
-- Do not move DM sequence mutation or generation behavior yet.
 - Do not move device bridge use cases yet.
 - Do not change `content_changed` or `data_changed` realtime payload shapes.
 - Do not move ORM model ownership or persistence class bodies.
@@ -71,7 +72,7 @@ this domain provides stable use cases and compatibility tests for that handoff.
 - `app.routers.data` remains the active route implementation until the router facade gate lands.
 - `app.routers.dm_sequences` remains the active route implementation until the router facade gate lands.
 - `app.domains.content_collection.read_models` owns collected comment/user/conversation list and export payload shaping.
-- `app.domains.content_collection.mutations` owns content template and sensitive-word mutation orchestration.
+- `app.domains.content_collection.mutations` owns content template, sensitive-word, and DM sequence mutation orchestration.
 - `app.domains.content_collection.content_generation` owns content, keyword, regex, and clean-prompt generation calls.
 - `app.domains.content_collection.realtime_events` owns content collection websocket broadcast helpers.
 - `app.domains.device_operations.content_bridge` remains the device-authenticated route boundary for `/api/device/*` content, collection, DM, profile, and avatar paths until this domain provides handoff use cases.
@@ -119,7 +120,7 @@ Run the read model extraction checks:
 Run the content mutation and realtime checks:
 
 ```powershell
-.\server\.venv\Scripts\python.exe -m pytest server/tests/test_content_collection_mutations.py server/tests/test_content_collection_realtime_broadcasts.py server/tests/test_content_api.py -q
+.\server\.venv\Scripts\python.exe -m pytest server/tests/test_content_collection_mutations.py server/tests/test_content_collection_realtime_broadcasts.py server/tests/test_content_api.py server/tests/test_dm_sequences_api.py -q
 ```
 
 ## Compatibility Cleanup Gates

@@ -273,6 +273,33 @@ def test_completed_run_is_completed(db):
 
 
 @pytest.mark.parametrize(
+    ("run_status", "expected_production_status"),
+    [
+        ("image_approved", "ready_for_video"),
+        ("video_segments_approved", "ready_for_compose"),
+    ],
+)
+def test_ready_gate_run_statuses_are_not_blocked(db, run_status, expected_production_status):
+    series, episode = _series_with_episode(db)
+    run = VideoProductionRun(
+        series_id=series.id,
+        episode_id=episode.id,
+        status=run_status,
+        current_stage=run_status,
+        run_type="real_short_e2e",
+    )
+    db.add(run)
+    db.commit()
+
+    matrix = build_episode_status_matrix(db, series.id)
+
+    assert matrix[episode.id]["production_status"] == expected_production_status
+    assert matrix[episode.id]["latest_run_status"] == run_status
+    assert matrix[episode.id]["active_run_id"] == run.id
+    assert matrix[episode.id]["blocking_code"] is None
+
+
+@pytest.mark.parametrize(
     ("run_status", "blocking_code"),
     [
         ("failed", "RUN_FAILED"),

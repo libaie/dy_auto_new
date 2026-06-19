@@ -1,6 +1,11 @@
 import importlib
 from pathlib import Path
 
+from fastapi.testclient import TestClient
+
+from app.db.models.ai_video_series import Series
+from app.main import app
+
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -71,6 +76,62 @@ def test_legacy_auto_asset_generation_facade_aliases_style_lock_dependencies():
         legacy_router.AUTO_GENERATE_ASSET_MODEL_TIMEOUT_SECONDS
         == style_lock.AUTO_GENERATE_ASSET_MODEL_TIMEOUT_SECONDS
     )
+
+
+def test_auto_generate_endpoint_uses_facade_ai_generator_timeout(db, monkeypatch):
+    from app.routers import series as series_router
+
+    series = Series(
+        title="City Healer",
+        logline="A young doctor solves urban mysteries with a consistent cyber-noir style.",
+        genre="drama",
+    )
+    db.add(series)
+    db.commit()
+
+    calls = []
+
+    async def fake_generate_custom(_db, _system_prompt, _user_prompt, **kwargs):
+        calls.append(kwargs)
+        if len(calls) == 1:
+            return """
+            {
+              "characters": [
+                {
+                  "name": "Lin",
+                  "role_type": "protagonist",
+                  "gender": "female",
+                  "age_range": "25-30",
+                  "personality": "Focused and kind.",
+                  "appearance_desc": "Short black hair and sharp eyes.",
+                  "outfit_desc": "Gray coat."
+                }
+              ]
+            }
+            """
+        return """
+        {
+          "scenes": [
+            {
+              "name": "Rain Clinic",
+              "scene_type": "indoor",
+              "location_desc": "Small clinic with neon reflections.",
+              "lighting": "night",
+              "mood": "mysterious"
+            }
+          ]
+        }
+        """
+
+    monkeypatch.setattr(series_router.ai_generator, "generate_custom", fake_generate_custom)
+
+    response = TestClient(app).post(f"/api/series/{series.id}/auto-generate")
+
+    assert response.status_code == 200
+    assert [call["request_timeout_seconds"] for call in calls] == [
+        series_router.AUTO_GENERATE_ASSET_MODEL_TIMEOUT_SECONDS,
+        series_router.AUTO_GENERATE_ASSET_MODEL_TIMEOUT_SECONDS,
+    ]
 
 
 def test_router_facade_cleanup_gates_are_documented():

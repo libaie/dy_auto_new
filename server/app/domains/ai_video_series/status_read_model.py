@@ -15,6 +15,7 @@ from app.db.models.ai_video_series import (
     ProductionShot,
     VideoProductionRun,
 )
+from app.services.video_production_state import IMAGE_READY_STATUS, VIDEO_READY_STATUS
 
 
 ACTIVE_JOB_STATUSES = {"queued", "leased", "running", "retry_wait"}
@@ -34,6 +35,10 @@ REVIEW_RUN_STATUSES = {
     "final_review_pending",
     "image_human_review_required",
     "video_human_review_required",
+}
+READY_RUN_STATUS_TO_PRODUCTION_STATUS = {
+    IMAGE_READY_STATUS: "ready_for_video",
+    VIDEO_READY_STATUS: "ready_for_compose",
 }
 
 
@@ -287,6 +292,8 @@ def _episode_status_payload(
 
     if run and run.status in COMPLETED_RUN_STATUSES:
         payload["production_status"] = "completed"
+    elif run and run.status in READY_RUN_STATUS_TO_PRODUCTION_STATUS:
+        payload["production_status"] = READY_RUN_STATUS_TO_PRODUCTION_STATUS[run.status]
     elif run and run.status in REVIEW_RUN_STATUSES:
         payload["production_status"] = "blocked"
         payload["blocking_code"] = "RUN_REQUIRES_REVIEW"

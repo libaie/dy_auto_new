@@ -168,6 +168,12 @@ Run the device operations boundary checks:
 .\server\.venv\Scripts\python.exe -m pytest server/tests/test_device_operations_auth_parity.py server/tests/test_device_operations_domain_boundary.py server/tests/test_device_operations_status_lifecycle.py -q
 ```
 
+Run the pairing, polling, and reporting response-shape checks:
+
+```powershell
+.\server\.venv\Scripts\python.exe -m pytest server/tests/test_device_operations_pairing.py server/tests/test_device_operations_polling_reporting.py -q
+```
+
 Run the existing device compatibility checks:
 
 ```powershell

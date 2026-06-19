@@ -159,6 +159,41 @@ def test_device_operations_pr4c_extracts_script_assets_module():
     assert "app.domains.device_operations.script_assets.device_calibrate" in endpoint_modules
 
 
+def test_device_operations_pr4d_extracts_content_bridge_module():
+    import app.domains.device_operations.content_bridge as content_bridge
+    import app.domains.device_operations.device_router as device_router
+
+    assert hasattr(content_bridge, "claim_comment_reply")
+    assert hasattr(content_bridge, "release_comment_claim")
+    assert hasattr(content_bridge, "generate_content")
+    assert hasattr(content_bridge, "ai_proxy")
+    assert hasattr(content_bridge, "collect_report")
+    assert hasattr(content_bridge, "dm_claim_recipient")
+    assert hasattr(content_bridge, "dm_send_report")
+    assert hasattr(content_bridge, "dm_release_recipient")
+    assert hasattr(content_bridge, "save_comment_ai_reply")
+    assert hasattr(content_bridge, "save_user_profile")
+    assert hasattr(content_bridge, "upload_user_avatar")
+    assert hasattr(content_bridge, "get_user_avatar")
+    endpoint_modules = {
+        f"{route.endpoint.__module__}.{route.endpoint.__qualname__}"
+        for route in device_router.router.routes
+        if hasattr(route, "endpoint")
+    }
+    assert "app.domains.device_operations.content_bridge.claim_comment_reply" in endpoint_modules
+    assert "app.domains.device_operations.content_bridge.release_comment_claim" in endpoint_modules
+    assert "app.domains.device_operations.content_bridge.generate_content" in endpoint_modules
+    assert "app.domains.device_operations.content_bridge.ai_proxy" in endpoint_modules
+    assert "app.domains.device_operations.content_bridge.collect_report" in endpoint_modules
+    assert "app.domains.device_operations.content_bridge.dm_claim_recipient" in endpoint_modules
+    assert "app.domains.device_operations.content_bridge.dm_send_report" in endpoint_modules
+    assert "app.domains.device_operations.content_bridge.dm_release_recipient" in endpoint_modules
+    assert "app.domains.device_operations.content_bridge.save_comment_ai_reply" in endpoint_modules
+    assert "app.domains.device_operations.content_bridge.save_user_profile" in endpoint_modules
+    assert "app.domains.device_operations.content_bridge.upload_user_avatar" in endpoint_modules
+    assert "app.domains.device_operations.content_bridge.get_user_avatar" in endpoint_modules
+
+
 def test_main_continues_to_wire_legacy_device_routers_during_migration():
     text = MAIN_PATH.read_text(encoding="utf-8")
 

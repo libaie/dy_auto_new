@@ -72,6 +72,20 @@ device reporting, script assets, and the admin device management surface.
 - Do not move `server/app/main.py::_offline_checker` yet.
 - Do not change admin device management routes yet.
 
+## PR4d Allowed
+
+- Move comment claim/release, generated content, AI proxy, collection reports, DM claim/report/release, comment AI reply, user profile, and avatar routes to `content_bridge.py`.
+- Keep `device_router.py` as the `/api/device/*` route aggregator.
+- Keep route order, public paths, methods, auth dependencies, and response shapes unchanged.
+- Keep this module explicitly documented as a temporary bridge until `content_collection` owns the business use cases.
+
+## PR4d Not Allowed
+
+- Do not move device registration yet.
+- Do not move `server/app/main.py::_offline_checker` yet.
+- Do not change admin device management routes yet.
+- Do not claim final ownership of content, collection, DM, or user profile business logic.
+
 ## Ownership Rules
 
 - `app.domains.device_operations` owns the target migration boundary for `/api/device/*` and `/api/devices/*`.
@@ -82,6 +96,7 @@ device reporting, script assets, and the admin device management surface.
 - `app.domains.device_operations.polling` owns device task polling, cancellation delivery, DM sequence sync, and poll response shaping.
 - `app.domains.device_operations.reporting` owns task progress, task result, stats increment, heartbeat, and risk-control reporting.
 - `app.domains.device_operations.script_assets` owns selectors, prompt-template sync, script packages, template images, and calibration uploads.
+- `app.domains.device_operations.content_bridge` temporarily owns device-authenticated bridges for content generation, AI proxy, collection reports, comment replies, DM flows, user profiles, and avatars.
 - `server/app/main.py::_offline_checker` remains in `app.main` until lifecycle behavior is moved behind `status_lifecycle.py`.
 - Content, collection, and DM endpoints under `/api/device/*` are a temporary bridge; final business ownership belongs to a future `content_collection` domain.
 - Domain non-router modules must avoid FastAPI imports unless they are route assembly modules.

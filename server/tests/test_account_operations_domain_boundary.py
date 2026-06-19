@@ -70,19 +70,20 @@ def test_account_operations_readme_documents_facades_and_cleanup_gates():
         assert term in text
 
 
-def test_account_operations_pr2_does_not_create_router_modules_yet():
-    assert not (FUTURE_DOMAIN_PATH / "accounts_router.py").exists()
-    assert not (FUTURE_DOMAIN_PATH / "account_groups_router.py").exists()
-    assert not (FUTURE_DOMAIN_PATH / "channels_router.py").exists()
-    assert not (FUTURE_DOMAIN_PATH / "chains_router.py").exists()
+def test_account_operations_pr3_owns_router_modules():
+    assert (FUTURE_DOMAIN_PATH / "accounts_router.py").exists()
+    assert (FUTURE_DOMAIN_PATH / "account_groups_router.py").exists()
+    assert (FUTURE_DOMAIN_PATH / "channels_router.py").exists()
+    assert (FUTURE_DOMAIN_PATH / "chains_router.py").exists()
 
 
 def test_account_operations_pr1_keeps_legacy_router_files_active():
     for _name, (path, prefix) in LEGACY_ROUTER_PATHS.items():
         text = path.read_text(encoding="utf-8")
-        assert prefix in text
-        assert "app.domains.account_operations" not in text
-        assert "pair_ws_manager" in text
+        assert prefix not in text
+        assert "app.domains.account_operations" in text
+        assert "sys.modules[_LEGACY_MODULE_NAME]" in text
+        assert _line_count(path) <= 20
 
 
 def test_account_operations_pr1_does_not_wire_domain_in_main():
@@ -133,3 +134,7 @@ def _is_account_operation_route(path):
         or path == "/api/chains"
         or path.startswith("/api/chains/")
     )
+
+
+def _line_count(path):
+    return len(path.read_text(encoding="utf-8").splitlines())

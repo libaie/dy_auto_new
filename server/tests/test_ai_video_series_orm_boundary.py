@@ -22,6 +22,7 @@ from app.db_models import (
 
 
 SERVER_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_ai_video_series_model_facade_reexports_legacy_classes():
@@ -91,3 +92,9 @@ def test_ai_video_series_model_boundary_imports_in_clean_process():
     )
 
     assert result.returncode == 0, result.stderr
+
+
+def test_db_models_facade_cleanup_gates_are_documented():
+    readme = (REPO_ROOT / "server/app/domains/ai_video_series/README.md").read_text(encoding="utf-8")
+
+    assert "Do not remove `app.db_models` re-exports until all of these are true" in readme

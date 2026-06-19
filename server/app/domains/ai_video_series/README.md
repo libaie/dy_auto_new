@@ -63,3 +63,18 @@ Run the production contract tests touched by this domain:
 ```powershell
 .\server\.venv\Scripts\python.exe -m pytest server/tests/test_video_production_start_flow_contract.py server/tests/test_video_production_readiness.py server/tests/test_video_production_observability_events.py -q
 ```
+
+## Compatibility Cleanup Gates
+
+Do not remove `app.routers.series` until all of these are true:
+
+- `rg "app\.routers\.series|from app\.routers import series" server/app server/tests` returns only this README and compatibility tests.
+- `server/tests/test_ai_video_series_router_facade.py` has been replaced with tests for the new public import path.
+- `app.main` imports worker functions from `app.domains.ai_video_series`.
+- Release notes mention the import-path migration.
+
+Do not remove `app.db_models` re-exports until all of these are true:
+
+- For every public name exported by `app.db.models.ai_video_series.__all__` (`Base`, `series_characters`, `series_scenes`, `AITextArtifact`, `AITextArtifactConsumer`, `Episode`, `EpisodeScript`, `ProductionAuditEvent`, `ProductionEpisode`, `ProductionJob`, `ProductionPlan`, `ProductionPlanVersion`, `ProductionScene`, `ProductionSegment`, `ProductionShot`, `Series`, `VideoProductionRun`), `rg "from app\.db_models import" server/app server/tests` returns only compatibility tests.
+- `server/tests/conftest.py` imports series/video-series ORM names through `app.db.models.ai_video_series` or an explicit shared test fixture module.
+- Alembic environment imports all model modules through `app.db.models`.

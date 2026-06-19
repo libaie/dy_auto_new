@@ -1,4 +1,8 @@
 import importlib
+from pathlib import Path
+
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 EXPECTED_SERIES_ROUTER_SNAPSHOT = [
@@ -56,3 +60,10 @@ def test_legacy_private_helper_names_alias_owning_modules():
     assert legacy_router._run_style_lock_worker_step is style_lock.run_style_lock_worker_step
     assert legacy_router._run_story_plan_worker_step is story_planning.run_story_plan_worker_step
     assert legacy_router._fill_reference_assets is style_lock.fill_reference_assets
+
+
+def test_router_facade_cleanup_gates_are_documented():
+    readme = (REPO_ROOT / "server/app/domains/ai_video_series/README.md").read_text(encoding="utf-8")
+
+    assert "Compatibility Cleanup Gates" in readme
+    assert "Do not remove `app.routers.series` until all of these are true" in readme

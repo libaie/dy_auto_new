@@ -19,7 +19,7 @@ from app.db_models import (
     VideoProductionRun,
     VideoReviewRecord,
 )
-from app.services.production_errors import ProductionErrorCode, ProductionRepairableError, to_http_detail
+from app.domains.video_production.production_errors import ProductionErrorCode, ProductionRepairableError, to_http_detail
 from app.services.production_review_service import apply_bulk_review_action
 from app.services.production_segment_service import retry_segment
 from app.services.production_tree_service import get_run_tree

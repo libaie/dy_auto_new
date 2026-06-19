@@ -20,6 +20,20 @@ device reporting, script assets, and the admin device management surface.
 - Do not move content, collection, DM, account, channel, chain, or video production ownership in PR2.
 - Do not modify frontend code.
 
+## PR3 Allowed
+
+- Create `device_router.py` from the current `app.routers.device` behavior.
+- Create `admin_router.py` from the current `app.routers.devices` behavior.
+- Replace legacy router files with compatibility facades.
+- Keep route paths, methods, dependencies, websocket paths, and response shapes unchanged.
+
+## PR3 Not Allowed
+
+- Do not split handler internals yet.
+- Do not move `server/app/main.py::_offline_checker` yet.
+- Do not change application wiring away from legacy imports yet.
+- Do not move content, collection, DM, account, channel, chain, or video production ownership yet.
+
 ## Ownership Rules
 
 - `app.domains.device_operations` owns the target migration boundary for `/api/device/*` and `/api/devices/*`.
@@ -33,8 +47,8 @@ device reporting, script assets, and the admin device management surface.
 
 | Facade | Target | Introduced | Exit condition |
 |---|---|---|---|
-| `app.routers.device` | `app.domains.device_operations.device_router` | Planned PR3 | Route/auth/websocket snapshots pass with the domain router and all callers have an explicit compatibility path. |
-| `app.routers.devices` | `app.domains.device_operations.admin_router` | Planned PR3 | Admin device route and pair-event websocket snapshots pass with the domain router and all callers have an explicit compatibility path. |
+| `app.routers.device` | `app.domains.device_operations.device_router` | PR3 | Route/auth/websocket snapshots pass with the domain router and all callers have an explicit compatibility path. |
+| `app.routers.devices` | `app.domains.device_operations.admin_router` | PR3 | Admin device route and pair-event websocket snapshots pass with the domain router and all callers have an explicit compatibility path. |
 | `app.main._offline_checker` | `app.domains.device_operations.status_lifecycle` | Planned PR5 | Lifecycle tests cover heartbeat drain, DB flush, requeue, offline broadcast, stuck task handling, and lifespan start/stop through the domain entrypoint. |
 | `/api/device/*` content and DM bridge handlers | Future `content_collection` domain adapters | Deferred | `content_collection` owns those business use cases and adapter tests prove unchanged device response shapes. |
 

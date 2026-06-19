@@ -48,10 +48,12 @@ def test_device_operations_migration_keeps_legacy_router_files_active():
     device_text = LEGACY_DEVICE_ROUTER_PATH.read_text(encoding="utf-8")
     admin_text = LEGACY_ADMIN_DEVICE_ROUTER_PATH.read_text(encoding="utf-8")
 
-    assert 'router = APIRouter(prefix="/api/device", tags=["device"])' in device_text
-    assert 'router = APIRouter(prefix="/api/devices", tags=["devices"])' in admin_text
-    assert _line_count(LEGACY_DEVICE_ROUTER_PATH) >= 1000
-    assert _line_count(LEGACY_ADMIN_DEVICE_ROUTER_PATH) >= 300
+    assert "app.domains.device_operations.device_router" in device_text
+    assert "app.domains.device_operations.admin_router" in admin_text
+    assert "sys.modules[_LEGACY_MODULE_NAME]" in device_text
+    assert "sys.modules[_LEGACY_MODULE_NAME]" in admin_text
+    assert _line_count(LEGACY_DEVICE_ROUTER_PATH) <= 20
+    assert _line_count(LEGACY_ADMIN_DEVICE_ROUTER_PATH) <= 20
 
 
 def test_device_operations_domain_package_exports_metadata_only_skeleton():
@@ -79,9 +81,9 @@ def test_device_operations_readme_documents_facades_and_cleanup_gates():
         assert term in text
 
 
-def test_device_operations_pr2_skeleton_has_no_active_behavior_modules():
-    assert not (FUTURE_DOMAIN_PATH / "device_router.py").exists()
-    assert not (FUTURE_DOMAIN_PATH / "admin_router.py").exists()
+def test_device_operations_pr3_owns_router_modules_but_not_lifecycle_module():
+    assert (FUTURE_DOMAIN_PATH / "device_router.py").exists()
+    assert (FUTURE_DOMAIN_PATH / "admin_router.py").exists()
     assert not (FUTURE_DOMAIN_PATH / "status_lifecycle.py").exists()
 
 

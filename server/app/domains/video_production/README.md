@@ -17,6 +17,8 @@ This domain owns the video production control-plane HTTP routes.
 
 ## Current Modules
 
+- `production_action_result.py` owns `ProductionActionResult` and action result
+  HTTP detail serialization.
 - `production_errors.py` owns `ProductionErrorCode`,
   `ProductionRepairableError`, and `to_http_detail`.
 - `video_production_router.py` owns route request models such as
@@ -29,6 +31,7 @@ This domain owns the video production control-plane HTTP routes.
 | Facade | Target | Exit condition |
 |---|---|---|
 | `app.routers.video_production` | `app.domains.video_production.video_production_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
+| `app.services.production_action_result` | `app.domains.video_production.production_action_result` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.production_errors` | `app.domains.video_production.production_errors` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 
 ## Boundaries
@@ -53,6 +56,12 @@ Do not remove the legacy router facade until all of these are true:
   tests pass.
 - Import inventory shows no unapproved production imports of
   `app.routers.video_production`.
+
+Do not remove the legacy production action result facade until all of these are true:
+
+- `rg "app\.services\.production_action_result" server/app server/tests` returns only compatibility tests, migration docs, or service modules whose domains have not moved yet.
+- `test_video_production_action_result_facade.py` has been replaced with tests for direct domain imports.
+- Domain-owned production modules import `app.domains.video_production.production_action_result` directly.
 
 Do not remove the legacy production errors facade until all of these are true:
 

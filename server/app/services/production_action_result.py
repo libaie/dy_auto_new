@@ -1,64 +1,13 @@
-from dataclasses import dataclass, field
+"""Compatibility facade for video production action result helpers.
 
-from app.services.production_errors import ProductionErrorCode
+The implementation now lives in app.domains.video_production.production_action_result.
+Keep this import path until cleanup gates prove no legacy callers remain.
+"""
 
+import sys
 
-def _serialize_code(code: ProductionErrorCode | str | None) -> str | None:
-    if code is None:
-        return None
-    if isinstance(code, ProductionErrorCode):
-        return code.value
-    return str(code)
+from app.domains.video_production import production_action_result as _production_action_result
 
-
-@dataclass
-class ProductionActionResult:
-    status: str
-    message: str = ""
-    code: ProductionErrorCode | str | None = None
-    repair_action: str | None = None
-    repair_route: str | None = None
-    retryable: bool = False
-    affected_ids: list[str] = field(default_factory=list)
-    data: dict = field(default_factory=dict)
-
-    @classmethod
-    def success(cls, message: str = "", data: dict | None = None) -> "ProductionActionResult":
-        return cls(status="success", code="OK", message=message, data=data or {})
-
-    @classmethod
-    def blocked(
-        cls,
-        code: ProductionErrorCode | str,
-        message: str,
-        repair_action: str,
-        repair_route: str | None = None,
-        affected_ids: list[str] | None = None,
-        retryable: bool = False,
-        data: dict | None = None,
-    ) -> "ProductionActionResult":
-        return cls(
-            status="blocked",
-            code=code,
-            message=message,
-            repair_action=repair_action,
-            repair_route=repair_route,
-            retryable=retryable,
-            affected_ids=affected_ids or [],
-            data=data or {},
-        )
-
-    def to_http_detail(self) -> dict:
-        code = _serialize_code(self.code)
-        return {
-            "ok": self.status == "success",
-            "status": self.status,
-            "code": code,
-            "error_code": code,
-            "message": self.message,
-            "repair_action": self.repair_action,
-            "repair_route": self.repair_route,
-            "retryable": self.retryable,
-            "affected_ids": self.affected_ids,
-            "data": self.data,
-        }
+_LEGACY_MODULE_NAME = __name__
+sys.modules[_LEGACY_MODULE_NAME] = _production_action_result
+globals().update(_production_action_result.__dict__)

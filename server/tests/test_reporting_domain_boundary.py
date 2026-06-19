@@ -68,10 +68,12 @@ def test_reporting_legacy_router_file_is_thin_facade():
     assert _line_count(LEGACY_STATS_PATH) <= 20
 
 
-def test_reporting_main_keeps_legacy_router_until_direct_wiring():
+def test_reporting_main_wires_domain_router():
     text = MAIN_PATH.read_text(encoding="utf-8")
 
-    assert "app.include_router(stats.router)" in text
+    assert "from app.domains.reporting import stats_router" in text
+    assert "app.include_router(stats_router.router)" in text
+    assert "app.include_router(stats.router)" not in text
 
 
 def test_reporting_keeps_device_stats_increment_in_device_operations():

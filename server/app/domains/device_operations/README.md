@@ -111,11 +111,24 @@ device reporting, script assets, and the admin device management surface.
 - Do not move content, collection, DM, or user profile business ownership out of the temporary bridge yet.
 - Do not change application wiring away from legacy router imports yet.
 
+## PR7 Allowed
+
+- Inventory production imports of `app.routers.device` and `app.routers.devices`.
+- Move `server/app/main.py` route wiring to `app.domains.device_operations.device_router` and `app.domains.device_operations.admin_router`.
+- Keep `app.routers.device` and `app.routers.devices` as compatibility facades for old import paths.
+- Keep all public paths, methods, auth dependencies, websocket paths, and response shapes unchanged.
+
+## PR7 Not Allowed
+
+- Do not delete `server/app/routers/device.py` or `server/app/routers/devices.py`.
+- Do not remove router facade tests yet.
+- Do not change device, admin device, websocket, script asset, or content bridge behavior.
+
 ## Ownership Rules
 
 - `app.domains.device_operations` owns the target migration boundary for `/api/device/*` and `/api/devices/*`.
-- `app.routers.device` remains the compatibility entrypoint for `/api/device/*` until the router facade gate lands.
-- `app.routers.devices` remains the compatibility entrypoint for `/api/devices/*` until the admin router facade gate lands.
+- `app.routers.device` remains the compatibility import path for `/api/device/*` callers outside app wiring.
+- `app.routers.devices` remains the compatibility import path for `/api/devices/*` callers outside app wiring.
 - `app.domains.device_operations.pairing` owns device pair request/status and pair-status websocket behavior.
 - `app.domains.device_operations.status_ws` owns the device status websocket and pending-task websocket notification helper.
 - `app.domains.device_operations.polling` owns device task polling, cancellation delivery, DM sequence sync, and poll response shaping.
@@ -144,7 +157,8 @@ device reporting, script assets, and the admin device management surface.
 4. Split pairing, status websocket, polling, reporting, script assets, and bridge behavior into focused modules.
 5. Move the offline checker into `status_lifecycle.py` after lifecycle tests cover the behavior.
 6. Lock script asset and content bridge response shapes with dedicated tests.
-7. Remove compatibility facades only after import inventories and route snapshots prove no behavior drift.
+7. Move app route wiring to domain router imports while keeping legacy facades.
+8. Remove compatibility facades only after import inventories and route snapshots prove no behavior drift.
 
 ## Test Commands
 
@@ -173,7 +187,7 @@ Do not remove `app.routers.device` or `app.routers.devices` until all of these a
 - `rg "app\.routers\.(device|devices)|from app\.routers import (device|devices)" server/app server/tests` returns only approved compatibility shims, README entries, and cleanup tests.
 - `server/tests/test_device_operations_auth_parity.py` passes against the domain routers.
 - `server/tests/test_device_operations_router_facade.py` proves old and new router import paths expose the same route objects during the alias phase.
-- `app.main` imports device operations lifecycle functions from `app.domains.device_operations`.
+- `app.main` imports device operations routers and lifecycle functions from `app.domains.device_operations`.
 - Release notes mention the import-path migration.
 
 Do not move the content, collection, or DM bridge out of this domain until a `content_collection` plan and tests own that transfer.

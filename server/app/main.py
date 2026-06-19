@@ -17,7 +17,8 @@ from contextlib import asynccontextmanager
 from app.config import bj_now
 from app.database import get_db, init_db, SessionLocal
 from app.seed import seed_all
-from app.routers import device, tasks, accounts, devices, auth, selectors, stats, content, account_groups, chains, settings, channels, prompt_templates, data, videos, pixelle, ai_config, characters, scenes, series, pipeline, audit, director, reference_data, dm_sequences, video_production, agency
+from app.domains.device_operations import admin_router, device_router
+from app.routers import tasks, accounts, auth, selectors, stats, content, account_groups, chains, settings, channels, prompt_templates, data, videos, pixelle, ai_config, characters, scenes, series, pipeline, audit, director, reference_data, dm_sequences, video_production, agency
 from app.routers import image_creation, image_production
 from app.routers import system_health
 from app.services.ai_generator import ai_generator
@@ -215,10 +216,10 @@ async def _catch_unhandled_errors(request: Request, call_next):
         return JSONResponse(status_code=500, content={"detail": "Internal Server Error"})
 
 
-app.include_router(device.router)
+app.include_router(device_router.router)
 app.include_router(tasks.router)
 app.include_router(accounts.router)
-app.include_router(devices.router)
+app.include_router(admin_router.router)
 app.include_router(auth.router)
 app.include_router(selectors.router)
 app.include_router(stats.router)

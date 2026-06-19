@@ -207,14 +207,14 @@ def test_device_operations_pr5_extracts_status_lifecycle_module():
     assert "TASK_STALE_MINUTES" not in main_checker_source
 
 
-def test_main_continues_to_wire_legacy_device_routers_during_migration():
+def test_main_wires_device_operation_domain_routers_after_cleanup_gate():
     text = MAIN_PATH.read_text(encoding="utf-8")
 
-    assert "from app.routers import device" in text
-    assert "app.include_router(device.router)" in text
-    assert "app.include_router(devices.router)" in text
-    assert "app.domains.device_operations.device_router" not in text
-    assert "app.domains.device_operations.admin_router" not in text
+    assert "from app.domains.device_operations import admin_router, device_router" in text
+    assert "app.include_router(device_router.router)" in text
+    assert "app.include_router(admin_router.router)" in text
+    assert "app.include_router(device.router)" not in text
+    assert "app.include_router(devices.router)" not in text
 
 
 def test_app_import_smoke_keeps_device_routes_registered():

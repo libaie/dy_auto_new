@@ -98,6 +98,19 @@ device reporting, script assets, and the admin device management surface.
 - Do not change heartbeat timeout windows, `TASK_STALE_MINUTES`, websocket payload shapes, or task recovery semantics.
 - Do not change admin device management routes.
 
+## PR6 Allowed
+
+- Add route ownership and response-shape tests for `script_assets.py`.
+- Add route ownership and response-shape tests for `content_bridge.py`.
+- Keep all `/api/device/*` public paths, methods, auth dependencies, and response shapes unchanged.
+- Keep `content_bridge.py` explicitly documented as a temporary bridge until `content_collection` owns those business use cases.
+
+## PR6 Not Allowed
+
+- Do not remove `app.routers.device` or `app.routers.devices` compatibility facades.
+- Do not move content, collection, DM, or user profile business ownership out of the temporary bridge yet.
+- Do not change application wiring away from legacy router imports yet.
+
 ## Ownership Rules
 
 - `app.domains.device_operations` owns the target migration boundary for `/api/device/*` and `/api/devices/*`.
@@ -130,7 +143,8 @@ device reporting, script assets, and the admin device management surface.
 3. Move legacy router behavior behind `device_router.py` and `admin_router.py` with compatibility facades.
 4. Split pairing, status websocket, polling, reporting, script assets, and bridge behavior into focused modules.
 5. Move the offline checker into `status_lifecycle.py` after lifecycle tests cover the behavior.
-6. Remove compatibility facades only after import inventories and route snapshots prove no behavior drift.
+6. Lock script asset and content bridge response shapes with dedicated tests.
+7. Remove compatibility facades only after import inventories and route snapshots prove no behavior drift.
 
 ## Test Commands
 
@@ -144,6 +158,12 @@ Run the existing device compatibility checks:
 
 ```powershell
 .\server\.venv\Scripts\python.exe -m pytest server/tests/test_device_api.py server/tests/test_device_endpoints.py server/tests/test_devices_api.py -q
+```
+
+Run the script asset and content bridge response-shape checks:
+
+```powershell
+.\server\.venv\Scripts\python.exe -m pytest server/tests/test_device_operations_uploads.py server/tests/test_device_operations_content_bridge.py server/tests/test_content_api.py server/tests/test_collection_builder.py server/tests/test_dm_sequences_api.py -q
 ```
 
 ## Compatibility Cleanup Gates

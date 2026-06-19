@@ -995,7 +995,7 @@ def retry_asset_persistence(
     db: Session = Depends(get_db),
     user=Depends(require_role("admin")),
 ):
-    from app.services.asset_storage_guard import persist_provider_asset
+    from app.domains.video_production.asset_storage_guard import persist_provider_asset
     from app.services.video_production_service import run_ai_audit_for_assets, run_final_audit_for_asset
 
     try:

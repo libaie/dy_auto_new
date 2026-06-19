@@ -20,9 +20,9 @@ from app.seed import seed_all
 from app.domains.account_operations import accounts_router, account_groups_router, chains_router, channels_router
 from app.domains.content_collection import content_router, data_router, dm_sequences_router
 from app.domains.device_operations import admin_router, device_router
+from app.domains.image_generation import image_creation_router, image_production_router
 from app.domains.task_operations import tasks_router
 from app.routers import auth, selectors, stats, settings, prompt_templates, videos, pixelle, ai_config, characters, scenes, series, pipeline, audit, director, reference_data, video_production, agency
-from app.routers import image_creation, image_production
 from app.routers import system_health
 from app.services.ai_generator import ai_generator
 
@@ -246,8 +246,8 @@ app.include_router(audit.router)
 app.include_router(director.router)
 app.include_router(video_production.router)
 app.include_router(agency.router)
-app.include_router(image_creation.router)
-app.include_router(image_production.router)
+app.include_router(image_creation_router.router)
+app.include_router(image_production_router.router)
 app.include_router(system_health.router)
 app.include_router(reference_data.router)
 app.include_router(dm_sequences_router.router)

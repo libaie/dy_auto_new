@@ -70,12 +70,15 @@ def test_image_generation_legacy_router_files_are_thin_facades():
     assert _line_count(LEGACY_IMAGE_PRODUCTION_PATH) <= 20
 
 
-def test_image_generation_main_wiring_remains_legacy_until_pr4():
+def test_image_generation_main_wires_domain_routers():
     text = MAIN_PATH.read_text(encoding="utf-8")
 
-    assert "from app.routers import image_creation, image_production" in text
-    assert "app.include_router(image_creation.router)" in text
-    assert "app.include_router(image_production.router)" in text
+    assert "from app.domains.image_generation import image_creation_router, image_production_router" in text
+    assert "from app.routers import image_creation, image_production" not in text
+    assert "app.include_router(image_creation_router.router)" in text
+    assert "app.include_router(image_production_router.router)" in text
+    assert "app.include_router(image_creation.router)" not in text
+    assert "app.include_router(image_production.router)" not in text
 
 
 def test_app_import_smoke_keeps_image_generation_routes_registered_once():

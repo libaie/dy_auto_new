@@ -81,11 +81,11 @@ def test_script_pipeline_main_wires_domain_router():
     assert "app.include_router(pipeline.router)" not in text
 
 
-def test_script_pipeline_service_layer_stays_router_free():
+def test_script_pipeline_legacy_service_facade_stays_router_free():
     text = SERVICE_SCRIPT_PIPELINE_PATH.read_text(encoding="utf-8")
 
-    assert "app.domains.script_pipeline" not in text
     assert "pipeline_router" not in text
+    assert "APIRouter(" not in text
 
 
 def test_app_import_smoke_keeps_script_pipeline_routes_registered_once():

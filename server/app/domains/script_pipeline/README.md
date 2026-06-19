@@ -1,6 +1,7 @@
 # Script Pipeline Domain
 
-This domain owns the legacy script-to-video pipeline HTTP routes.
+This domain owns the legacy script-to-video pipeline HTTP routes and script
+generation pipeline runtime.
 
 ## Owned Routes
 
@@ -14,7 +15,8 @@ This domain owns the legacy script-to-video pipeline HTTP routes.
 - Role dependencies stay in `app.deps`.
 - Pixelle transport stays in `app.services.pixelle_client`.
 - Agency orchestration internals stay in `app.services`.
-- Script text generation service code stays in `app.services.script_pipeline`.
+- Non-domain service modules may keep importing `app.services.script_pipeline`
+  until their owning domains move.
 - Series authoring, AI text artifact, director, and video production routes stay
   in their own routers or domains.
 
@@ -23,12 +25,17 @@ This domain owns the legacy script-to-video pipeline HTTP routes.
 - `pipeline_router.py` owns `PipelineStartRequest`, `/api/pipeline/*` route
   handlers, `_submit_and_poll`, `_run_all_layers`, run serialization, agency
   trace status helpers, and route-local Pixelle pipeline orchestration helpers.
+- `script_pipeline_service.py` owns `DynamicPromptBuilder`,
+  `ScriptGenerationPipeline`, `PipelineManager`, script generation retries,
+  structured script persistence, episode snapshots, and AI text artifact
+  publication.
 
 ## Facade Register
 
 | Facade | Target | Exit condition |
 |---|---|---|
 | `app.routers.pipeline` | `app.domains.script_pipeline.pipeline_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
+| `app.services.script_pipeline` | `app.domains.script_pipeline.script_pipeline_service` | Direct service imports use the domain service path, except compatibility tests and callers whose owning domains have not moved yet. |
 
 ## Boundaries
 
@@ -36,8 +43,9 @@ This domain owns the legacy script-to-video pipeline HTTP routes.
 - Preserve saved `Episode.storyboard_json` startup compatibility.
 - Preserve monkeypatch compatibility for `_submit_and_poll`.
 - Preserve direct call compatibility for `_run_all_layers`.
-- Keep service-layer `app.services.script_pipeline` independent from this
-  route domain.
+- Keep the script pipeline service runtime independent from `pipeline_router`.
+- Preserve `app.services.script_pipeline` import compatibility during the
+  facade phase.
 
 ## Compatibility Cleanup Gates
 
@@ -50,3 +58,9 @@ Do not remove the legacy router facade until all of these are true:
 - Existing saved-storyboard and agency console pipeline tests pass.
 - Import inventory shows no unapproved production imports of
   `app.routers.pipeline`.
+
+Do not remove the legacy service facade until all of these are true:
+
+- `rg "app\.services\.script_pipeline" server/app server/tests` returns only compatibility tests and migration docs.
+- `test_script_pipeline_service_domain_facade.py` has been replaced with tests for direct domain imports.
+- `production_run_service.py` imports `PipelineManager` through `app.domains.script_pipeline.script_pipeline_service` after that service is moved or cleaned up.

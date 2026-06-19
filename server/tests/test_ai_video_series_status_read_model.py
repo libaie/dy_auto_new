@@ -1,5 +1,6 @@
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import event
 
 from app.main import app
 from app.db.models.ai_video_series import (
@@ -351,3 +352,54 @@ def test_final_review_pending_blocks_even_with_active_job(db):
     assert matrix[episode.id]["production_status"] == "blocked"
     assert matrix[episode.id]["active_job_count"] == 1
     assert matrix[episode.id]["blocking_code"] == "RUN_REQUIRES_REVIEW"
+
+
+def test_status_matrix_loads_evidence_in_batches(db):
+    series = Series(title="Batch Status", logline="Batch", genre="drama", total_episodes=10)
+    db.add(series)
+    db.flush()
+    plan = ProductionPlan(series_id=series.id, status="running")
+    db.add(plan)
+    db.flush()
+    for index in range(10):
+        episode = Episode(series_id=series.id, episode_number=index + 1, title=f"Episode {index + 1}")
+        db.add(episode)
+        db.flush()
+        production_episode = ProductionEpisode(plan_id=plan.id, episode_id=episode.id)
+        db.add(production_episode)
+        db.flush()
+        run = VideoProductionRun(
+            series_id=series.id,
+            episode_id=episode.id,
+            production_plan_id=plan.id,
+            production_episode_id=production_episode.id,
+            status="running",
+            current_stage="image_batch_running",
+            run_type="real_short_e2e",
+        )
+        db.add(run)
+        db.flush()
+        db.add(ProductionJob(
+            plan_id=plan.id,
+            target_type="episode",
+            target_id=episode.id,
+            stage="image_generation",
+            status="running",
+            idempotency_key=f"{run.id}:image_generation",
+        ))
+    db.commit()
+
+    statements = []
+
+    def before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+        statements.append(statement)
+
+    event.listen(db.bind, "before_cursor_execute", before_cursor_execute)
+    try:
+        matrix = build_episode_status_matrix(db, series.id)
+    finally:
+        event.remove(db.bind, "before_cursor_execute", before_cursor_execute)
+
+    assert len(matrix) == 10
+    assert all(item["production_status"] == "producing" for item in matrix.values())
+    assert len(statements) <= 8

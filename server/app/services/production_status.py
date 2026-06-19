@@ -1,50 +1,13 @@
-PLAN_DRAFT = "draft"
-PLAN_READY = "ready"
-PLAN_RUNNING = "running"
-PLAN_PAUSED = "paused"
-PLAN_BLOCKED = "blocked"
-PLAN_COMPLETED = "completed"
-PLAN_FAILED = "failed"
-PLAN_CANCELLED = "cancelled"
+"""Compatibility facade for video production status constants.
 
-JOB_QUEUED = "queued"
-JOB_LEASED = "leased"
-JOB_RUNNING = "running"
-JOB_RETRY_WAIT = "retry_wait"
-JOB_BLOCKED = "blocked"
-JOB_COMPLETED = "completed"
-JOB_FAILED = "failed"
-JOB_CANCELLED = "cancelled"
+The implementation now lives in app.domains.video_production.production_status.
+Keep this import path until cleanup gates prove no legacy callers remain.
+"""
 
-SEGMENT_PLANNED = "planned"
-SEGMENT_IMAGE_QUEUED = "image_queued"
-SEGMENT_IMAGE_RUNNING = "image_running"
-SEGMENT_IMAGE_REVIEW_PENDING = "image_review_pending"
-SEGMENT_IMAGE_APPROVED = "image_approved"
-SEGMENT_VIDEO_QUEUED = "video_queued"
-SEGMENT_VIDEO_RUNNING = "video_running"
-SEGMENT_VIDEO_REVIEW_PENDING = "video_review_pending"
-SEGMENT_VIDEO_APPROVED = "video_approved"
-SEGMENT_COMPLETED = "completed"
-SEGMENT_FAILED = "failed"
-SEGMENT_BLOCKED_BY_REVIEW = "blocked_by_review"
-SEGMENT_RETRY_QUEUED = "retry_queued"
-SEGMENT_SUPERSEDED = "superseded"
+import sys
 
-STAGE_IMAGE_GENERATION = "image_generation"
-STAGE_IMAGE_AUDIT = "image_audit"
-STAGE_VIDEO_GENERATION = "video_generation"
-STAGE_VIDEO_AUDIT = "video_audit"
-STAGE_EPISODE_COMPOSE = "episode_compose"
-STAGE_COLLECTION_COMPOSE = "collection_compose"
+from app.domains.video_production import production_status as _production_status
 
-CONTINUITY_CONTINUOUS_ACTION = "continuous_action"
-CONTINUITY_NARRATIVE_CUT = "narrative_cut"
-CONTINUITY_SCENE_CHANGE = "scene_change"
-CONTINUITY_MONTAGE = "montage"
-
-REFERENCE_CHARACTER_ANCHOR = "character_anchor"
-REFERENCE_STYLE_ANCHOR = "style_anchor"
-REFERENCE_SCENE_REFERENCE = "scene_reference"
-REFERENCE_FIRST_FRAME = "first_frame"
-REFERENCE_PREVIOUS_END_FRAME = "previous_end_frame"
+_LEGACY_MODULE_NAME = __name__
+sys.modules[_LEGACY_MODULE_NAME] = _production_status
+globals().update(_production_status.__dict__)

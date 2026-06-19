@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.config import bj_now
 from app.db_models import ProductionCostEvent, ProductionJob, ProductionPlan
-from app.services.production_status import JOB_BLOCKED, JOB_QUEUED, JOB_RETRY_WAIT, PLAN_BLOCKED
+from app.domains.video_production.production_status import JOB_BLOCKED, JOB_QUEUED, JOB_RETRY_WAIT, PLAN_BLOCKED
 
 
 def _get_plan(db: Session, plan_id: str) -> ProductionPlan:

@@ -764,7 +764,7 @@ def segment_detail(
     db: Session = Depends(get_db),
     user=Depends(require_role("admin")),
 ):
-    from app.services.production_segment_detail_service import get_segment_detail
+    from app.domains.video_production.production_segment_detail_service import get_segment_detail
 
     try:
         return {"ok": True, **get_segment_detail(db, segment_id, history_limit)}

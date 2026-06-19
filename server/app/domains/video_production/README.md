@@ -29,6 +29,8 @@ This domain owns the video production control-plane HTTP routes.
   `apply_bulk_review_action`.
 - `production_cost_summary_service.py` owns `_ZERO_RESERVATION_COSTS`,
   `_ACTIVE_RESERVATION_STATUSES`, and `get_run_costs`.
+- `production_cost_service.py` owns `assert_budget_available`,
+  `record_cost_event`, and `pause_plan_for_budget`.
 - `provider_cost_reservation_service.py` owns
   `_ACTIVE_RESERVATION_STATUSES`, `_PLAN_LOCKS`, `active_reserved_cost`,
   `create_cost_reservation`, `settle_reservation`, and reservation lifecycle
@@ -53,6 +55,7 @@ This domain owns the video production control-plane HTTP routes.
 | `app.routers.video_production` | `app.domains.video_production.video_production_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
 | `app.services.asset_storage_guard` | `app.domains.video_production.asset_storage_guard` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.production_action_result` | `app.domains.video_production.production_action_result` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
+| `app.services.production_cost_service` | `app.domains.video_production.production_cost_service` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.production_cost_summary_service` | `app.domains.video_production.production_cost_summary_service` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.production_errors` | `app.domains.video_production.production_errors` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.production_review_service` | `app.domains.video_production.production_review_service` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
@@ -105,6 +108,14 @@ Do not remove the legacy production cost summary service facade until all of the
 - Domain-owned production modules import `app.domains.video_production.production_cost_summary_service` directly.
 - Direct domain cost summary coverage proves `_ZERO_RESERVATION_COSTS` and
   `get_run_costs` behavior without legacy imports.
+
+Do not remove the legacy production cost service facade until all of these are true:
+
+- `rg "app\.services\.production_cost_service" server/app server/tests` returns only compatibility tests, migration docs, or service modules whose domains have not moved yet.
+- `test_video_production_cost_service_facade.py` has been replaced with tests for direct domain imports.
+- Domain-owned production modules import `app.domains.video_production.production_cost_service` directly.
+- Direct domain cost coverage proves `record_cost_event` and
+  `pause_plan_for_budget` behavior without legacy imports.
 
 Do not remove the legacy production state contract facade until all of these are true:
 

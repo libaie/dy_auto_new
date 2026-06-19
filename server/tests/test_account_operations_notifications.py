@@ -7,7 +7,7 @@ from app.main import app
 
 
 def test_account_mutation_broadcasts_accounts_changed():
-    with patch("app.routers.accounts.pair_ws_manager.broadcast_to_admins", new_callable=AsyncMock) as broadcast:
+    with patch("app.domains.account_operations.realtime_events.pair_ws_manager.broadcast_to_admins", new_callable=AsyncMock) as broadcast:
         with TestClient(app) as client:
             response = client.post(
                 "/api/accounts",
@@ -19,7 +19,7 @@ def test_account_mutation_broadcasts_accounts_changed():
 
 
 def test_account_group_mutation_broadcasts_account_groups_changed():
-    with patch("app.routers.account_groups.pair_ws_manager.broadcast_to_admins", new_callable=AsyncMock) as broadcast:
+    with patch("app.domains.account_operations.realtime_events.pair_ws_manager.broadcast_to_admins", new_callable=AsyncMock) as broadcast:
         with TestClient(app) as client:
             response = client.post("/api/account-groups", json={"name": _uid("notify-group")})
 
@@ -32,7 +32,7 @@ def test_channel_create_broadcasts_channels_changed(db):
     account_id = _uid("notify-acc")
     _seed_group(db, group_id, [account_id])
 
-    with patch("app.routers.channels.pair_ws_manager.broadcast_to_admins", new_callable=AsyncMock) as broadcast:
+    with patch("app.domains.account_operations.realtime_events.pair_ws_manager.broadcast_to_admins", new_callable=AsyncMock) as broadcast:
         with TestClient(app) as client:
             response = client.post(
                 "/api/channels",
@@ -71,8 +71,8 @@ def test_channel_resume_broadcasts_channels_changed_and_new_task_available(db):
         paused = client.patch(f"/api/channels/{channel_id}", json={"status": "paused"})
 
         with (
-            patch("app.routers.channels.pair_ws_manager.broadcast_to_admins", new_callable=AsyncMock) as admin_broadcast,
-            patch("app.routers.channels.pair_ws_manager.broadcast_to_devices", new_callable=AsyncMock) as device_broadcast,
+            patch("app.domains.account_operations.realtime_events.pair_ws_manager.broadcast_to_admins", new_callable=AsyncMock) as admin_broadcast,
+            patch("app.domains.account_operations.realtime_events.pair_ws_manager.broadcast_to_devices", new_callable=AsyncMock) as device_broadcast,
         ):
             response = client.patch(f"/api/channels/{channel_id}", json={"status": "active"})
 

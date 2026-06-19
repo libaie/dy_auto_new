@@ -1,14 +1,14 @@
 """Account management CRUD API."""
-from fastapi import APIRouter, HTTPException, Depends
 from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.db_models import Account
-from app.deps import verify_admin_token, require_role
-from app.config import bj_now
-from app.ws_manager import pair_ws_manager
+from app.deps import require_role, verify_admin_token
+
+from . import account_use_cases, realtime_events
 
 router = APIRouter(prefix="/api/accounts", tags=["accounts"])
 
@@ -30,19 +30,6 @@ class AccountUpdateRequest(BaseModel):
     cookie: Optional[str] = None
 
 
-def _account_to_dict(acc: Account) -> dict:
-    return {
-        "id": acc.id,
-        "nickname": acc.nickname,
-        "douyin_id": acc.douyin_id,
-        "group": acc.group,
-        "status": acc.status,
-        "daily_limits": acc.daily_limits,
-        "created_at": str(acc.created_at) if acc.created_at else None,
-        "updated_at": str(acc.updated_at) if acc.updated_at else None,
-    }
-
-
 @router.post("")
 async def create_account(
     request: AccountCreateRequest,
@@ -50,19 +37,9 @@ async def create_account(
     user = Depends(require_role("admin")),
 ):
     user_id, _ = user
-    acc = Account(
-        nickname=request.nickname,
-        douyin_id=request.douyin_id,
-        group=request.group,
-        status=request.status,
-        daily_limits=request.daily_limits,
-        user_id=user_id,
-    )
-    db.add(acc)
-    db.commit()
-    db.refresh(acc)
-    await pair_ws_manager.broadcast_to_admins({"event": "accounts_changed"})
-    return _account_to_dict(acc)
+    account = account_use_cases.create_account(db, request, user_id)
+    await realtime_events.broadcast_accounts_changed()
+    return account
 
 
 @router.get("")
@@ -73,16 +50,7 @@ def list_accounts(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    limit = min(limit, 100)
-    user_id, role = user
-    query = db.query(Account)
-    if not include_deleted:
-        query = query.filter(Account.status != "deleted")
-    if role != "admin":
-        query = query.filter(Account.user_id == user_id)
-    total = query.count()
-    accounts = query.order_by(Account.created_at.desc()).offset(skip).limit(limit).all()
-    return {"accounts": [_account_to_dict(a) for a in accounts], "total": total}
+    return account_use_cases.list_accounts(db, skip, limit, include_deleted, user)
 
 
 @router.get("/{account_id}")
@@ -92,16 +60,10 @@ def get_account(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    user_id, role = user
-    query = db.query(Account).filter(Account.id == account_id)
-    if not include_deleted:
-        query = query.filter(Account.status != "deleted")
-    if role != "admin":
-        query = query.filter(Account.user_id == user_id)
-    acc = query.first()
-    if not acc:
+    try:
+        return account_use_cases.get_account(db, account_id, include_deleted, user)
+    except LookupError:
         raise HTTPException(status_code=404, detail="Account not found")
-    return _account_to_dict(acc)
 
 
 @router.put("/{account_id}")
@@ -111,31 +73,12 @@ async def update_account(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    user_id, role = user
-    query = db.query(Account).filter(Account.id == account_id)
-    if role != "admin":
-        query = query.filter(Account.user_id == user_id)
-    acc = query.first()
-    if not acc:
+    try:
+        account = account_use_cases.update_account(db, account_id, request, user)
+    except LookupError:
         raise HTTPException(status_code=404, detail="Account not found")
-
-    if request.nickname is not None:
-        acc.nickname = request.nickname
-    if request.douyin_id is not None:
-        acc.douyin_id = request.douyin_id
-    if request.group is not None:
-        acc.group = request.group
-    if request.status is not None:
-        acc.status = request.status
-    if request.daily_limits is not None:
-        acc.daily_limits = request.daily_limits
-    if request.cookie is not None:
-        acc.cookie = request.cookie
-
-    db.commit()
-    db.refresh(acc)
-    await pair_ws_manager.broadcast_to_admins({"event": "accounts_changed"})
-    return _account_to_dict(acc)
+    await realtime_events.broadcast_accounts_changed()
+    return account
 
 
 @router.delete("/{account_id}")
@@ -144,29 +87,9 @@ async def delete_account(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    user_id, role = user
-    query = db.query(Account).filter(Account.id == account_id)
-    if role != "admin":
-        query = query.filter(Account.user_id == user_id)
-    acc = query.first()
-    if not acc:
+    try:
+        result = account_use_cases.delete_account(db, account_id, user)
+    except LookupError:
         raise HTTPException(status_code=404, detail="Account not found")
-
-    from app.db_models import Device, Task as DBTask
-    # 1. 解绑关联设备
-    db.query(Device).filter(Device.bound_account_id == account_id).update(
-        {"bound_account_id": None}, synchronize_session=False
-    )
-    # 2. 取消该账号的 pending/running 任务（标记为 cancelled 而非 failed）
-    db.query(DBTask).filter(
-        DBTask.account_id == account_id,
-        DBTask.status.in_(["pending", "running"]),
-    ).update({"status": "cancelled", "result": {"error": "account deleted"}, "completed_at": bj_now()},
-             synchronize_session=False)
-
-    # 3. 软删除 — 保留数据可审计，可恢复
-    acc.status = "deleted"
-
-    db.commit()
-    await pair_ws_manager.broadcast_to_admins({"event": "accounts_changed"})
-    return {"deleted": True, "id": account_id}
+    await realtime_events.broadcast_accounts_changed()
+    return result

@@ -60,6 +60,21 @@ CHAIN_INSTANCE_KEYS = {
 CHAIN_TASK_KEYS = {"id", "step_order", "type", "status", "params", "result", "started_at", "completed_at"}
 
 
+def test_read_model_module_owns_account_group_channel_and_chain_payload_helpers():
+    import app.domains.account_operations.read_models as read_models
+
+    for name in (
+        "account_to_dict",
+        "group_to_dict",
+        "member_to_dict",
+        "channel_to_response",
+        "channel_item_to_response",
+        "chain_template_to_dict",
+        "chain_instance_to_dict",
+    ):
+        assert hasattr(read_models, name)
+
+
 def test_account_list_response_shape():
     with TestClient(app) as client:
         created = client.post(

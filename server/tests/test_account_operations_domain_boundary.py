@@ -8,6 +8,7 @@ PLAN_PATH = REPO_ROOT / "docs/superpowers/plans/2026-06-18-account-operations-do
 MAIN_PATH = REPO_ROOT / "server/app/main.py"
 TASKS_ROUTER_PATH = REPO_ROOT / "server/app/routers/tasks.py"
 FUTURE_DOMAIN_PATH = REPO_ROOT / "server/app/domains/account_operations"
+FUTURE_DOMAIN_README_PATH = FUTURE_DOMAIN_PATH / "README.md"
 
 LEGACY_ROUTER_PATHS = {
     "accounts": (REPO_ROOT / "server/app/routers/accounts.py", 'APIRouter(prefix="/api/accounts"'),
@@ -42,8 +43,38 @@ def test_account_operations_future_contract_is_documented_in_plan():
         assert term in text
 
 
-def test_account_operations_pr1_does_not_create_domain_package_yet():
-    assert not FUTURE_DOMAIN_PATH.exists()
+def test_account_operations_domain_package_exports_metadata_only_skeleton():
+    import app.domains.account_operations as domain
+
+    assert domain.DOMAIN_NAME == "account_operations"
+    assert domain.PUBLIC_ROUTE_PREFIXES == ("/api/accounts", "/api/account-groups", "/api/channels", "/api/chains")
+
+
+def test_account_operations_readme_documents_facades_and_cleanup_gates():
+    text = FUTURE_DOMAIN_README_PATH.read_text(encoding="utf-8")
+
+    required_terms = [
+        "Facade Register",
+        "app.routers.accounts",
+        "app.domains.account_operations.accounts_router",
+        "app.routers.account_groups",
+        "app.domains.account_operations.account_groups_router",
+        "app.routers.channels",
+        "app.domains.account_operations.channels_router",
+        "app.routers.chains",
+        "app.domains.account_operations.chains_router",
+        "server/app/routers/tasks.py",
+        "Compatibility Cleanup Gates",
+    ]
+    for term in required_terms:
+        assert term in text
+
+
+def test_account_operations_pr2_does_not_create_router_modules_yet():
+    assert not (FUTURE_DOMAIN_PATH / "accounts_router.py").exists()
+    assert not (FUTURE_DOMAIN_PATH / "account_groups_router.py").exists()
+    assert not (FUTURE_DOMAIN_PATH / "channels_router.py").exists()
+    assert not (FUTURE_DOMAIN_PATH / "chains_router.py").exists()
 
 
 def test_account_operations_pr1_keeps_legacy_router_files_active():

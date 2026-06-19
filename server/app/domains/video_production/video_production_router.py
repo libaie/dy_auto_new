@@ -778,7 +778,7 @@ def segment_retry_impact(
     db: Session = Depends(get_db),
     user=Depends(require_role("admin")),
 ):
-    from app.services.production_retry_service import get_retry_impact
+    from app.domains.video_production.production_retry_service import get_retry_impact
 
     try:
         return {"ok": True, **get_retry_impact(db, segment_id)}

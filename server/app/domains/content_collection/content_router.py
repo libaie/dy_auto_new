@@ -12,8 +12,7 @@ from app.models import (
 )
 from app.database import get_db
 from app.deps import verify_admin_token
-from app.services.content_service import content_service
-from app.ws_manager import pair_ws_manager
+from app.domains.content_collection import content_generation, mutations, realtime_events
 
 router = APIRouter(prefix="/api/content", tags=["content"])
 
@@ -26,11 +25,8 @@ async def create_template(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    result = content_service.create_template(
-        db, name=request.name, category=request.category,
-        body=request.body, variables=request.variables,
-    )
-    await pair_ws_manager.broadcast_to_admins({"event": "content_changed"})
+    result = mutations.create_template(db, request)
+    await realtime_events.broadcast_content_changed()
     return result
 
 
@@ -42,9 +38,7 @@ def list_templates(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    limit = min(limit, 100)
-    templates, total = content_service.list_templates(db, category=category, skip=skip, limit=limit)
-    return {"templates": templates, "total": total}
+    return mutations.list_templates(db, category=category, skip=skip, limit=limit)
 
 
 @router.get("/templates/{template_id}", response_model=ContentTemplateResponse)
@@ -53,7 +47,7 @@ def get_template(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    tpl = content_service.get_template(db, template_id)
+    tpl = mutations.get_template(db, template_id)
     if not tpl:
         raise HTTPException(status_code=404, detail="Template not found")
     return tpl
@@ -66,11 +60,10 @@ async def update_template(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    updates = request.model_dump(exclude_none=True)
-    tpl = content_service.update_template(db, template_id, **updates)
+    tpl = mutations.update_template(db, template_id, request)
     if not tpl:
         raise HTTPException(status_code=404, detail="Template not found")
-    await pair_ws_manager.broadcast_to_admins({"event": "content_changed"})
+    await realtime_events.broadcast_content_changed()
     return tpl
 
 
@@ -80,9 +73,9 @@ async def delete_template(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    if not content_service.delete_template(db, template_id):
+    if not mutations.delete_template(db, template_id):
         raise HTTPException(status_code=404, detail="Template not found")
-    await pair_ws_manager.broadcast_to_admins({"event": "content_changed"})
+    await realtime_events.broadcast_content_changed()
     return {"ok": True}
 
 
@@ -95,8 +88,8 @@ async def add_sensitive_word(
     user = Depends(verify_admin_token),
 ):
     try:
-        result = content_service.add_sensitive_word(db, request.word)
-        await pair_ws_manager.broadcast_to_admins({"event": "content_changed"})
+        result = mutations.add_sensitive_word(db, request)
+        await realtime_events.broadcast_content_changed()
         return result
     except ValueError:
         raise HTTPException(status_code=409, detail="Word already exists")
@@ -109,8 +102,7 @@ def list_sensitive_words(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    words, total = content_service.list_sensitive_words(db, skip=skip, limit=limit)
-    return {"words": words, "total": total}
+    return mutations.list_sensitive_words(db, skip=skip, limit=limit)
 
 
 @router.delete("/sensitive-words/{word_id}")
@@ -119,9 +111,9 @@ async def delete_sensitive_word(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    if not content_service.delete_sensitive_word(db, word_id):
+    if not mutations.delete_sensitive_word(db, word_id):
         raise HTTPException(status_code=404, detail="Word not found")
-    await pair_ws_manager.broadcast_to_admins({"event": "content_changed"})
+    await realtime_events.broadcast_content_changed()
     return {"ok": True}
 
 
@@ -134,9 +126,7 @@ async def generate_content(
     user = Depends(verify_admin_token),
 ):
     try:
-        content = await content_service.generate_from_template(
-            db, request.template_id, request.context,
-        )
+        content = await content_generation.generate_from_template(db, request)
     except ValueError as e:
         if "not found" in str(e):
             raise HTTPException(status_code=404, detail="Template not found")
@@ -156,7 +146,7 @@ async def generate_keywords(
     user = Depends(verify_admin_token),
 ):
     try:
-        keywords = await content_service.generate_keyword_matrix(request.keyword, request.count, db=db)
+        keywords = await content_generation.generate_keywords(db, request)
     except RuntimeError as e:
         if "not configured" in str(e):
             raise HTTPException(status_code=503, detail="AI service not configured.")
@@ -172,7 +162,7 @@ async def generate_regex(
     user = Depends(verify_admin_token),
 ):
     try:
-        regex = await content_service.generate_regex(db, request.description)
+        regex = await content_generation.generate_regex(db, request)
     except RuntimeError as e:
         if "not configured" in str(e):
             raise HTTPException(status_code=503, detail="AI service not configured.")
@@ -187,7 +177,7 @@ async def generate_clean_prompt(
     user = Depends(verify_admin_token),
 ):
     try:
-        prompt = await content_service.generate_clean_prompt(db, request.description)
+        prompt = await content_generation.generate_clean_prompt(db, request)
     except RuntimeError as e:
         if "not configured" in str(e):
             raise HTTPException(status_code=503, detail="AI service not configured.")

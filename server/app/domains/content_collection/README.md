@@ -50,6 +50,20 @@ this domain provides stable use cases and compatibility tests for that handoff.
 - Do not move device bridge use cases yet.
 - Do not move ORM model ownership or persistence class bodies.
 
+## PR4b Allowed
+
+- Move content template and sensitive-word mutation orchestration to `mutations.py`.
+- Move content, keyword, regex, and clean-prompt generation calls to `content_generation.py`.
+- Move content websocket broadcast helper to `realtime_events.py`.
+- Keep `content_router.py` as the FastAPI route and HTTP error mapping boundary.
+
+## PR4b Not Allowed
+
+- Do not move DM sequence mutation or generation behavior yet.
+- Do not move device bridge use cases yet.
+- Do not change `content_changed` or `data_changed` realtime payload shapes.
+- Do not move ORM model ownership or persistence class bodies.
+
 ## Ownership Rules
 
 - `app.domains.content_collection` owns the target migration boundary for `/api/content/*`, `/api/data/*`, and `/api/dm-sequences/*`.
@@ -57,6 +71,9 @@ this domain provides stable use cases and compatibility tests for that handoff.
 - `app.routers.data` remains the active route implementation until the router facade gate lands.
 - `app.routers.dm_sequences` remains the active route implementation until the router facade gate lands.
 - `app.domains.content_collection.read_models` owns collected comment/user/conversation list and export payload shaping.
+- `app.domains.content_collection.mutations` owns content template and sensitive-word mutation orchestration.
+- `app.domains.content_collection.content_generation` owns content, keyword, regex, and clean-prompt generation calls.
+- `app.domains.content_collection.realtime_events` owns content collection websocket broadcast helpers.
 - `app.domains.device_operations.content_bridge` remains the device-authenticated route boundary for `/api/device/*` content, collection, DM, profile, and avatar paths until this domain provides handoff use cases.
 - `content_collection` must preserve `content_changed` and `data_changed` websocket payloads when logic moves.
 - Domain non-router use-case modules must avoid FastAPI imports unless they are route assembly modules.
@@ -97,6 +114,12 @@ Run the read model extraction checks:
 
 ```powershell
 .\server\.venv\Scripts\python.exe -m pytest server/tests/test_content_collection_read_models.py server/tests/test_data_export.py -q
+```
+
+Run the content mutation and realtime checks:
+
+```powershell
+.\server\.venv\Scripts\python.exe -m pytest server/tests/test_content_collection_mutations.py server/tests/test_content_collection_realtime_broadcasts.py server/tests/test_content_api.py -q
 ```
 
 ## Compatibility Cleanup Gates

@@ -749,7 +749,7 @@ def run_costs(
     db: Session = Depends(get_db),
     user=Depends(require_role("admin")),
 ):
-    from app.services.production_cost_summary_service import get_run_costs
+    from app.domains.video_production.production_cost_summary_service import get_run_costs
 
     try:
         return {"ok": True, **get_run_costs(db, run_id)}

@@ -21,6 +21,9 @@ plus image production strategy business logic.
 - `image_production_policy_runtime.py` owns `estimate_image_cost`,
   `preview_image_capacity`, `preview_review_gate`, and image production policy
   preview defaults.
+- `image_production_metrics_service.py` owns `refresh_image_strategy_metrics`,
+  `refresh_all_image_strategy_metrics`, `aggregate_strategy_metrics_payload`,
+  and `strategy_metrics_payload`.
 - `image_selection_preview_service.py` owns `create_selection_preview`,
   provider-option validation, model/cost/capacity/review preview assembly,
   request hashing, and `ImageSelectionPreview` persistence.
@@ -39,6 +42,7 @@ plus image production strategy business logic.
 | `app.routers.image_production` | `app.domains.image_generation.image_production_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
 | `app.services.image_production_strategy_service` | `app.domains.image_generation.image_production_strategy_service` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.image_production_policy_runtime` | `app.domains.image_generation.image_production_policy_runtime` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
+| `app.services.image_production_metrics_service` | `app.domains.image_generation.image_production_metrics_service` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.image_selection_preview_service` | `app.domains.image_generation.image_selection_preview_service` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.image_model_selection_service` | `app.domains.image_generation.image_model_selection_service` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.image_selection_preview_hash` | `app.domains.image_generation.image_selection_preview_hash` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
@@ -76,6 +80,12 @@ Do not remove the legacy image policy runtime facade until all of these are true
 - `rg "app\.services\.image_production_policy_runtime" server/app server/tests` returns only compatibility tests, migration docs, or service modules whose domains have not moved yet.
 - `test_image_generation_policy_runtime_facade.py` has been replaced with tests for direct domain imports.
 - Domain-owned production modules import `app.domains.image_generation.image_production_policy_runtime` directly.
+
+Do not remove the legacy image metrics service facade until all of these are true:
+
+- `rg "app\.services\.image_production_metrics_service" server/app server/tests` returns only compatibility tests, migration docs, or service modules whose domains have not moved yet.
+- `test_image_generation_metrics_service_facade.py` has been replaced with tests for direct domain imports.
+- Domain-owned production modules import `app.domains.image_generation.image_production_metrics_service` directly.
 
 Do not remove the legacy selection preview service facade until all of these are true:
 

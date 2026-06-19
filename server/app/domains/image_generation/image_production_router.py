@@ -22,7 +22,7 @@ from app.services.image_asset_bridge_service import (
     video_asset_payload,
 )
 from app.domains.image_generation.image_selection_preview_service import create_selection_preview
-from app.services.image_production_metrics_service import (
+from app.domains.image_generation.image_production_metrics_service import (
     aggregate_strategy_metrics_payload,
     refresh_all_image_strategy_metrics,
 )

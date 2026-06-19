@@ -17,8 +17,9 @@ from contextlib import asynccontextmanager
 from app.config import bj_now
 from app.database import get_db, init_db, SessionLocal
 from app.seed import seed_all
+from app.domains.content_collection import content_router, data_router, dm_sequences_router
 from app.domains.device_operations import admin_router, device_router
-from app.routers import tasks, accounts, auth, selectors, stats, content, account_groups, chains, settings, channels, prompt_templates, data, videos, pixelle, ai_config, characters, scenes, series, pipeline, audit, director, reference_data, dm_sequences, video_production, agency
+from app.routers import tasks, accounts, auth, selectors, stats, account_groups, chains, settings, channels, prompt_templates, videos, pixelle, ai_config, characters, scenes, series, pipeline, audit, director, reference_data, video_production, agency
 from app.routers import image_creation, image_production
 from app.routers import system_health
 from app.services.ai_generator import ai_generator
@@ -223,13 +224,13 @@ app.include_router(admin_router.router)
 app.include_router(auth.router)
 app.include_router(selectors.router)
 app.include_router(stats.router)
-app.include_router(content.router)
+app.include_router(content_router.router)
 app.include_router(account_groups.router)
 app.include_router(chains.router)
 app.include_router(settings.router)
 app.include_router(channels.router)
 app.include_router(prompt_templates.router)
-app.include_router(data.router)
+app.include_router(data_router.router)
 app.include_router(videos.router)
 app.include_router(pixelle.router)
 app.include_router(pixelle.proxy_router)
@@ -247,7 +248,7 @@ app.include_router(image_creation.router)
 app.include_router(image_production.router)
 app.include_router(system_health.router)
 app.include_router(reference_data.router)
-app.include_router(dm_sequences.router)
+app.include_router(dm_sequences_router.router)
 
 
 @app.get("/health")

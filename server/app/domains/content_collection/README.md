@@ -80,12 +80,25 @@ this domain provides stable use cases and compatibility tests for that handoff.
 - Do not change device auth, response shapes, avatar file paths, or DM idempotency semantics.
 - Do not move ORM model ownership or persistence class bodies.
 
+## PR6 Allowed
+
+- Inventory production imports of `app.routers.content`, `app.routers.data`, and `app.routers.dm_sequences`.
+- Move `server/app/main.py` route wiring to `app.domains.content_collection.content_router`, `data_router`, and `dm_sequences_router`.
+- Keep `app.routers.content`, `app.routers.data`, and `app.routers.dm_sequences` as compatibility facades for old import paths.
+- Keep all public paths, methods, auth dependencies, response shapes, export streams, and realtime payloads unchanged.
+
+## PR6 Not Allowed
+
+- Do not delete `server/app/routers/content.py`, `server/app/routers/data.py`, or `server/app/routers/dm_sequences.py`.
+- Do not remove router facade tests yet.
+- Do not move ORM model ownership or persistence class bodies.
+
 ## Ownership Rules
 
 - `app.domains.content_collection` owns the target migration boundary for `/api/content/*`, `/api/data/*`, and `/api/dm-sequences/*`.
-- `app.routers.content` remains the active route implementation until the router facade gate lands.
-- `app.routers.data` remains the active route implementation until the router facade gate lands.
-- `app.routers.dm_sequences` remains the active route implementation until the router facade gate lands.
+- `app.routers.content` remains the compatibility import path for `/api/content/*` callers outside app wiring.
+- `app.routers.data` remains the compatibility import path for `/api/data/*` callers outside app wiring.
+- `app.routers.dm_sequences` remains the compatibility import path for `/api/dm-sequences/*` callers outside app wiring.
 - `app.domains.content_collection.read_models` owns collected comment/user/conversation list and export payload shaping.
 - `app.domains.content_collection.mutations` owns content template, sensitive-word, and DM sequence mutation orchestration.
 - `app.domains.content_collection.content_generation` owns content, keyword, regex, and clean-prompt generation calls.
@@ -112,7 +125,8 @@ this domain provides stable use cases and compatibility tests for that handoff.
 3. Move legacy route behavior behind domain routers with compatibility facades.
 4. Split read models, mutations, content generation, and realtime event helpers into focused modules.
 5. Move collection report and DM claim use cases behind content collection while keeping device route ownership stable.
-6. Remove compatibility facades only after import inventories and route snapshots prove no behavior drift.
+6. Move app route wiring to domain router imports while keeping legacy facades.
+7. Remove compatibility facades only after import inventories and route snapshots prove no behavior drift.
 
 ## Test Commands
 
@@ -155,6 +169,7 @@ Do not remove `app.routers.content`, `app.routers.data`, or `app.routers.dm_sequ
 - `server/tests/test_content_collection_router_facade.py` proves old and new router import paths expose the same route objects during the alias phase.
 - `server/tests/test_content_collection_realtime_broadcasts.py` proves `content_changed` and `data_changed` payloads still reach `pair_ws_manager.broadcast_to_admins`.
 - `server/tests/test_content_collection_device_bridge.py` proves the device bridge handoff keeps `/api/device/*` auth and response shapes stable.
+- `app.main` imports content collection routers from `app.domains.content_collection`.
 - Release notes mention the import-path migration.
 
 Do not move ORM model ownership or persistence class bodies until a separate graph/import plan exists.

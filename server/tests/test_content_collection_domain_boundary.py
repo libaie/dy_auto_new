@@ -5,6 +5,7 @@ from fastapi.routing import APIRoute
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PLAN_PATH = REPO_ROOT / "docs/superpowers/plans/2026-06-18-content-collection-domain-plan.md"
+MAIN_PATH = REPO_ROOT / "server/app/main.py"
 FUTURE_DOMAIN_PATH = REPO_ROOT / "server/app/domains/content_collection"
 FUTURE_DOMAIN_README_PATH = FUTURE_DOMAIN_PATH / "README.md"
 CONTENT_ROUTER_PATH = REPO_ROOT / "server/app/routers/content.py"
@@ -94,6 +95,18 @@ def test_app_import_smoke_keeps_content_collection_routes_registered():
     assert "/api/dm-sequences" in paths
     assert "/api/dm-sequences/device/sync" in paths
     assert "/api/device/collect-report" in paths
+
+
+def test_main_wires_content_collection_domain_routers_after_cleanup_gate():
+    text = MAIN_PATH.read_text(encoding="utf-8")
+
+    assert "from app.domains.content_collection import content_router, data_router, dm_sequences_router" in text
+    assert "app.include_router(content_router.router)" in text
+    assert "app.include_router(data_router.router)" in text
+    assert "app.include_router(dm_sequences_router.router)" in text
+    assert "app.include_router(content.router)" not in text
+    assert "app.include_router(data.router)" not in text
+    assert "app.include_router(dm_sequences.router)" not in text
 
 
 def _line_count(path):

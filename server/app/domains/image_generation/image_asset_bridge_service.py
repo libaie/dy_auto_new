@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.db_models import ImageCreationAsset, ImageCreationTask, VideoProductionAsset, VideoProductionRun
 from app.services.image_creation_errors import image_error
 from app.services.image_creation_service import _asset_allowed_actions
-from app.services.image_review_gate_service import asset_review_gate, review_gate_passed, review_gate_rescue_actions
+from app.domains.image_generation.image_review_gate_service import asset_review_gate, review_gate_passed, review_gate_rescue_actions
 
 
 def _review_snapshot(asset: ImageCreationAsset) -> dict[str, Any]:

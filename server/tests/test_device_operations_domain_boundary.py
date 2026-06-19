@@ -87,7 +87,28 @@ def test_device_operations_pr3_owns_router_modules_but_not_lifecycle_module():
     assert not (FUTURE_DOMAIN_PATH / "status_lifecycle.py").exists()
 
 
-def test_main_continues_to_wire_legacy_device_routers_during_pr2():
+def test_device_operations_pr4a_extracts_pairing_and_status_ws_modules():
+    import app.domains.device_operations.device_router as device_router
+    import app.domains.device_operations.pairing as pairing
+    import app.domains.device_operations.status_ws as status_ws
+
+    assert hasattr(pairing, "create_pair_request")
+    assert hasattr(pairing, "check_pair_status")
+    assert hasattr(pairing, "ws_pair_status")
+    assert hasattr(status_ws, "ws_device_status")
+    assert hasattr(status_ws, "_notify_pending_tasks")
+    endpoint_modules = {
+        f"{route.endpoint.__module__}.{route.endpoint.__qualname__}"
+        for route in device_router.router.routes
+        if hasattr(route, "endpoint")
+    }
+    assert "app.domains.device_operations.pairing.create_pair_request" in endpoint_modules
+    assert "app.domains.device_operations.pairing.check_pair_status" in endpoint_modules
+    assert "app.domains.device_operations.pairing.ws_pair_status" in endpoint_modules
+    assert "app.domains.device_operations.status_ws.ws_device_status" in endpoint_modules
+
+
+def test_main_continues_to_wire_legacy_device_routers_during_migration():
     text = MAIN_PATH.read_text(encoding="utf-8")
 
     assert "from app.routers import device" in text

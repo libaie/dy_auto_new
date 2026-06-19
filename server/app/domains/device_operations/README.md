@@ -34,11 +34,26 @@ device reporting, script assets, and the admin device management surface.
 - Do not change application wiring away from legacy imports yet.
 - Do not move content, collection, DM, account, channel, chain, or video production ownership yet.
 
+## PR4a Allowed
+
+- Move device pairing routes to `pairing.py`.
+- Move the device status websocket and pending-task notification helper to `status_ws.py`.
+- Keep `device_router.py` as the `/api/device/*` route aggregator.
+- Keep all public paths, methods, auth dependencies, websocket paths, and response shapes unchanged.
+
+## PR4a Not Allowed
+
+- Do not move task polling, progress/reporting, script assets, content bridge, DM bridge, or avatar handlers yet.
+- Do not move `server/app/main.py::_offline_checker` yet.
+- Do not change admin device management routes yet.
+
 ## Ownership Rules
 
 - `app.domains.device_operations` owns the target migration boundary for `/api/device/*` and `/api/devices/*`.
 - `app.routers.device` remains the compatibility entrypoint for `/api/device/*` until the router facade gate lands.
 - `app.routers.devices` remains the compatibility entrypoint for `/api/devices/*` until the admin router facade gate lands.
+- `app.domains.device_operations.pairing` owns device pair request/status and pair-status websocket behavior.
+- `app.domains.device_operations.status_ws` owns the device status websocket and pending-task websocket notification helper.
 - `server/app/main.py::_offline_checker` remains in `app.main` until lifecycle behavior is moved behind `status_lifecycle.py`.
 - Content, collection, and DM endpoints under `/api/device/*` are a temporary bridge; final business ownership belongs to a future `content_collection` domain.
 - Domain non-router modules must avoid FastAPI imports unless they are route assembly modules.

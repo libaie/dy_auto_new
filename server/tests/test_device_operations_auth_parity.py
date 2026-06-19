@@ -46,8 +46,8 @@ EXPECTED_DEVICE_OPERATION_HTTP_ROUTES = [
 
 
 EXPECTED_DEVICE_OPERATION_WEBSOCKETS = [
-    ("/api/device/ws/pair/{token}", "ws_pair_status", "app.domains.device_operations.device_router.ws_pair_status", "device"),
-    ("/api/device/ws/status", "ws_device_status", "app.domains.device_operations.device_router.ws_device_status", "device"),
+    ("/api/device/ws/pair/{token}", "ws_pair_status", "app.domains.device_operations.pairing.ws_pair_status", "device"),
+    ("/api/device/ws/status", "ws_device_status", "app.domains.device_operations.status_ws.ws_device_status", "device"),
     ("/api/devices/ws/pair-events", "ws_pair_events", "app.domains.device_operations.admin_router.ws_pair_events", "admin"),
 ]
 

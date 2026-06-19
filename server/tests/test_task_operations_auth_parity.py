@@ -4,13 +4,13 @@ from app.main import app
 
 
 EXPECTED_TASK_OPERATION_HTTP_ROUTES = [
-    ("/api/tasks", ("POST",), "create_task", "app.routers.tasks.create_task", ("get_db", "verify_admin_token")),
-    ("/api/tasks/batch", ("POST",), "batch_create_tasks", "app.routers.tasks.batch_create_tasks", ("get_db", "verify_admin_token")),
-    ("/api/tasks", ("GET",), "list_tasks", "app.routers.tasks.list_tasks", ("get_db", "verify_admin_token")),
-    ("/api/tasks/batch-delete", ("POST",), "batch_delete_tasks", "app.routers.tasks.batch_delete_tasks", ("get_db", "verify_admin_token")),
-    ("/api/tasks/{task_id}", ("GET",), "get_task", "app.routers.tasks.get_task", ("get_db", "verify_admin_token")),
-    ("/api/tasks/{task_id}/cancel", ("POST",), "cancel_task", "app.routers.tasks.cancel_task", ("get_db", "verify_admin_token")),
-    ("/api/tasks/{task_id}", ("DELETE",), "delete_task", "app.routers.tasks.delete_task", ("get_db", "verify_admin_token")),
+    ("/api/tasks", ("POST",), "create_task", "app.domains.task_operations.tasks_router.create_task", ("get_db", "verify_admin_token")),
+    ("/api/tasks/batch", ("POST",), "batch_create_tasks", "app.domains.task_operations.tasks_router.batch_create_tasks", ("get_db", "verify_admin_token")),
+    ("/api/tasks", ("GET",), "list_tasks", "app.domains.task_operations.tasks_router.list_tasks", ("get_db", "verify_admin_token")),
+    ("/api/tasks/batch-delete", ("POST",), "batch_delete_tasks", "app.domains.task_operations.tasks_router.batch_delete_tasks", ("get_db", "verify_admin_token")),
+    ("/api/tasks/{task_id}", ("GET",), "get_task", "app.domains.task_operations.tasks_router.get_task", ("get_db", "verify_admin_token")),
+    ("/api/tasks/{task_id}/cancel", ("POST",), "cancel_task", "app.domains.task_operations.tasks_router.cancel_task", ("get_db", "verify_admin_token")),
+    ("/api/tasks/{task_id}", ("DELETE",), "delete_task", "app.domains.task_operations.tasks_router.delete_task", ("get_db", "verify_admin_token")),
 ]
 
 

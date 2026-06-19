@@ -64,18 +64,17 @@ def test_task_operations_readme_documents_facades_and_cleanup_gates():
         assert term in text
 
 
-def test_task_operations_pr2_does_not_create_router_module_yet():
-    assert not (FUTURE_DOMAIN_PATH / "tasks_router.py").exists()
+def test_task_operations_pr3_owns_router_module():
+    assert (FUTURE_DOMAIN_PATH / "tasks_router.py").exists()
 
 
 def test_task_operations_pr1_keeps_legacy_router_file_active():
     text = LEGACY_TASKS_ROUTER_PATH.read_text(encoding="utf-8")
 
-    assert 'APIRouter(prefix="/api/tasks"' in text
-    assert "app.domains.task_operations" not in text
-    assert "pair_ws_manager" in text
-    assert "_maybe_resolve_content_template" in text
-    assert "_maybe_resolve_dm_sequence" in text
+    assert 'APIRouter(prefix="/api/tasks"' not in text
+    assert "app.domains.task_operations" in text
+    assert "sys.modules[_LEGACY_MODULE_NAME]" in text
+    assert _line_count(LEGACY_TASKS_ROUTER_PATH) <= 20
 
 
 def test_task_operations_pr1_does_not_wire_domain_in_main():
@@ -113,3 +112,7 @@ def test_app_import_smoke_keeps_task_routes_registered_once():
     assert "/api/tasks/batch-delete" in paths
     assert "/api/tasks/{task_id}" in paths
     assert "/api/tasks/{task_id}/cancel" in paths
+
+
+def _line_count(path):
+    return len(path.read_text(encoding="utf-8").splitlines())

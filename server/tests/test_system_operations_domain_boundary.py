@@ -61,11 +61,13 @@ def test_system_operations_legacy_router_file_is_thin_facade():
     assert _line_count(LEGACY_SYSTEM_HEALTH_PATH) <= 20
 
 
-def test_system_operations_main_wiring_remains_legacy_until_pr4():
+def test_system_operations_main_wires_domain_router():
     text = MAIN_PATH.read_text(encoding="utf-8")
 
-    assert "from app.routers import system_health" in text
-    assert "app.include_router(system_health.router)" in text
+    assert "from app.domains.system_operations import system_health_router" in text
+    assert "app.include_router(system_health_router.router)" in text
+    assert "from app.routers import system_health" not in text
+    assert "app.include_router(system_health.router)" not in text
 
 
 def test_app_import_smoke_keeps_system_operations_routes_registered_once():

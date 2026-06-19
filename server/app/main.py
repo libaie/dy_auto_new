@@ -23,9 +23,9 @@ from app.domains.creative_library import characters_router, reference_data_route
 from app.domains.device_operations import admin_router, device_router
 from app.domains.image_generation import image_creation_router, image_production_router
 from app.domains.prompt_management import prompt_templates_router
+from app.domains.system_operations import system_health_router
 from app.domains.task_operations import tasks_router
 from app.routers import auth, selectors, stats, settings, videos, pixelle, ai_config, series, pipeline, audit, director, video_production, agency
-from app.routers import system_health
 from app.services.ai_generator import ai_generator
 
 
@@ -250,7 +250,7 @@ app.include_router(video_production.router)
 app.include_router(agency.router)
 app.include_router(image_creation_router.router)
 app.include_router(image_production_router.router)
-app.include_router(system_health.router)
+app.include_router(system_health_router.router)
 app.include_router(reference_data_router.router)
 app.include_router(dm_sequences_router.router)
 

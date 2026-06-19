@@ -24,6 +24,8 @@ This domain owns the video production control-plane HTTP routes.
 - `production_state_contract.py` owns provider task status constants, cost
   reservation status constants, `asset_is_reviewable`,
   `provider_task_is_active`, and `validate_transition`.
+- `provider_capability_service.py` owns `DEFAULT_REAL_PROVIDER_CAPABILITY`,
+  `capability_from_model_config`, and `assert_real_paid_allowed`.
 - `provider_stage_task_service.py` owns `request_hash`,
   `provider_stage_idempotency_key`, `get_or_create_stage_task`,
   `set_task_status`, and `claim_stage_task_for_submit`.
@@ -39,6 +41,7 @@ This domain owns the video production control-plane HTTP routes.
 | `app.routers.video_production` | `app.domains.video_production.video_production_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
 | `app.services.production_action_result` | `app.domains.video_production.production_action_result` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.production_errors` | `app.domains.video_production.production_errors` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
+| `app.services.provider_capability_service` | `app.domains.video_production.provider_capability_service` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, approved cross-domain consumers, or service modules whose domains have not moved yet. |
 | `app.services.provider_stage_task_service` | `app.domains.video_production.provider_stage_task_service` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.production_state_contract` | `app.domains.video_production.production_state_contract` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 
@@ -84,6 +87,14 @@ Do not remove the legacy provider stage task service facade until all of these a
 - Domain-owned production modules import `app.domains.video_production.provider_stage_task_service` directly.
 - Direct domain task helper coverage proves `get_or_create_stage_task` and
   `claim_stage_task_for_submit` behavior without legacy imports.
+
+Do not remove the legacy provider capability service facade until all of these are true:
+
+- `rg "app\.services\.provider_capability_service" server/app server/tests` returns only compatibility tests, migration docs, approved cross-domain consumers, or service modules whose domains have not moved yet.
+- `test_video_production_provider_capability_service_facade.py` has been replaced with tests for direct domain imports.
+- Domain-owned production modules import `app.domains.video_production.provider_capability_service` directly.
+- Direct domain capability coverage proves `capability_from_model_config` and
+  `assert_real_paid_allowed` behavior without legacy imports.
 
 Do not remove the legacy production errors facade until all of these are true:
 

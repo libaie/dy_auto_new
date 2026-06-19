@@ -30,6 +30,25 @@ def test_device_bridge_routes_stay_in_device_operations_during_pr1():
     } == DEVICE_BRIDGE_ENDPOINTS
 
 
+def test_device_bridge_handoff_use_case_modules_exist():
+    import app.domains.content_collection.collection_reports as collection_reports
+    import app.domains.content_collection.content_generation as content_generation
+    import app.domains.content_collection.dm_claims as dm_claims
+
+    for name in (
+        "collect_report",
+        "save_comment_ai_reply",
+        "save_user_profile",
+        "upload_user_avatar",
+    ):
+        assert hasattr(collection_reports, name)
+
+    assert hasattr(content_generation, "generate_from_template")
+
+    for name in ("claim_recipient", "send_report", "release_recipient"):
+        assert hasattr(dm_claims, name)
+
+
 def test_device_generate_content_bridge_response_shape(db):
     from app.services.content_service import content_service
 

@@ -65,6 +65,21 @@ this domain provides stable use cases and compatibility tests for that handoff.
 - Do not change `content_changed` or `data_changed` realtime payload shapes.
 - Do not move ORM model ownership or persistence class bodies.
 
+## PR5 Allowed
+
+- Move device content generation calls through `content_generation.py`.
+- Move collected comment/user ingestion, comment AI reply, user profile, and avatar use cases to `collection_reports.py`.
+- Move DM recipient claim, send report, and release use cases to `dm_claims.py`.
+- Keep `/api/device/*` route paths and device-secret auth in `device_operations.content_bridge`.
+- Preserve `data_changed` realtime payloads for comment, user, and conversation events.
+
+## PR5 Not Allowed
+
+- Do not move the `/api/device/*` route declarations out of `device_operations`.
+- Do not move AI proxy behavior yet.
+- Do not change device auth, response shapes, avatar file paths, or DM idempotency semantics.
+- Do not move ORM model ownership or persistence class bodies.
+
 ## Ownership Rules
 
 - `app.domains.content_collection` owns the target migration boundary for `/api/content/*`, `/api/data/*`, and `/api/dm-sequences/*`.
@@ -74,6 +89,8 @@ this domain provides stable use cases and compatibility tests for that handoff.
 - `app.domains.content_collection.read_models` owns collected comment/user/conversation list and export payload shaping.
 - `app.domains.content_collection.mutations` owns content template, sensitive-word, and DM sequence mutation orchestration.
 - `app.domains.content_collection.content_generation` owns content, keyword, regex, and clean-prompt generation calls.
+- `app.domains.content_collection.collection_reports` owns collected comment/user ingestion, comment AI reply, user profile, and avatar use cases.
+- `app.domains.content_collection.dm_claims` owns DM recipient claim, send report, and release use cases.
 - `app.domains.content_collection.realtime_events` owns content collection websocket broadcast helpers.
 - `app.domains.device_operations.content_bridge` remains the device-authenticated route boundary for `/api/device/*` content, collection, DM, profile, and avatar paths until this domain provides handoff use cases.
 - `content_collection` must preserve `content_changed` and `data_changed` websocket payloads when logic moves.
@@ -121,6 +138,12 @@ Run the content mutation and realtime checks:
 
 ```powershell
 .\server\.venv\Scripts\python.exe -m pytest server/tests/test_content_collection_mutations.py server/tests/test_content_collection_realtime_broadcasts.py server/tests/test_content_api.py server/tests/test_dm_sequences_api.py -q
+```
+
+Run the device bridge handoff checks:
+
+```powershell
+.\server\.venv\Scripts\python.exe -m pytest server/tests/test_content_collection_device_bridge.py server/tests/test_content_collection_realtime_broadcasts.py server/tests/test_device_api.py server/tests/test_device_endpoints.py server/tests/test_dm_sequences_api.py -q
 ```
 
 ## Compatibility Cleanup Gates

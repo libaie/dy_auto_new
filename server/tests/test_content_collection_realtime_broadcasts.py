@@ -40,7 +40,7 @@ def test_sensitive_word_mutation_broadcasts_content_changed():
 
 def test_collect_report_broadcasts_comment_and_user_data_changed_events():
     with patch(
-        "app.domains.device_operations.content_bridge.pair_ws_manager.broadcast_to_admins",
+        "app.domains.content_collection.realtime_events.pair_ws_manager.broadcast_to_admins",
         new_callable=AsyncMock,
     ) as broadcast:
         with TestClient(app) as client:
@@ -76,7 +76,7 @@ def test_collect_report_broadcasts_comment_and_user_data_changed_events():
 
 def test_dm_send_report_broadcasts_conversation_data_changed_event():
     with patch(
-        "app.domains.device_operations.content_bridge.pair_ws_manager.broadcast_to_admins",
+        "app.domains.content_collection.realtime_events.pair_ws_manager.broadcast_to_admins",
         new_callable=AsyncMock,
     ) as broadcast:
         with TestClient(app) as client:

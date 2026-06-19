@@ -34,6 +34,7 @@ from app.domains.quality_audit import audit_router
 from app.domains.reporting import stats_router
 from app.domains.selector_management import selectors_router
 from app.domains.script_pipeline import pipeline_router
+from app.domains.storyboard_images import storyboard_images_router
 from app.domains.system_operations import system_health_router
 from app.domains.system_configuration import settings_router
 from app.domains.task_operations import tasks_router
@@ -261,6 +262,7 @@ app.include_router(director_router.router)
 app.include_router(video_production.router)
 app.include_router(agency_router.router)
 app.include_router(ai_text_artifacts_router.router)
+app.include_router(storyboard_images_router.router)
 app.include_router(image_creation_router.router)
 app.include_router(image_production_router.router)
 app.include_router(system_health_router.router)

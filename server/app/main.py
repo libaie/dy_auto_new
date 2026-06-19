@@ -39,8 +39,9 @@ from app.domains.storyboard_images import storyboard_images_router
 from app.domains.system_operations import system_health_router
 from app.domains.system_configuration import settings_router
 from app.domains.task_operations import tasks_router
+from app.domains.video_production import video_production_router
 from app.domains.video_library import videos_router
-from app.routers import series, video_production
+from app.routers import series
 from app.services.ai_generator import ai_generator
 
 
@@ -262,7 +263,7 @@ app.include_router(series.router)
 app.include_router(pipeline_router.router)
 app.include_router(audit_router.router)
 app.include_router(director_router.router)
-app.include_router(video_production.router)
+app.include_router(video_production_router.router)
 app.include_router(agency_router.router)
 app.include_router(ai_text_artifacts_router.router)
 app.include_router(storyboard_images_router.router)

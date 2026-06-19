@@ -1,8 +1,7 @@
-from sqlalchemy.orm import Session
+import sys
 
-from app.db_models import ProductionSegment
-from app.services.production_retry_service import retry_segment_with_impact
+from app.domains.video_production import production_segment_service as _domain_module
 
 
-def retry_segment(db: Session, segment_id: str) -> ProductionSegment:
-    return retry_segment_with_impact(db, segment_id)
+_LEGACY_MODULE_NAME = __name__
+sys.modules[_LEGACY_MODULE_NAME] = _domain_module

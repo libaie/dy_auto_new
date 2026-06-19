@@ -27,6 +27,8 @@ This domain owns the video production control-plane HTTP routes.
 - `production_review_service.py` owns `SUPPORTED_BULK_REVIEW_ACTIONS`,
   `GATED_ASSET_TYPES`, `SUPPORTED_BULK_ASSET_TYPES`, and
   `apply_bulk_review_action`.
+- `production_segment_service.py` owns `retry_segment`, the domain-level retry
+  entry point for individual production segments.
 - `production_cost_summary_service.py` owns `_ZERO_RESERVATION_COSTS`,
   `_ACTIVE_RESERVATION_STATUSES`, and `get_run_costs`.
 - `production_cost_service.py` owns `assert_budget_available`,
@@ -65,6 +67,7 @@ This domain owns the video production control-plane HTTP routes.
 | `app.services.production_cost_summary_service` | `app.domains.video_production.production_cost_summary_service` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.production_errors` | `app.domains.video_production.production_errors` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.production_review_service` | `app.domains.video_production.production_review_service` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
+| `app.services.production_segment_service` | `app.domains.video_production.production_segment_service` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.production_status` | `app.domains.video_production.production_status` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, approved cross-domain consumers, or service modules whose domains have not moved yet. |
 | `app.services.video_production_run_types` | `app.domains.video_production.video_production_run_types` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.provider_capability_service` | `app.domains.video_production.provider_capability_service` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, approved cross-domain consumers, or service modules whose domains have not moved yet. |
@@ -154,6 +157,13 @@ Do not remove the legacy production review service facade until all of these are
 - Domain-owned production modules import `app.domains.video_production.production_review_service` directly.
 - Direct domain review coverage proves `SUPPORTED_BULK_REVIEW_ACTIONS` and
   `apply_bulk_review_action` behavior without legacy imports.
+
+Do not remove the legacy production segment service facade until all of these are true:
+
+- `rg "app\.services\.production_segment_service" server/app server/tests` returns only compatibility tests, migration docs, or service modules whose domains have not moved yet.
+- `test_video_production_segment_service_facade.py` has been replaced with tests for direct domain imports.
+- Domain-owned production modules import `app.domains.video_production.production_segment_service` directly.
+- Direct domain segment coverage proves `retry_segment` behavior without legacy imports.
 
 Do not remove the legacy provider stage task service facade until all of these are true:
 

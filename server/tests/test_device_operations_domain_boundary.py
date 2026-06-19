@@ -9,6 +9,7 @@ MAIN_PATH = REPO_ROOT / "server/app/main.py"
 LEGACY_DEVICE_ROUTER_PATH = REPO_ROOT / "server/app/routers/device.py"
 LEGACY_ADMIN_DEVICE_ROUTER_PATH = REPO_ROOT / "server/app/routers/devices.py"
 FUTURE_DOMAIN_PATH = REPO_ROOT / "server/app/domains/device_operations"
+FUTURE_DOMAIN_README_PATH = FUTURE_DOMAIN_PATH / "README.md"
 
 
 def test_device_operations_future_contract_is_documented_in_spec():
@@ -43,7 +44,7 @@ def test_device_operations_bridge_ownership_is_documented_as_temporary():
     assert "do not move content/collection/DM bridge ownership" in text
 
 
-def test_device_operations_pr1_keeps_legacy_router_files_active():
+def test_device_operations_migration_keeps_legacy_router_files_active():
     device_text = LEGACY_DEVICE_ROUTER_PATH.read_text(encoding="utf-8")
     admin_text = LEGACY_ADMIN_DEVICE_ROUTER_PATH.read_text(encoding="utf-8")
 
@@ -53,14 +54,38 @@ def test_device_operations_pr1_keeps_legacy_router_files_active():
     assert _line_count(LEGACY_ADMIN_DEVICE_ROUTER_PATH) >= 300
 
 
-def test_device_operations_pr1_has_no_active_domain_package():
-    assert not (FUTURE_DOMAIN_PATH / "__init__.py").exists()
+def test_device_operations_domain_package_exports_metadata_only_skeleton():
+    import app.domains.device_operations as domain
+
+    assert domain.DOMAIN_NAME == "device_operations"
+    assert domain.PUBLIC_ROUTE_PREFIXES == ("/api/device", "/api/devices")
+
+
+def test_device_operations_readme_documents_facades_and_cleanup_gates():
+    text = FUTURE_DOMAIN_README_PATH.read_text(encoding="utf-8")
+
+    required_terms = [
+        "Facade Register",
+        "app.routers.device",
+        "app.domains.device_operations.device_router",
+        "app.routers.devices",
+        "app.domains.device_operations.admin_router",
+        "app.main._offline_checker",
+        "app.domains.device_operations.status_lifecycle",
+        "content_collection",
+        "Compatibility Cleanup Gates",
+    ]
+    for term in required_terms:
+        assert term in text
+
+
+def test_device_operations_pr2_skeleton_has_no_active_behavior_modules():
     assert not (FUTURE_DOMAIN_PATH / "device_router.py").exists()
     assert not (FUTURE_DOMAIN_PATH / "admin_router.py").exists()
     assert not (FUTURE_DOMAIN_PATH / "status_lifecycle.py").exists()
 
 
-def test_main_continues_to_wire_legacy_device_routers_in_pr1():
+def test_main_continues_to_wire_legacy_device_routers_during_pr2():
     text = MAIN_PATH.read_text(encoding="utf-8")
 
     assert "from app.routers import device" in text

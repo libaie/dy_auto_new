@@ -35,7 +35,9 @@ def test_account_group_and_channel_routes_stay_on_domain_routers():
 
 def test_account_operation_use_case_modules_export_expected_functions():
     import app.domains.account_operations.account_use_cases as account_use_cases
+    import app.domains.account_operations.adapters as adapters
     import app.domains.account_operations.channel_use_cases as channel_use_cases
+    import app.domains.account_operations.chain_use_cases as chain_use_cases
     import app.domains.account_operations.group_use_cases as group_use_cases
     import app.domains.account_operations.realtime_events as realtime_events
 
@@ -77,3 +79,20 @@ def test_account_operation_use_case_modules_export_expected_functions():
         "send_cancel_task",
     ):
         assert hasattr(realtime_events, name)
+
+    for name in ("chain_service", "channel_service"):
+        assert hasattr(adapters, name)
+
+    for name in (
+        "create_template",
+        "list_templates",
+        "get_template",
+        "update_template",
+        "delete_template",
+        "create_instances",
+        "list_instances",
+        "get_instance",
+        "cancel_instance",
+        "retry_instance",
+    ):
+        assert hasattr(chain_use_cases, name)

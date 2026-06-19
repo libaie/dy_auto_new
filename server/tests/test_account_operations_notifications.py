@@ -84,7 +84,7 @@ def test_channel_resume_broadcasts_channels_changed_and_new_task_available(db):
 
 
 def test_chain_template_mutation_broadcasts_chains_changed():
-    with patch("app.routers.chains.pair_ws_manager.broadcast_to_admins", new_callable=AsyncMock) as broadcast:
+    with patch("app.domains.account_operations.realtime_events.pair_ws_manager.broadcast_to_admins", new_callable=AsyncMock) as broadcast:
         with TestClient(app) as client:
             response = client.post(
                 "/api/chains/templates",
@@ -136,8 +136,8 @@ def test_chain_cancel_broadcasts_chains_changed_and_sends_device_cancel(db):
         instance_id = _latest_instance_id(db, account_id)
 
         with (
-            patch("app.routers.chains.pair_ws_manager.broadcast_to_admins", new_callable=AsyncMock) as admin_broadcast,
-            patch("app.routers.chains.pair_ws_manager.send_to_device", new_callable=AsyncMock) as send_to_device,
+            patch("app.domains.account_operations.realtime_events.pair_ws_manager.broadcast_to_admins", new_callable=AsyncMock) as admin_broadcast,
+            patch("app.domains.account_operations.realtime_events.pair_ws_manager.send_to_device", new_callable=AsyncMock) as send_to_device,
         ):
             response = client.post(f"/api/chains/instances/{instance_id}/cancel")
 

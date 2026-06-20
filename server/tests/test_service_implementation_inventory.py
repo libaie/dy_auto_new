@@ -1,3 +1,4 @@
+import ast
 from pathlib import Path
 
 
@@ -23,6 +24,10 @@ EXPECTED_NON_FACADE_SERVICE_FILES = {
     "video_production_readiness.py",
 }
 
+EXPECTED_MIXED_FACADE_SERVICE_FILES = {
+    "video_production_service.py",
+}
+
 EXPECTED_SERVICE_DOMAIN_TARGETS = {
     "agency_console.py": "agency_operations",
     "agency_creative_patch_service.py": "agency_operations",
@@ -46,6 +51,10 @@ def test_service_implementation_inventory_matches_allowlist():
     assert _non_facade_service_files() == EXPECTED_NON_FACADE_SERVICE_FILES
 
 
+def test_mixed_facade_implementation_inventory_matches_allowlist():
+    assert _mixed_facade_implementation_files() == EXPECTED_MIXED_FACADE_SERVICE_FILES
+
+
 def test_service_implementation_files_have_target_domains():
     assert set(EXPECTED_SERVICE_DOMAIN_TARGETS) == EXPECTED_NON_FACADE_SERVICE_FILES
     assert all(EXPECTED_SERVICE_DOMAIN_TARGETS.values())
@@ -66,7 +75,29 @@ def _non_facade_service_files() -> set[str]:
         if path.name == "__init__.py":
             continue
         text = path.read_text(encoding="utf-8")
-        if "from app.domains" in text:
+        if _imports_domains(text):
             continue
         files.add(path.name)
     return files
+
+
+def _mixed_facade_implementation_files() -> set[str]:
+    files = set()
+    for path in SERVICES_ROOT.glob("*.py"):
+        if path.name == "__init__.py":
+            continue
+        text = path.read_text(encoding="utf-8")
+        if not _imports_domains(text):
+            continue
+        tree = ast.parse(text)
+        has_top_level_definition = any(
+            isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef))
+            for node in tree.body
+        )
+        if has_top_level_definition:
+            files.add(path.name)
+    return files
+
+
+def _imports_domains(text: str) -> bool:
+    return "from app.domains" in text or "import app.domains" in text

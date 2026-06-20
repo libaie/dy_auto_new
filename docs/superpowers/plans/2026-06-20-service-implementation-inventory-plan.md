@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add an automated inventory gate for the remaining non-facade implementation files in `server/app/services`.
+**Goal:** Add automated inventory gates for the remaining implementation files in `server/app/services`.
 
-**Architecture:** A pytest file scans direct files in `server/app/services`, treats files importing `app.domains` as compatibility facades, compares the remaining file names with a temporary allowlist, and validates a target-domain map for each remaining implementation file.
+**Architecture:** A pytest file scans direct files in `server/app/services`, treats files importing `app.domains` as compatibility facades, compares the remaining file names with a temporary allowlist, separately tracks mixed facades that still define top-level implementation, and validates a target-domain map for each remaining implementation file.
 
 **Tech Stack:** Python stdlib `pathlib`, pytest.
 
@@ -120,7 +120,71 @@ def test_service_implementation_targets_are_existing_domains():
 
 Expected: PASS.
 
-### Task 4: Commit
+### Task 4: Record Mixed Facade Debt
+
+**Files:**
+
+- Modify: `server/tests/test_service_implementation_inventory.py`
+
+- [ ] **Step 1: Add the failing mixed-facade test**
+
+```python
+import ast
+
+EXPECTED_MIXED_FACADE_SERVICE_FILES = set()
+
+
+def test_mixed_facade_implementation_inventory_matches_allowlist():
+    assert _mixed_facade_implementation_files() == EXPECTED_MIXED_FACADE_SERVICE_FILES
+
+
+def _mixed_facade_implementation_files() -> set[str]:
+    files = set()
+    for path in SERVICES_ROOT.glob("*.py"):
+        if path.name == "__init__.py":
+            continue
+        text = path.read_text(encoding="utf-8")
+        if not _imports_domains(text):
+            continue
+        tree = ast.parse(text)
+        has_top_level_definition = any(
+            isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef))
+            for node in tree.body
+        )
+        if has_top_level_definition:
+            files.add(path.name)
+    return files
+
+
+def _imports_domains(text: str) -> bool:
+    return "from app.domains" in text or "import app.domains" in text
+```
+
+- [ ] **Step 2: Run red**
+
+```powershell
+.\server\.venv\Scripts\python.exe -m pytest server/tests/test_service_implementation_inventory.py -q
+```
+
+Expected: FAIL with `video_production_service.py` as the only mixed facade.
+
+- [ ] **Step 3: Record the current mixed facade**
+
+```python
+EXPECTED_MIXED_FACADE_SERVICE_FILES = {
+    "video_production_service.py",
+}
+```
+
+- [ ] **Step 4: Run green**
+
+```powershell
+.\server\.venv\Scripts\python.exe -m pytest server/tests/test_service_implementation_inventory.py -q
+```
+
+Expected: PASS.
+
+### Task 5: Commit
 
 **Files:**
 
@@ -139,5 +203,5 @@ git diff --check -- docs/superpowers/specs/2026-06-20-service-implementation-inv
 
 ```powershell
 git add -f docs/superpowers/specs/2026-06-20-service-implementation-inventory-design.md docs/superpowers/plans/2026-06-20-service-implementation-inventory-plan.md server/tests/test_service_implementation_inventory.py
-git commit --only docs/superpowers/specs/2026-06-20-service-implementation-inventory-design.md docs/superpowers/plans/2026-06-20-service-implementation-inventory-plan.md server/tests/test_service_implementation_inventory.py -m "test: map service implementation targets"
+git commit --only docs/superpowers/specs/2026-06-20-service-implementation-inventory-design.md docs/superpowers/plans/2026-06-20-service-implementation-inventory-plan.md server/tests/test_service_implementation_inventory.py -m "test: inventory mixed service facades"
 ```

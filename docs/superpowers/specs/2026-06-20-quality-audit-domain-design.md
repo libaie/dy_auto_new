@@ -37,7 +37,9 @@ Use the established facade-first migration pattern:
 - `AuditReport` and `AIModel` ORM definitions, which remain in `app.db_models`.
 - DB session construction, which remains in `app.database`.
 - Auth dependencies, which remain in `app.deps`.
-- Audit gate classification, which remains in `app.services.audit_gate`.
+- Audit gate classification through `classify_audit_gate` now lives in
+  `app.domains.quality_audit.audit_gate`; `app.services.audit_gate` remains as
+  a temporary compatibility facade.
 - Model registry and runtime model configuration.
 - Video production orchestration, which only consumes `_do_audit`.
 

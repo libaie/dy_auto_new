@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import verify_admin_token
 from app.db_models import AuditReport, AIModel
-from app.services.audit_gate import classify_audit_gate
+from app.domains.quality_audit.audit_gate import classify_audit_gate
 from app.services.crypto import decrypt
 
 logger = logging.getLogger(__name__)

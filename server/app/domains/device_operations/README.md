@@ -134,6 +134,7 @@ device reporting, script assets, and the admin device management surface.
 - `app.domains.device_operations.polling` owns device task polling, cancellation delivery, DM sequence sync, and poll response shaping.
 - `app.domains.device_operations.reporting` owns task progress, task result, stats increment, heartbeat, and risk-control reporting.
 - `app.domains.device_operations.script_assets` owns selectors, prompt-template sync, script packages, template images, and calibration uploads.
+- `app.domains.device_operations.script_service` owns `ScriptService`, `script_service`, script zip upload/download, and version storage under SERVER_DIR / `scripts`.
 - `app.domains.device_operations.content_bridge` temporarily owns device-authenticated bridges for content generation, AI proxy, collection reports, comment replies, DM flows, user profiles, and avatars.
 - `app.domains.device_operations.status_lifecycle` owns heartbeat flush, stale-device offline marking, stuck-task handling, and channel item reset behavior.
 - `app.domains.device_operations.device_service` owns `DeviceService` registration, heartbeat, status lookup, and offline marking.
@@ -150,6 +151,7 @@ device reporting, script assets, and the admin device management surface.
 | `app.main._offline_checker` | `app.domains.device_operations.status_lifecycle` | PR5 | Lifecycle tests cover heartbeat drain, DB flush, requeue, offline broadcast, stuck task handling, and lifespan start/stop through the domain entrypoint. |
 | `/api/device/*` content and DM bridge handlers | Future `content_collection` domain adapters | Deferred | `content_collection` owns those business use cases and adapter tests prove unchanged device response shapes. |
 | `app.services.device_service` | `app.domains.device_operations.device_service` | Device service domain slice | Remove only after `rg -n "app\.services\.device_service" server/app -g "*.py"` returns no production imports and remaining legacy-path tests are migrated or retired. |
+| `app.services.script_service` | `app.domains.device_operations.script_service` | Script service domain slice | Remove only after import inventory shows no production imports of `app.services.script_service` and legacy-path tests are migrated or retired. |
 
 ## Migration Checklist
 

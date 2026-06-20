@@ -54,7 +54,7 @@ def get_prompt_templates(
 def script_version(
     _: None = Depends(verify_device_secret),
 ):
-    from app.services.script_service import script_service
+    from app.domains.device_operations.script_service import script_service
     return {"version": script_service.get_version()}
 
 
@@ -62,7 +62,7 @@ def script_version(
 def script_download(
     _: None = Depends(verify_device_secret),
 ):
-    from app.services.script_service import script_service
+    from app.domains.device_operations.script_service import script_service
     from fastapi.responses import Response
     data = script_service.download_script()
     if data is None:
@@ -79,7 +79,7 @@ async def script_upload(
     file: UploadFile = FastAPIFile(...),
     user = Depends(verify_admin_token),
 ):
-    from app.services.script_service import script_service
+    from app.domains.device_operations.script_service import script_service
     if not file.filename.endswith(".zip"):
         raise HTTPException(status_code=400, detail="Only .zip files accepted")
     content = await file.read()

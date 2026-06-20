@@ -17,6 +17,8 @@ generation pipeline runtime.
 - Agency orchestration internals stay in `app.services`.
 - Non-domain service modules may keep importing `app.services.script_pipeline`
   until their owning domains move.
+- Non-domain service modules may keep importing `app.services.storyboard_timing`
+  until their owning domains move.
 - Series authoring, AI text artifact, director, and video production routes stay
   in their own routers or domains.
 
@@ -29,6 +31,9 @@ generation pipeline runtime.
   `ScriptGenerationPipeline`, `PipelineManager`, script generation retries,
   structured script persistence, episode snapshots, and AI text artifact
   publication.
+- `storyboard_timing.py` owns `annotate_storyboard_with_timing`, shot duration
+  normalization, timed storyboard line rendering, and detailed image/video
+  prompt timing text.
 
 ## Facade Register
 
@@ -36,6 +41,7 @@ generation pipeline runtime.
 |---|---|---|
 | `app.routers.pipeline` | `app.domains.script_pipeline.pipeline_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
 | `app.services.script_pipeline` | `app.domains.script_pipeline.script_pipeline_service` | Direct service imports use the domain service path, except compatibility tests and callers whose owning domains have not moved yet. |
+| `app.services.storyboard_timing` | `app.domains.script_pipeline.storyboard_timing` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 
 ## Boundaries
 
@@ -64,3 +70,12 @@ Do not remove the legacy service facade until all of these are true:
 - `rg "app\.services\.script_pipeline" server/app server/tests` returns only compatibility tests and migration docs.
 - `test_script_pipeline_service_domain_facade.py` has been replaced with tests for direct domain imports.
 - `production_run_service.py` imports `PipelineManager` through `app.domains.script_pipeline.script_pipeline_service` after that service is moved or cleaned up.
+
+Do not remove the legacy storyboard timing facade until all of these are true:
+
+- `rg "app\.services\.storyboard_timing" server/app server/tests` returns only
+  compatibility tests and migration docs.
+- `test_script_pipeline_storyboard_timing_facade.py` has been replaced with
+  tests for direct domain imports.
+- Domain-owned production modules import
+  `app.domains.script_pipeline.storyboard_timing` directly.

@@ -26,6 +26,10 @@ routes.
 - `pixelle_client.py` owns `DEFAULT_BASE_URL`, Pixelle base URL/API key lookup,
   lazy `httpx.AsyncClient`, `_pixelle_request`, retries, JSON parsing, and
   `close_client`.
+- `pixelle_stage_client.py` owns Pixelle stage payload construction for image
+  batch, image create, stage status, video batch, and compose calls:
+  `submit_image_batch`, `submit_image_create`, `get_stage_task`,
+  `submit_video_batch`, and `submit_compose`.
 
 ## Facade Register
 
@@ -33,6 +37,7 @@ routes.
 |---|---|---|
 | `app.routers.pixelle` | `app.domains.pixelle_integration.pixelle_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
 | `app.services.pixelle_client` | `app.domains.pixelle_integration.pixelle_client` | Keep while `app.main` shutdown and not-yet-moved service modules have approved compatibility imports; remove only after import inventory shows no production legacy imports. |
+| `app.services.pixelle_stage_client` | `app.domains.pixelle_integration.pixelle_stage_client` | Keep while legacy orchestration services have approved compatibility imports; remove only after import inventory shows no production legacy imports. |
 
 ## Boundaries
 
@@ -43,6 +48,8 @@ routes.
 - Preserve monkeypatch compatibility for `app.services.pixelle_client` while
   shutdown and not-yet-moved service modules keep approved compatibility
   imports.
+- Preserve monkeypatch compatibility for `app.services.pixelle_stage_client`
+  while legacy orchestration services keep approved compatibility imports.
 - Keep video-library and video-production ownership outside this domain.
 
 ## Compatibility Cleanup Gates
@@ -65,3 +72,15 @@ Do not remove the legacy Pixelle client facade until all of these are true:
   `close_client` behavior.
 - Domain-owned production modules import
   `app.domains.pixelle_integration.pixelle_client` directly.
+
+Do not remove the legacy Pixelle stage client facade until all of these are
+true:
+
+- `rg "app\.services\.pixelle_stage_client" server/app server/tests` returns
+  only compatibility tests, migration docs, or service modules whose domains
+  have not moved yet.
+- Direct domain stage client coverage proves image batch, image create, stage
+  status, video batch, compose payloads, validation errors, and legacy
+  monkeypatch compatibility.
+- Domain-owned production modules import
+  `app.domains.pixelle_integration.pixelle_stage_client` directly.

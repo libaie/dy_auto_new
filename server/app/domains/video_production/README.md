@@ -69,6 +69,8 @@ This domain owns the video production control-plane HTTP routes.
 - `provider_stage_task_service.py` owns `request_hash`,
   `provider_stage_idempotency_key`, `get_or_create_stage_task`,
   `set_task_status`, and `claim_stage_task_for_submit`.
+- `mock_scale_scheduler_service.py` owns `create_mock_scale_run` and
+  `advance_mock_scheduler` for provider-free mock scale production runs.
 - `video_production_router.py` owns route request models such as
   `StartRunRequest` and `OneSentenceVideoRequest`, payload helpers such as
   `_run_payload`, `_asset_payload`, and `_provider_stage_task_payload`,
@@ -79,6 +81,7 @@ This domain owns the video production control-plane HTTP routes.
 | Facade | Target | Exit condition |
 |---|---|---|
 | `app.routers.video_production` | `app.domains.video_production.video_production_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
+| `app.services.mock_scale_scheduler_service` | `app.domains.video_production.mock_scale_scheduler_service` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.asset_storage_guard` | `app.domains.video_production.asset_storage_guard` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.production_gate_evaluator` | `app.domains.video_production.production_gate_evaluator` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.production_action_result` | `app.domains.video_production.production_action_result` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
@@ -122,6 +125,14 @@ Do not remove the legacy router facade until all of these are true:
   tests pass.
 - Import inventory shows no unapproved production imports of
   `app.routers.video_production`.
+
+Do not remove the legacy mock scale scheduler service facade until all of these are true:
+
+- `rg "app\.services\.mock_scale_scheduler_service" server/app server/tests` returns only compatibility tests, migration docs, or service modules whose domains have not moved yet.
+- `test_video_production_mock_scale_scheduler_facade.py` has been replaced with tests for direct domain imports.
+- Domain-owned production modules import `app.domains.video_production.mock_scale_scheduler_service` directly.
+- Direct domain mock scale coverage proves `create_mock_scale_run` and
+  `advance_mock_scheduler` behavior without legacy imports.
 
 Do not remove the legacy production action result facade until all of these are true:
 

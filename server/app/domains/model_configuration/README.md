@@ -31,6 +31,9 @@ seeding helpers.
 - `runtime_model_config.py` owns `RuntimeModelConfigError`,
   `resolve_runtime_model_config`, `resolve_image_model_for_capability`,
   `_model_supports_capability`, and `redact_runtime_model_config`.
+- `ai_generator.py` owns `AiGeneratorService`, shared custom and streaming LLM
+  calls, sensitive-word retry generation, and the process-wide `ai_generator`
+  instance used by app shutdown and domain callers.
 - `migration.py` owns legacy Settings, Pixelle, and Seedance configuration
   migration into `AIModel` rows.
 
@@ -42,6 +45,7 @@ seeding helpers.
 | `app.services.model_schema` | `app.domains.model_configuration.model_schema` | Keep while legacy tests or callers import schema helpers from `app.services`; remove only after import inventory shows no production legacy imports. |
 | `app.services.model_registry` | `app.domains.model_configuration.model_registry` | Keep while `video_production_service` has an approved video production compatibility import; remove only after import inventory shows no production legacy imports. |
 | `app.services.runtime_model_config` | `app.domains.model_configuration.runtime_model_config` | Keep while dirty or not-yet-moved service modules have approved compatibility imports; remove only after import inventory shows no production legacy imports. |
+| `app.services.ai_generator` | `app.domains.model_configuration.ai_generator` | Keep while app startup/shutdown, domain callers, and legacy tests import or monkeypatch the shared generator through `app.services`; remove after import inventory is clean. |
 | `app.services.migration` | `app.domains.model_configuration.migration` | Keep while legacy tests or maintenance scripts import migration helpers from `app.services`; remove after import inventory is clean. |
 
 ## Boundaries

@@ -41,6 +41,8 @@ repair task routes.
   `CreativePatchProposal`, and `normalize_patch_payload`.
 - `agency_backtrack_policy.py` owns `trigger_backtrack_if_needed` for repeated
   asset review failure backtracking into upstream auto-repair jobs.
+- `agency_prompting.py` owns `ExpertPrompt` and `build_expert_prompt` for
+  agency expert prompt safety, schema, and multimodal user payload construction.
 
 ## Facade Register
 
@@ -56,6 +58,7 @@ repair task routes.
 | `app.services.agency_multimodal_review` | `app.domains.agency_operations.agency_multimodal_review` | Keep while legacy tests monkeypatch multimodal review through `app.services`; remove after import inventory is clean. |
 | `app.services.agency_creative_patch_contracts` | `app.domains.agency_operations.agency_creative_patch_contracts` | Keep while dirty creative patch service code imports contracts from `app.services`; remove after import inventory is clean. |
 | `app.services.agency_backtrack_policy` | `app.domains.agency_operations.agency_backtrack_policy` | Keep while dirty video production service code imports backtrack policy from `app.services`; remove after import inventory is clean. |
+| `app.services.agency_prompting` | `app.domains.agency_operations.agency_prompting` | Keep while dirty agency runtime code imports prompt construction from `app.services`; remove after import inventory is clean. |
 
 ## Boundaries
 

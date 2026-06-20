@@ -3,7 +3,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.db_models import ProductionAuditEvent
+from app.db.models.production_observability import ProductionAuditEvent
 
 
 SECRET_KEYS = {

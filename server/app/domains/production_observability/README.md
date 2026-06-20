@@ -8,7 +8,6 @@ This domain owns shared production audit-event writing and secret redaction.
 
 ## Not Owned
 
-- `ProductionAuditEvent` ORM model definitions stay in `app.db_models`.
 - Database session helpers stay in `app.database`.
 - Video production, image generation, and agency operation workflows stay in
   their own domains or services.
@@ -19,12 +18,15 @@ This domain owns shared production audit-event writing and secret redaction.
   `_redact`, and `record_production_event` for redacted
   `ProductionAuditEvent` persistence without committing caller-owned
   transactions.
+- `app.db.models.production_observability` owns the `ProductionAuditEvent` ORM
+  class body.
 
 ## Facade Register
 
 | Facade | Target | Exit condition |
 |---|---|---|
 | `app.services.production_observability` | `app.domains.production_observability.production_observability_service` | Domain modules import the shared domain path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
+| `app.db_models.ProductionAuditEvent` | `app.db.models.production_observability.ProductionAuditEvent` | Keep as a compatibility re-export until production imports use the domain model path. |
 
 ## Boundaries
 

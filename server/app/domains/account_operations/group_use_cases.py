@@ -2,8 +2,7 @@
 
 from sqlalchemy import func
 
-from app.db.models.account_operations import Account
-from app.db_models import AccountGroup, AccountGroupMember
+from app.db.models.account_operations import Account, AccountGroup, AccountGroupMember
 
 from .read_models import group_to_dict, member_to_dict
 

@@ -7,10 +7,10 @@ from sqlalchemy import update, and_, exists, select, or_
 from sqlalchemy.orm import Session
 
 from app.db_models import (
-    Channel, ChannelItem, AccountGroup, AccountGroupMember,
+    Channel, ChannelItem,
     Task as DBTask, Device as DBDevice,
 )
-from app.db.models.account_operations import Account
+from app.db.models.account_operations import Account, AccountGroup, AccountGroupMember
 from app.models import TaskStatus
 
 

@@ -12,7 +12,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 
 from app.db.models.ai_text_artifacts import AITextArtifact, AITextArtifactConsumer
-from app.db.models.account_operations import Account
+from app.db.models.account_operations import Account, AccountGroup, AccountGroupMember
 from app.db.models.device_operations import Device, DevicePairRequest
 from app.db.models.content_collection import (
     CollectedComment,
@@ -73,34 +73,6 @@ class Task(Base):
     account = relationship("Account", back_populates="tasks")
     device = relationship("Device", back_populates="tasks")
     chain_instance = relationship("ChainInstance", back_populates="tasks")
-
-
-class AccountGroup(Base):
-    __tablename__ = "account_groups"
-
-    id = Column(String(36), primary_key=True, default=_uuid)
-    name = Column(String(100), nullable=False, unique=True)
-    description = Column(String(500), nullable=True, default="")
-    user_id = Column(String(36), ForeignKey("users.id"), nullable=True)
-    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
-    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
-
-    members = relationship("AccountGroupMember", back_populates="group", cascade="all, delete-orphan")
-
-
-class AccountGroupMember(Base):
-    __tablename__ = "account_group_members"
-    __table_args__ = (
-        UniqueConstraint("group_id", "account_id", name="uq_group_account"),
-    )
-
-    id = Column(String(36), primary_key=True, default=_uuid)
-    group_id = Column(String(36), ForeignKey("account_groups.id", ondelete="CASCADE"), nullable=False)
-    account_id = Column(String(36), ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False)
-    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
-
-    group = relationship("AccountGroup", back_populates="members")
-    account = relationship("Account")
 
 
 class ChainTemplate(Base):

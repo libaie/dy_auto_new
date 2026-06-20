@@ -3,26 +3,37 @@ import sys
 from pathlib import Path
 
 from app.db_models import Account as LegacyAccount
+from app.db_models import AccountGroup as LegacyAccountGroup
+from app.db_models import AccountGroupMember as LegacyAccountGroupMember
 from app.db_models import Base
 
 
 SERVER_ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_account_operations_model_boundary_reexports_account():
-    from app.db.models.account_operations import Account
+def test_account_operations_model_boundary_reexports_account_models():
+    from app.db.models.account_operations import Account, AccountGroup, AccountGroupMember
 
     assert Account is LegacyAccount
+    assert AccountGroup is LegacyAccountGroup
+    assert AccountGroupMember is LegacyAccountGroupMember
     assert Account.metadata is Base.metadata
+    assert AccountGroup.metadata is Base.metadata
+    assert AccountGroupMember.metadata is Base.metadata
     assert "accounts" in Base.metadata.tables
+    assert "account_groups" in Base.metadata.tables
+    assert "account_group_members" in Base.metadata.tables
 
 
 def test_account_operations_model_boundary_imports_in_clean_process():
     code = (
         "import app.db_models as legacy; "
-        "from app.db.models.account_operations import Account; "
+        "from app.db.models.account_operations import Account, AccountGroup, AccountGroupMember; "
         "assert legacy.Account is Account; "
-        "assert 'accounts' in legacy.Base.metadata.tables"
+        "assert legacy.AccountGroup is AccountGroup; "
+        "assert legacy.AccountGroupMember is AccountGroupMember; "
+        "assert 'accounts' in legacy.Base.metadata.tables; "
+        "assert 'account_group_members' in legacy.Base.metadata.tables"
     )
     result = subprocess.run(
         [sys.executable, "-c", code],

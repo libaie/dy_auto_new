@@ -10,9 +10,8 @@ from sqlalchemy.orm import Session
 
 from app.db_models import (
     ChainTemplate, ChainInstance, Task as DBTask, Device,
-    AccountGroupMember,
 )
-from app.db.models.account_operations import Account
+from app.db.models.account_operations import Account, AccountGroupMember
 from app.models import TaskType
 
 logger = logging.getLogger(__name__)

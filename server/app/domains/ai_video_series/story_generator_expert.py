@@ -18,7 +18,7 @@ from app.services.agency_runtime import (
     _ensure_openai_compatible_provider,
     _runtime_setting,
 )
-from app.services.runtime_model_config import redact_runtime_model_config, resolve_runtime_model_config
+from app.domains.model_configuration.runtime_model_config import redact_runtime_model_config, resolve_runtime_model_config
 
 
 STORY_GENERATOR_EXPERT_ID = "story_generator"

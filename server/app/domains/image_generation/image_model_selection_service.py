@@ -5,7 +5,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.db_models import AIModel, ImageProductionStrategy
-from app.services.runtime_model_config import _model_supports_capability
+from app.domains.model_configuration.runtime_model_config import _model_supports_capability
 
 
 def _model_identity(model: AIModel) -> dict[str, Any]:

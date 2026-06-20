@@ -28,7 +28,7 @@ from app.models.script import (
 from app.services.agency_orchestrator import AgencyOrchestrator
 from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
 from app.services.agency_runtime import _default_model_client
-from app.services.runtime_model_config import resolve_runtime_model_config
+from app.domains.model_configuration.runtime_model_config import resolve_runtime_model_config
 from app.services.storyboard_timing import (
     annotate_storyboard_with_timing,
     build_detailed_image_prompt,

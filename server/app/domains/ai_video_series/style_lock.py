@@ -41,7 +41,7 @@ from app.services.production_status import (
     PLAN_COMPLETED,
     PLAN_READY,
 )
-from app.services.runtime_model_config import RuntimeModelConfigError, resolve_runtime_model_config
+from app.domains.model_configuration.runtime_model_config import RuntimeModelConfigError, resolve_runtime_model_config
 from app.services.video_agency_team import (
     build_video_agency_team,
     ensure_video_agency_team,

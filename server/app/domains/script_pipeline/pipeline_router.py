@@ -12,7 +12,7 @@ from app.deps import require_role
 from app.db_models import Episode, PipelineRun, GeneratedVideo, Series
 from app.services.pixelle_client import _pixelle_request
 from app.services.agency_orchestrator import AgencyOrchestrator
-from app.services.runtime_model_config import RuntimeModelConfigError, resolve_runtime_model_config
+from app.domains.model_configuration.runtime_model_config import RuntimeModelConfigError, resolve_runtime_model_config
 from app.services.video_agency_team import build_agency_context
 
 logger = logging.getLogger(__name__)

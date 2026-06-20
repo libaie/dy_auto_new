@@ -25,7 +25,7 @@ from app.services.image_creation_service import (
     sync_image_task,
     task_payload,
 )
-from app.services.pixelle_client import _get_base_url
+from app.domains.pixelle_integration.pixelle_client import _get_base_url
 
 
 router = APIRouter(prefix="/api/image-creation", tags=["image-creation"])

@@ -27,6 +27,8 @@ repair task routes.
   lookup, and manifest verification.
 - `agency_contracts.py` owns agency status enums and Pydantic response models
   such as `AgencyConsoleResponse` and `AgencyInvocationSummary`.
+- `agency_repair_contracts.py` owns agency auto-repair constants, repair task
+  models, repair classification results, and repair action helper labels.
 
 ## Facade Register
 
@@ -35,6 +37,7 @@ repair task routes.
 | `app.routers.agency` | `app.domains.agency_operations.agency_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
 | `app.services.agency_manifest` | `app.domains.agency_operations.agency_manifest` | Keep while dirty service modules have approved compatibility imports; remove only after import inventory shows no production legacy imports. |
 | `app.services.agency_contracts` | `app.domains.agency_operations.agency_contracts` | Keep while legacy tests or dirty service modules import agency response contracts from `app.services`; remove after import inventory is clean. |
+| `app.services.agency_repair_contracts` | `app.domains.agency_operations.agency_repair_contracts` | Keep while dirty service modules import repair contracts from `app.services`; remove after import inventory is clean. |
 
 ## Boundaries
 

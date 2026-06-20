@@ -12,7 +12,6 @@ EXPECTED_NON_FACADE_SERVICE_FILES = {
     "agency_orchestrator.py",
     "image_creation_service.py",
     "one_sentence_video_service.py",
-    "production_run_service.py",
     "video_agency_team.py",
 }
 
@@ -25,7 +24,6 @@ EXPECTED_SERVICE_DOMAIN_TARGETS = {
     "agency_orchestrator.py": "agency_operations",
     "image_creation_service.py": "image_generation",
     "one_sentence_video_service.py": "video_production",
-    "production_run_service.py": "video_production",
     "video_agency_team.py": "agency_operations",
 }
 

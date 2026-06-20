@@ -31,6 +31,13 @@ def test_story_generator_expert_domain_file_exists():
     assert DOMAIN_SERVICE_PATH.exists()
 
 
+def test_story_generator_expert_imports_agency_persistence_domain_path():
+    text = DOMAIN_SERVICE_PATH.read_text(encoding="utf-8")
+
+    assert "app.domains.agency_operations.agency_persistence" in text
+    assert "app.services.agency_persistence" not in text
+
+
 def test_legacy_story_generator_expert_service_is_thin_facade():
     text = LEGACY_SERVICE_PATH.read_text(encoding="utf-8")
 

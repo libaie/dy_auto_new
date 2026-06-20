@@ -132,3 +132,34 @@ Commit message:
 ```text
 refactor: move story generator expert into domain
 ```
+
+### Task 4: Use Domain Agency Persistence Import
+
+**Files:**
+
+- Modify: `server/app/domains/ai_video_series/story_generator_expert.py`
+- Test: `server/tests/test_ai_video_series_story_generator_expert_facade.py`
+
+- [ ] **Step 1: Add the failing boundary test**
+
+```python
+def test_story_generator_expert_imports_agency_persistence_domain_path():
+    text = DOMAIN_SERVICE_PATH.read_text(encoding="utf-8")
+
+    assert "app.domains.agency_operations.agency_persistence" in text
+    assert "app.services.agency_persistence" not in text
+```
+
+- [ ] **Step 2: Change only the import**
+
+```python
+from app.domains.agency_operations.agency_persistence import create_or_resume_invocation, finalize_invocation_and_audit
+```
+
+- [ ] **Step 3: Run focused verification**
+
+```powershell
+.\server\.venv\Scripts\python.exe -m pytest server/tests/test_ai_video_series_story_generator_expert_facade.py server/tests/test_series_planning_service.py -q
+```
+
+Expected: all selected tests pass.

@@ -11,7 +11,7 @@ import httpx
 from sqlalchemy.orm import Session
 
 from app.domains.agency_operations.agency_manifest import get_expert, load_manifest, read_expert_markdown
-from app.services.agency_persistence import create_or_resume_invocation, finalize_invocation_and_audit
+from app.domains.agency_operations.agency_persistence import create_or_resume_invocation, finalize_invocation_and_audit
 from app.services.agency_runtime import (
     AgencyRuntimeError,
     _chat_completion_url,

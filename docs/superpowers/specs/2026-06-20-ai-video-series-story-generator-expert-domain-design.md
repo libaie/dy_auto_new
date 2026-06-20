@@ -17,6 +17,9 @@ In scope:
 - Create `server/app/domains/ai_video_series/story_generator_expert.py` with the existing implementation.
 - Replace `server/app/services/story_generator_expert.py` with a thin compatibility facade.
 - Update `server/app/domains/ai_video_series/series_planning_service.py` to import `generate_story_plan_with_expert` from `app.domains.ai_video_series.story_generator_expert`.
+- Import agency invocation persistence from
+  `app.domains.agency_operations.agency_persistence`, not the legacy
+  `app.services.agency_persistence` facade.
 - Register the facade in `server/app/domains/ai_video_series/README.md`.
 - Add focused boundary tests that prove the old and new import paths share the same module object and public runtime objects.
 
@@ -57,6 +60,8 @@ Add `server/tests/test_ai_video_series_story_generator_expert_facade.py` to veri
 - the old service file is a thin facade and contains no copied expert runtime implementation;
 - old and new imports are the same module object and expose the same key public objects;
 - `series_planning_service.py` imports the domain path instead of the legacy service path;
+- `story_generator_expert.py` imports agency persistence from the agency
+  operations domain path;
 - the AI video series README records the facade and cleanup gate.
 
 Run the new boundary test together with existing story planning coverage:

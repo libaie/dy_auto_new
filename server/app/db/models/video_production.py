@@ -203,6 +203,37 @@ class ProviderStageTask(Base):
     updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
 
 
+class ProviderCostReservation(Base):
+    __tablename__ = "provider_cost_reservations"
+    __table_args__ = (
+        UniqueConstraint(
+            "provider_stage_task_id",
+            name="uq_provider_cost_reservation_stage_task",
+        ),
+        Index("idx_provider_cost_reservations_plan_status", "plan_id", "status"),
+        Index("idx_provider_cost_reservations_expires", "expires_at", "status"),
+    )
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    plan_id = Column(String(36), ForeignKey("production_plans.id", ondelete="CASCADE"), nullable=False)
+    provider_stage_task_id = Column(
+        String(36),
+        ForeignKey("provider_stage_tasks.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    status = Column(String(40), nullable=False, default="active_unsubmitted")
+    estimated_cost = Column(Float, nullable=False, default=0.0)
+    reserved_cost = Column(Float, nullable=False, default=0.0)
+    actual_cost = Column(Float, nullable=True)
+    currency = Column(String(10), nullable=False, default="CNY")
+    units_json = Column(JSON, nullable=True, default=dict)
+    expires_at = Column(DateTime, nullable=True)
+    submitted_at = Column(DateTime, nullable=True)
+    settled_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
+    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
+
+
 class VideoCollection(Base):
     __tablename__ = "video_collections"
 

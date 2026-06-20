@@ -12,6 +12,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 
 from app.db.models.device_operations import DevicePairRequest
+from app.db.models.system_configuration import SystemSetting
 
 
 class Account(Base):
@@ -223,14 +224,6 @@ class RepliedComment(Base):
     text = Column(Text, nullable=False)
     replied_by_device = Column(String(36), nullable=True)
     created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
-
-
-class SystemSetting(Base):
-    __tablename__ = "system_settings"
-
-    key = Column(String(100), primary_key=True)
-    value = Column(Text, nullable=False, default="")
-    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
 
 
 class Channel(Base):

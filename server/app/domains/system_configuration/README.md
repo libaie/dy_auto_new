@@ -17,6 +17,7 @@ This domain owns admin key-value system configuration routes.
 
 - `settings_router.py` owns settings reads, sensitive-value masking, settings
   updates, and masked secret placeholder preservation.
+- `app.db.models.system_configuration` owns the `SystemSetting` ORM class body.
 
 ## Facade Register
 
@@ -24,10 +25,11 @@ This domain owns admin key-value system configuration routes.
 |---|---|---|
 | `app.routers.settings` | `app.domains.system_configuration.settings_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
 | `app.services.crypto` | `app.domains.system_configuration.crypto` | Sensitive-setting crypto compatibility; remove after production callers use the domain path. |
+| `app.db_models.SystemSetting` | `app.db.models.system_configuration.SystemSetting` | Keep as a compatibility re-export until production imports use the domain model path. |
 
 ## Boundaries
 
-- Keep persistence on the existing `SystemSetting` ORM model.
+- Keep persistence on the existing `system_settings` table.
 - Keep request validation on the existing `SettingUpdate` model.
 - Keep health/status routes in `system_operations`.
 - Preserve route paths, route names, auth dependencies, response shapes,

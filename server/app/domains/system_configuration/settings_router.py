@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import OperationalError
 
 from app.database import get_db
-from app.db_models import SystemSetting
+from app.db.models.system_configuration import SystemSetting
 from app.deps import verify_admin_token, require_role
 from app.models import SettingUpdate
 

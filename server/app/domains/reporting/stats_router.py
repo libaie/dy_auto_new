@@ -8,7 +8,7 @@ from app.config import bj_now
 from app.database import get_db
 from app.deps import verify_admin_token
 from app.db_models import Account, Device, Task, DailyStats
-from app.services.stats_service import stats_service
+from app.domains.reporting.stats_service import stats_service
 
 router = APIRouter(prefix="/api/stats", tags=["stats"])
 

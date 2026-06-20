@@ -4,7 +4,7 @@
 
 **Goal:** Create `app.domains.reporting` and move admin stats route ownership behind a compatibility-preserving domain module.
 
-**Architecture:** Keep `app.services.stats_service` unchanged and move only the FastAPI router boundary. Preserve `app.routers.stats` as a thin module alias until import inventory proves it can be removed.
+**Architecture:** Keep `app.routers.stats` as a thin module alias until import inventory proves it can be removed. Daily stats counting and quota checks now live in `app.domains.reporting.stats_service`, with `app.services.stats_service` preserved as a `StatsService` compatibility facade for callers that have not moved yet.
 
 **Tech Stack:** FastAPI `APIRouter`, pytest route snapshots, Python module aliasing via `sys.modules`.
 
@@ -179,10 +179,11 @@ Run: `git commit -m "refactor: wire reporting router from domain"`
 ### Later Splits
 
 - Split dashboard read models only after route ownership is stable.
-- Split daily stats and account quota query helpers only if the stats router
-  gains more behavior.
-- Keep `app.services.stats_service` stable until a separate service-split plan
-  is approved.
+- Daily stats service logic now lives in
+  `app.domains.reporting.stats_service`; keep `app.services.stats_service` as a
+  compatibility facade until direct-domain coverage replaces legacy imports.
+- Split daily stats and account quota query helpers further only if the stats
+  router gains more behavior.
 
 ### Verification
 

@@ -27,7 +27,9 @@ The migration keeps `app.routers.stats` as a compatibility facade.
 
 - Do not move device-facing `/api/device/stats/increment`; that stays in
   `device_operations`.
-- Do not split or move `app.services.stats_service` in this slice.
+- Daily stats counting and quota checks now live in
+  `app.domains.reporting.stats_service`; `app.services.stats_service` remains
+  as a temporary compatibility facade.
 - Do not change route paths, route names, auth dependencies, response shapes,
   default dates, quota behavior, or dashboard query behavior.
 - Do not add new analytics features.
@@ -38,12 +40,14 @@ The migration keeps `app.routers.stats` as a compatibility facade.
 server/app/domains/reporting/
   __init__.py
   README.md
+  stats_service.py
   stats_router.py
 ```
 
-This is a route-boundary migration. Later work can split dashboard read models,
-daily stats queries, and account quota query helpers after the domain import
-boundary is stable.
+This began as a route-boundary migration. Daily stats queries and account quota
+helpers now live in the reporting domain through `StatsService`, while later
+work can still split dashboard read models after the domain import boundary is
+stable.
 
 ## Compatibility Strategy
 

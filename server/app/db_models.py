@@ -13,7 +13,7 @@ from sqlalchemy.orm import relationship
 
 from app.db.models.device_operations import DevicePairRequest
 from app.db.models.content_collection import ContentTemplate, DMSequence, RepliedComment, SensitiveWord
-from app.db.models.creative_library import ReferenceCategory, ReferenceData
+from app.db.models.creative_library import CharacterAnchor, ReferenceCategory, ReferenceData, SceneAnchor
 from app.db.models.identity_access import User
 from app.db.models.model_configuration import AIModel
 from app.db.models.prompt_management import PromptTemplate
@@ -340,56 +340,6 @@ class Scene(Base):
     created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
     updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
     anchors = relationship("SceneAnchor", back_populates="scene", cascade="all, delete-orphan")
-
-
-class CharacterAnchor(Base):
-    __tablename__ = "character_anchors"
-    __table_args__ = (
-        UniqueConstraint("character_id", "reference_slot", name="uq_character_anchor_slot"),
-        Index("idx_character_anchors_character_id", "character_id"),
-        Index("idx_character_anchors_status", "status"),
-    )
-
-    id = Column(String(36), primary_key=True, default=_uuid)
-    character_id = Column(String(36), ForeignKey("characters.id", ondelete="CASCADE"), nullable=False)
-    name = Column(String(100), nullable=False, default="")
-    reference_slot = Column(String(80), nullable=False, default="avatar_front_url")
-    base_prompt = Column(Text, nullable=False, default="")
-    anchor_image_url = Column(Text, nullable=True)
-    seed = Column(Integer, nullable=True)
-    ref_mode = Column(String(80), nullable=False, default="character_face")
-    provider_options_json = Column(JSON, nullable=True, default=dict)
-    status = Column(String(30), nullable=False, default="draft")
-    metadata_json = Column(JSON, nullable=True, default=dict)
-    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
-    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
-
-    character = relationship("Character", back_populates="anchors")
-
-
-class SceneAnchor(Base):
-    __tablename__ = "scene_anchors"
-    __table_args__ = (
-        UniqueConstraint("scene_id", "reference_slot", name="uq_scene_anchor_slot"),
-        Index("idx_scene_anchors_scene_id", "scene_id"),
-        Index("idx_scene_anchors_status", "status"),
-    )
-
-    id = Column(String(36), primary_key=True, default=_uuid)
-    scene_id = Column(String(36), ForeignKey("scenes.id", ondelete="CASCADE"), nullable=False)
-    scene_name = Column(String(100), nullable=False, default="")
-    reference_slot = Column(String(80), nullable=False, default="reference_wideshot_url")
-    environment_prompt = Column(Text, nullable=False, default="")
-    anchor_image_url = Column(Text, nullable=True)
-    seed = Column(Integer, nullable=True)
-    ref_mode = Column(String(80), nullable=False, default="scene_environment")
-    provider_options_json = Column(JSON, nullable=True, default=dict)
-    status = Column(String(30), nullable=False, default="draft")
-    metadata_json = Column(JSON, nullable=True, default=dict)
-    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
-    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
-
-    scene = relationship("Scene", back_populates="anchors")
 
 
 class Series(Base):

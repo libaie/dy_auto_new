@@ -18,8 +18,8 @@ reference dictionaries, plus character and scene reference asset generation.
   image generation, and scene AI rewrite endpoints.
 - `reference_data_router.py` owns reference category/item CRUD and default seed
   data.
-- `app.db.models.creative_library` owns the `ReferenceData` and
-  `ReferenceCategory` ORM class bodies.
+- `app.db.models.creative_library` owns the `ReferenceData`,
+  `ReferenceCategory`, `CharacterAnchor`, and `SceneAnchor` ORM class bodies.
 - `reference_asset_service.py` owns `ReferenceAssetError`,
   `generate_character_reference_images`, `generate_scene_reference_images`,
   `generate_reference_url`, reference URL usability checks, provider task reuse,
@@ -48,7 +48,7 @@ reference dictionaries, plus character and scene reference asset generation.
 | `app.services.asset_lifecycle_service` | `app.domains.creative_library.asset_lifecycle_service` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.asset_ai_rewrite_service` | `app.domains.creative_library.asset_ai_rewrite_service` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.visual_style_inference_service` | `app.domains.creative_library.visual_style_inference_service` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
-| `app.db_models.ReferenceData` / `ReferenceCategory` | `app.db.models.creative_library` | Keep as compatibility re-exports until production imports use the domain model path. |
+| `app.db_models.ReferenceData` / `ReferenceCategory` / `CharacterAnchor` / `SceneAnchor` | `app.db.models.creative_library` | Keep as compatibility re-exports until production imports use the domain model path. |
 
 ## Boundaries
 
@@ -65,8 +65,8 @@ reference dictionaries, plus character and scene reference asset generation.
 - Non-domain service modules may keep importing
   `app.services.visual_style_inference_service` until their owning domains
   move.
-- Keep the character/scene/anchor ORM graph in `app.db_models` until a
-  dedicated graph extraction; reference dictionary models live in
+- Keep the character/scene ORM graph in `app.db_models` until a dedicated
+  graph extraction; reference dictionary and anchor models live in
   `app.db.models.creative_library`.
 - Keep startup reference data seeding behavior unchanged.
 

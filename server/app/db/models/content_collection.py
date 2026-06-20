@@ -25,3 +25,14 @@ class SensitiveWord(Base):
     id = Column(String(36), primary_key=True, default=_uuid)
     word = Column(String(100), nullable=False, unique=True)
     created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
+
+
+class RepliedComment(Base):
+    """Comment reply dedupe row."""
+    __tablename__ = "replied_comments"
+
+    content_hash = Column(String(64), primary_key=True)
+    author = Column(String(200), nullable=False)
+    text = Column(Text, nullable=False)
+    replied_by_device = Column(String(36), nullable=True)
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())

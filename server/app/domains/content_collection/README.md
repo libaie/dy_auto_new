@@ -101,8 +101,8 @@ this domain provides stable use cases and compatibility tests for that handoff.
 - `app.routers.dm_sequences` remains the compatibility import path for `/api/dm-sequences/*` callers outside app wiring.
 - `app.domains.content_collection.read_models` owns collected comment/user/conversation list and export payload shaping.
 - `app.domains.content_collection.content_service` owns `ContentService` template CRUD, sensitive-word CRUD/matching, variable substitution, and content-generation helpers.
-- `app.db.models.content_collection` owns the `ContentTemplate` and
-  `SensitiveWord` ORM class bodies.
+- `app.db.models.content_collection` owns the `ContentTemplate`,
+  `SensitiveWord`, and `RepliedComment` ORM class bodies.
 - `app.domains.content_collection.mutations` owns content template, sensitive-word, and DM sequence mutation orchestration.
 - `app.domains.content_collection.content_generation` owns content, keyword, regex, and clean-prompt generation calls.
 - `app.domains.content_collection.industry_profile_service` owns `load_profile`, `list_industries`, and DM industry compliance profile JSON loading from `server/app/data/industry_profiles`.
@@ -125,7 +125,7 @@ this domain provides stable use cases and compatibility tests for that handoff.
 | `app.services.dm_sequence_visibility` | `app.domains.content_collection.dm_sequence_visibility` | DM sequence visibility slice | `rg -n "app\.services\.dm_sequence_visibility" server/app -g "*.py"` returns only approved device bridge compatibility imports. |
 | `app.services.content_service` | `app.domains.content_collection.content_service` | Content service domain slice | Keep while `rg -n "app\.services\.content_service" server/app -g "*.py"` returns approved task/device/account bridge compatibility imports; remove only when that command returns no production imports. |
 | `app.services.industry_profile_service` | `app.domains.content_collection.industry_profile_service` | Industry profile domain slice | Remove only after import inventory shows no production imports of `app.services.industry_profile_service`. |
-| `app.db_models.ContentTemplate` / `SensitiveWord` | `app.db.models.content_collection` | ORM boundary slice | Keep as compatibility re-exports until production imports use the domain model path. |
+| `app.db_models.ContentTemplate` / `SensitiveWord` / `RepliedComment` | `app.db.models.content_collection` | ORM boundary slice | Keep as compatibility re-exports until production imports use the domain model path. |
 
 ## Migration Checklist
 
@@ -182,4 +182,4 @@ Do not remove `app.routers.content`, `app.routers.data`, or `app.routers.dm_sequ
 - Release notes mention the import-path migration.
 - Do not remove `app.services.dm_sequence_visibility` until device bridge cleanup either imports the domain service directly or documents the legacy import as the approved compatibility path.
 
-Do not move ORM model ownership or persistence class bodies until a separate graph/import plan exists.
+Do not move the remaining collected comment/user/conversation/DM sequence ORM graph until a separate graph/import plan exists.

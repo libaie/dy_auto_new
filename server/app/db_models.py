@@ -12,7 +12,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 
 from app.db.models.device_operations import DevicePairRequest
-from app.db.models.content_collection import ContentTemplate, SensitiveWord
+from app.db.models.content_collection import ContentTemplate, RepliedComment, SensitiveWord
 from app.db.models.creative_library import ReferenceCategory, ReferenceData
 from app.db.models.identity_access import User
 from app.db.models.model_configuration import AIModel
@@ -156,17 +156,6 @@ class ChainInstance(Base):
     account = relationship("Account")
     device = relationship("Device")
     tasks = relationship("Task", back_populates="chain_instance")
-
-
-class RepliedComment(Base):
-    """已回复的评论去重表 — 基于作者+内容哈希全局去重"""
-    __tablename__ = "replied_comments"
-
-    content_hash = Column(String(64), primary_key=True)  # SHA256 of author+text
-    author = Column(String(200), nullable=False)
-    text = Column(Text, nullable=False)
-    replied_by_device = Column(String(36), nullable=True)
-    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
 
 
 class Channel(Base):

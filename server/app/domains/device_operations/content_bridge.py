@@ -43,7 +43,7 @@ def claim_comment_reply(
     content_hash = hashlib.sha256(
         (request.author + "|" + request.text).encode("utf-8")
     ).hexdigest()
-    from app.db_models import RepliedComment
+    from app.db.models.content_collection import RepliedComment
     # INSERT first — PK collision triggers IntegrityError, no SELECT+INSERT race window
     db.add(RepliedComment(
         content_hash=content_hash,
@@ -70,7 +70,7 @@ def release_comment_claim(
     content_hash = hashlib.sha256(
         (request.author + "|" + request.text).encode("utf-8")
     ).hexdigest()
-    from app.db_models import RepliedComment
+    from app.db.models.content_collection import RepliedComment
     db.query(RepliedComment).filter(
         RepliedComment.content_hash == content_hash,
         RepliedComment.replied_by_device == authed_device_id,

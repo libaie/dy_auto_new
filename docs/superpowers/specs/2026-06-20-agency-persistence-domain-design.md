@@ -45,6 +45,9 @@ task, or production-event behavior changes are included.
 - Repair classification and orchestration are imported directly from
   `app.domains.agency_operations.agency_repair_classifier` and
   `app.domains.agency_operations.agency_repair_orchestrator`.
+- Video production run type helpers are imported from
+  `app.domains.video_production.video_production_run_types`, not the legacy
+  `app.services.video_production_run_types` facade.
 
 ## Verification
 

@@ -139,3 +139,33 @@ from app.domains.agency_operations.agency_repair_orchestrator import enqueue_rep
 ```
 
 Expected: all selected tests pass.
+
+### Task 5: Use Domain Video Production Run Types Import
+
+**Files:**
+
+- Modify: `server/app/domains/agency_operations/agency_persistence.py`
+- Test: `server/tests/test_agency_persistence_facade.py`
+
+- [ ] **Step 1: Add the failing boundary test**
+
+```python
+def test_agency_persistence_imports_video_run_types_from_domain():
+    text = DOMAIN_PATH.read_text(encoding="utf-8")
+    assert "from app.domains.video_production.video_production_run_types import get_run_type" in text
+    assert "app.services.video_production_run_types" not in text
+```
+
+- [ ] **Step 2: Change only that import**
+
+```python
+from app.domains.video_production.video_production_run_types import get_run_type
+```
+
+- [ ] **Step 3: Run focused verification**
+
+```powershell
+.\server\.venv\Scripts\python.exe -m pytest server/tests/test_agency_persistence_facade.py server/tests/test_agency_persistence.py server/tests/test_video_production_run_types_facade.py server/tests/test_video_production_run_type.py -q
+```
+
+Expected: all selected tests pass.

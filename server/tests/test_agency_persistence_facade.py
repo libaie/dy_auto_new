@@ -54,6 +54,12 @@ def test_agency_persistence_imports_already_migrated_helpers_from_domains():
     assert "app.services.agency_repair_orchestrator" not in text
 
 
+def test_agency_persistence_imports_video_run_types_from_domain():
+    text = DOMAIN_PATH.read_text(encoding="utf-8")
+    assert "from app.domains.video_production.video_production_run_types import get_run_type" in text
+    assert "app.services.video_production_run_types" not in text
+
+
 def test_legacy_agency_persistence_is_thin_facade():
     text = LEGACY_PATH.read_text(encoding="utf-8")
     assert "app.domains.agency_operations import agency_persistence" in text

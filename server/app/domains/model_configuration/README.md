@@ -14,7 +14,7 @@ seeding helpers.
 - Auth dependencies stay in `app.deps`.
 - Encryption helpers stay in `app.services.crypto`.
 - raw schema data stays in `app.data.model_schema_data`.
-- Runtime model resolution stays in `app.services.runtime_model_config`.
+- Pixelle/runtime payload resolution stays in `app.services.runtime_model_config`.
 - Pixelle, Seedance, and audit execution routes stay in their own domains or
   routers.
 
@@ -26,6 +26,9 @@ seeding helpers.
 - `model_schema.py` owns `get_schema_payload`, `get_provider_preset`, scene
   lookups, and provider lists; raw schema data stays in
   `app.data.model_schema_data`.
+- `model_registry.py` owns `ModelResolutionError`, `get_model_for_scene`,
+  scene-based AIModel selection, decrypted runtime credentials, and repair
+  messages.
 
 ## Facade Register
 
@@ -33,6 +36,7 @@ seeding helpers.
 |---|---|---|
 | `app.routers.ai_config` | `app.domains.model_configuration.ai_models_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
 | `app.services.model_schema` | `app.domains.model_configuration.model_schema` | Keep while legacy tests or callers import schema helpers from `app.services`; remove only after import inventory shows no production legacy imports. |
+| `app.services.model_registry` | `app.domains.model_configuration.model_registry` | Keep while `video_production_service` has an approved video production compatibility import; remove only after import inventory shows no production legacy imports. |
 
 ## Boundaries
 

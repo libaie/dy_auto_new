@@ -26,7 +26,7 @@ class AuditImageRequest(BaseModel):
 
 def _get_audit_model(db: Session, model_id: str | None) -> dict:
     """Resolve audit model via registry with backward-compatible fallback."""
-    from app.services.model_registry import get_model_for_scene, ModelResolutionError
+    from app.domains.model_configuration.model_registry import get_model_for_scene, ModelResolutionError
     try:
         return get_model_for_scene(db, "quality_audit", explicit_model_id=model_id)
     except ModelResolutionError:

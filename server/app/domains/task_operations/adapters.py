@@ -2,7 +2,7 @@
 
 from app.domains.account_operations.channel_service import channel_service
 from app.domains.content_collection.content_service import content_service
-from app.services.task_service import task_service
+from app.domains.task_operations.task_service import task_service
 from app.ws_manager import pair_ws_manager
 
 __all__ = [

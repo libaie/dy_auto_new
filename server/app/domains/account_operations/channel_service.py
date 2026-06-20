@@ -189,7 +189,7 @@ class ChannelService:
 
     def claim_channel_item(self, db: Session, device_id: str):
         """Claim a pending channel item. Returns (PydanticTask, channel_item_id) or None."""
-        from app.services.task_service import _db_task_to_pydantic
+        from app.domains.task_operations.task_service import _db_task_to_pydantic
         from app.domains.reporting.stats_service import stats_service
         from app.models import TaskType, TaskStatus
 

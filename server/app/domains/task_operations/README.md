@@ -72,6 +72,7 @@ and DM sequence business logic remains in `content_collection`.
 - `app.domains.task_operations.task_use_cases` owns admin task create, batch create, list, get, cancel, delete, and batch delete orchestration.
 - `app.domains.task_operations.realtime_events` owns `new_task_available`, `task_updated`, `tasks_changed`, and direct device `cancel_task` websocket helper calls.
 - `app.domains.task_operations.adapters` owns narrow adapter calls into `task_service`, `content_service`, `channel_service`, ORM lookups, and websocket manager APIs.
+- `app.domains.task_operations.task_service` owns `TaskService`, task leasing, stale-task recovery, cancellation acknowledgement, and task result persistence.
 - `app.domains.device_operations.polling` and `app.domains.device_operations.reporting` continue to own device-authenticated task leasing, progress, result, heartbeat, and risk reporting.
 - `app.domains.account_operations.chain_use_cases` continues to own chain instance step orchestration.
 - `app.domains.content_collection` continues to own content templates and DM sequence business use cases.
@@ -82,6 +83,7 @@ and DM sequence business logic remains in `content_collection`.
 | Facade | Target | Introduced | Exit condition |
 |---|---|---|---|
 | `app.routers.tasks` | `app.domains.task_operations.tasks_router` | Planned PR3 | Route/auth snapshots and existing task API tests pass with the domain router and all callers have an explicit compatibility path. |
+| `app.services.task_service` | `app.domains.task_operations.task_service` | 2026-06-20 task service domain migration | Cleanup only after all non-compatibility callers use the domain path and task-service behavior tests pass. |
 
 ## Migration Checklist
 

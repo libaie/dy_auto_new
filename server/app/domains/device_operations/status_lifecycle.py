@@ -78,7 +78,7 @@ async def offline_checker():
                 DBTask.device_id.in_(online_ids),  # only online devices; offline handled by get_pending_task
             ).all()
             if stuck_tasks:
-                from app.services.task_service import MAX_RETRIES
+                from app.domains.task_operations.task_service import MAX_RETRIES
                 for task in stuck_tasks:
                     task.retry_count += 1
                     if task.retry_count >= MAX_RETRIES:

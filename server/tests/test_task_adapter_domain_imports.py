@@ -16,7 +16,6 @@ def test_task_adapter_import_spec_and_plan_document_boundary():
         "app.domains.content_collection.content_service",
         "app.services.channel_service",
         "app.services.content_service",
-        "app.services.task_service",
     ]:
         assert term in spec
         assert term in plan
@@ -26,9 +25,10 @@ def test_task_adapters_import_moved_helpers_from_domain_paths():
     text = ADAPTERS_PATH.read_text(encoding="utf-8")
     assert "app.domains.account_operations.channel_service" in text
     assert "app.domains.content_collection.content_service" in text
+    assert "app.domains.task_operations.task_service" in text
     assert "app.services.channel_service" not in text
     assert "app.services.content_service" not in text
-    assert "app.services.task_service" in text
+    assert "app.services.task_service" not in text
 
 
 def test_legacy_channel_and_content_facades_resolve_to_domain_modules():

@@ -5,11 +5,12 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.config import bj_now
-from app.db.models.image_production import ImageProductionCostEvent, ImageProductionMetric
-from app.db_models import (
+from app.db.models.image_production import (
     ImageCreationAsset,
     ImageCreationReviewRecord,
     ImageCreationTask,
+    ImageProductionCostEvent,
+    ImageProductionMetric,
 )
 
 

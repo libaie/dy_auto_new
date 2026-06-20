@@ -15,15 +15,13 @@ from sqlalchemy.orm import Session, object_session
 
 from app.config import bj_now
 from app.db.models.image_production import (
+    ImageCreationAsset,
+    ImageCreationReviewRecord,
+    ImageCreationTask,
     ImageProductionAbAttempt,
     ImageProductionAbGroup,
     ImageSelectionPreview,
     ImageProductionStrategy,
-)
-from app.db_models import (
-    ImageCreationAsset,
-    ImageCreationReviewRecord,
-    ImageCreationTask,
 )
 from app.domains.image_generation.image_creation_errors import image_error
 from app.domains.image_generation.image_creation_storage import (

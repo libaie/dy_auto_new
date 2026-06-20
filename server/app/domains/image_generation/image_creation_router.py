@@ -157,7 +157,7 @@ async def create_task(body: CreateImageTaskRequest, db: Session = Depends(get_db
 
 @router.get("/tasks/{task_id}")
 async def read_task(task_id: str, db: Session = Depends(get_db), user=Depends(require_role("admin"))):
-    from app.db_models import ImageCreationAsset, ImageCreationTask
+    from app.db.models.image_production import ImageCreationAsset, ImageCreationTask
 
     task = db.query(ImageCreationTask).filter(ImageCreationTask.id == task_id).first()
     if not task:
@@ -168,7 +168,7 @@ async def read_task(task_id: str, db: Session = Depends(get_db), user=Depends(re
 
 @router.post("/tasks/{task_id}/sync")
 async def sync_task(task_id: str, db: Session = Depends(get_db), user=Depends(require_role("admin"))):
-    from app.db_models import ImageCreationAsset
+    from app.db.models.image_production import ImageCreationAsset
 
     task = await sync_image_task(db, task_id)
     task_assets = db.query(ImageCreationAsset).filter(ImageCreationAsset.task_id == task.id).all()
@@ -219,7 +219,7 @@ async def review_asset(asset_id: str, body: ReviewImageAssetRequest, db: Session
 
 @router.post("/assets/{asset_id}/edit")
 async def edit_asset(asset_id: str, body: EditImageAssetRequest, db: Session = Depends(get_db), user=Depends(require_role("admin"))):
-    from app.db_models import ImageCreationAsset
+    from app.db.models.image_production import ImageCreationAsset
 
     asset = db.query(ImageCreationAsset).filter(ImageCreationAsset.id == asset_id).first()
     if not asset:

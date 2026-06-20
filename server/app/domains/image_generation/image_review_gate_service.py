@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.db_models import ImageCreationAsset, ImageCreationTask
+from app.db.models.image_production import ImageCreationAsset, ImageCreationTask
 
 
 def asset_review_gate(task: ImageCreationTask | None, asset: ImageCreationAsset) -> dict[str, Any]:

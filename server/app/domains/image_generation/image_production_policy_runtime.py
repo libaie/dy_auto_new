@@ -5,8 +5,7 @@ from typing import Any
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
-from app.db.models.image_production import ImageProductionPolicyVersion, ImageProductionStrategy
-from app.db_models import ImageCreationTask
+from app.db.models.image_production import ImageCreationTask, ImageProductionPolicyVersion, ImageProductionStrategy
 
 
 DEFAULT_COST_POLICY = {

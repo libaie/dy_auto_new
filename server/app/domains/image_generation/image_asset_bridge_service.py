@@ -4,7 +4,8 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.db_models import ImageCreationAsset, ImageCreationTask, VideoProductionAsset, VideoProductionRun
+from app.db.models.image_production import ImageCreationAsset, ImageCreationTask
+from app.db_models import VideoProductionAsset, VideoProductionRun
 from app.domains.image_generation.image_creation_errors import image_error
 from app.services.image_creation_service import _asset_allowed_actions
 from app.domains.image_generation.image_review_gate_service import asset_review_gate, review_gate_passed, review_gate_rescue_actions

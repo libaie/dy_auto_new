@@ -17,7 +17,7 @@ from app.services.agency_creative_patch_service import (
     reject_patch as reject_creative_patch,
     update_patch_after,
 )
-from app.services.agency_manifest import (
+from app.domains.agency_operations.agency_manifest import (
     AgencyManifestError,
     get_expert,
     get_legacy_expert,

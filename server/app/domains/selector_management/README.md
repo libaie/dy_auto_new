@@ -15,17 +15,23 @@ This domain owns admin UI selector management routes.
 - `selectors_router.py` owns selector CRUD, selector toggling, template image
   list/upload/delete, selector revision broadcasts, and admin cache update
   notifications.
+- `selector_service.py` owns `SelectorService`, `selector_service`, selector
+  CRUD, revision counter updates, device selector filtering, and selector
+  serialization.
 
 ## Facade Register
 
 | Facade | Target | Exit condition |
 |---|---|---|
 | `app.routers.selectors` | `app.domains.selector_management.selectors_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
+| `app.services.selector_service` | `app.domains.selector_management.selector_service` | All selector service callers import the domain service directly or belong to domains that have not moved yet. |
 
 ## Boundaries
 
 - Keep device selector polling in `device_operations`.
-- Keep selector and template service bodies in `app.services.*`.
+- Keep selector CRUD and device selector filtering in
+  `app.domains.selector_management.selector_service`.
+- Keep template service body in `app.services.template_service`.
 - Preserve websocket payloads `selectors_updated` and `selectors_changed`.
 - Preserve route ordering so `/templates/*` paths are not shadowed by
   `/{action_name}`.
@@ -41,3 +47,15 @@ Do not remove the legacy router facade until all of these are true:
 - Existing selector API, selector service, and device selector tests pass.
 - Import inventory shows no unapproved production imports of
   `app.routers.selectors`.
+
+Do not remove the legacy selector service facade until all of these are true:
+
+- `rg "app\.services\.selector_service" server/app server/tests` returns only
+  compatibility tests, migration docs, seed helpers, or modules whose domains
+  have not moved yet.
+- `test_selector_service_domain_facade.py` has been replaced with tests for
+  direct domain imports.
+- Domain-owned selector management modules import
+  `app.domains.selector_management.selector_service` directly.
+- Direct domain selector service coverage proves `SelectorService`,
+  `selector_service`, and `_bump_revision` behavior without legacy imports.

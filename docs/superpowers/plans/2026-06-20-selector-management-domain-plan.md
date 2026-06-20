@@ -4,8 +4,8 @@ Date: 2026-06-20
 
 ## Goal
 
-Create `app.domains.selector_management` and move admin selector route ownership
-behind a compatibility-preserving domain module.
+Create `app.domains.selector_management` and move admin selector route and
+selector service ownership behind compatibility-preserving domain modules.
 
 ## PR1: Boundary And Route Snapshot
 
@@ -40,10 +40,14 @@ behind a compatibility-preserving domain module.
 
 ## Later Splits
 
-- Split selector CRUD use cases, template image handlers, and realtime event
-  helpers only after route ownership is stable.
-- Keep `selector_service` and `template_service` stable until a separate
-  service-split plan is approved.
+- Selector service logic now lives in
+  `app.domains.selector_management.selector_service`; keep
+  `app.services.selector_service` as a compatibility facade until direct-domain
+  coverage replaces legacy imports.
+- Split selector CRUD use cases further only if the selector service gains more
+  behavior.
+- Keep `template_service` stable until a separate service-split plan is
+  approved.
 
 ## Verification
 

@@ -7,7 +7,7 @@ import time
 
 from app.database import get_db
 from app.deps import verify_admin_token, require_role
-from app.services.selector_service import selector_service
+from app.domains.selector_management.selector_service import selector_service
 from app.services.template_service import template_service
 
 router = APIRouter(prefix="/api/selectors", tags=["selectors"])

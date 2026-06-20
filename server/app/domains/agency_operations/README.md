@@ -31,6 +31,8 @@ repair task routes.
   models, repair classification results, and repair action helper labels.
 - `agency_repair_classifier.py` owns repair-task classification from expert
   output summaries into repair tasks and manual gates.
+- `agency_repair_orchestrator.py` owns converting repair tasks into manual
+  audit events or auto-repair production jobs.
 
 ## Facade Register
 
@@ -41,6 +43,7 @@ repair task routes.
 | `app.services.agency_contracts` | `app.domains.agency_operations.agency_contracts` | Keep while legacy tests or dirty service modules import agency response contracts from `app.services`; remove after import inventory is clean. |
 | `app.services.agency_repair_contracts` | `app.domains.agency_operations.agency_repair_contracts` | Keep while dirty service modules import repair contracts from `app.services`; remove after import inventory is clean. |
 | `app.services.agency_repair_classifier` | `app.domains.agency_operations.agency_repair_classifier` | Keep while dirty service modules import the repair classifier from `app.services`; remove after import inventory is clean. |
+| `app.services.agency_repair_orchestrator` | `app.domains.agency_operations.agency_repair_orchestrator` | Keep while dirty service modules import repair orchestration from `app.services`; remove after import inventory is clean. |
 
 ## Boundaries
 

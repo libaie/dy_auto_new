@@ -14,7 +14,7 @@ routes.
 - Database session helpers stay in `app.database`.
 - Auth dependencies stay in `app.deps`.
 - Runtime model resolution stays in shared services.
-- Pixelle execution orchestration stays in `app.services.pixelle_execution_service`.
+- Video production orchestration stays outside this domain.
 - Video production orchestration stays in its own router and services.
 
 ## Current Modules
@@ -30,6 +30,8 @@ routes.
   batch, image create, stage status, video batch, and compose calls:
   `submit_image_batch`, `submit_image_create`, `get_stage_task`,
   `submit_video_batch`, and `submit_compose`.
+- `pixelle_execution_service.py` owns `build_video_stage_frame` payload mapping
+  for Pixelle video stage segment frames.
 
 ## Facade Register
 
@@ -38,6 +40,7 @@ routes.
 | `app.routers.pixelle` | `app.domains.pixelle_integration.pixelle_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
 | `app.services.pixelle_client` | `app.domains.pixelle_integration.pixelle_client` | Keep while `app.main` shutdown and not-yet-moved service modules have approved compatibility imports; remove only after import inventory shows no production legacy imports. |
 | `app.services.pixelle_stage_client` | `app.domains.pixelle_integration.pixelle_stage_client` | Keep while legacy orchestration services have approved compatibility imports; remove only after import inventory shows no production legacy imports. |
+| `app.services.pixelle_execution_service` | `app.domains.pixelle_integration.pixelle_execution_service` | Legacy imports remain only in compatibility tests or older callers not yet migrated. |
 
 ## Boundaries
 

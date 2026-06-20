@@ -5,9 +5,9 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from app.config import PIXELLE_CONFIG_PATH, bj_now
+from app.db.models.video_production import ProductionPlan
 from app.db_models import (
     Episode,
-    ProductionPlan,
     ProductionScene,
     ProductionSegment,
     ProductionShot,

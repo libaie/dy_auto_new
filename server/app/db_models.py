@@ -56,29 +56,9 @@ from app.db.models.selector_management import UISelector
 from app.db.models.system_configuration import SystemSetting
 from app.db.models.task_operations import Task
 from app.db.models.video_library import GeneratedVideo
-from app.db.models.video_production import VideoCollection
+from app.db.models.video_production import ProductionPlan, VideoCollection
 
 # ==== 多模型系列生成系统 ====
-
-
-class ProductionPlan(Base):
-    __tablename__ = "production_plans"
-
-    id = Column(String(36), primary_key=True, default=_uuid)
-    series_id = Column(String(36), ForeignKey("series.id", ondelete="CASCADE"), nullable=False)
-    status = Column(String(30), nullable=False, default="draft")
-    active_version = Column(Integer, nullable=False, default=1)
-    target_total_duration_seconds = Column(Integer, nullable=False, default=0)
-    budget_limit = Column(Float, nullable=True)
-    current_cost = Column(Float, nullable=False, default=0.0)
-    error_message = Column(Text, nullable=True)
-    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
-    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
-
-    __table_args__ = (
-        Index("idx_production_plans_series_id", "series_id"),
-        Index("idx_production_plans_status", "status"),
-    )
 
 
 class ProductionPlanVersion(Base):

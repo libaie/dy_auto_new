@@ -4,7 +4,8 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.config import bj_now
-from app.db_models import ProductionPlan, ProviderCostReservation
+from app.db.models.video_production import ProductionPlan
+from app.db_models import ProviderCostReservation
 from app.domains.video_production.production_errors import ProductionErrorCode, ProductionRepairableError
 from app.domains.video_production.production_state_contract import (
     COST_ACTIVE_UNSUBMITTED,

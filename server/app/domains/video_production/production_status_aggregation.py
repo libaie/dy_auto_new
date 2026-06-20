@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 
-from app.db_models import ProductionEpisode, ProductionPlan, ProductionScene, ProductionSegment, ProductionShot
+from app.db.models.video_production import ProductionPlan
+from app.db_models import ProductionEpisode, ProductionScene, ProductionSegment, ProductionShot
 
 
 def _parent_status(child_statuses: list[str]) -> str:

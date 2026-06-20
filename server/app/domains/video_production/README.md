@@ -8,7 +8,8 @@ This domain owns the video production control-plane HTTP routes.
 
 ## Not Owned
 
-- Production ORM models stay in `app.db_models`.
+- `VideoCollection` lives in `app.db.models.video_production`; the remaining
+  production ORM graph stays in `app.db_models`.
 - Database session helpers stay in `app.database`.
 - Auth dependencies stay in `app.deps`.
 - Video library routes stay in `app.domains.video_library`.
@@ -57,6 +58,7 @@ This domain owns the video production control-plane HTTP routes.
   persistence, and run status updates after stage jobs.
 - `production_collection_service.py` owns `create_collection_from_approved_episodes`
   for packaging approved episode videos into draft collections.
+- `app.db.models.video_production` owns the `VideoCollection` ORM class body.
 - `production_tree_service.py` owns `get_run_tree` and tree payload helpers for
   plan and run production hierarchy endpoints.
 - `review_asset_edit_service.py` owns `ReviewAssetEditError`,
@@ -104,6 +106,7 @@ This domain owns the video production control-plane HTTP routes.
 | Facade | Target | Exit condition |
 |---|---|---|
 | `app.routers.video_production` | `app.domains.video_production.video_production_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
+| `app.db_models.VideoCollection` | `app.db.models.video_production.VideoCollection` | Keep as a compatibility re-export until production imports use the domain model path. |
 | `app.services.mock_scale_scheduler_service` | `app.domains.video_production.mock_scale_scheduler_service` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.asset_storage_guard` | `app.domains.video_production.asset_storage_guard` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.production_gate_evaluator` | `app.domains.video_production.production_gate_evaluator` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |

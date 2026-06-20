@@ -35,7 +35,8 @@ def test_collection_service_domain_file_owns_helper():
 
 def test_legacy_collection_service_is_thin_facade():
     text = LEGACY_PATH.read_text(encoding="utf-8")
-    assert "app.domains.video_production import production_collection_service" in text
+    assert "importlib.import_module" in text
+    assert "app.domains.video_production.production_collection_service" in text
     assert "sys.modules[_LEGACY_MODULE_NAME] = _domain_module" in text
     assert "def create_collection_from_approved_episodes" not in text
     assert "db.query(Episode)" not in text

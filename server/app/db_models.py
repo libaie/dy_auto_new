@@ -22,6 +22,7 @@ from app.db.models.reporting import DailyStats, StatsEvent
 from app.db.models.selector_management import UISelector
 from app.db.models.system_configuration import SystemSetting
 from app.db.models.video_library import GeneratedVideo
+from app.db.models.video_production import VideoCollection
 
 
 class Account(Base):
@@ -867,25 +868,6 @@ class ProductionAuditEvent(Base):
     actor_role = Column(String(40), nullable=True)
     payload_json = Column(JSON, nullable=True, default=dict)
     created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
-
-
-class VideoCollection(Base):
-    __tablename__ = "video_collections"
-
-    id = Column(String(36), primary_key=True, default=_uuid)
-    series_id = Column(String(36), ForeignKey("series.id", ondelete="CASCADE"), nullable=False)
-    status = Column(String(30), nullable=False, default="draft")
-    included_episode_ids = Column(JSON, nullable=False, default=list)
-    duration_seconds = Column(Float, nullable=False, default=0.0)
-    video_url = Column(Text, nullable=True)
-    error_message = Column(Text, nullable=True)
-    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
-    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
-
-    __table_args__ = (
-        Index("idx_video_collections_series_id", "series_id"),
-        Index("idx_video_collections_status", "status"),
-    )
 
 
 class PipelineRun(Base):

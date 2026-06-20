@@ -1,7 +1,8 @@
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.db_models import Episode, Series, VideoCollection
+from app.db.models.video_production import VideoCollection
+from app.db_models import Episode, Series
 
 
 def create_collection_from_approved_episodes(db: Session, series_id: str) -> VideoCollection:

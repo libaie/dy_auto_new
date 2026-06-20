@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.config import bj_now
+from app.db.models.video_production import VideoCollection
 from app.db_models import (
     Character,
     Episode,
@@ -11,7 +12,6 @@ from app.db_models import (
     ProductionPlan,
     Scene,
     Series,
-    VideoCollection,
     VideoProductionAsset,
     VideoProductionRun,
     series_characters,

@@ -1,5 +1,5 @@
 """Content generation use cases."""
-from app.services.content_service import content_service
+from app.domains.content_collection.content_service import content_service
 
 
 async def generate_from_template(db, request):

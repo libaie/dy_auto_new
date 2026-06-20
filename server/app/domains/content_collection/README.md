@@ -100,6 +100,7 @@ this domain provides stable use cases and compatibility tests for that handoff.
 - `app.routers.data` remains the compatibility import path for `/api/data/*` callers outside app wiring.
 - `app.routers.dm_sequences` remains the compatibility import path for `/api/dm-sequences/*` callers outside app wiring.
 - `app.domains.content_collection.read_models` owns collected comment/user/conversation list and export payload shaping.
+- `app.domains.content_collection.content_service` owns `ContentService` template CRUD, sensitive-word CRUD/matching, variable substitution, and content-generation helpers.
 - `app.domains.content_collection.mutations` owns content template, sensitive-word, and DM sequence mutation orchestration.
 - `app.domains.content_collection.content_generation` owns content, keyword, regex, and clean-prompt generation calls.
 - `app.domains.content_collection.collection_reports` owns collected comment/user ingestion, comment AI reply, user profile, and avatar use cases.
@@ -119,6 +120,7 @@ this domain provides stable use cases and compatibility tests for that handoff.
 | `app.routers.dm_sequences` | `app.domains.content_collection.dm_sequences_router` | PR3 | DM sequence CRUD, generation, variant, and device-sync tests pass with the domain router. |
 | `app.domains.device_operations.content_bridge` | `app.domains.content_collection` use cases | Planned PR5 | Device bridge tests prove `/api/device/*` auth, response shape, and realtime events are unchanged. |
 | `app.services.dm_sequence_visibility` | `app.domains.content_collection.dm_sequence_visibility` | DM sequence visibility slice | `rg -n "app\.services\.dm_sequence_visibility" server/app -g "*.py"` returns only approved device bridge compatibility imports. |
+| `app.services.content_service` | `app.domains.content_collection.content_service` | Content service domain slice | Keep while `rg -n "app\.services\.content_service" server/app -g "*.py"` returns approved task/device/account/AI bridge compatibility imports; remove only when that command returns no production imports. |
 
 ## Migration Checklist
 

@@ -59,6 +59,7 @@ from app.db.models.video_library import GeneratedVideo
 from app.db.models.video_production import (
     ProviderCostReservation,
     ProviderStageTask,
+    ProductionCostEvent,
     ProductionEpisode,
     ProductionJob,
     ProductionPlan,
@@ -70,31 +71,6 @@ from app.db.models.video_production import (
 )
 
 # ==== 多模型系列生成系统 ====
-
-
-class ProductionCostEvent(Base):
-    __tablename__ = "production_cost_events"
-    __table_args__ = (
-        Index("idx_production_cost_events_plan_id", "plan_id"),
-        Index("idx_production_cost_events_episode_plan_id", "episode_plan_id"),
-        Index("idx_production_cost_events_segment_id", "segment_id"),
-    )
-
-    id = Column(String(36), primary_key=True, default=_uuid)
-    plan_id = Column(String(36), ForeignKey("production_plans.id", ondelete="CASCADE"), nullable=False)
-    episode_plan_id = Column(String(36), ForeignKey("production_episodes.id", ondelete="SET NULL"), nullable=True)
-    segment_id = Column(String(36), ForeignKey("production_segments.id", ondelete="SET NULL"), nullable=True)
-    stage = Column(String(40), nullable=False)
-    model_config_id = Column(String(36), nullable=True)
-    config_version = Column(Integer, nullable=False, default=1)
-    provider_task_id = Column(String(120), nullable=True)
-    provider = Column(String(50), nullable=False, default="")
-    model_name = Column(String(100), nullable=False, default="")
-    estimated_cost = Column(Float, nullable=False, default=0.0)
-    actual_cost = Column(Float, nullable=False, default=0.0)
-    currency = Column(String(10), nullable=False, default="CNY")
-    units_json = Column(JSON, nullable=True, default=dict)
-    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
 
 
 class AgencyExpertInvocation(Base):

@@ -6,6 +6,7 @@ from app.db_models import (
     Base,
     ProviderCostReservation as LegacyProviderCostReservation,
     ProviderStageTask as LegacyProviderStageTask,
+    ProductionCostEvent as LegacyProductionCostEvent,
     ProductionEpisode as LegacyProductionEpisode,
     ProductionJob as LegacyProductionJob,
     ProductionPlan as LegacyProductionPlan,
@@ -24,6 +25,7 @@ def test_video_production_model_boundary_reexports_video_collection():
     from app.db.models.video_production import (
         ProviderCostReservation,
         ProviderStageTask,
+        ProductionCostEvent,
         ProductionEpisode,
         ProductionJob,
         ProductionPlan,
@@ -36,6 +38,7 @@ def test_video_production_model_boundary_reexports_video_collection():
 
     assert ProviderCostReservation is LegacyProviderCostReservation
     assert ProviderStageTask is LegacyProviderStageTask
+    assert ProductionCostEvent is LegacyProductionCostEvent
     assert ProductionEpisode is LegacyProductionEpisode
     assert ProductionJob is LegacyProductionJob
     assert ProductionPlan is LegacyProductionPlan
@@ -46,6 +49,7 @@ def test_video_production_model_boundary_reexports_video_collection():
     assert VideoCollection is LegacyVideoCollection
     assert ProviderCostReservation.metadata is Base.metadata
     assert ProviderStageTask.metadata is Base.metadata
+    assert ProductionCostEvent.metadata is Base.metadata
     assert ProductionEpisode.metadata is Base.metadata
     assert ProductionJob.metadata is Base.metadata
     assert ProductionPlan.metadata is Base.metadata
@@ -56,6 +60,7 @@ def test_video_production_model_boundary_reexports_video_collection():
     assert VideoCollection.metadata is Base.metadata
     assert ProviderCostReservation.__module__ == "app.db.models.video_production"
     assert ProviderStageTask.__module__ == "app.db.models.video_production"
+    assert ProductionCostEvent.__module__ == "app.db.models.video_production"
     assert ProductionEpisode.__module__ == "app.db.models.video_production"
     assert ProductionJob.__module__ == "app.db.models.video_production"
     assert ProductionPlan.__module__ == "app.db.models.video_production"
@@ -65,6 +70,7 @@ def test_video_production_model_boundary_reexports_video_collection():
     assert ProductionShot.__module__ == "app.db.models.video_production"
     assert "provider_cost_reservations" in Base.metadata.tables
     assert "provider_stage_tasks" in Base.metadata.tables
+    assert "production_cost_events" in Base.metadata.tables
     assert "production_episodes" in Base.metadata.tables
     assert "production_jobs" in Base.metadata.tables
     assert "production_plans" in Base.metadata.tables
@@ -78,9 +84,10 @@ def test_video_production_model_boundary_reexports_video_collection():
 def test_video_production_model_boundary_imports_in_clean_process():
     code = (
         "import app.db_models as legacy; "
-        "from app.db.models.video_production import ProviderCostReservation, ProviderStageTask, ProductionEpisode, ProductionJob, ProductionPlan, ProductionPlanVersion, ProductionScene, ProductionSegment, ProductionShot, VideoCollection; "
+        "from app.db.models.video_production import ProviderCostReservation, ProviderStageTask, ProductionCostEvent, ProductionEpisode, ProductionJob, ProductionPlan, ProductionPlanVersion, ProductionScene, ProductionSegment, ProductionShot, VideoCollection; "
         "assert legacy.ProviderCostReservation is ProviderCostReservation; "
         "assert legacy.ProviderStageTask is ProviderStageTask; "
+        "assert legacy.ProductionCostEvent is ProductionCostEvent; "
         "assert legacy.ProductionEpisode is ProductionEpisode; "
         "assert legacy.ProductionJob is ProductionJob; "
         "assert legacy.ProductionPlan is ProductionPlan; "
@@ -91,6 +98,7 @@ def test_video_production_model_boundary_imports_in_clean_process():
         "assert legacy.VideoCollection is VideoCollection; "
         "assert ProviderCostReservation.__module__ == 'app.db.models.video_production'; "
         "assert ProviderStageTask.__module__ == 'app.db.models.video_production'; "
+        "assert ProductionCostEvent.__module__ == 'app.db.models.video_production'; "
         "assert ProductionEpisode.__module__ == 'app.db.models.video_production'; "
         "assert ProductionJob.__module__ == 'app.db.models.video_production'; "
         "assert ProductionPlan.__module__ == 'app.db.models.video_production'; "
@@ -100,6 +108,7 @@ def test_video_production_model_boundary_imports_in_clean_process():
         "assert ProductionShot.__module__ == 'app.db.models.video_production'; "
         "assert 'provider_cost_reservations' in legacy.Base.metadata.tables; "
         "assert 'provider_stage_tasks' in legacy.Base.metadata.tables; "
+        "assert 'production_cost_events' in legacy.Base.metadata.tables; "
         "assert 'production_episodes' in legacy.Base.metadata.tables; "
         "assert 'production_jobs' in legacy.Base.metadata.tables; "
         "assert 'production_plans' in legacy.Base.metadata.tables; "

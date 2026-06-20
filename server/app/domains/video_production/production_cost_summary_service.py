@@ -1,8 +1,8 @@
 from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
-from app.db.models.video_production import ProviderCostReservation
-from app.db_models import ProductionCostEvent, VideoProductionRun
+from app.db.models.video_production import ProductionCostEvent, ProviderCostReservation
+from app.db_models import VideoProductionRun
 from app.domains.video_production.production_state_contract import (
     COST_ACTIVE_UNSUBMITTED,
     COST_RELEASED,

@@ -22,6 +22,9 @@ The new domain owns:
 - route-local helpers for SSE payloads, JSON fence stripping, canonical template
   comparison, and prompt rewrite streaming;
 - websocket notification payloads for prompt template update events.
+- prompt template CRUD, revision tracking, device payloads, rewrite validation,
+  rewrite output validation, and rewrite prompt construction through
+  `app.domains.prompt_management.prompt_template_service`.
 
 The migration keeps `app.routers.prompt_templates` as a compatibility facade.
 
@@ -29,10 +32,7 @@ The migration keeps `app.routers.prompt_templates` as a compatibility facade.
 
 - Do not move device-facing `/api/device/prompt-templates`; that stays in
   `device_operations`.
-- Prompt template CRUD, revision tracking, device payloads, rewrite validation,
-  rewrite output validation, and rewrite prompt construction now live in
-  `app.domains.prompt_management.prompt_template_service`;
-  `app.services.prompt_template_service` remains as a temporary compatibility
+- Keep `app.services.prompt_template_service` as a temporary compatibility
   facade.
 - Do not move prompt template ORM model bodies.
 - Do not change route paths, auth dependencies, SSE event shapes, websocket

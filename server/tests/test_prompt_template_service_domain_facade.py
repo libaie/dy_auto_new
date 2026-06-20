@@ -55,7 +55,10 @@ def test_legacy_prompt_template_service_module_is_domain_module():
     assert legacy is domain
     assert legacy.PromptTemplateService is domain.PromptTemplateService
     assert legacy.prompt_template_service is domain.prompt_template_service
+    assert legacy.PROMPT_TEMPLATE_REWRITE_MAX_INSTRUCTION_CHARS is domain.PROMPT_TEMPLATE_REWRITE_MAX_INSTRUCTION_CHARS
     assert legacy.PROMPT_TEMPLATE_REWRITE_MAX_CONTENT_BYTES is domain.PROMPT_TEMPLATE_REWRITE_MAX_CONTENT_BYTES
+    assert legacy._get_tmpl_revision is domain._get_tmpl_revision
+    assert legacy._set_tmpl_revision is domain._set_tmpl_revision
     assert legacy._bump_tmpl_revision is domain._bump_tmpl_revision
     assert legacy._to_dict is domain._to_dict
     assert legacy._to_device_dict is domain._to_device_dict

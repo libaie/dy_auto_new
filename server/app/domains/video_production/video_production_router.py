@@ -10,9 +10,8 @@ from sqlalchemy.orm import Session
 from app.database import SessionLocal, get_db
 from app.deps import require_role
 from app.config import PIXELLE_CONFIG_PATH
-from app.db.models.video_production import ProductionPlan
+from app.db.models.video_production import ProductionEpisode, ProductionPlan
 from app.db_models import (
-    ProductionEpisode,
     ProviderCostReservation,
     ProviderStageTask,
     VideoProductionAsset,

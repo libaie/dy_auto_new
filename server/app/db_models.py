@@ -56,29 +56,9 @@ from app.db.models.selector_management import UISelector
 from app.db.models.system_configuration import SystemSetting
 from app.db.models.task_operations import Task
 from app.db.models.video_library import GeneratedVideo
-from app.db.models.video_production import ProductionPlan, ProductionPlanVersion, VideoCollection
+from app.db.models.video_production import ProductionEpisode, ProductionPlan, ProductionPlanVersion, VideoCollection
 
 # ==== 多模型系列生成系统 ====
-
-
-class ProductionEpisode(Base):
-    __tablename__ = "production_episodes"
-    __table_args__ = (
-        UniqueConstraint("plan_id", "episode_id", name="uq_production_episode_plan_episode"),
-        Index("idx_production_episodes_plan_id", "plan_id"),
-        Index("idx_production_episodes_episode_id", "episode_id"),
-        Index("idx_production_episodes_status", "status"),
-    )
-
-    id = Column(String(36), primary_key=True, default=_uuid)
-    plan_id = Column(String(36), ForeignKey("production_plans.id", ondelete="CASCADE"), nullable=False)
-    episode_id = Column(String(36), ForeignKey("episodes.id", ondelete="CASCADE"), nullable=False)
-    order_index = Column(Integer, nullable=False, default=0)
-    status = Column(String(30), nullable=False, default="planned")
-    target_duration_seconds = Column(Integer, nullable=False, default=0)
-    approved_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
-    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
 
 
 class ProductionScene(Base):

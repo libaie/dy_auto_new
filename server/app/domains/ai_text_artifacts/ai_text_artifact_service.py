@@ -7,7 +7,8 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.config import bj_now
-from app.db_models import AITextArtifact, AITextArtifactConsumer, Episode, Series, VideoProductionRun
+from app.db.models.ai_text_artifacts import AITextArtifact, AITextArtifactConsumer
+from app.db_models import Episode, Series, VideoProductionRun
 
 
 SERIES_RUN_ARTIFACT_TYPES = ("series_bible", "series_story_plan", "season_arc", "continuity_ledger")

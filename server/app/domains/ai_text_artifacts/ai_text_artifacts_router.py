@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.db_models import AITextArtifact
+from app.db.models.ai_text_artifacts import AITextArtifact
 from app.deps import require_role, verify_admin_token
 from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
 

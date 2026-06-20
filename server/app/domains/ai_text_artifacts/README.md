@@ -14,7 +14,6 @@ regeneration routes, and the `AITextArtifactService` business logic.
 
 ## Not Owned
 
-- `AITextArtifact` ORM definitions stay in `app.db_models`.
 - Database session helpers stay in `app.database`.
 - Auth dependencies stay in `app.deps`.
 - Non-domain service modules may keep importing
@@ -29,6 +28,8 @@ regeneration routes, and the `AITextArtifactService` business logic.
 - `ai_text_artifact_service.py` owns `AITextArtifactService`, artifact
   versioning, approval, lineage, regeneration, consumer binding, and legacy run
   backfill.
+- `app.db.models.ai_text_artifacts` owns the `AITextArtifact` and
+  `AITextArtifactConsumer` ORM class bodies.
 
 ## Facade Register
 
@@ -36,6 +37,7 @@ regeneration routes, and the `AITextArtifactService` business logic.
 |---|---|---|
 | `app.routers.ai_text_artifacts` | `app.domains.ai_text_artifacts.ai_text_artifacts_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
 | `app.services.ai_text_artifact_service` | `app.domains.ai_text_artifacts.ai_text_artifact_service` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
+| `app.db_models.AITextArtifact` / `AITextArtifactConsumer` | `app.db.models.ai_text_artifacts` | Keep as compatibility re-exports until production imports use the domain model path. |
 
 ## Boundaries
 

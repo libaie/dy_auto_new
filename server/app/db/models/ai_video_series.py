@@ -1,11 +1,10 @@
 """AI video series ORM compatibility facade."""
 
+from app.db.models.ai_text_artifacts import AITextArtifact, AITextArtifactConsumer
 from app.db_models import (
     Base,
     series_characters,
     series_scenes,
-    AITextArtifact,
-    AITextArtifactConsumer,
     Episode,
     EpisodeScript,
     ProductionAuditEvent,

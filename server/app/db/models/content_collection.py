@@ -1,0 +1,27 @@
+"""Content collection ORM models."""
+
+from app.config import bj_now
+from app.db.base import Base, _uuid
+
+from sqlalchemy import Boolean, Column, DateTime, JSON, String, Text
+
+
+class ContentTemplate(Base):
+    __tablename__ = "content_templates"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    name = Column(String(100), nullable=False)
+    category = Column(String(50), nullable=False, default="comment")
+    body = Column(Text, nullable=False)
+    variables = Column(JSON, nullable=False, default=list)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
+    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
+
+
+class SensitiveWord(Base):
+    __tablename__ = "sensitive_words"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    word = Column(String(100), nullable=False, unique=True)
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())

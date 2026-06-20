@@ -12,6 +12,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 
 from app.db.models.device_operations import DevicePairRequest
+from app.db.models.content_collection import ContentTemplate, SensitiveWord
 from app.db.models.system_configuration import SystemSetting
 
 
@@ -129,27 +130,6 @@ class DailyStats(Base):
     updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
 
     account = relationship("Account")
-
-
-class ContentTemplate(Base):
-    __tablename__ = "content_templates"
-
-    id = Column(String(36), primary_key=True, default=_uuid)
-    name = Column(String(100), nullable=False)
-    category = Column(String(50), nullable=False, default="comment")  # comment, dm, reply
-    body = Column(Text, nullable=False)
-    variables = Column(JSON, nullable=False, default=list)  # ["keyword", "username", "video_title"]
-    is_active = Column(Boolean, nullable=False, default=True)
-    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
-    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
-
-
-class SensitiveWord(Base):
-    __tablename__ = "sensitive_words"
-
-    id = Column(String(36), primary_key=True, default=_uuid)
-    word = Column(String(100), nullable=False, unique=True)
-    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
 
 
 class AccountGroup(Base):

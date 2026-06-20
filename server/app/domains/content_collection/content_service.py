@@ -7,7 +7,7 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from app.db_models import ContentTemplate as DBTemplate, SensitiveWord as DBWord
+from app.db.models.content_collection import ContentTemplate as DBTemplate, SensitiveWord as DBWord
 from app.models import ContentTemplateResponse, SensitiveWordResponse
 
 

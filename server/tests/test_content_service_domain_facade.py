@@ -11,7 +11,7 @@ DOMAIN_SERVICE_PATH = REPO_ROOT / "server/app/domains/content_collection/content
 LEGACY_SERVICE_PATH = REPO_ROOT / "server/app/services/content_service.py"
 CONTENT_GENERATION_PATH = REPO_ROOT / "server/app/domains/content_collection/content_generation.py"
 MUTATIONS_PATH = REPO_ROOT / "server/app/domains/content_collection/mutations.py"
-AI_GENERATOR_PATH = REPO_ROOT / "server/app/services/ai_generator.py"
+AI_GENERATOR_PATH = REPO_ROOT / "server/app/domains/model_configuration/ai_generator.py"
 TASK_ADAPTERS_PATH = REPO_ROOT / "server/app/domains/task_operations/adapters.py"
 CHANNEL_SERVICE_PATH = REPO_ROOT / "server/app/domains/account_operations/channel_service.py"
 README_PATH = REPO_ROOT / "server/app/domains/content_collection/README.md"
@@ -76,11 +76,11 @@ def test_content_collection_modules_import_domain_content_service_only():
         assert "app.services.content_service" not in text
 
 
-def test_legacy_ai_bridge_stays_legacy_compatible():
+def test_ai_generator_imports_domain_content_service_directly():
     for path in [AI_GENERATOR_PATH]:
         text = path.read_text(encoding="utf-8")
-        assert "app.services.content_service" in text
-        assert "app.domains.content_collection.content_service" not in text
+        assert "app.domains.content_collection.content_service" in text
+        assert "app.services.content_service" not in text
 
 
 def test_channel_service_imports_domain_content_service_directly():
@@ -102,7 +102,7 @@ def test_content_collection_docs_register_content_service_facade():
         "app.domains.content_collection.content_service",
         "app.services.content_service",
         "ContentService",
-        "approved task/device/account/AI bridge compatibility imports",
+        "approved task/device/account bridge compatibility imports",
         "remove only when that command returns no production imports",
     ]:
         assert term in readme

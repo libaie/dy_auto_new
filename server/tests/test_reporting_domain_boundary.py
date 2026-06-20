@@ -80,7 +80,9 @@ def test_reporting_keeps_device_stats_increment_in_device_operations():
     reporting = DEVICE_REPORTING_PATH.read_text(encoding="utf-8")
 
     assert '@router.post("/stats/increment")' in reporting
-    assert "app.domains.reporting" not in reporting
+    assert "app.domains.reporting.stats_router" not in reporting
+    assert "app.domains.reporting.stats_service" in reporting
+    assert "app.db.models.reporting" in reporting
 
 
 def test_app_import_smoke_keeps_reporting_routes_registered_once():

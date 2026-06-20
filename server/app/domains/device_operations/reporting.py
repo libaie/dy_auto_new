@@ -114,7 +114,8 @@ def stats_increment(
     校验 task→account 归属和 task→device 归属，防止跨账号伪造统计。
     """
     from app.domains.reporting.stats_service import stats_service
-    from app.db_models import Task as DBTask, StatsEvent
+    from app.db.models.reporting import StatsEvent
+    from app.db_models import Task as DBTask
 
     # 1. Validate task exists and belongs to the claimed account
     db_task = db.query(DBTask).filter(DBTask.id == body.task_id).first()

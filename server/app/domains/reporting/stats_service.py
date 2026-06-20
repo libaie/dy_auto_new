@@ -6,7 +6,8 @@ from typing import Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 
-from app.db_models import DailyStats, Account
+from app.db.models.reporting import DailyStats
+from app.db_models import Account
 
 
 # Task type -> daily_stats column mapping

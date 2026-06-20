@@ -18,6 +18,8 @@ views.
 - `stats_service.py` owns `StatsService`, `stats_service`, daily stats row
   creation, quota checks, remaining quota payloads, and task quota parameter
   injection.
+- `app.db.models.reporting` owns the `DailyStats` and `StatsEvent` ORM class
+  bodies.
 
 ## Facade Register
 
@@ -25,12 +27,14 @@ views.
 |---|---|---|
 | `app.routers.stats` | `app.domains.reporting.stats_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
 | `app.services.stats_service` | `app.domains.reporting.stats_service` | All stats service callers import the reporting domain service directly or belong to domains that have not moved yet. |
+| `app.db_models.DailyStats` / `StatsEvent` | `app.db.models.reporting` | Keep as compatibility re-exports until production imports use the domain model path. |
 
 ## Boundaries
 
 - Keep daily stats counting and quota logic in
   `app.domains.reporting.stats_service`.
 - Keep device-side stats increment reporting in `device_operations`.
+- Keep reporting stats ORM class bodies in `app.db.models.reporting`.
 - Preserve route paths, route names, auth dependencies, response shapes, default
   date behavior, and dashboard query behavior.
 - Do not add analytics features in this route-boundary migration.

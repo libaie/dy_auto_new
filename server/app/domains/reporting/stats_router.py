@@ -6,8 +6,9 @@ from datetime import datetime, timezone
 from app.config import bj_now
 
 from app.database import get_db
+from app.db.models.reporting import DailyStats
 from app.deps import verify_admin_token
-from app.db_models import Account, Device, Task, DailyStats
+from app.db_models import Account, Device, Task
 from app.domains.reporting.stats_service import stats_service
 
 router = APIRouter(prefix="/api/stats", tags=["stats"])

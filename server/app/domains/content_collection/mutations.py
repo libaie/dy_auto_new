@@ -6,7 +6,7 @@ import re
 
 from fastapi import HTTPException
 
-from app.db_models import DMSequence
+from app.db.models.content_collection import DMSequence
 from app.domains.content_collection.dm_sequence_visibility import get_device_visible_dm_sequences
 from app.domains.content_collection.content_service import content_service
 

@@ -31,7 +31,7 @@ async def maybe_resolve_dm_sequence(params: dict, db=None) -> dict:
     if not seq_id or not db:
         return params
     try:
-        from app.db_models import DMSequence
+        from app.db.models.content_collection import DMSequence
 
         seq = db.query(DMSequence).filter(DMSequence.id == seq_id).first()
         if seq and seq.messages:

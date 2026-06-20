@@ -426,7 +426,7 @@ class ChannelService:
             seq_id = params.get("dm_sequence_id")
             if seq_id:
                 try:
-                    from app.db_models import DMSequence
+                    from app.db.models.content_collection import DMSequence
                     seq = db.query(DMSequence).filter(DMSequence.id == seq_id).first()
                     if seq and seq.messages:
                         params["dm_messages"] = seq.messages

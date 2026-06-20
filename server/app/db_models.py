@@ -12,7 +12,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 
 from app.db.models.device_operations import DevicePairRequest
-from app.db.models.content_collection import ContentTemplate, RepliedComment, SensitiveWord
+from app.db.models.content_collection import ContentTemplate, DMSequence, RepliedComment, SensitiveWord
 from app.db.models.creative_library import ReferenceCategory, ReferenceData
 from app.db.models.identity_access import User
 from app.db.models.model_configuration import AIModel
@@ -205,20 +205,6 @@ class ChannelItem(Base):
     account = relationship("Account")
     device = relationship("Device")
     task = relationship("Task")
-
-
-class DMSequence(Base):
-    """DM 私信序列模板 — 预设有序多条私信内容，前端全量自定义传入"""
-    __tablename__ = "dm_sequences"
-
-    id = Column(String(36), primary_key=True, default=_uuid)
-    name = Column(String(100), nullable=False)
-    messages = Column(JSON, nullable=False)             # [{order, content, delay_ms}, ...]
-    variants = Column(JSON, nullable=True)
-    industry = Column(String(50), nullable=True, index=True)
-    user_id = Column(String(36), ForeignKey("users.id"), nullable=True)
-    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
-    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
 
 
 class CollectedComment(Base):

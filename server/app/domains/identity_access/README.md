@@ -11,7 +11,8 @@ This domain owns admin and device authentication routes.
 - Shared JWT and role dependencies stay in `app.deps`.
 - Device secret verification stays with device-facing infrastructure and
   `device_operations`.
-- `User` and `Device` ORM model definitions stay in `app.db_models`.
+- `User` ORM lives in `app.db.models.identity_access`; `Device` remains in
+  `app.db_models` until the device/account graph moves.
 
 ## Current Modules
 
@@ -23,6 +24,7 @@ This domain owns admin and device authentication routes.
 | Facade | Target | Exit condition |
 |---|---|---|
 | `app.routers.auth` | `app.domains.identity_access.auth_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
+| `app.db_models.User` | `app.db.models.identity_access.User` | Keep as a compatibility re-export until production imports use the domain model path. |
 
 ## Boundaries
 

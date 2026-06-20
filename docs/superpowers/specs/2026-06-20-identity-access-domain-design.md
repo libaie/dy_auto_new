@@ -25,7 +25,8 @@ The migration keeps `app.routers.auth` as a compatibility facade.
 ## Non-Goals
 
 - Do not move shared JWT/token dependencies from `app.deps`.
-- Do not move `User` or `Device` ORM model definitions.
+- Keep `Device` in `app.db_models`; `User` can move later through a separate
+  ORM-boundary slice with a legacy re-export.
 - Do not change password hashing, token payloads, token expiry, role checks,
   rate-limit behavior, trusted-proxy IP selection, response shapes, route
   paths, route names, or auth dependencies.

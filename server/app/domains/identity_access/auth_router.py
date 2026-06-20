@@ -89,7 +89,7 @@ def login(request: LoginRequest, http_request: Request, db: Session = Depends(ge
     client_ip = _get_client_ip(http_request)
     _check_rate_limit(client_ip)
 
-    from app.db_models import User
+    from app.db.models.identity_access import User
     import bcrypt
 
     user = db.query(User).filter(User.username == request.username, User.status == "active").first()
@@ -116,7 +116,8 @@ def device_login(request: LoginRequest, http_request: Request, db: Session = Dep
     client_ip = _get_client_ip(http_request)
     _check_rate_limit(client_ip)
 
-    from app.db_models import User, Device
+    from app.db.models.identity_access import User
+    from app.db_models import Device
     import bcrypt, uuid as _uuid
 
     user = db.query(User).filter(User.username == request.username, User.status == "active").first()
@@ -148,7 +149,7 @@ def device_login(request: LoginRequest, http_request: Request, db: Session = Dep
 @router.post("/register")
 def register_user(request: RegisterRequest, user=Depends(require_role("admin")), db: Session = Depends(get_db)):
     """Create a new user (admin only)."""
-    from app.db_models import User
+    from app.db.models.identity_access import User
     import bcrypt
 
     existing = db.query(User).filter(User.username == request.username).first()
@@ -170,7 +171,7 @@ def register_user(request: RegisterRequest, user=Depends(require_role("admin")),
 @router.get("/users")
 def list_users(user=Depends(require_role("admin")), db: Session = Depends(get_db)):
     """List all users (admin only)."""
-    from app.db_models import User
+    from app.db.models.identity_access import User
     users = db.query(User).order_by(User.created_at.desc()).all()
     return {"users": [{"id": u.id, "username": u.username, "nickname": u.nickname,
                        "role": u.role, "status": u.status, "created_at": str(u.created_at)} for u in users]}

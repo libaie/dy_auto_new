@@ -14,6 +14,7 @@ from sqlalchemy.orm import relationship
 from app.db.models.device_operations import DevicePairRequest
 from app.db.models.content_collection import ContentTemplate, SensitiveWord
 from app.db.models.creative_library import ReferenceCategory, ReferenceData
+from app.db.models.identity_access import User
 from app.db.models.model_configuration import AIModel
 from app.db.models.prompt_management import PromptTemplate
 from app.db.models.quality_audit import AuditReport
@@ -321,19 +322,6 @@ class CollectedUser(Base):
     intended_city = Column(String(100), nullable=True)     # 意向城市
     intended_attraction = Column(String(200), nullable=True)  # 意向景点
     created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
-
-
-class User(Base):
-    __tablename__ = "users"
-
-    id = Column(String(36), primary_key=True, default=_uuid)
-    username = Column(String(50), unique=True, nullable=False, index=True)
-    password_hash = Column(String(128), nullable=False)
-    role = Column(String(20), nullable=False, default="operator")  # admin | operator
-    nickname = Column(String(100), nullable=True)
-    status = Column(String(20), nullable=False, default="active")  # active | disabled
-    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
-    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
 
 
 class Conversation(Base):

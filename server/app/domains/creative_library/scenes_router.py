@@ -9,7 +9,7 @@ from app.database import get_db
 from app.deps import verify_admin_token
 from app.db_models import Scene
 from app.services.ai_generator import ai_generator
-from app.services.asset_ai_rewrite_service import (
+from app.domains.creative_library.asset_ai_rewrite_service import (
     AssetAiRewriteError,
     generate_scene_rewrite_candidate,
 )

@@ -28,6 +28,8 @@ reference dictionaries, plus character and scene reference asset generation.
 - `asset_lifecycle_service.py` owns `AssetLifecycleError`, series
   delete/archive decisions, character/scene unlinking, and character/scene
   archive-or-delete behavior.
+- `asset_ai_rewrite_service.py` owns `AssetAiRewriteError`, character/scene
+  candidate-only rewrites, allowed field filtering, and AI output parsing.
 
 ## Facade Register
 
@@ -39,18 +41,20 @@ reference dictionaries, plus character and scene reference asset generation.
 | `app.services.reference_asset_service` | `app.domains.creative_library.reference_asset_service` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.anchor_service` | `app.domains.creative_library.anchor_service` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.asset_lifecycle_service` | `app.domains.creative_library.asset_lifecycle_service` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
+| `app.services.asset_ai_rewrite_service` | `app.domains.creative_library.asset_ai_rewrite_service` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 
 ## Boundaries
 
 - Keep series character/scene linking in `ai_video_series`.
-- Keep AI rewrite service bodies in `app.services.*` until a service-split plan
-  is approved.
+- Shared AI generation stays in `app.services.ai_generator`.
 - Non-domain service modules may keep importing
   `app.services.reference_asset_service` until their owning domains move.
 - Non-domain utility or service modules may keep importing
   `app.services.anchor_service` until their owning domains move.
 - Non-domain service modules may keep importing
   `app.services.asset_lifecycle_service` until their owning domains move.
+- Non-domain service modules may keep importing
+  `app.services.asset_ai_rewrite_service` until their owning domains move.
 - Keep ORM models in `app.db_models` during this route-boundary migration.
 - Keep startup reference data seeding behavior unchanged.
 
@@ -92,3 +96,13 @@ true:
   with tests for direct domain imports.
 - Domain-owned production modules import
   `app.domains.creative_library.asset_lifecycle_service` directly.
+
+Do not remove the legacy asset AI rewrite service facade until all of these are
+true:
+
+- `rg "app\.services\.asset_ai_rewrite_service" server/app server/tests`
+  returns only compatibility tests and migration docs.
+- `test_creative_library_asset_ai_rewrite_service_facade.py` has been replaced
+  with tests for direct domain imports.
+- Domain-owned production modules import
+  `app.domains.creative_library.asset_ai_rewrite_service` directly.

@@ -121,6 +121,52 @@ class ImageProductionCostEvent(Base):
     )
 
 
+class ImageProductionAbGroup(Base):
+    __tablename__ = "image_production_ab_groups"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    user_id = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    idempotency_key = Column(String(160), nullable=True)
+    source_request_hash = Column(String(80), nullable=False)
+    prompt_snapshot_json = Column(JSON, nullable=False, default=dict)
+    cost_confirmation_json = Column(JSON, nullable=True, default=dict)
+    winner_attempt_id = Column(String(36), nullable=True)
+    decision_json = Column(JSON, nullable=True, default=dict)
+    status = Column(String(30), nullable=False, default="running")
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
+    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
+
+    __table_args__ = (
+        UniqueConstraint("idempotency_key", name="uq_image_ab_group_idempotency_key"),
+        Index("idx_image_ab_groups_status", "status"),
+        Index("idx_image_ab_groups_created", "created_at"),
+        Index("idx_image_ab_groups_winner", "winner_attempt_id"),
+    )
+
+
+class ImageProductionAbAttempt(Base):
+    __tablename__ = "image_production_ab_attempts"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    group_id = Column(String(36), ForeignKey("image_production_ab_groups.id", ondelete="CASCADE"), nullable=False)
+    task_id = Column(String(36), ForeignKey("image_creation_tasks.id", ondelete="SET NULL"), nullable=True)
+    strategy_id = Column(String(36), nullable=False)
+    strategy_version = Column(Integer, nullable=False)
+    model_id = Column(String(120), nullable=True)
+    status = Column(String(30), nullable=False, default="creating")
+    metrics_snapshot_json = Column(JSON, nullable=True, default=dict)
+    human_decision_json = Column(JSON, nullable=True, default=dict)
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
+    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
+
+    __table_args__ = (
+        UniqueConstraint("group_id", "strategy_id", "strategy_version", name="uq_image_ab_attempt_strategy"),
+        Index("idx_image_ab_attempts_group", "group_id"),
+        Index("idx_image_ab_attempts_task", "task_id"),
+        Index("idx_image_ab_attempts_status", "status"),
+    )
+
+
 class ImageProductionMetric(Base):
     __tablename__ = "image_production_metrics"
 

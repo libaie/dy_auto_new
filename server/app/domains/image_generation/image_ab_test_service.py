@@ -11,12 +11,14 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.config import bj_now
-from app.db.models.image_production import ImageProductionStrategy
+from app.db.models.image_production import (
+    ImageProductionAbAttempt,
+    ImageProductionAbGroup,
+    ImageProductionStrategy,
+)
 from app.db_models import (
     ImageCreationAsset,
     ImageCreationTask,
-    ImageProductionAbAttempt,
-    ImageProductionAbGroup,
     ProductionAuditEvent,
 )
 from app.domains.image_generation.image_creation_errors import image_error

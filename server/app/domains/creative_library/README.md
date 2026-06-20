@@ -30,6 +30,9 @@ reference dictionaries, plus character and scene reference asset generation.
   archive-or-delete behavior.
 - `asset_ai_rewrite_service.py` owns `AssetAiRewriteError`, character/scene
   candidate-only rewrites, allowed field filtering, and AI output parsing.
+- `visual_style_inference_service.py` owns `infer_visual_style_from_story`,
+  story-text style inference, visual style merging, prompt constraint
+  appending, and stored prompt style matching.
 
 ## Facade Register
 
@@ -42,6 +45,7 @@ reference dictionaries, plus character and scene reference asset generation.
 | `app.services.anchor_service` | `app.domains.creative_library.anchor_service` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.asset_lifecycle_service` | `app.domains.creative_library.asset_lifecycle_service` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.asset_ai_rewrite_service` | `app.domains.creative_library.asset_ai_rewrite_service` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
+| `app.services.visual_style_inference_service` | `app.domains.creative_library.visual_style_inference_service` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 
 ## Boundaries
 
@@ -55,6 +59,9 @@ reference dictionaries, plus character and scene reference asset generation.
   `app.services.asset_lifecycle_service` until their owning domains move.
 - Non-domain service modules may keep importing
   `app.services.asset_ai_rewrite_service` until their owning domains move.
+- Non-domain service modules may keep importing
+  `app.services.visual_style_inference_service` until their owning domains
+  move.
 - Keep ORM models in `app.db_models` during this route-boundary migration.
 - Keep startup reference data seeding behavior unchanged.
 
@@ -106,3 +113,13 @@ true:
   with tests for direct domain imports.
 - Domain-owned production modules import
   `app.domains.creative_library.asset_ai_rewrite_service` directly.
+
+Do not remove the legacy visual style inference service facade until all of
+these are true:
+
+- `rg "app\.services\.visual_style_inference_service" server/app server/tests`
+  returns only compatibility tests and migration docs.
+- `test_creative_library_visual_style_service_facade.py` has been replaced
+  with tests for direct domain imports.
+- Domain-owned production modules import
+  `app.domains.creative_library.visual_style_inference_service` directly.

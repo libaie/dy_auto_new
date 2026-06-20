@@ -13,7 +13,7 @@ from sqlalchemy.orm.attributes import flag_modified
 from app.config import bj_now
 from app.db_models import Character, ImageCreationAsset, ImageCreationTask, Scene, Series, series_characters, series_scenes
 from app.domains.image_generation.image_creation_storage import configured_public_base_url
-from app.services.visual_style_inference_service import (
+from app.domains.creative_library.visual_style_inference_service import (
     append_visual_style_constraints,
     infer_visual_style_from_story,
     reference_prompt_matches_visual_style,

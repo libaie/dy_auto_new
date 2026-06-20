@@ -12,7 +12,7 @@ seeding helpers.
 - `AIModel` ORM model definitions stay in `app.db_models`.
 - Database session helpers stay in `app.database`.
 - Auth dependencies stay in `app.deps`.
-- Encryption helpers stay in `app.services.crypto`.
+- Encryption helpers stay in `app.domains.system_configuration.crypto`.
 - raw schema data stays in `app.data.model_schema_data`.
 - Pixelle, Seedance, and audit execution routes stay in their own domains or
   routers.
@@ -31,6 +31,8 @@ seeding helpers.
 - `runtime_model_config.py` owns `RuntimeModelConfigError`,
   `resolve_runtime_model_config`, `resolve_image_model_for_capability`,
   `_model_supports_capability`, and `redact_runtime_model_config`.
+- `migration.py` owns legacy Settings, Pixelle, and Seedance configuration
+  migration into `AIModel` rows.
 
 ## Facade Register
 
@@ -40,6 +42,7 @@ seeding helpers.
 | `app.services.model_schema` | `app.domains.model_configuration.model_schema` | Keep while legacy tests or callers import schema helpers from `app.services`; remove only after import inventory shows no production legacy imports. |
 | `app.services.model_registry` | `app.domains.model_configuration.model_registry` | Keep while `video_production_service` has an approved video production compatibility import; remove only after import inventory shows no production legacy imports. |
 | `app.services.runtime_model_config` | `app.domains.model_configuration.runtime_model_config` | Keep while dirty or not-yet-moved service modules have approved compatibility imports; remove only after import inventory shows no production legacy imports. |
+| `app.services.migration` | `app.domains.model_configuration.migration` | Keep while legacy tests or maintenance scripts import migration helpers from `app.services`; remove after import inventory is clean. |
 
 ## Boundaries
 

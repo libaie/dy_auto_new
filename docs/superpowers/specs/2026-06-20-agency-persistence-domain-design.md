@@ -38,11 +38,13 @@ task, or production-event behavior changes are included.
 ## Dependencies Kept In Place
 
 - ORM classes stay in `app.db_models`.
-- `record_production_event` stays in `app.services.production_observability`.
+- `record_production_event` is imported from
+  `app.domains.production_observability.production_observability_service`.
 - Creative patch creation stays in
   `app.services.agency_creative_patch_service`.
-- Repair classification and orchestration stay behind their existing imported
-  facades until those modules are migrated.
+- Repair classification and orchestration are imported directly from
+  `app.domains.agency_operations.agency_repair_classifier` and
+  `app.domains.agency_operations.agency_repair_orchestrator`.
 
 ## Verification
 

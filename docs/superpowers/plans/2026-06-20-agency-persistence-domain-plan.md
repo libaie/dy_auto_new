@@ -103,3 +103,39 @@ Expected: prints the app title.
 git add -f docs/superpowers/specs/2026-06-20-agency-persistence-domain-design.md docs/superpowers/plans/2026-06-20-agency-persistence-domain-plan.md server/tests/test_agency_persistence_facade.py server/app/domains/agency_operations/agency_persistence.py server/app/services/agency_persistence.py server/app/domains/agency_operations/README.md
 git commit --only docs/superpowers/specs/2026-06-20-agency-persistence-domain-design.md docs/superpowers/plans/2026-06-20-agency-persistence-domain-plan.md server/tests/test_agency_persistence_facade.py server/app/domains/agency_operations/agency_persistence.py server/app/services/agency_persistence.py server/app/domains/agency_operations/README.md -m "refactor: move agency persistence into domain"
 ```
+
+### Task 4: Remove Legacy Imports For Already-Migrated Helpers
+
+**Files:**
+
+- Modify: `server/app/domains/agency_operations/agency_persistence.py`
+- Test: `server/tests/test_agency_persistence_facade.py`
+
+- [ ] **Step 1: Add the failing boundary test**
+
+```python
+def test_agency_persistence_imports_already_migrated_helpers_from_domains():
+    text = DOMAIN_PATH.read_text(encoding="utf-8")
+    assert "from app.domains.production_observability.production_observability_service import record_production_event" in text
+    assert "from app.domains.agency_operations.agency_repair_classifier import classify_repair_tasks" in text
+    assert "from app.domains.agency_operations.agency_repair_orchestrator import enqueue_repair_tasks_for_invocation" in text
+    assert "app.services.production_observability" not in text
+    assert "app.services.agency_repair_classifier" not in text
+    assert "app.services.agency_repair_orchestrator" not in text
+```
+
+- [ ] **Step 2: Change only those imports**
+
+```python
+from app.domains.production_observability.production_observability_service import record_production_event
+from app.domains.agency_operations.agency_repair_classifier import classify_repair_tasks
+from app.domains.agency_operations.agency_repair_orchestrator import enqueue_repair_tasks_for_invocation
+```
+
+- [ ] **Step 3: Run focused verification**
+
+```powershell
+.\server\.venv\Scripts\python.exe -m pytest server/tests/test_agency_persistence_facade.py server/tests/test_agency_persistence.py -q
+```
+
+Expected: all selected tests pass.

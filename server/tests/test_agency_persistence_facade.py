@@ -35,6 +35,25 @@ def test_agency_persistence_domain_file_owns_invocation_persistence():
     assert "record_production_event" in text
 
 
+def test_agency_persistence_imports_already_migrated_helpers_from_domains():
+    text = DOMAIN_PATH.read_text(encoding="utf-8")
+    assert (
+        "from app.domains.production_observability.production_observability_service "
+        "import record_production_event"
+    ) in text
+    assert (
+        "from app.domains.agency_operations.agency_repair_classifier "
+        "import classify_repair_tasks"
+    ) in text
+    assert (
+        "from app.domains.agency_operations.agency_repair_orchestrator "
+        "import enqueue_repair_tasks_for_invocation"
+    ) in text
+    assert "app.services.production_observability" not in text
+    assert "app.services.agency_repair_classifier" not in text
+    assert "app.services.agency_repair_orchestrator" not in text
+
+
 def test_legacy_agency_persistence_is_thin_facade():
     text = LEGACY_PATH.read_text(encoding="utf-8")
     assert "app.domains.agency_operations import agency_persistence" in text

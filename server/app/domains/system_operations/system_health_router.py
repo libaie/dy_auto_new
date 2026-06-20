@@ -16,7 +16,7 @@ from app.db_models import (
     VideoReviewRecord,
 )
 from app.deps import verify_admin_token
-from app.services.provider_capability_service import capability_from_model_config
+from app.domains.video_production.provider_capability_service import capability_from_model_config
 from app.domains.video_production.provider_stage_executor import PROVIDER_SUBMIT_WORKER_COUNT_ENV
 
 

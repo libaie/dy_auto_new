@@ -9,7 +9,8 @@ from openpyxl import Workbook
 from sqlalchemy import Integer, asc, cast, desc, func, or_
 
 from app.config import bj_now
-from app.db_models import CollectedComment, CollectedUser, Conversation, Device, Task
+from app.db.models.content_collection import CollectedComment, CollectedUser, Conversation
+from app.db_models import Device, Task
 
 
 MAX_EXPORT_ROWS = 50000

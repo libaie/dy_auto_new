@@ -6,7 +6,7 @@ from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
 
 from app.config import bj_now
-from app.db_models import CollectedComment, CollectedUser
+from app.db.models.content_collection import CollectedComment, CollectedUser
 from app.domains.content_collection import realtime_events
 
 

@@ -102,7 +102,8 @@ this domain provides stable use cases and compatibility tests for that handoff.
 - `app.domains.content_collection.read_models` owns collected comment/user/conversation list and export payload shaping.
 - `app.domains.content_collection.content_service` owns `ContentService` template CRUD, sensitive-word CRUD/matching, variable substitution, and content-generation helpers.
 - `app.db.models.content_collection` owns the `ContentTemplate`,
-  `SensitiveWord`, `RepliedComment`, and `DMSequence` ORM class bodies.
+  `SensitiveWord`, `RepliedComment`, `DMSequence`, `CollectedComment`,
+  `CollectedUser`, and `Conversation` ORM class bodies.
 - `app.domains.content_collection.mutations` owns content template, sensitive-word, and DM sequence mutation orchestration.
 - `app.domains.content_collection.content_generation` owns content, keyword, regex, and clean-prompt generation calls.
 - `app.domains.content_collection.industry_profile_service` owns `load_profile`, `list_industries`, and DM industry compliance profile JSON loading from `server/app/data/industry_profiles`.
@@ -125,7 +126,7 @@ this domain provides stable use cases and compatibility tests for that handoff.
 | `app.services.dm_sequence_visibility` | `app.domains.content_collection.dm_sequence_visibility` | DM sequence visibility slice | `rg -n "app\.services\.dm_sequence_visibility" server/app -g "*.py"` returns only approved device bridge compatibility imports. |
 | `app.services.content_service` | `app.domains.content_collection.content_service` | Content service domain slice | Keep while `rg -n "app\.services\.content_service" server/app -g "*.py"` returns approved task/device/account bridge compatibility imports; remove only when that command returns no production imports. |
 | `app.services.industry_profile_service` | `app.domains.content_collection.industry_profile_service` | Industry profile domain slice | Remove only after import inventory shows no production imports of `app.services.industry_profile_service`. |
-| `app.db_models.ContentTemplate` / `SensitiveWord` / `RepliedComment` / `DMSequence` | `app.db.models.content_collection` | ORM boundary slice | Keep as compatibility re-exports until production imports use the domain model path. |
+| `app.db_models.ContentTemplate` / `SensitiveWord` / `RepliedComment` / `DMSequence` / `CollectedComment` / `CollectedUser` / `Conversation` | `app.db.models.content_collection` | ORM boundary slices | Keep as compatibility re-exports until production imports use the domain model path. |
 
 ## Migration Checklist
 

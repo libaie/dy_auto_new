@@ -4,7 +4,7 @@
 
 **Goal:** Add automated inventory gates for the remaining implementation files in `server/app/services`.
 
-**Architecture:** A pytest file scans direct files in `server/app/services`, treats files importing `app.domains` as compatibility facades, compares the remaining file names with a temporary allowlist, separately tracks mixed facades that still define top-level implementation, and validates a target-domain map for each remaining implementation file.
+**Architecture:** A pytest file scans git-tracked direct files in `server/app/services`, treats files importing `app.domains` as compatibility facades, compares the remaining file names with a temporary allowlist, separately tracks mixed facades that still define top-level implementation, and validates a target-domain map for each remaining implementation file.
 
 **Tech Stack:** Python stdlib `pathlib`, pytest.
 
@@ -97,7 +97,6 @@ EXPECTED_SERVICE_DOMAIN_TARGETS = {
     "production_queue_service.py": "video_production",
     "production_run_service.py": "video_production",
     "production_worker_service.py": "video_production",
-    "storyboard_image_service.py": "storyboard_images",
     "video_agency_team.py": "agency_operations",
     "video_production_readiness.py": "video_production",
 }
@@ -120,7 +119,72 @@ def test_service_implementation_targets_are_existing_domains():
 
 Expected: PASS.
 
-### Task 4: Record Mixed Facade Debt
+### Task 4: Ignore Untracked Service Drafts
+
+**Files:**
+
+- Modify: `server/tests/test_service_implementation_inventory.py`
+
+- [ ] **Step 1: Add the failing untracked-file test**
+
+```python
+import subprocess
+
+
+def test_non_facade_inventory_ignores_untracked_files():
+    assert _non_facade_service_files() <= _tracked_service_file_names()
+
+
+def _tracked_service_file_names() -> set[str]:
+    result = subprocess.run(
+        ["git", "ls-files", "--", "server/app/services/*.py"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        check=True,
+        text=True,
+    )
+    return {Path(line).name for line in result.stdout.splitlines()}
+```
+
+- [ ] **Step 2: Run red**
+
+```powershell
+.\server\.venv\Scripts\python.exe -m pytest server/tests/test_service_implementation_inventory.py -q
+```
+
+Expected: FAIL when the local worktree has an untracked service file such as
+`storyboard_image_service.py`.
+
+- [ ] **Step 3: Scan tracked files only**
+
+```python
+def _tracked_service_file_names() -> set[str]:
+    return {path.name for path in _tracked_service_files()}
+
+
+def _tracked_service_files() -> list[Path]:
+    result = subprocess.run(
+        ["git", "ls-files", "--", "server/app/services/*.py"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        check=True,
+        text=True,
+    )
+    return [REPO_ROOT / line for line in result.stdout.splitlines()]
+```
+
+Use `_tracked_service_files()` in `_non_facade_service_files()` and
+`_mixed_facade_implementation_files()`.
+
+- [ ] **Step 4: Run green**
+
+```powershell
+.\server\.venv\Scripts\python.exe -m pytest server/tests/test_service_implementation_inventory.py -q
+```
+
+Expected: PASS.
+
+### Task 5: Record Mixed Facade Debt
 
 **Files:**
 
@@ -184,7 +248,7 @@ EXPECTED_MIXED_FACADE_SERVICE_FILES = {
 
 Expected: PASS.
 
-### Task 5: Commit
+### Task 6: Commit
 
 **Files:**
 

@@ -13,14 +13,16 @@ This domain owns storyboard frame image task and promoted image asset routes.
 
 - Database session helpers stay in `app.database`.
 - Auth dependencies stay in `app.deps`.
-- Storyboard image task creation, state listing, and asset promotion logic stay
-  in `app.services.storyboard_image_service`.
+- Storyboard image task creation, state listing, and asset promotion logic live
+  in `app.domains.storyboard_images.storyboard_image_service`.
 
 ## Current Modules
 
 - `storyboard_images_router.py` owns `StoryboardImageTaskRequest`,
   `PromoteStoryboardImageRequest`, `_auth_user_id`, and all
   `/api/storyboard-images/*` route handlers.
+- `storyboard_image_service.py` owns storyboard frame image task creation,
+  state listing, and promotion to video assets.
 
 ## Facade Register
 

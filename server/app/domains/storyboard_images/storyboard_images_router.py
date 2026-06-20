@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.deps import require_role
-from app.services.storyboard_image_service import (
+from app.domains.storyboard_images.storyboard_image_service import (
     create_missing_storyboard_image_tasks,
     create_storyboard_frame_image_task,
     list_storyboard_image_state,

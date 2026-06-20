@@ -1,4 +1,5 @@
 import ast
+import subprocess
 from pathlib import Path
 
 
@@ -19,7 +20,6 @@ EXPECTED_NON_FACADE_SERVICE_FILES = {
     "production_queue_service.py",
     "production_run_service.py",
     "production_worker_service.py",
-    "storyboard_image_service.py",
     "video_agency_team.py",
     "video_production_readiness.py",
 }
@@ -41,7 +41,6 @@ EXPECTED_SERVICE_DOMAIN_TARGETS = {
     "production_queue_service.py": "video_production",
     "production_run_service.py": "video_production",
     "production_worker_service.py": "video_production",
-    "storyboard_image_service.py": "storyboard_images",
     "video_agency_team.py": "agency_operations",
     "video_production_readiness.py": "video_production",
 }
@@ -49,6 +48,10 @@ EXPECTED_SERVICE_DOMAIN_TARGETS = {
 
 def test_service_implementation_inventory_matches_allowlist():
     assert _non_facade_service_files() == EXPECTED_NON_FACADE_SERVICE_FILES
+
+
+def test_non_facade_inventory_ignores_untracked_files():
+    assert _non_facade_service_files() <= _tracked_service_file_names()
 
 
 def test_mixed_facade_implementation_inventory_matches_allowlist():
@@ -71,7 +74,7 @@ def test_service_implementation_targets_are_existing_domains():
 
 def _non_facade_service_files() -> set[str]:
     files = set()
-    for path in SERVICES_ROOT.glob("*.py"):
+    for path in _tracked_service_files():
         if path.name == "__init__.py":
             continue
         text = path.read_text(encoding="utf-8")
@@ -83,7 +86,7 @@ def _non_facade_service_files() -> set[str]:
 
 def _mixed_facade_implementation_files() -> set[str]:
     files = set()
-    for path in SERVICES_ROOT.glob("*.py"):
+    for path in _tracked_service_files():
         if path.name == "__init__.py":
             continue
         text = path.read_text(encoding="utf-8")
@@ -101,3 +104,18 @@ def _mixed_facade_implementation_files() -> set[str]:
 
 def _imports_domains(text: str) -> bool:
     return "from app.domains" in text or "import app.domains" in text
+
+
+def _tracked_service_file_names() -> set[str]:
+    return {path.name for path in _tracked_service_files()}
+
+
+def _tracked_service_files() -> list[Path]:
+    result = subprocess.run(
+        ["git", "ls-files", "--", "server/app/services/*.py"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        check=True,
+        text=True,
+    )
+    return [REPO_ROOT / line for line in result.stdout.splitlines()]

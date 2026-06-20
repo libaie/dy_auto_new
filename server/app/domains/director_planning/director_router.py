@@ -473,7 +473,7 @@ def create_episode_production_plan_endpoint(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    from app.services.production_plan_service import ensure_episode_production_plan
+    from app.domains.video_production.production_plan_service import ensure_episode_production_plan
 
     try:
         plan = ensure_episode_production_plan(
@@ -506,7 +506,7 @@ def create_episode_plan_endpoint(
     user = Depends(verify_admin_token),
 ):
     from app.db_models import ProductionEpisode
-    from app.services.production_plan_service import ensure_episode_production_plan, ensure_shot_segments
+    from app.domains.video_production.production_plan_service import ensure_episode_production_plan, ensure_shot_segments
 
     try:
         plan = ensure_episode_production_plan(
@@ -546,7 +546,7 @@ def create_shot_segments_endpoint(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    from app.services.production_plan_service import ensure_shot_segments
+    from app.domains.video_production.production_plan_service import ensure_shot_segments
 
     try:
         segments = ensure_shot_segments(db, body.production_episode_id, body.preferred_segment_seconds)

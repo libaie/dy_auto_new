@@ -46,6 +46,9 @@ This domain owns the video production control-plane HTTP routes.
 - `production_status_aggregation.py` owns `_parent_status` and
   `recompute_from_segment`, which roll segment status changes up to shots,
   scenes, episodes, and plans.
+- `production_plan_service.py` owns `create_episode_production_plan`,
+  `ensure_episode_production_plan`, and `ensure_shot_segments` for converting
+  locked style and episode storyboards into production plans.
 - `production_tree_service.py` owns `get_run_tree` and tree payload helpers for
   plan and run production hierarchy endpoints.
 - `review_asset_edit_service.py` owns `ReviewAssetEditError`,
@@ -94,6 +97,7 @@ This domain owns the video production control-plane HTTP routes.
 | `app.services.production_segment_service` | `app.domains.video_production.production_segment_service` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.production_status` | `app.domains.video_production.production_status` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, approved cross-domain consumers, or service modules whose domains have not moved yet. |
 | `app.services.production_status_aggregation` | `app.domains.video_production.production_status_aggregation` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
+| `app.services.production_plan_service` | `app.domains.video_production.production_plan_service` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.production_tree_service` | `app.domains.video_production.production_tree_service` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.review_asset_edit_service` | `app.domains.video_production.review_asset_edit_service` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.video_production_state` | `app.domains.video_production.video_production_state` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, approved cross-domain consumers, or service modules whose domains have not moved yet. |
@@ -185,6 +189,14 @@ Do not remove the legacy production status aggregation facade until all of these
 - `test_video_production_status_aggregation_facade.py` has been replaced with tests for direct domain imports.
 - Domain-owned production modules import `app.domains.video_production.production_status_aggregation` directly.
 - Direct domain status aggregation coverage proves `recompute_from_segment` behavior without legacy imports.
+
+Do not remove the legacy production plan service facade until all of these are true:
+
+- `rg "app\.services\.production_plan_service" server/app server/tests` returns only compatibility tests, migration docs, or service modules whose domains have not moved yet.
+- `test_video_production_plan_service_facade.py` has been replaced with tests for direct domain imports.
+- Domain-owned production modules import `app.domains.video_production.production_plan_service` directly.
+- Direct domain production plan coverage proves `create_episode_production_plan`
+  and `ensure_shot_segments` behavior without legacy imports.
 
 Do not remove the legacy production tree service facade until all of these are true:
 

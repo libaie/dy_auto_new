@@ -43,7 +43,8 @@ Use the established facade-first migration pattern:
 - Expert-review orchestration in `app.services.agency_orchestrator`.
 - AI text artifact persistence internals in
   `app.services.ai_text_artifact_service`.
-- Production plan row construction in `app.services.production_plan_service`.
+- Production plan row construction in
+  `app.domains.video_production.production_plan_service`.
 - Pipeline execution, video rendering, or style-lock ownership.
 
 ## Compatibility Contract

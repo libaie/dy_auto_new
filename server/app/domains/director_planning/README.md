@@ -16,7 +16,8 @@ This domain owns director workshop and episode production planning routes.
 - Agency review orchestration stays in `app.services.agency_orchestrator`.
 - AI text artifact persistence internals stay in
   `app.services.ai_text_artifact_service`.
-- Production plan row construction stays in `app.services.production_plan_service`.
+- Production plan row construction stays in
+  `app.domains.video_production.production_plan_service`.
 - Pipeline execution and video rendering stay in their own domains and services.
 
 ## Current Modules

@@ -45,6 +45,8 @@ def test_ai_video_series_model_facade_reexports_legacy_classes():
     assert models.VideoProductionRun is VideoProductionRun
     assert models.series_characters is series_characters
     assert models.series_scenes is series_scenes
+    assert models.Series.__module__ == "app.db.models.ai_video_series"
+    assert models.Episode.__module__ == "app.db.models.ai_video_series"
 
 
 def test_ai_video_series_model_facade_uses_one_metadata_object():
@@ -81,6 +83,7 @@ def test_ai_video_series_model_boundary_imports_in_clean_process():
         "from app.db.models.ai_video_series import ProductionJob, Series; "
         "import app.db_models as legacy; "
         "assert legacy.Series is Series; "
+        "assert Series.__module__ == 'app.db.models.ai_video_series'; "
         "assert legacy.ProductionJob is ProductionJob"
     )
     result = subprocess.run(

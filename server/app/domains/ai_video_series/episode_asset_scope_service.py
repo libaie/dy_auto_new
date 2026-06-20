@@ -5,7 +5,8 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.db_models import Character, Episode, Scene, Series
+from app.db.models.ai_video_series import Episode, Series
+from app.db.models.creative_library import Character, Scene
 
 
 GENERATED_ASSET_SOURCE = "episode_story_planning"

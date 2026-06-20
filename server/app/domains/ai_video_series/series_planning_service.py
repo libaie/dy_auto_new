@@ -8,7 +8,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
-from app.db_models import Episode, Series
+from app.db.models.ai_video_series import Episode, Series
 from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
 from app.domains.ai_video_series.episode_asset_scope_service import normalize_episode_asset_scope
 from app.domains.ai_video_series.story_generator_expert import generate_story_plan_with_expert

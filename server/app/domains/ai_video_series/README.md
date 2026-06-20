@@ -36,6 +36,12 @@ This domain will own the multi-episode AI video series business flow.
 | `app.services.story_generator_expert` | `app.domains.ai_video_series.story_generator_expert` | PR5 | Production code and tests import the domain story generator expert path directly, except explicit compatibility tests. |
 | `app.db_models` series ORM names | `app.db.models.ai_video_series` | PR4 | All production code imports series/video-series ORM names through `app.db.models.ai_video_series`; tests still prove legacy imports. |
 
+## Series Episode ORM Boundary
+
+- `app.db.models.ai_video_series` owns `Series`, `Episode`, `series_characters`, and `series_scenes`.
+- `app.db_models` keeps compatibility re-exports for legacy callers.
+- Production ORM names that still live in `app.db_models` remain lazy compatibility exports from `app.db.models.ai_video_series` until their own boundary plans move them.
+
 ## Migration Checklist
 
 1. Add skeleton and tests without behavior changes.

@@ -331,7 +331,7 @@ async def run_asset_multimodal_review(
     db: Session = Depends(get_db),
     _=Depends(require_role("admin")),
 ):
-    from app.services.agency_multimodal_review import run_multimodal_asset_review
+    from app.domains.agency_operations.agency_multimodal_review import run_multimodal_asset_review
 
     trace = await run_multimodal_asset_review(db, asset_id)
     return {"ok": True, "trace": trace}

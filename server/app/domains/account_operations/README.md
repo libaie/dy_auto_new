@@ -90,6 +90,7 @@ business use cases remain in `content_collection`.
 - `app.domains.account_operations.account_use_cases` owns account CRUD and account status behavior.
 - `app.domains.account_operations.group_use_cases` owns account group CRUD and membership add/remove behavior.
 - `app.domains.account_operations.channel_use_cases` owns channel CRUD, channel item mutation, batch item edits, and channel status transitions.
+- `app.domains.account_operations.channel_service` owns `ChannelService` channel creation, item claim/recovery, quota/risk-control handling, and channel stats.
 - `app.domains.account_operations.chain_use_cases` owns chain template CRUD and chain instance create/list/detail/cancel/retry orchestration.
 - `app.domains.account_operations.chain_service` owns `ChainService` chain instance orchestration, step task creation, and chain advancement.
 - `app.domains.account_operations.realtime_events` owns `accounts_changed`, `account_groups_changed`, `channels_changed`, `chains_changed`, and `new_task_available` websocket helper calls.
@@ -106,6 +107,7 @@ business use cases remain in `content_collection`.
 | `app.routers.channels` | `app.domains.account_operations.channels_router` | Planned PR3 | Channel API, edit, model, service, and notification tests pass with the domain router. |
 | `app.routers.chains` | `app.domains.account_operations.chains_router` | Planned PR3 | Chain API, chain service, task compatibility, and device cancel notification tests pass with the domain router. |
 | `app.services.chain_service` | `app.domains.account_operations.chain_service` | Chain service domain slice | Keep while `rg -n "app\.services\.chain_service" server/app -g "*.py"` returns the approved `task_service` compatibility import; remove only when that command returns no production imports. |
+| `app.services.channel_service` | `app.domains.account_operations.channel_service` | Channel service domain slice | Keep while `rg -n "app\.services\.channel_service" server/app -g "*.py"` returns approved task/device bridge compatibility imports; remove only when that command returns no production imports. |
 
 ## Migration Checklist
 

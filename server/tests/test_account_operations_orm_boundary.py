@@ -6,34 +6,51 @@ from app.db_models import Account as LegacyAccount
 from app.db_models import AccountGroup as LegacyAccountGroup
 from app.db_models import AccountGroupMember as LegacyAccountGroupMember
 from app.db_models import Base
+from app.db_models import ChainInstance as LegacyChainInstance
+from app.db_models import ChainTemplate as LegacyChainTemplate
 
 
 SERVER_ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_account_operations_model_boundary_reexports_account_models():
-    from app.db.models.account_operations import Account, AccountGroup, AccountGroupMember
+    from app.db.models.account_operations import (
+        Account,
+        AccountGroup,
+        AccountGroupMember,
+        ChainInstance,
+        ChainTemplate,
+    )
 
     assert Account is LegacyAccount
     assert AccountGroup is LegacyAccountGroup
     assert AccountGroupMember is LegacyAccountGroupMember
+    assert ChainInstance is LegacyChainInstance
+    assert ChainTemplate is LegacyChainTemplate
     assert Account.metadata is Base.metadata
     assert AccountGroup.metadata is Base.metadata
     assert AccountGroupMember.metadata is Base.metadata
+    assert ChainInstance.metadata is Base.metadata
+    assert ChainTemplate.metadata is Base.metadata
     assert "accounts" in Base.metadata.tables
     assert "account_groups" in Base.metadata.tables
     assert "account_group_members" in Base.metadata.tables
+    assert "chain_instances" in Base.metadata.tables
+    assert "chain_templates" in Base.metadata.tables
 
 
 def test_account_operations_model_boundary_imports_in_clean_process():
     code = (
         "import app.db_models as legacy; "
-        "from app.db.models.account_operations import Account, AccountGroup, AccountGroupMember; "
+        "from app.db.models.account_operations import Account, AccountGroup, AccountGroupMember, ChainInstance, ChainTemplate; "
         "assert legacy.Account is Account; "
         "assert legacy.AccountGroup is AccountGroup; "
         "assert legacy.AccountGroupMember is AccountGroupMember; "
+        "assert legacy.ChainInstance is ChainInstance; "
+        "assert legacy.ChainTemplate is ChainTemplate; "
         "assert 'accounts' in legacy.Base.metadata.tables; "
-        "assert 'account_group_members' in legacy.Base.metadata.tables"
+        "assert 'account_group_members' in legacy.Base.metadata.tables; "
+        "assert 'chain_templates' in legacy.Base.metadata.tables"
     )
     result = subprocess.run(
         [sys.executable, "-c", code],

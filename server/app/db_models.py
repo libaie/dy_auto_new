@@ -12,7 +12,13 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 
 from app.db.models.ai_text_artifacts import AITextArtifact, AITextArtifactConsumer
-from app.db.models.account_operations import Account, AccountGroup, AccountGroupMember
+from app.db.models.account_operations import (
+    Account,
+    AccountGroup,
+    AccountGroupMember,
+    ChainInstance,
+    ChainTemplate,
+)
 from app.db.models.device_operations import Device, DevicePairRequest
 from app.db.models.content_collection import (
     CollectedComment,
@@ -73,41 +79,6 @@ class Task(Base):
     account = relationship("Account", back_populates="tasks")
     device = relationship("Device", back_populates="tasks")
     chain_instance = relationship("ChainInstance", back_populates="tasks")
-
-
-class ChainTemplate(Base):
-    __tablename__ = "chain_templates"
-
-    id = Column(String(36), primary_key=True, default=_uuid)
-    name = Column(String(100), nullable=False)
-    description = Column(String(500), nullable=True, default="")
-    user_id = Column(String(36), ForeignKey("users.id"), nullable=True)
-    steps = Column(JSON, nullable=False)  # [{step_order, type, label, params}, ...]
-    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
-    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
-
-    instances = relationship("ChainInstance", back_populates="template")
-
-
-class ChainInstance(Base):
-    __tablename__ = "chain_instances"
-
-    id = Column(String(36), primary_key=True, default=_uuid)
-    template_id = Column(String(36), ForeignKey("chain_templates.id", ondelete="RESTRICT"), nullable=False)
-    account_id = Column(String(36), ForeignKey("accounts.id", ondelete="RESTRICT"), nullable=False)
-    device_id = Column(String(36), ForeignKey("devices.id"), nullable=True)
-    user_id = Column(String(36), ForeignKey("users.id"), nullable=True)
-    current_step = Column(Integer, nullable=False, default=1)
-    total_steps = Column(Integer, nullable=False)
-    status = Column(String(20), nullable=False, default="pending")  # pending, running, completed, failed, cancelled
-    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
-    started_at = Column(DateTime, nullable=True)
-    completed_at = Column(DateTime, nullable=True)
-
-    template = relationship("ChainTemplate", back_populates="instances")
-    account = relationship("Account")
-    device = relationship("Device")
-    tasks = relationship("Task", back_populates="chain_instance")
 
 
 class Channel(Base):

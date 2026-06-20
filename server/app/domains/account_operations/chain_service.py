@@ -8,10 +8,8 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from app.db_models import (
-    ChainTemplate, ChainInstance, Task as DBTask, Device,
-)
-from app.db.models.account_operations import Account, AccountGroupMember
+from app.db.models.account_operations import Account, AccountGroupMember, ChainInstance, ChainTemplate
+from app.db_models import Task as DBTask, Device
 from app.models import TaskType
 
 logger = logging.getLogger(__name__)

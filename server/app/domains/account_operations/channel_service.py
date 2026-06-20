@@ -6,11 +6,8 @@ from typing import Optional
 from sqlalchemy import update, and_, exists, select, or_
 from sqlalchemy.orm import Session
 
-from app.db_models import (
-    Channel, ChannelItem,
-    Task as DBTask, Device as DBDevice,
-)
-from app.db.models.account_operations import Account, AccountGroup, AccountGroupMember
+from app.db.models.account_operations import Account, AccountGroup, AccountGroupMember, Channel, ChannelItem
+from app.db_models import Task as DBTask, Device as DBDevice
 from app.models import TaskStatus
 
 

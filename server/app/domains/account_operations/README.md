@@ -96,7 +96,8 @@ business use cases remain in `content_collection`.
 - `app.domains.account_operations.realtime_events` owns `accounts_changed`, `account_groups_changed`, `channels_changed`, `chains_changed`, and `new_task_available` websocket helper calls.
 - `app.domains.account_operations.adapters` owns narrow adapter calls into current ORM sessions, `channel_service`, `chain_service`, and `task_service`.
 - `app.db.models.account_operations` owns the `Account`, `AccountGroup`,
-  `AccountGroupMember`, `ChainTemplate`, and `ChainInstance` ORM class bodies.
+  `AccountGroupMember`, `ChainTemplate`, `ChainInstance`, `Channel`, and
+  `ChannelItem` ORM class bodies.
 - `server/app/routers/tasks.py` remains outside this domain unless a separate task-domain or chain-task adapter plan approves it.
 - Domain non-router use-case modules must avoid FastAPI imports unless they are route assembly modules.
 
@@ -110,7 +111,7 @@ business use cases remain in `content_collection`.
 | `app.routers.chains` | `app.domains.account_operations.chains_router` | Planned PR3 | Chain API, chain service, task compatibility, and device cancel notification tests pass with the domain router. |
 | `app.services.chain_service` | `app.domains.account_operations.chain_service` | Chain service domain slice | Keep while `rg -n "app\.services\.chain_service" server/app -g "*.py"` returns the approved `task_service` compatibility import; remove only when that command returns no production imports. |
 | `app.services.channel_service` | `app.domains.account_operations.channel_service` | Channel service domain slice | Keep while `rg -n "app\.services\.channel_service" server/app -g "*.py"` returns approved task/device bridge compatibility imports; remove only when that command returns no production imports. |
-| `app.db_models.Account` / `AccountGroup` / `AccountGroupMember` / `ChainTemplate` / `ChainInstance` | `app.db.models.account_operations` | ORM boundary slices | Keep as compatibility re-exports until production imports use the domain model path. |
+| `app.db_models.Account` / `AccountGroup` / `AccountGroupMember` / `ChainTemplate` / `ChainInstance` / `Channel` / `ChannelItem` | `app.db.models.account_operations` | ORM boundary slices | Keep as compatibility re-exports until production imports use the domain model path. |
 
 ## Migration Checklist
 

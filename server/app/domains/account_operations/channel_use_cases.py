@@ -1,7 +1,7 @@
 """Channel CRUD and item mutation use cases."""
 
-from app.db.models.account_operations import Account, AccountGroup
-from app.db_models import ChannelItem, Device
+from app.db.models.account_operations import Account, AccountGroup, ChannelItem
+from app.db_models import Device
 
 from .adapters import channel_service
 from .read_models import channel_item_to_response, channel_to_response

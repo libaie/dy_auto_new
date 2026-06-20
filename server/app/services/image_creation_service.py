@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import sys
 
+# approved image creation service compatibility import: app.services.image_creation_storage
+# approved image creation service compatibility import: app.services.image_production_cost_service
 from app.domains.image_generation import image_creation_service as _domain_module
 
 

@@ -42,6 +42,7 @@ from app.db.models.creative_library import (
 from app.db.models.identity_access import User
 from app.db.models.image_production import (
     ImageSelectionPreview,
+    ImageProductionCostEvent,
     ImageProductionMetric,
     ImageProductionPolicyVersion,
     ImageProductionStrategy,
@@ -327,36 +328,6 @@ class ImageCreationAsset(Base):
         Index("idx_image_assets_group", "group_id", "group_index"),
         Index("idx_image_assets_source", "source_asset_id"),
         Index("idx_image_assets_latest", "is_latest"),
-    )
-
-
-class ImageProductionCostEvent(Base):
-    __tablename__ = "image_production_cost_events"
-
-    id = Column(String(36), primary_key=True, default=_uuid)
-    event_key = Column(String(220), nullable=False)
-    task_id = Column(String(36), ForeignKey("image_creation_tasks.id", ondelete="CASCADE"), nullable=False)
-    asset_id = Column(String(36), ForeignKey("image_creation_assets.id", ondelete="SET NULL"), nullable=True)
-    event_type = Column(String(30), nullable=False)
-    stage = Column(String(40), nullable=False, default="image_generation")
-    strategy_id = Column(String(36), nullable=True)
-    strategy_version = Column(Integer, nullable=True)
-    model_id = Column(String(120), nullable=True)
-    provider = Column(String(80), nullable=True)
-    provider_task_id = Column(String(120), nullable=True)
-    estimated_cost = Column(Float, nullable=False, default=0.0)
-    actual_cost = Column(Float, nullable=False, default=0.0)
-    currency = Column(String(10), nullable=False, default="CNY")
-    units_json = Column(JSON, nullable=True, default=dict)
-    estimate_source = Column(String(40), nullable=False, default="policy")
-    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
-
-    __table_args__ = (
-        UniqueConstraint("event_key", name="uq_image_cost_event_key"),
-        Index("idx_image_cost_events_task", "task_id"),
-        Index("idx_image_cost_events_event_type", "event_type"),
-        Index("idx_image_cost_events_strategy", "strategy_id", "strategy_version"),
-        Index("idx_image_cost_events_created", "created_at"),
     )
 
 

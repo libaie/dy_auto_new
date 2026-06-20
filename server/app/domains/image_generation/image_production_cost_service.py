@@ -5,7 +5,8 @@ from typing import Any
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.db_models import ImageCreationTask, ImageProductionCostEvent
+from app.db.models.image_production import ImageProductionCostEvent
+from app.db_models import ImageCreationTask
 
 
 def _usage_from_provider_response(task: ImageCreationTask) -> dict[str, Any]:

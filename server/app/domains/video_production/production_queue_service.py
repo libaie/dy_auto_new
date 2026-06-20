@@ -5,8 +5,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.config import bj_now
-from app.db.models.video_production import ProductionPlan
-from app.db_models import ProductionJob
+from app.db.models.video_production import ProductionJob, ProductionPlan
 from app.domains.video_production.production_status import (
     JOB_BLOCKED,
     JOB_CANCELLED,

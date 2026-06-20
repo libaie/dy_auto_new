@@ -9,8 +9,8 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.config import PIXELLE_CONFIG_PATH, bj_now
-from app.db.models.video_production import ProductionSegment
-from app.db_models import ProductionJob, VideoProductionRun
+from app.db.models.video_production import ProductionJob, ProductionSegment
+from app.db_models import VideoProductionRun
 from app.domains.agency_operations.agency_creative_patch_service import unresolved_patch_gate
 from app.domains.agency_operations.agency_repair_executor import execute_repair_job, is_agency_repair_stage
 from app.domains.model_configuration.runtime_model_config import resolve_runtime_model_config

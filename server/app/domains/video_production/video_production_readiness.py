@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 
-from app.db_models import ProductionJob
+from app.db.models.video_production import ProductionJob
 from app.domains.video_production.production_status import JOB_BLOCKED
 
 from app.domains.video_production.video_production_run_types import get_run_type

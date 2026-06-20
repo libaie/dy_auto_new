@@ -3,7 +3,7 @@
 from app.config import bj_now
 from app.db.base import Base, _uuid
 
-from sqlalchemy import Column, DateTime, Float, ForeignKey, Index, Integer, JSON, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Index, Integer, JSON, String, Text, UniqueConstraint
 
 
 class ProductionPlan(Base):
@@ -127,6 +127,45 @@ class ProductionSegment(Base):
     video_prompt = Column(Text, nullable=False, default="")
     narration = Column(Text, nullable=True)
     reference_roles_json = Column(JSON, nullable=False, default=list)
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
+    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
+
+
+class ProductionJob(Base):
+    __tablename__ = "production_jobs"
+    __table_args__ = (
+        UniqueConstraint("idempotency_key", name="uq_production_jobs_idempotency_key"),
+        Index("idx_production_jobs_plan_id", "plan_id"),
+        Index("idx_production_jobs_target", "target_type", "target_id"),
+        Index("idx_production_jobs_status", "status"),
+        Index("idx_production_jobs_plan_status_resume", "plan_id", "status", "resume_status"),
+        Index("idx_production_jobs_plan_stage_status", "plan_id", "stage", "status"),
+        Index("idx_production_jobs_stage_created_at", "stage", "created_at"),
+    )
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    plan_id = Column(String(36), ForeignKey("production_plans.id", ondelete="CASCADE"), nullable=False)
+    target_type = Column(String(30), nullable=False)
+    target_id = Column(String(36), nullable=False)
+    stage = Column(String(80), nullable=False)
+    status = Column(String(30), nullable=False, default="queued")
+    provider_task_id = Column(String(120), nullable=True)
+    attempt_count = Column(Integer, nullable=False, default=0)
+    max_attempts = Column(Integer, nullable=False, default=3)
+    retry_after = Column(DateTime, nullable=True)
+    lease_id = Column(String(80), nullable=True)
+    leased_until = Column(DateTime, nullable=True)
+    priority = Column(Integer, nullable=False, default=100)
+    scheduled_at = Column(DateTime, nullable=False, default=lambda: bj_now())
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    error_code = Column(String(80), nullable=True)
+    error_message = Column(Text, nullable=True)
+    retryable = Column(Boolean, nullable=False, default=True)
+    idempotency_key = Column(String(200), nullable=False)
+    resume_status = Column(String(30), nullable=True)
+    blocked_reason = Column(String(120), nullable=True)
+    paused_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
     updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
 

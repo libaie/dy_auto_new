@@ -5,6 +5,7 @@ from pathlib import Path
 from app.db_models import (
     Base,
     ProductionEpisode as LegacyProductionEpisode,
+    ProductionJob as LegacyProductionJob,
     ProductionPlan as LegacyProductionPlan,
     ProductionPlanVersion as LegacyProductionPlanVersion,
     ProductionScene as LegacyProductionScene,
@@ -20,6 +21,7 @@ SERVER_ROOT = Path(__file__).resolve().parents[1]
 def test_video_production_model_boundary_reexports_video_collection():
     from app.db.models.video_production import (
         ProductionEpisode,
+        ProductionJob,
         ProductionPlan,
         ProductionPlanVersion,
         ProductionScene,
@@ -29,6 +31,7 @@ def test_video_production_model_boundary_reexports_video_collection():
     )
 
     assert ProductionEpisode is LegacyProductionEpisode
+    assert ProductionJob is LegacyProductionJob
     assert ProductionPlan is LegacyProductionPlan
     assert ProductionPlanVersion is LegacyProductionPlanVersion
     assert ProductionScene is LegacyProductionScene
@@ -36,6 +39,7 @@ def test_video_production_model_boundary_reexports_video_collection():
     assert ProductionShot is LegacyProductionShot
     assert VideoCollection is LegacyVideoCollection
     assert ProductionEpisode.metadata is Base.metadata
+    assert ProductionJob.metadata is Base.metadata
     assert ProductionPlan.metadata is Base.metadata
     assert ProductionPlanVersion.metadata is Base.metadata
     assert ProductionScene.metadata is Base.metadata
@@ -43,12 +47,14 @@ def test_video_production_model_boundary_reexports_video_collection():
     assert ProductionShot.metadata is Base.metadata
     assert VideoCollection.metadata is Base.metadata
     assert ProductionEpisode.__module__ == "app.db.models.video_production"
+    assert ProductionJob.__module__ == "app.db.models.video_production"
     assert ProductionPlan.__module__ == "app.db.models.video_production"
     assert ProductionPlanVersion.__module__ == "app.db.models.video_production"
     assert ProductionScene.__module__ == "app.db.models.video_production"
     assert ProductionSegment.__module__ == "app.db.models.video_production"
     assert ProductionShot.__module__ == "app.db.models.video_production"
     assert "production_episodes" in Base.metadata.tables
+    assert "production_jobs" in Base.metadata.tables
     assert "production_plans" in Base.metadata.tables
     assert "production_plan_versions" in Base.metadata.tables
     assert "production_scenes" in Base.metadata.tables
@@ -60,8 +66,9 @@ def test_video_production_model_boundary_reexports_video_collection():
 def test_video_production_model_boundary_imports_in_clean_process():
     code = (
         "import app.db_models as legacy; "
-        "from app.db.models.video_production import ProductionEpisode, ProductionPlan, ProductionPlanVersion, ProductionScene, ProductionSegment, ProductionShot, VideoCollection; "
+        "from app.db.models.video_production import ProductionEpisode, ProductionJob, ProductionPlan, ProductionPlanVersion, ProductionScene, ProductionSegment, ProductionShot, VideoCollection; "
         "assert legacy.ProductionEpisode is ProductionEpisode; "
+        "assert legacy.ProductionJob is ProductionJob; "
         "assert legacy.ProductionPlan is ProductionPlan; "
         "assert legacy.ProductionPlanVersion is ProductionPlanVersion; "
         "assert legacy.ProductionScene is ProductionScene; "
@@ -69,12 +76,14 @@ def test_video_production_model_boundary_imports_in_clean_process():
         "assert legacy.ProductionShot is ProductionShot; "
         "assert legacy.VideoCollection is VideoCollection; "
         "assert ProductionEpisode.__module__ == 'app.db.models.video_production'; "
+        "assert ProductionJob.__module__ == 'app.db.models.video_production'; "
         "assert ProductionPlan.__module__ == 'app.db.models.video_production'; "
         "assert ProductionPlanVersion.__module__ == 'app.db.models.video_production'; "
         "assert ProductionScene.__module__ == 'app.db.models.video_production'; "
         "assert ProductionSegment.__module__ == 'app.db.models.video_production'; "
         "assert ProductionShot.__module__ == 'app.db.models.video_production'; "
         "assert 'production_episodes' in legacy.Base.metadata.tables; "
+        "assert 'production_jobs' in legacy.Base.metadata.tables; "
         "assert 'production_plans' in legacy.Base.metadata.tables; "
         "assert 'production_plan_versions' in legacy.Base.metadata.tables; "
         "assert 'production_scenes' in legacy.Base.metadata.tables; "

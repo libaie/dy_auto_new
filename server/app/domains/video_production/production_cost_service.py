@@ -4,8 +4,8 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.config import bj_now
-from app.db.models.video_production import ProductionPlan
-from app.db_models import ProductionCostEvent, ProductionJob
+from app.db.models.video_production import ProductionJob, ProductionPlan
+from app.db_models import ProductionCostEvent
 from app.domains.video_production.production_status import JOB_BLOCKED, JOB_QUEUED, JOB_RETRY_WAIT, PLAN_BLOCKED
 
 

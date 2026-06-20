@@ -25,6 +25,8 @@ repair task routes.
 - `agency_manifest.py` owns `AgencyManifest`, `AgencyManifestError`,
   `EXPERT_IDS`, manifest loading, expert markdown hash checks, legacy expert
   lookup, and manifest verification.
+- `agency_contracts.py` owns agency status enums and Pydantic response models
+  such as `AgencyConsoleResponse` and `AgencyInvocationSummary`.
 
 ## Facade Register
 
@@ -32,6 +34,7 @@ repair task routes.
 |---|---|---|
 | `app.routers.agency` | `app.domains.agency_operations.agency_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
 | `app.services.agency_manifest` | `app.domains.agency_operations.agency_manifest` | Keep while dirty service modules have approved compatibility imports; remove only after import inventory shows no production legacy imports. |
+| `app.services.agency_contracts` | `app.domains.agency_operations.agency_contracts` | Keep while legacy tests or dirty service modules import agency response contracts from `app.services`; remove after import inventory is clean. |
 
 ## Boundaries
 

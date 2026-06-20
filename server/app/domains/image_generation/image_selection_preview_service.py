@@ -6,8 +6,8 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.config import bj_now
-from app.db.models.image_production import ImageProductionStrategy
-from app.db_models import AIModel, ImageSelectionPreview
+from app.db.models.image_production import ImageSelectionPreview, ImageProductionStrategy
+from app.db_models import AIModel
 from app.domains.image_generation.image_creation_errors import image_error
 from app.services.image_creation_service import MODE_TO_SCENE_CAPABILITY, contains_protected_provider_option_key
 from app.domains.image_generation.image_model_selection_service import resolve_image_model_selection

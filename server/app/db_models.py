@@ -41,6 +41,7 @@ from app.db.models.creative_library import (
 )
 from app.db.models.identity_access import User
 from app.db.models.image_production import (
+    ImageSelectionPreview,
     ImageProductionPolicyVersion,
     ImageProductionStrategy,
     ImageProductionStrategyVersion,
@@ -170,29 +171,6 @@ class AgencyCreativePatch(Base):
     rejected_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
     updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
-
-
-class ImageSelectionPreview(Base):
-    __tablename__ = "image_selection_previews"
-
-    id = Column(String(36), primary_key=True, default=_uuid)
-    user_id = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
-    strategy_id = Column(String(36), ForeignKey("image_production_strategies.id", ondelete="SET NULL"), nullable=True)
-    strategy_version = Column(Integer, nullable=True)
-    mode = Column(String(40), nullable=False)
-    destination_role = Column(String(80), nullable=True)
-    model_id = Column(String(36), nullable=True)
-    selected_model_id = Column(String(36), nullable=True)
-    request_hash = Column(String(64), nullable=False)
-    response_json = Column(JSON, nullable=False, default=dict)
-    expires_at = Column(DateTime, nullable=False)
-    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
-
-    __table_args__ = (
-        Index("idx_image_selection_previews_hash", "request_hash"),
-        Index("idx_image_selection_previews_expires", "expires_at"),
-        Index("idx_image_selection_previews_user_created", "user_id", "created_at"),
-    )
 
 
 class ImageCreationTask(Base):

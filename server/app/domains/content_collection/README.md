@@ -103,6 +103,7 @@ this domain provides stable use cases and compatibility tests for that handoff.
 - `app.domains.content_collection.content_service` owns `ContentService` template CRUD, sensitive-word CRUD/matching, variable substitution, and content-generation helpers.
 - `app.domains.content_collection.mutations` owns content template, sensitive-word, and DM sequence mutation orchestration.
 - `app.domains.content_collection.content_generation` owns content, keyword, regex, and clean-prompt generation calls.
+- `app.domains.content_collection.industry_profile_service` owns `load_profile`, `list_industries`, and DM industry compliance profile JSON loading from `server/app/data/industry_profiles`.
 - `app.domains.content_collection.collection_reports` owns collected comment/user ingestion, comment AI reply, user profile, and avatar use cases.
 - `app.domains.content_collection.dm_claims` owns DM recipient claim, send report, and release use cases.
 - `app.domains.content_collection.dm_sequence_visibility` owns `get_device_visible_dm_sequences` and DM sequence visibility rules for device sync and polling payload inclusion.
@@ -121,6 +122,7 @@ this domain provides stable use cases and compatibility tests for that handoff.
 | `app.domains.device_operations.content_bridge` | `app.domains.content_collection` use cases | Planned PR5 | Device bridge tests prove `/api/device/*` auth, response shape, and realtime events are unchanged. |
 | `app.services.dm_sequence_visibility` | `app.domains.content_collection.dm_sequence_visibility` | DM sequence visibility slice | `rg -n "app\.services\.dm_sequence_visibility" server/app -g "*.py"` returns only approved device bridge compatibility imports. |
 | `app.services.content_service` | `app.domains.content_collection.content_service` | Content service domain slice | Keep while `rg -n "app\.services\.content_service" server/app -g "*.py"` returns approved task/device/account/AI bridge compatibility imports; remove only when that command returns no production imports. |
+| `app.services.industry_profile_service` | `app.domains.content_collection.industry_profile_service` | Industry profile domain slice | Remove only after import inventory shows no production imports of `app.services.industry_profile_service`. |
 
 ## Migration Checklist
 

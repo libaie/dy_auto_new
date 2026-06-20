@@ -144,7 +144,7 @@ def delete_dm_sequence(db, user, sequence_id: str):
 
 async def generate_dm_sequence_events(db, body):
     from app.services.ai_generator import ai_generator as generator
-    from app.services.industry_profile_service import load_profile
+    from app.domains.content_collection.industry_profile_service import load_profile
 
     profile = load_profile(body.industry)
     system_prompt = profile["system_prompt"]
@@ -227,7 +227,7 @@ async def generate_dm_sequence_events(db, body):
 
 async def generate_dm_variants(db, seq_id: str, body):
     from app.services.ai_generator import ai_generator as generator
-    from app.services.industry_profile_service import load_profile
+    from app.domains.content_collection.industry_profile_service import load_profile
 
     sequence = db.query(DMSequence).filter(DMSequence.id == seq_id).first()
     if not sequence:

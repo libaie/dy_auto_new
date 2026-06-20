@@ -4,12 +4,11 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.db.models.image_production import ImageProductionStrategy
+from app.db.models.image_production import ImageProductionMetric, ImageProductionStrategy
 from app.db_models import (
     ImageCreationAsset,
     ImageProductionAbAttempt,
     ImageProductionAbGroup,
-    ImageProductionMetric,
 )
 from app.domains.image_generation.image_creation_errors import image_error
 from app.domains.image_generation.image_production_metrics_service import aggregate_strategy_metrics_payload

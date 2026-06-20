@@ -42,6 +42,7 @@ from app.db.models.creative_library import (
 from app.db.models.identity_access import User
 from app.db.models.image_production import (
     ImageSelectionPreview,
+    ImageProductionMetric,
     ImageProductionPolicyVersion,
     ImageProductionStrategy,
     ImageProductionStrategyVersion,
@@ -402,37 +403,6 @@ class ImageProductionAbAttempt(Base):
         Index("idx_image_ab_attempts_group", "group_id"),
         Index("idx_image_ab_attempts_task", "task_id"),
         Index("idx_image_ab_attempts_status", "status"),
-    )
-
-
-class ImageProductionMetric(Base):
-    __tablename__ = "image_production_metrics"
-
-    id = Column(String(36), primary_key=True, default=_uuid)
-    strategy_id = Column(String(36), nullable=False)
-    strategy_version = Column(Integer, nullable=False)
-    model_id = Column(String(120), nullable=True)
-    attempt_count = Column(Integer, nullable=False, default=0)
-    success_count = Column(Integer, nullable=False, default=0)
-    failure_count = Column(Integer, nullable=False, default=0)
-    ai_pass_count = Column(Integer, nullable=False, default=0)
-    human_pass_count = Column(Integer, nullable=False, default=0)
-    repaint_count = Column(Integer, nullable=False, default=0)
-    average_latency_seconds = Column(Float, nullable=False, default=0.0)
-    average_cost_amount = Column(Float, nullable=False, default=0.0)
-    currency = Column(String(10), nullable=False, default="CNY")
-    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
-
-    __table_args__ = (
-        Index(
-            "uq_image_metric_strategy_version_model",
-            "strategy_id",
-            "strategy_version",
-            func.coalesce(model_id, "__strategy__"),
-            unique=True,
-        ),
-        Index("idx_image_metrics_strategy", "strategy_id", "strategy_version"),
-        Index("idx_image_metrics_updated", "updated_at"),
     )
 
 

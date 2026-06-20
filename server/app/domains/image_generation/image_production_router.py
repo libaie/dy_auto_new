@@ -5,8 +5,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.db.models.image_production import ImageProductionStrategy
-from app.db_models import ImageProductionMetric
+from app.db.models.image_production import ImageProductionMetric, ImageProductionStrategy
 from app.deps import require_role, verify_admin_token
 from app.domains.image_generation.image_ab_test_service import (
     adopt_ab_winner,

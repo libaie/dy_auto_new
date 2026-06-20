@@ -3,7 +3,7 @@
 from app.config import bj_now
 from app.db.base import Base, _uuid
 
-from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, JSON, String, Text, UniqueConstraint
+from sqlalchemy import Column, DateTime, Float, ForeignKey, Index, Integer, JSON, String, Text, UniqueConstraint, func
 
 
 class ImageProductionPolicyVersion(Base):
@@ -88,4 +88,35 @@ class ImageSelectionPreview(Base):
         Index("idx_image_selection_previews_hash", "request_hash"),
         Index("idx_image_selection_previews_expires", "expires_at"),
         Index("idx_image_selection_previews_user_created", "user_id", "created_at"),
+    )
+
+
+class ImageProductionMetric(Base):
+    __tablename__ = "image_production_metrics"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    strategy_id = Column(String(36), nullable=False)
+    strategy_version = Column(Integer, nullable=False)
+    model_id = Column(String(120), nullable=True)
+    attempt_count = Column(Integer, nullable=False, default=0)
+    success_count = Column(Integer, nullable=False, default=0)
+    failure_count = Column(Integer, nullable=False, default=0)
+    ai_pass_count = Column(Integer, nullable=False, default=0)
+    human_pass_count = Column(Integer, nullable=False, default=0)
+    repaint_count = Column(Integer, nullable=False, default=0)
+    average_latency_seconds = Column(Float, nullable=False, default=0.0)
+    average_cost_amount = Column(Float, nullable=False, default=0.0)
+    currency = Column(String(10), nullable=False, default="CNY")
+    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
+
+    __table_args__ = (
+        Index(
+            "uq_image_metric_strategy_version_model",
+            "strategy_id",
+            "strategy_version",
+            func.coalesce(model_id, "__strategy__"),
+            unique=True,
+        ),
+        Index("idx_image_metrics_strategy", "strategy_id", "strategy_version"),
+        Index("idx_image_metrics_updated", "updated_at"),
     )

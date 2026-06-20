@@ -56,25 +56,9 @@ from app.db.models.selector_management import UISelector
 from app.db.models.system_configuration import SystemSetting
 from app.db.models.task_operations import Task
 from app.db.models.video_library import GeneratedVideo
-from app.db.models.video_production import ProductionPlan, VideoCollection
+from app.db.models.video_production import ProductionPlan, ProductionPlanVersion, VideoCollection
 
 # ==== 多模型系列生成系统 ====
-
-
-class ProductionPlanVersion(Base):
-    __tablename__ = "production_plan_versions"
-    __table_args__ = (
-        UniqueConstraint("plan_id", "version", name="uq_production_plan_version"),
-        Index("idx_production_plan_versions_plan_id", "plan_id"),
-    )
-
-    id = Column(String(36), primary_key=True, default=_uuid)
-    plan_id = Column(String(36), ForeignKey("production_plans.id", ondelete="CASCADE"), nullable=False)
-    version = Column(Integer, nullable=False)
-    style_lock_json = Column(JSON, nullable=True, default=dict)
-    model_config_snapshot_json = Column(JSON, nullable=True, default=dict)
-    prompt_policy_json = Column(JSON, nullable=True, default=dict)
-    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
 
 
 class ProductionEpisode(Base):

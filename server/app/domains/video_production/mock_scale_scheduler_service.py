@@ -6,12 +6,11 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.config import bj_now
-from app.db.models.video_production import ProductionPlan
+from app.db.models.video_production import ProductionPlan, ProductionPlanVersion
 from app.db_models import (
     Episode,
     ProductionEpisode,
     ProductionJob,
-    ProductionPlanVersion,
     ProductionScene,
     ProductionSegment,
     ProductionShot,

@@ -3,11 +3,10 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.db.models.video_production import ProductionPlan
+from app.db.models.video_production import ProductionPlan, ProductionPlanVersion
 from app.db_models import (
     Episode,
     ProductionEpisode,
-    ProductionPlanVersion,
     ProductionScene,
     ProductionSegment,
     ProductionShot,

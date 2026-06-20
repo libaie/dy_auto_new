@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.config import bj_now
 from app.db_models import ProductionAuditEvent, ProductionJob, VideoProductionAsset, VideoProductionRun, VideoReviewRecord
-from app.services.production_queue_service import enqueue_job
+from app.domains.video_production.production_queue_service import enqueue_job
 
 
 AUTO_REPAIR_STAGE = "agency_auto_repair"

@@ -49,6 +49,8 @@ This domain owns the video production control-plane HTTP routes.
 - `production_plan_service.py` owns `create_episode_production_plan`,
   `ensure_episode_production_plan`, and `ensure_shot_segments` for converting
   locked style and episode storyboards into production plans.
+- `production_queue_service.py` owns production job enqueue, claim, completion,
+  retry-wait, pause, and resume helpers.
 - `production_collection_service.py` owns `create_collection_from_approved_episodes`
   for packaging approved episode videos into draft collections.
 - `production_tree_service.py` owns `get_run_tree` and tree payload helpers for
@@ -105,6 +107,7 @@ This domain owns the video production control-plane HTTP routes.
 | `app.services.production_status` | `app.domains.video_production.production_status` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, approved cross-domain consumers, or service modules whose domains have not moved yet. |
 | `app.services.production_status_aggregation` | `app.domains.video_production.production_status_aggregation` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.production_plan_service` | `app.domains.video_production.production_plan_service` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
+| `app.services.production_queue_service` | `app.domains.video_production.production_queue_service` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests or service modules whose domains have not moved yet. |
 | `app.services.production_collection_service` | `app.domains.video_production.production_collection_service` | Domain router imports the domain helper directly, and legacy imports remain only in compatibility tests or older callers not yet migrated. |
 | `app.services.production_tree_service` | `app.domains.video_production.production_tree_service` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.review_asset_edit_service` | `app.domains.video_production.review_asset_edit_service` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |

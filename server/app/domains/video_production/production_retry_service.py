@@ -8,7 +8,7 @@ from app.db_models import (
     VideoProductionAsset,
     VideoProductionRun,
 )
-from app.services.production_queue_service import enqueue_job
+from app.domains.video_production.production_queue_service import enqueue_job
 
 
 def get_retry_impact(db: Session, segment_id: str) -> dict:

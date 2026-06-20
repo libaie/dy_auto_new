@@ -29,7 +29,7 @@ from app.domains.video_production.production_status import (
     SEGMENT_COMPLETED,
     SEGMENT_PLANNED,
 )
-from app.services.production_queue_service import claim_next_job, mark_job_completed
+from app.domains.video_production.production_queue_service import claim_next_job, mark_job_completed
 from app.domains.production_observability.production_observability_service import record_production_event
 from app.domains.video_production.video_production_run_types import MOCK_SERIES_SCALE
 

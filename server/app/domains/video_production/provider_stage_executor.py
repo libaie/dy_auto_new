@@ -10,7 +10,7 @@ from app.db_models import ProviderCostReservation, ProviderStageTask
 from app.domains.video_production.production_action_result import ProductionActionResult
 from app.domains.video_production.production_errors import ProductionErrorCode, ProductionRepairableError
 from app.domains.production_observability.production_observability_service import record_production_event
-from app.services.production_queue_service import retry_job_without_attempt
+from app.domains.video_production.production_queue_service import retry_job_without_attempt
 from app.domains.video_production.production_state_contract import (
     COST_SUBMITTED,
     PROVIDER_TASK_CANCELLED,

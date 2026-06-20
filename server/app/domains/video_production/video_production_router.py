@@ -792,7 +792,7 @@ def pause_run(
     db: Session = Depends(get_db),
     user=Depends(require_role("admin")),
 ):
-    from app.services.production_queue_service import pause_plan_jobs
+    from app.domains.video_production.production_queue_service import pause_plan_jobs
 
     run = db.query(VideoProductionRun).filter(VideoProductionRun.id == run_id).first()
     if not run or not run.production_plan_id:
@@ -817,7 +817,7 @@ def resume_run(
     db: Session = Depends(get_db),
     user=Depends(require_role("admin")),
 ):
-    from app.services.production_queue_service import resume_plan_jobs
+    from app.domains.video_production.production_queue_service import resume_plan_jobs
 
     run = db.query(VideoProductionRun).filter(VideoProductionRun.id == run_id).first()
     if not run or not run.production_plan_id:

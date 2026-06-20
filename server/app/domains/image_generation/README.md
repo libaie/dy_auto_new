@@ -12,6 +12,9 @@ plus image production strategy business logic.
 
 - `image_creation_router.py` owns upload, Pixelle file proxy, task create/read,
   task sync/dispatch, asset list/review, and asset edit endpoints.
+- `image_creation_storage.py` owns `IMAGE_CREATION_ROOT`, `save_upload`,
+  `save_output_bytes`, public image URLs, and image storage content-type/size
+  validation.
 - `image_creation_errors.py` owns `image_error` and structured image API error
   payload construction.
 - `image_production_router.py` owns image strategies, metrics refresh, selection
@@ -53,6 +56,7 @@ plus image production strategy business logic.
 |---|---|---|
 | `app.routers.image_creation` | `app.domains.image_generation.image_creation_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
 | `app.routers.image_production` | `app.domains.image_generation.image_production_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
+| `app.services.image_creation_storage` | `app.domains.image_generation.image_creation_storage` | Keep while `image_creation_service` has an approved image creation service compatibility import; remove only after import inventory shows no production legacy imports. |
 | `app.services.image_creation_errors` | `app.domains.image_generation.image_creation_errors` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.image_ab_test_service` | `app.domains.image_generation.image_ab_test_service` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.image_asset_bridge_service` | `app.domains.image_generation.image_asset_bridge_service` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |

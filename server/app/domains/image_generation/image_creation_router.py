@@ -13,6 +13,7 @@ from app.config import PIXELLE_API_KEY
 from app.database import get_db
 from app.deps import require_role
 from app.domains.image_generation.image_creation_errors import image_error
+from app.domains.image_generation.image_creation_storage import configured_public_base_url, save_upload
 from app.services.image_creation_service import (
     asset_payload,
     create_image_task,
@@ -24,7 +25,6 @@ from app.services.image_creation_service import (
     sync_image_task,
     task_payload,
 )
-from app.services.image_creation_storage import configured_public_base_url, save_upload
 from app.services.pixelle_client import _get_base_url
 
 

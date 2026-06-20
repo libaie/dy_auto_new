@@ -10,7 +10,7 @@ from app.db.models.video_production import (
     ProductionShot,
     VideoProductionRun,
 )
-from app.db_models import (
+from app.db.models import (
     Character,
     Episode,
     Scene,

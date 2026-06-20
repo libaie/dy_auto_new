@@ -5,7 +5,7 @@ import yaml
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal, init_db
-from app.db_models import Account, SensitiveWord, UISelector, PromptTemplate
+from app.db.models import Account, SensitiveWord, UISelector, PromptTemplate
 from app.config import load_accounts_config, load_selectors_config
 
 
@@ -83,7 +83,7 @@ def seed_selectors(db: Session) -> tuple[int, int]:
         ))
         added += 1
     if added or updated:
-        from app.services.selector_service import _bump_revision
+        from app.domains.selector_management.selector_service import _bump_revision
         _bump_revision(db)
     db.commit()
     return added, updated

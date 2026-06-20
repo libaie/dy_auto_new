@@ -117,7 +117,7 @@ def device_login(request: LoginRequest, http_request: Request, db: Session = Dep
     _check_rate_limit(client_ip)
 
     from app.db.models.identity_access import User
-    from app.db_models import Device
+    from app.db.models import Device
     import bcrypt, uuid as _uuid
 
     user = db.query(User).filter(User.username == request.username, User.status == "active").first()

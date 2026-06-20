@@ -183,8 +183,8 @@ def _raise_failed_task(task) -> None:
 
 
 async def _generate_edited_image(db: Session, asset: VideoProductionAsset, instruction: str) -> dict[str, Any]:
-    from app.db_models import ImageCreationAsset
-    from app.services.image_creation_service import create_image_task, sync_image_task
+    from app.db.models import ImageCreationAsset
+    from app.domains.image_generation.image_creation_service import create_image_task, sync_image_task
 
     payload = {
         "mode": "image_to_image",

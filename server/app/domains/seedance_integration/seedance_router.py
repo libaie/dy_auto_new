@@ -34,7 +34,7 @@ def _get_api_key(db: Session | None) -> str:
     key = os.getenv("SEEDANCE_API_KEY", "")
     if db is not None:
         try:
-            from app.db_models import SystemSetting
+            from app.db.models import SystemSetting
             row = db.query(SystemSetting).filter(SystemSetting.key == "seedance_api_key").first()
             if row and row.value:
                 key = str(row.value)

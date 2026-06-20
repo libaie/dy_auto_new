@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 import logging
 
-from app.db_models import Account, AccountGroupMember, Channel, ChannelItem as DBChannelItem, Device
+from app.db.models import Account, AccountGroupMember, Channel, ChannelItem as DBChannelItem, Device
 from app.models import TaskType as TT
 
 from .adapters import channel_service, task_service
@@ -179,7 +179,7 @@ def _assert_groups_exist(db, group_ids: list[str]):
     if not group_ids:
         return
 
-    from app.db_models import AccountGroup
+    from app.db.models import AccountGroup
 
     existing_groups = db.query(AccountGroup.id).filter(
         AccountGroup.id.in_(group_ids)
@@ -269,7 +269,7 @@ def _resolve_channel_group_id(db, request, all_accounts: list) -> str:
     if member_group:
         return member_group[0]
 
-    from app.db_models import AccountGroup
+    from app.db.models import AccountGroup
     from datetime import datetime as dt
 
     display = all_accounts[0].nickname or all_accounts[0].douyin_id or all_accounts[0].id[:8]

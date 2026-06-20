@@ -162,7 +162,7 @@ def _resolve_ai_config(db=None):
 
     if db:
         try:
-            from app.db_models import SystemSetting
+            from app.db.models import SystemSetting
             settings = {s.key: s.value for s in db.query(SystemSetting).all()}
             # llm_* keys take priority (new naming), ai_* fallback (legacy)
             api_key = settings.get("llm_api_key") or settings.get("ai_api_key") or api_key
@@ -236,7 +236,7 @@ def _resolve_pixelle_config(db=None):
         import logging
         _log = logging.getLogger(__name__)
         try:
-            from app.db_models import SystemSetting
+            from app.db.models import SystemSetting
             settings = {s.key: s.value for s in db.query(SystemSetting).all()}
             url = settings.get("pixelle_video_url") or url
             try:

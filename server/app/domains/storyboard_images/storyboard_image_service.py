@@ -7,11 +7,11 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.db_models import Episode, ImageCreationAsset, ImageCreationTask, Series, VideoProductionRun
+from app.db.models import Episode, ImageCreationAsset, ImageCreationTask, Series, VideoProductionRun
 from app.domains.image_generation.image_asset_bridge_service import promote_image_asset_to_video_asset, video_asset_payload
 from app.domains.image_generation.image_creation_errors import image_error
 from app.domains.image_generation.image_review_gate_service import review_gate_passed
-from app.services.image_creation_service import asset_payload, create_image_task, task_payload
+from app.domains.image_generation.image_creation_service import asset_payload, create_image_task, task_payload
 
 
 def _stable_hash(value: Any) -> str:

@@ -5,7 +5,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.config import bj_now
-from app.db_models import ProductionAuditEvent, ProductionJob, VideoProductionAsset, VideoProductionRun, VideoReviewRecord
+from app.db.models import ProductionAuditEvent, ProductionJob, VideoProductionAsset, VideoProductionRun, VideoReviewRecord
 from app.domains.video_production.production_queue_service import enqueue_job
 
 

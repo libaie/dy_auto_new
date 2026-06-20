@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.config import get_ai_config_with_key
 from app.database import get_db, SessionLocal
 from app.deps import verify_admin_token, require_role
-from app.services.ai_generator import ai_generator as gen
+from app.domains.model_configuration.ai_generator import ai_generator as gen
 from app.domains.prompt_management.prompt_template_service import prompt_template_service
 
 logger = logging.getLogger("app.routers.prompt_templates")
@@ -147,7 +147,7 @@ async def generate_template(
     user = Depends(verify_admin_token),
 ):
     """AI 根据描述生成提示词模板 JSON"""
-    from app.services.ai_generator import ai_generator as gen
+    from app.domains.model_configuration.ai_generator import ai_generator as gen
 
     user_prompt = (
         f"行业：{request.industry}\n"
@@ -189,7 +189,7 @@ async def generate_template_stream(
     user = Depends(verify_admin_token),
 ):
     """AI 根据描述生成提示词模板 JSON（SSE 流式输出，避免超时）"""
-    from app.services.ai_generator import ai_generator as gen
+    from app.domains.model_configuration.ai_generator import ai_generator as gen
 
     user_prompt = (
         f"行业：{request.industry}\n"

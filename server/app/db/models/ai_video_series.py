@@ -99,9 +99,10 @@ _LEGACY_NAMES = {
 
 def __getattr__(name):
     if name in _LEGACY_NAMES:
-        from app import db_models
+        from importlib import import_module
 
-        value = getattr(db_models, name)
+        video_production = import_module("app.db.models.video_production")
+        value = getattr(video_production, name)
         globals()[name] = value
         return value
     raise AttributeError(name)

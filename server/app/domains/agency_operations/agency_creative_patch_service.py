@@ -8,7 +8,7 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from app.config import bj_now
 from app.db.models.agency_operations import AgencyCreativePatch, AgencyExpertInvocation
-from app.db_models import (
+from app.db.models import (
     AITextArtifact,
     Episode,
     ProductionAuditEvent,

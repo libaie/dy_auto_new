@@ -15,7 +15,7 @@ async def _notify_pending_tasks(db: Session, device_id: str):
     logger = logging.getLogger(__name__)
 
     from app.db.models.device_operations import Device
-    from app.db_models import Task as DBTask
+    from app.db.models import Task as DBTask
     from app.models import TaskStatus
     from datetime import datetime, timezone
     from sqlalchemy import or_, and_
@@ -57,7 +57,7 @@ async def _notify_pending_tasks(db: Session, device_id: str):
     pending_tasks = pending_task_query.all()
 
     # Also check pending channel items for this device
-    from app.db_models import ChannelItem, Channel
+    from app.db.models import ChannelItem, Channel
     channel_subquery = db.query(Channel.id).filter(
         Channel.status == "active", Channel.deleted_at.is_(None)
     )

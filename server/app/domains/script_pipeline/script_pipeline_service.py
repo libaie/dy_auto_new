@@ -16,7 +16,7 @@ from app.db.models.script_pipeline import (
     ScriptSceneOutline,
     ScriptVisualShot,
 )
-from app.db_models import (
+from app.db.models import (
     Episode,
 )
 from app.models.script import (
@@ -27,9 +27,9 @@ from app.models.script import (
     SceneOutlineList,
     VisualShotList,
 )
-from app.services.agency_orchestrator import AgencyOrchestrator
+from app.domains.agency_operations.agency_orchestrator import AgencyOrchestrator
 from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
-from app.services.agency_runtime import _default_model_client
+from app.domains.agency_operations.agency_runtime import _default_model_client
 from app.domains.model_configuration.runtime_model_config import resolve_runtime_model_config
 from app.domains.script_pipeline.storyboard_timing import (
     annotate_storyboard_with_timing,

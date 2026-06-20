@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import verify_device_secret
 from app.models import RiskReport, StatsIncrementRequest, TaskProgressReport, TaskResultReport
-from app.services.task_service import task_service
+from app.domains.task_operations.task_service import task_service
 from app.ws_manager import pair_ws_manager
 from app.domains.device_operations.status_ws import _notify_pending_tasks
 
@@ -25,7 +25,7 @@ async def report_progress(
     authed_device_id: str = Depends(verify_device_secret),
 ):
     """Device reports task execution progress. Broadcast to admin WS for real-time UI."""
-    from app.db_models import Task as DBTask
+    from app.db.models import Task as DBTask
     db_task = db.query(DBTask).filter(DBTask.id == report.task_id).first()
     if not db_task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -53,7 +53,7 @@ async def report_result(
 ):
     # Verify lease: accept current lease, log stale reports, fall back to device_id
     if authed_device_id:
-        from app.db_models import Task as DBTask
+        from app.db.models import Task as DBTask
         db_task = db.query(DBTask).filter(DBTask.id == report.task_id).first()
         if not db_task:
             raise HTTPException(status_code=404, detail="Task not found")
@@ -115,7 +115,7 @@ def stats_increment(
     """
     from app.domains.reporting.stats_service import stats_service
     from app.db.models.reporting import StatsEvent
-    from app.db_models import Task as DBTask
+    from app.db.models import Task as DBTask
 
     # 1. Validate task exists and belongs to the claimed account
     db_task = db.query(DBTask).filter(DBTask.id == body.task_id).first()
@@ -193,7 +193,7 @@ async def report_risk(
     _: None = Depends(verify_device_secret),
 ):
     """Device reports risk control detection. Marks account as risk_controlled."""
-    from app.db_models import Account
+    from app.db.models import Account
     account = db.query(Account).filter(Account.id == report.account_id).first()
     if not account:
         return {"status": "ignored", "account_status": "unknown"}

@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.config import bj_now
 from app.db.models.ai_text_artifacts import AITextArtifact, AITextArtifactConsumer
-from app.db_models import Episode, Series, VideoProductionRun
+from app.db.models import Episode, Series, VideoProductionRun
 
 
 SERIES_RUN_ARTIFACT_TYPES = ("series_bible", "series_story_plan", "season_arc", "continuity_ledger")
@@ -142,7 +142,7 @@ class AITextArtifactService:
         input_json: dict[str, Any] | None = None,
         actor_user_id: str | None = None,
     ) -> AITextArtifact:
-        from app.services.ai_generator import ai_generator
+        from app.domains.model_configuration.ai_generator import ai_generator
 
         parent = self._get_artifact(artifact_id)
         request_input = dict(input_json or {})

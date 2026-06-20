@@ -11,8 +11,8 @@ from typing import Any, Optional
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import verify_admin_token
-from app.db_models import Episode, Series
-from app.services.ai_generator import ai_generator
+from app.db.models import Episode, Series
+from app.domains.model_configuration.ai_generator import ai_generator
 from app.domains.agency_operations.agency_orchestrator import AgencyOrchestrator
 from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
 from app.domains.model_configuration.runtime_model_config import RuntimeModelConfigError, resolve_runtime_model_config
@@ -505,7 +505,7 @@ def create_episode_plan_endpoint(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    from app.db_models import ProductionEpisode
+    from app.db.models import ProductionEpisode
     from app.domains.video_production.production_plan_service import ensure_episode_production_plan, ensure_shot_segments
 
     try:

@@ -2,9 +2,8 @@ from sqlalchemy.orm import Session
 
 from app.db.models.ai_video_series import Episode, Series, VideoProductionRun
 from app.db.models.video_library import GeneratedVideo
-# Cross-domain model: keep on app.db_models until its owning domain exists.
-from app.db_models import Character, PipelineRun, Scene
-from app.services.agency_console import build_agency_console_payload
+from app.db.models import Character, PipelineRun, Scene
+from app.domains.agency_operations.agency_console import build_agency_console_payload
 from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
 from app.domains.creative_library.reference_asset_service import reference_url_is_usable
 

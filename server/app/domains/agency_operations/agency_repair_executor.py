@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlalchemy.orm import Session
 
 from app.config import bj_now
-from app.db_models import (
+from app.db.models import (
     Character,
     ProductionAuditEvent,
     ProductionJob,

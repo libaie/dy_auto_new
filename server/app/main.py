@@ -42,7 +42,7 @@ from app.domains.system_configuration import settings_router
 from app.domains.task_operations import tasks_router
 from app.domains.video_production import video_production_router
 from app.domains.video_library import videos_router
-from app.services.ai_generator import ai_generator
+from app.domains.model_configuration.ai_generator import ai_generator
 
 
 def _one_sentence_reference_check_due(run, now=None) -> bool:
@@ -137,8 +137,8 @@ async def _story_plan_worker(interval_seconds: float | None = None, batch_size: 
 async def _one_sentence_reference_worker(interval_seconds: float | None = None, batch_size: int | None = None):
     """Resume one-sentence reference-generation jobs after page refresh or server restart."""
     import logging
-    from app.db_models import VideoProductionRun
-    from app.services.one_sentence_video_service import (
+    from app.db.models import VideoProductionRun
+    from app.domains.video_production.one_sentence_video_service import (
         ONE_SENTENCE_REFERENCE_RUNNING_STATUS,
         complete_one_sentence_reference_generation,
     )
@@ -214,7 +214,7 @@ async def lifespan(app: FastAPI):
     one_sentence_reference_task.cancel()
     await asyncio.gather(task, style_lock_task, story_plan_task, one_sentence_reference_task, return_exceptions=True)
     await ai_generator.aclose()
-    from app.services import pixelle_client
+    from app.domains.pixelle_integration import pixelle_client
     await pixelle_client.close_client()
 
 

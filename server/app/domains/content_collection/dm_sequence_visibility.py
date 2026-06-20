@@ -6,7 +6,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.db.models.content_collection import DMSequence
-from app.db_models import Device, Task
+from app.db.models import Device, Task
 from app.models import TaskStatus
 
 

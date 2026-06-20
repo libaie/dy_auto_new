@@ -18,11 +18,11 @@ from app.db.models.image_production import (
     ImageProductionAbGroup,
     ImageProductionStrategy,
 )
-from app.db_models import (
+from app.db.models import (
     ProductionAuditEvent,
 )
 from app.domains.image_generation.image_creation_errors import image_error
-from app.services.image_creation_service import (
+from app.domains.image_generation.image_creation_service import (
     _apply_strategy_defaults,
     _resolve_reference_images,
     _resolve_source_asset,

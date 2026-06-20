@@ -11,7 +11,7 @@ from app.database import SessionLocal, get_db
 from app.db.models.script_pipeline import PipelineRun
 from app.db.models.video_library import GeneratedVideo
 from app.deps import require_role
-from app.db_models import Episode, Series
+from app.db.models import Episode, Series
 from app.domains.pixelle_integration.pixelle_client import _pixelle_request
 from app.domains.agency_operations.agency_orchestrator import AgencyOrchestrator
 from app.domains.model_configuration.runtime_model_config import RuntimeModelConfigError, resolve_runtime_model_config

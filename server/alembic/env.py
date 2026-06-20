@@ -10,7 +10,7 @@ from alembic import context
 # Add parent dir to path so `app` is importable
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.db_models import Base
+from app.db.models import Base
 from app.database import DATABASE_URL
 
 config = context.config

@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import update, or_, and_, null, String, select
 
 from app.db.models.task_operations import Task
-from app.db_models import Device as DBDevice
+from app.db.models import Device as DBDevice
 from app.models import TaskType, TaskStatus, Task as PydanticTask
 from app.domains.reporting.stats_service import stats_service
 
@@ -133,7 +133,7 @@ class TaskService:
         # Channel-backed tasks MUST be cancelled (not reset to PENDING) — otherwise
         # the old task enters the direct queue AND the ChannelItem generates a new
         # task, creating two execution paths for the same keyword/account.
-        from app.db_models import ChannelItem
+        from app.db.models import ChannelItem
         from app.domains.account_operations.channel_service import channel_service as ch_svc
         stale_ids = [t.id for t in stale_running]
         stale_ch_items = db.query(ChannelItem).filter(ChannelItem.task_id.in_(stale_ids)).all()
@@ -247,7 +247,7 @@ class TaskService:
             raise ValueError(f"Task {task_id} not found")
 
         # Pre-load channel association (used by both the ack path and retry logic)
-        from app.db_models import ChannelItem
+        from app.db.models import ChannelItem
         from app.domains.account_operations.channel_service import channel_service
         channel_item = db.query(ChannelItem).filter(ChannelItem.task_id == task_id).first()
 
@@ -403,7 +403,7 @@ class TaskService:
         # Keep device_id — check_cancelled_running and WS both need it for
         # cancellation delivery.  Reset ChannelItem immediately so the channel
         # can re-dispatch without waiting for the device to ack.
-        from app.db_models import ChannelItem
+        from app.db.models import ChannelItem
         from app.domains.account_operations.channel_service import channel_service as ch_svc
         channel_item = db.query(ChannelItem).filter(ChannelItem.task_id == task_id).first()
         if channel_item and channel_item.status == "assigned":
@@ -428,7 +428,7 @@ class TaskService:
 
         # Reset associated ChannelItem so the keyword can be re-dispatched
         from app.db.models.video_library import GeneratedVideo
-        from app.db_models import ChannelItem, CollectedComment, CollectedUser, Conversation
+        from app.db.models import ChannelItem, CollectedComment, CollectedUser, Conversation
         from app.domains.account_operations.channel_service import channel_service as ch_svc
         channel_item = db.query(ChannelItem).filter(ChannelItem.task_id == task_id).first()
         if channel_item:
@@ -453,7 +453,7 @@ class TaskService:
         """Delete multiple tasks in batch. Returns count of deleted tasks."""
         if not task_ids:
             return 0
-        from app.db_models import ChannelItem
+        from app.db.models import ChannelItem
         # Only delete non-running tasks; running tasks are protected
         deletable = db.query(DBTask.id).filter(
             DBTask.id.in_(task_ids),
@@ -478,7 +478,7 @@ class TaskService:
                 ch_svc._reactivate_channel(db, cid)
         # Null out FK references from child tables
         from app.db.models.video_library import GeneratedVideo
-        from app.db_models import CollectedComment, CollectedUser, Conversation
+        from app.db.models import CollectedComment, CollectedUser, Conversation
         for model in (CollectedComment, CollectedUser, Conversation, GeneratedVideo):
             db.query(model).filter(model.task_id.in_(deletable_ids)).update(
                 {"task_id": None}, synchronize_session=False

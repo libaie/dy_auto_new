@@ -160,7 +160,7 @@ async def _apply_travel_destination_fallback(db, request):
     )
     if not has_destination and request.keyword and request.task_id:
         from app.db.models.prompt_management import PromptTemplate
-        from app.db_models import Task
+        from app.db.models import Task
         task = db.query(Task).filter(Task.id == request.task_id).first()
         if task and task.params:
             template_id = task.params.get("prompt_template_id")
@@ -181,7 +181,7 @@ async def _apply_travel_destination_fallback(db, request):
 async def _resolve_destination(keyword: str, db) -> dict | None:
     if not keyword or keyword in _dest_cache:
         return _dest_cache.get(keyword)
-    from app.services.ai_generator import ai_generator
+    from app.domains.model_configuration.ai_generator import ai_generator
     try:
         raw = await ai_generator.generate_custom(
             db,

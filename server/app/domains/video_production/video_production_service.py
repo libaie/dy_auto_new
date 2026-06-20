@@ -14,7 +14,7 @@ from app.db.models.video_production import (
     VideoProductionRun,
     VideoReviewRecord,
 )
-from app.db_models import Episode
+from app.db.models import Episode
 from app.domains.agency_operations.agency_backtrack_policy import trigger_backtrack_if_needed
 from app.domains.agency_operations.agency_creative_patch_service import unresolved_patch_gate
 from app.domains.agency_operations.agency_orchestrator import AgencyOrchestrator
@@ -1728,7 +1728,7 @@ def complete_final_video(
     gate_result: dict | None = None,
 ) -> VideoProductionAsset:
     from app.db.models.video_library import GeneratedVideo
-    from app.db_models import Series
+    from app.db.models import Series
 
     _assert_final_asset_ready_for_writeback(db, run, asset, gate_result=gate_result)
     duration = int(asset.duration_seconds or 0)

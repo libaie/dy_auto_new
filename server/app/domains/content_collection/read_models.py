@@ -10,7 +10,7 @@ from sqlalchemy import Integer, asc, cast, desc, func, or_
 
 from app.config import bj_now
 from app.db.models.content_collection import CollectedComment, CollectedUser, Conversation, ConversationMessage
-from app.db_models import Device, Task
+from app.db.models import Device, Task
 
 
 MAX_EXPORT_ROWS = 50000

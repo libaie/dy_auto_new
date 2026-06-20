@@ -4,9 +4,9 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.db_models import ProductionScene, ProductionShot
+from app.db.models import ProductionScene, ProductionShot
 from app.models.asset_anchor import ComposedShotPrompt
-from app.services.anchor_service import AssetAnchorManager
+from app.domains.creative_library.anchor_service import AssetAnchorManager
 
 
 DEFAULT_SEED_SCHEMA = {"seed": {"type": "number"}}

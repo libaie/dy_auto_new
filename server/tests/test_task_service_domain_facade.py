@@ -16,7 +16,7 @@ DOMAIN_IMPORT_PATHS = [
     REPO_ROOT / "server/app/domains/account_operations/channel_service.py",
 ]
 
-FACADE_IMPORT_PATHS = [
+CROSS_DOMAIN_IMPORT_PATHS = [
     REPO_ROOT / "server/app/domains/device_operations/polling.py",
     REPO_ROOT / "server/app/domains/device_operations/reporting.py",
 ]
@@ -68,11 +68,11 @@ def test_domain_modules_import_task_service_from_domain_path():
         assert "app.services.task_service" not in text
 
 
-def test_neighbor_domains_import_task_service_through_facade():
-    for path in FACADE_IMPORT_PATHS:
+def test_neighbor_domains_import_task_service_from_domain_path():
+    for path in CROSS_DOMAIN_IMPORT_PATHS:
         text = path.read_text(encoding="utf-8")
-        assert "app.services.task_service" in text
-        assert "app.domains.task_operations.task_service" not in text
+        assert "app.domains.task_operations.task_service" in text
+        assert "app.services.task_service" not in text
 
 
 def test_task_operations_readme_registers_task_service_facade():

@@ -406,7 +406,7 @@ async def start_run(
     db: Session = Depends(get_db),
     user=Depends(require_role("admin")),
 ):
-    from app.services.production_run_service import start_episode_production
+    from app.domains.video_production.production_run_service import start_episode_production
 
     try:
         run = await start_episode_production(
@@ -551,7 +551,7 @@ def real_worker_step(
     db: Session = Depends(get_db),
     user=Depends(require_role("admin")),
 ):
-    from app.services.production_worker_service import run_real_worker_step
+    from app.domains.video_production.production_worker_service import run_real_worker_step
 
     if body.async_mode:
         background_tasks.add_task(_run_real_worker_step_background, run_id, body.lease_id, body.batch_size)
@@ -584,7 +584,7 @@ def real_worker_step(
 
 
 def _run_real_worker_step_background(run_id: str, lease_id: str, batch_size: int) -> None:
-    from app.services.production_worker_service import run_real_worker_step
+    from app.domains.video_production.production_worker_service import run_real_worker_step
 
     db = SessionLocal()
     try:

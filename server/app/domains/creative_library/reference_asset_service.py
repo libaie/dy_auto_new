@@ -12,7 +12,7 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from app.config import bj_now
 from app.db.models.creative_library import Character, Scene
-from app.db_models import ImageCreationAsset, ImageCreationTask, Series, series_characters, series_scenes
+from app.db.models import ImageCreationAsset, ImageCreationTask, Series, series_characters, series_scenes
 from app.domains.image_generation.image_creation_storage import configured_public_base_url
 from app.domains.creative_library.visual_style_inference_service import (
     append_visual_style_constraints,
@@ -104,7 +104,7 @@ def _reference_url_needs_project_copy(value: str | None) -> bool:
 async def _ensure_project_reference_asset(db: Session, asset: ImageCreationAsset) -> ImageCreationAsset:
     if not asset.url or not _reference_url_needs_project_copy(asset.url):
         return asset
-    from app.services.image_creation_service import _copy_external_image
+    from app.domains.image_generation.image_creation_service import _copy_external_image
 
     source_url = asset.url
     try:
@@ -250,7 +250,7 @@ async def generate_reference_url(
     destination_role: str = "style_reference_image",
     destination_context: dict | None = None,
 ) -> str:
-    from app.services.image_creation_service import create_image_task, sync_image_task
+    from app.domains.image_generation.image_creation_service import create_image_task, sync_image_task
 
     payload = {
         "mode": "text_to_image",

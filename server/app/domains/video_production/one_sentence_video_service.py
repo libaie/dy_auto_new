@@ -12,7 +12,7 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from app.config import bj_now
 from app.db.models.video_production import ProductionScene, ProductionSegment, ProductionShot, VideoProductionRun
-from app.db_models import (
+from app.db.models import (
     Character,
     Episode,
     Scene,

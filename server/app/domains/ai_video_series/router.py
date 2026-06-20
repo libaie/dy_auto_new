@@ -1,11 +1,10 @@
-﻿"""系列 + 剧集管理 API."""
+"""系列 + 剧集管理 API."""
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import require_role, verify_admin_token
 from app.db.models.ai_video_series import Episode, Series
-# Cross-domain model: keep on app.db_models until its owning domain exists.
-from app.db_models import Character, Scene
+from app.db.models import Character, Scene
 from app.domains.ai_video_series import story_planning, style_lock
 from app.domains.ai_video_series.artifacts import (
     actor_id,
@@ -44,7 +43,7 @@ from app.domains.creative_library.asset_lifecycle_service import (
     unlink_character_from_series,
     unlink_scene_from_series,
 )
-from app.services.production_run_service import generate_episode_script_storyboard
+from app.domains.video_production.production_run_service import generate_episode_script_storyboard
 from app.domains.ai_video_series.series_planning_service import (
     ensure_episode_placeholders,
     ensure_series_continuity_artifacts,

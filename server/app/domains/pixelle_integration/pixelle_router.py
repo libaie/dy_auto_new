@@ -42,7 +42,7 @@ def _write_pixelle_config(data: dict):
 def _pixelle_api_key(db: Session | None = None) -> str:
     if db is not None:
         try:
-            from app.db_models import SystemSetting
+            from app.db.models import SystemSetting
             row = db.query(SystemSetting).filter(SystemSetting.key == "pixelle_api_key").first()
             if row and row.value:
                 return str(row.value)
@@ -94,7 +94,7 @@ async def get_pixelle_config(
 
 def _serialize_ai_models(db: Session) -> dict:
     """Read AIModel table and serialize to Pixelle-Video ai_models.scenes format."""
-    from app.db_models import AIModel
+    from app.db.models import AIModel
     from app.domains.system_configuration.crypto import decrypt
 
     models = db.query(AIModel).filter(AIModel.enabled == True).order_by(

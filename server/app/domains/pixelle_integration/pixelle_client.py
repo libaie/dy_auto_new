@@ -30,7 +30,7 @@ def _get_base_url(db: Session | None = None) -> str:
         return _normalize_base_url(_base_url)
     if db is not None:
         try:
-            from app.db_models import SystemSetting
+            from app.db.models import SystemSetting
             row = db.query(SystemSetting).filter(SystemSetting.key == "pixelle_video_url").first()
             if row and row.value:
                 _base_url = _normalize_base_url(row.value)
@@ -44,7 +44,7 @@ def _get_base_url(db: Session | None = None) -> str:
 def _get_api_key(db: Session | None = None) -> str:
     if db is not None:
         try:
-            from app.db_models import SystemSetting
+            from app.db.models import SystemSetting
             row = db.query(SystemSetting).filter(SystemSetting.key == "pixelle_api_key").first()
             if row and row.value:
                 return str(row.value)

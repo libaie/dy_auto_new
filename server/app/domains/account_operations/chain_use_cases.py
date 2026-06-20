@@ -2,7 +2,7 @@
 
 from app.config import bj_now
 from app.db.models.account_operations import Account, ChainInstance, ChainTemplate
-from app.db_models import Device, Task as DBTask
+from app.db.models import Device, Task as DBTask
 
 from .adapters import chain_service
 from .read_models import chain_instance_to_dict, chain_template_to_dict

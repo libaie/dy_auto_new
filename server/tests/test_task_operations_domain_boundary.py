@@ -86,11 +86,11 @@ def test_task_operations_pr5_wires_domain_router_in_main():
     assert "app.include_router(tasks.router)" not in text
 
 
-def test_task_operations_explicitly_stays_out_of_neighbor_domains():
+def test_task_operations_explicitly_keeps_router_out_of_neighbor_domains():
     task_text = LEGACY_TASKS_ROUTER_PATH.read_text(encoding="utf-8")
 
-    assert "task_operations" not in (DEVICE_OPERATIONS_PATH / "polling.py").read_text(encoding="utf-8")
-    assert "task_operations" not in (DEVICE_OPERATIONS_PATH / "reporting.py").read_text(encoding="utf-8")
+    assert "app.domains.task_operations.tasks_router" not in (DEVICE_OPERATIONS_PATH / "polling.py").read_text(encoding="utf-8")
+    assert "app.domains.task_operations.tasks_router" not in (DEVICE_OPERATIONS_PATH / "reporting.py").read_text(encoding="utf-8")
     assert "task_operations" not in (ACCOUNT_OPERATIONS_PATH / "chain_use_cases.py").read_text(encoding="utf-8")
     assert "task_operations" not in (CONTENT_COLLECTION_PATH / "mutations.py").read_text(encoding="utf-8")
     assert "app.domains.device_operations" not in task_text

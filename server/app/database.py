@@ -6,7 +6,7 @@ from pathlib import Path
 from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.orm import sessionmaker, Session
 
-from app.db_models import Base
+from app.db.models import Base
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +67,7 @@ def _seed_admin_user():
     """Create default admin user from env vars if users table is empty (idempotent)."""
     import os as _os
     import bcrypt as _bcrypt
-    from app.db_models import User
+    from app.db.models import User
 
     with SessionLocal() as db:
         if db.query(User).count() == 0:
@@ -81,7 +81,7 @@ def _seed_admin_user():
 
 def _seed_selector_descriptions():
     """Populate empty description fields for known action names (idempotent)."""
-    from app.db_models import UISelector
+    from app.db.models import UISelector
 
     descriptions = {
         "back_btn": "返回按钮",

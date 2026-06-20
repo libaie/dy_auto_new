@@ -79,7 +79,7 @@ async def create_device(
     user_id, _ = user
     # Validate bound_account_id references an existing account
     if request.bound_account_id:
-        from app.db_models import Account
+        from app.db.models import Account
         if not db.query(Account).filter(Account.id == request.bound_account_id).first():
             raise HTTPException(status_code=404, detail="Account not found")
 
@@ -318,7 +318,7 @@ async def update_device(
         dev.status = request.status
     if request.bound_account_id is not None:
         if request.bound_account_id:
-            from app.db_models import Account
+            from app.db.models import Account
             if not db.query(Account).filter(Account.id == request.bound_account_id).first():
                 raise HTTPException(status_code=404, detail="Account not found")
         dev.bound_account_id = request.bound_account_id
@@ -383,7 +383,7 @@ async def delete_device(
     user = Depends(verify_admin_token),
 ):
     from app.db.models.device_operations import DevicePairRequest
-    from app.db_models import Task
+    from app.db.models import Task
 
     user_id, role = user
     query = db.query(Device).filter(Device.id == device_id)

@@ -6,7 +6,7 @@ from sqlalchemy.orm.attributes import flag_modified
 from app.config import bj_now
 from app.db.models.creative_library import Character, Scene
 from app.db.models.video_production import VideoCollection
-from app.db_models import (
+from app.db.models import (
     Episode,
     PipelineRun,
     ProductionPlan,

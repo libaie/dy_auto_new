@@ -69,7 +69,7 @@ async def offline_checker():
             #    Offline-device tasks are handled by get_pending_task() stale recovery.
             stuck_minutes = int(os.getenv("TASK_STALE_MINUTES", "10"))
             stuck_cutoff = now - timedelta(seconds=stuck_minutes * 60)
-            from app.db_models import Task as DBTask, ChannelItem as DBChannelItem
+            from app.db.models import Task as DBTask, ChannelItem as DBChannelItem
             online_ids = [d.id for d in online_devices]  # reuse from liveness check above
             stuck_tasks = db.query(DBTask).filter(
                 DBTask.status == "running",

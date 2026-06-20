@@ -267,7 +267,7 @@ class ContentService:
         self, db: Session, template_body: str, context: dict[str, str],
     ) -> str:
         """Delegate to the AI generator service."""
-        from app.services.ai_generator import ai_generator
+        from app.domains.model_configuration.ai_generator import ai_generator
         return await ai_generator.generate(db, template_body, context)
 
     # --- Keyword Matrix Generation ---
@@ -276,7 +276,7 @@ class ContentService:
         """Generate expanded keyword matrix from a seed keyword using AI."""
         prompt = f"基于关键词「{keyword}」，生成 {count} 个相关的抖音搜索关键词。要求：包含同义词、长尾词、热门话题标签，每个关键词 2-8 个字。只返回 JSON 数组格式。"
 
-        from app.services.ai_generator import ai_generator
+        from app.domains.model_configuration.ai_generator import ai_generator
         system_prompt = (
             "你是一个抖音搜索引擎优化专家。用户提供一个种子关键词，"
             "你返回一个 JSON 字符串数组，包含相关的长尾关键词和同义词。"
@@ -314,7 +314,7 @@ class ContentService:
 
     async def generate_regex(self, db: Session, description: str) -> str:
         """Generate a regex pattern from natural language description."""
-        from app.services.ai_generator import ai_generator
+        from app.domains.model_configuration.ai_generator import ai_generator
         system_prompt = (
             "你是一个正则表达式专家。用户用大白话描述需求，你只返回对应的正则表达式，"
             "不要加引号、不要解释、不要 markdown 代码块。"
@@ -330,7 +330,7 @@ class ContentService:
 
     async def generate_clean_prompt(self, db: Session, description: str) -> str:
         """Generate an AI cleaning prompt from natural language description."""
-        from app.services.ai_generator import ai_generator
+        from app.domains.model_configuration.ai_generator import ai_generator
         system_prompt = (
             "你是一个数据清洗专家。用户描述需要从一段文本中提取或清洗什么信息，"
             "你返回一个清晰的清洗提示词，这个提示词会被用于 AI 清洗从抖音控件中提取的原始数据。"

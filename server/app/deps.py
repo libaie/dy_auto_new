@@ -27,7 +27,7 @@ def verify_device_secret(
         return None
 
     # Per-device secret — returns device_id for ownership verification
-    from app.db_models import Device
+    from app.db.models import Device
     device = db.query(Device).filter(Device.device_secret == x_device_secret).first()
     if device:
         return device.id

@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import verify_admin_token
 from app.db.models.creative_library import Scene
-from app.services.ai_generator import ai_generator
+from app.domains.model_configuration.ai_generator import ai_generator
 from app.domains.creative_library.asset_ai_rewrite_service import (
     AssetAiRewriteError,
     generate_scene_rewrite_candidate,

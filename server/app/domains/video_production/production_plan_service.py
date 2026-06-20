@@ -11,7 +11,7 @@ from app.db.models.video_production import (
     ProductionSegment,
     ProductionShot,
 )
-from app.db_models import (
+from app.db.models import (
     Episode,
     Series,
 )

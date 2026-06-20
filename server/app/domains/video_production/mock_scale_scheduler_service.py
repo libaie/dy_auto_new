@@ -17,7 +17,7 @@ from app.db.models.video_production import (
     VideoProductionAsset,
     VideoProductionRun,
 )
-from app.db_models import (
+from app.db.models import (
     Episode,
     Series,
 )

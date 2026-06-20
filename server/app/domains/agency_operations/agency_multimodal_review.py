@@ -4,7 +4,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.db_models import Episode, VideoProductionAsset, VideoProductionRun
+from app.db.models import Episode, VideoProductionAsset, VideoProductionRun
 from app.domains.agency_operations.agency_orchestrator import AgencyOrchestrator
 from app.domains.model_configuration.runtime_model_config import resolve_runtime_model_config
 

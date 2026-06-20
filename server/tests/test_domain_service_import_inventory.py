@@ -3,36 +3,9 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DOMAIN_ROOT = REPO_ROOT / "server/app/domains"
+APP_ROOT = REPO_ROOT / "server/app"
 
-EXPECTED_DOMAIN_SERVICE_IMPORTS = {
-    ("server/app/domains/ai_text_artifacts/ai_text_artifact_service.py", "ai_generator"),
-    ("server/app/domains/ai_video_series/read_models.py", "agency_console"),
-    ("server/app/domains/ai_video_series/router.py", "production_run_service"),
-    ("server/app/domains/ai_video_series/story_generator_expert.py", "agency_runtime"),
-    ("server/app/domains/ai_video_series/style_lock.py", "ai_generator"),
-    ("server/app/domains/content_collection/collection_reports.py", "ai_generator"),
-    ("server/app/domains/content_collection/content_service.py", "ai_generator"),
-    ("server/app/domains/content_collection/mutations.py", "ai_generator"),
-    ("server/app/domains/creative_library/asset_ai_rewrite_service.py", "ai_generator"),
-    ("server/app/domains/creative_library/characters_router.py", "ai_generator"),
-    ("server/app/domains/creative_library/reference_asset_service.py", "image_creation_service"),
-    ("server/app/domains/creative_library/scenes_router.py", "ai_generator"),
-    ("server/app/domains/device_operations/polling.py", "task_service"),
-    ("server/app/domains/device_operations/reporting.py", "task_service"),
-    ("server/app/domains/director_planning/director_router.py", "ai_generator"),
-    ("server/app/domains/image_generation/image_ab_test_service.py", "image_creation_service"),
-    ("server/app/domains/image_generation/image_asset_bridge_service.py", "image_creation_service"),
-    ("server/app/domains/image_generation/image_creation_router.py", "image_creation_service"),
-    ("server/app/domains/image_generation/image_selection_preview_service.py", "image_creation_service"),
-    ("server/app/domains/prompt_management/prompt_templates_router.py", "ai_generator"),
-    ("server/app/domains/script_pipeline/script_pipeline_service.py", "agency_orchestrator"),
-    ("server/app/domains/script_pipeline/script_pipeline_service.py", "agency_runtime"),
-    ("server/app/domains/storyboard_images/storyboard_image_service.py", "image_creation_service"),
-    ("server/app/domains/video_production/review_asset_edit_service.py", "image_creation_service"),
-    ("server/app/domains/video_production/video_production_router.py", "production_run_service"),
-    ("server/app/domains/video_production/video_production_router.py", "production_worker_service"),
-}
+EXPECTED_DOMAIN_SERVICE_IMPORTS = set()
 
 
 def test_domain_service_import_inventory_matches_allowlist():
@@ -41,7 +14,9 @@ def test_domain_service_import_inventory_matches_allowlist():
 
 def _domain_service_imports() -> set[tuple[str, str]]:
     imports: set[tuple[str, str]] = set()
-    for path in DOMAIN_ROOT.rglob("*.py"):
+    for path in APP_ROOT.rglob("*.py"):
+        if path.relative_to(APP_ROOT).parts[:1] == ("services",):
+            continue
         relative_path = path.relative_to(REPO_ROOT).as_posix()
         tree = ast.parse(path.read_text(encoding="utf-8-sig"), filename=str(path))
         for node in ast.walk(tree):

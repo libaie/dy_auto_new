@@ -14,8 +14,7 @@ from sqlalchemy.orm.attributes import flag_modified
 from app.config import bj_now
 from app.database import SessionLocal
 from app.db.models.ai_video_series import ProductionJob, ProductionPlan, Series
-# Cross-domain model: keep on app.db_models until its owning domain exists.
-from app.db_models import Character, Scene
+from app.db.models import Character, Scene
 from app.domains.ai_video_series.read_models import (
     character_reference_urls,
     reference_status,
@@ -23,7 +22,7 @@ from app.domains.ai_video_series.read_models import (
     series_char_dict,
     series_scene_dict,
 )
-from app.services.ai_generator import ai_generator
+from app.domains.model_configuration.ai_generator import ai_generator
 from app.domains.agency_operations.agency_orchestrator import AgencyOrchestrator
 from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
 from app.domains.creative_library.reference_asset_service import (

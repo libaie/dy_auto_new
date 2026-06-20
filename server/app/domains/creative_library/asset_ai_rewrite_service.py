@@ -6,7 +6,7 @@ from json import JSONDecodeError
 from sqlalchemy.orm import Session
 
 from app.db.models.creative_library import Character, Scene
-from app.services.ai_generator import ai_generator
+from app.domains.model_configuration.ai_generator import ai_generator
 
 
 class AssetAiRewriteError(Exception):

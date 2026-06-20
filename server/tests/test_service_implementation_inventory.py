@@ -7,17 +7,11 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SERVICES_ROOT = REPO_ROOT / "server/app/services"
 DOMAINS_ROOT = REPO_ROOT / "server/app/domains"
 
-EXPECTED_NON_FACADE_SERVICE_FILES = {
-    "video_agency_team.py",
-}
+EXPECTED_NON_FACADE_SERVICE_FILES = set()
 
-EXPECTED_MIXED_FACADE_SERVICE_FILES = {
-    "video_production_service.py",
-}
+EXPECTED_MIXED_FACADE_SERVICE_FILES = set()
 
-EXPECTED_SERVICE_DOMAIN_TARGETS = {
-    "video_agency_team.py": "agency_operations",
-}
+EXPECTED_SERVICE_DOMAIN_TARGETS = {}
 
 
 def test_service_implementation_inventory_matches_allowlist():

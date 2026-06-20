@@ -61,6 +61,9 @@ repair task routes.
 - `agency_persistence.py` owns agency expert invocation idempotency, retryable
   resume state, finalization, repair task classification, creative patch
   creation, and production audit event mirroring.
+- `video_agency_team.py` owns the embedded video agency team definition,
+  current team version checks, role summaries, and agency context building for
+  story, style, and production review stages.
 
 ## Facade Register
 
@@ -82,6 +85,7 @@ repair task routes.
 | `app.services.agency_prompting` | `app.domains.agency_operations.agency_prompting` | Keep while dirty agency runtime code imports prompt construction from `app.services`; remove after import inventory is clean. |
 | `app.services.agency_runtime` | `app.domains.agency_operations.agency_runtime` | Keep while dirty agency orchestrator, story generator, script pipeline, and legacy tests import runtime symbols from `app.services`; remove after import inventory is clean. |
 | `app.services.agency_persistence` | `app.domains.agency_operations.agency_persistence` | Keep while dirty agency orchestrator, story generator, and legacy tests import invocation persistence from `app.services`; remove after import inventory is clean. |
+| `app.services.video_agency_team` | `app.domains.agency_operations.video_agency_team` | Keep while legacy tests and older callers import team helpers through `app.services`; remove after import inventory is clean. |
 
 ## Boundaries
 

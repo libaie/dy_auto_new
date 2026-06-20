@@ -35,7 +35,7 @@ from app.domains.video_production.production_status import (
 )
 from app.domains.video_production.provider_capability_service import capability_from_model_config
 from app.domains.video_production.provider_stage_executor import ProviderStageExecutor
-from app.services.video_production_service import run_ai_audit_for_assets
+from app.domains.video_production.video_production_service import run_ai_audit_for_assets
 from app.domains.video_production.video_production_run_types import MOCK_SERIES_SCALE, REAL_SHORT_E2E, get_run_type
 
 
@@ -112,7 +112,7 @@ async def _run_deferred_stage_gates(
     job: ProductionJob,
     job_spec: dict,
 ) -> ProductionActionResult | None:
-    from app.services import video_production_service as video_service
+    from app.domains.video_production import video_production_service as video_service
     from app.domains.model_configuration.runtime_model_config import RuntimeModelConfigError
 
     gates: list[tuple[str, str, Any]] = []
@@ -589,7 +589,7 @@ def _image_stage_context_for_model(context: dict, model_config: dict) -> dict:
 
 
 def _job_spec(db: Session, run: VideoProductionRun, job: ProductionJob) -> dict:
-    from app.services import video_production_service as video_service
+    from app.domains.video_production import video_production_service as video_service
 
     _guard_creative_patch_job(db, run, job)
     if job.stage == "image_generation":
@@ -681,7 +681,7 @@ class PixelleStageClientAdapter:
         self.job = job
 
     async def submit(self, payload: dict) -> dict:
-        from app.services import video_production_service as video_service
+        from app.domains.video_production import video_production_service as video_service
 
         model_config = payload["model_config"]
         provider_template = _provider_stage_template(payload)
@@ -719,7 +719,7 @@ class PixelleStageClientAdapter:
         return {**response, "provider_task_id": stage_task_id}
 
     async def sync(self, provider_task_id: str) -> dict:
-        from app.services import video_production_service as video_service
+        from app.domains.video_production import video_production_service as video_service
 
         status = await video_service.get_stage_task(self.db, provider_task_id)
         return {**status, "provider_task_id": provider_task_id, "stage_task_id": provider_task_id}
@@ -749,7 +749,7 @@ def _persist_completed_provider_result(
     job: ProductionJob,
     result: ProductionActionResult,
 ) -> bool:
-    from app.services import video_production_service as video_service
+    from app.domains.video_production import video_production_service as video_service
     from app.domains.video_production.asset_storage_guard import persist_provider_asset
 
     provider_result = result.data.get("provider_result", {}) if isinstance(result.data, dict) else {}

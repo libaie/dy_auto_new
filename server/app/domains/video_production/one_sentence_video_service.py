@@ -42,8 +42,8 @@ from app.domains.production_observability.production_observability_service impor
 from app.domains.script_pipeline.storyboard_timing import format_time_range
 from app.domains.video_production import production_plan_service, production_run_service
 from app.domains.video_production.production_errors import ProductionErrorCode, ProductionRepairableError
-from app.services.video_agency_team import ensure_video_agency_team
-from app.services.video_production_service import VideoProductionError
+from app.domains.agency_operations.video_agency_team import ensure_video_agency_team
+from app.domains.video_production.video_production_service import VideoProductionError
 from app.domains.video_production.video_production_run_types import (
     MOCK_SERIES_SCALE,
     REAL_SHORT_E2E,

@@ -29,10 +29,13 @@ from app.domains.video_production.review_asset_edit_service import (
     void_asset_version,
 )
 from app.domains.video_production.mock_scale_scheduler_service import advance_mock_scheduler
-from app.services.one_sentence_video_service import complete_one_sentence_reference_generation, create_one_sentence_video
+from app.domains.video_production.one_sentence_video_service import (
+    complete_one_sentence_reference_generation,
+    create_one_sentence_video,
+)
 from app.domains.video_production.video_production_readiness import build_run_readiness
 from app.domains.video_production.video_production_run_types import LEGACY_EPISODE_RUN, MOCK_SERIES_SCALE, REAL_SHORT_E2E, get_run_type
-from app.services.video_production_service import (
+from app.domains.video_production.video_production_service import (
     VideoProductionError,
     approve_asset,
     create_regenerated_image_asset,
@@ -996,7 +999,7 @@ def retry_asset_persistence(
     user=Depends(require_role("admin")),
 ):
     from app.domains.video_production.asset_storage_guard import persist_provider_asset
-    from app.services.video_production_service import run_ai_audit_for_assets, run_final_audit_for_asset
+    from app.domains.video_production.video_production_service import run_ai_audit_for_assets, run_final_audit_for_asset
 
     try:
         existing = db.query(VideoProductionAsset).filter_by(id=asset_id).first()

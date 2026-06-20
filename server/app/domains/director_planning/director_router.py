@@ -16,7 +16,7 @@ from app.services.ai_generator import ai_generator
 from app.domains.agency_operations.agency_orchestrator import AgencyOrchestrator
 from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
 from app.domains.model_configuration.runtime_model_config import RuntimeModelConfigError, resolve_runtime_model_config
-from app.services.video_agency_team import build_agency_context, ensure_video_agency_team
+from app.domains.agency_operations.video_agency_team import build_agency_context, ensure_video_agency_team
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/director", tags=["director"])

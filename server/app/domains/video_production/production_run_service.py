@@ -36,7 +36,7 @@ from app.domains.video_production.production_plan_service import (
     create_episode_production_plan,
     ensure_shot_segments,
 )
-from app.services.video_production_service import create_run_from_episode, start_image_stage
+from app.domains.video_production.video_production_service import create_run_from_episode, start_image_stage
 from app.domains.video_production.video_production_run_types import (
     LEGACY_EPISODE_RUN,
     MOCK_SERIES_SCALE,

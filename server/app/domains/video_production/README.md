@@ -11,8 +11,6 @@ This domain owns the video production control-plane HTTP routes.
 - Production ORM models stay in `app.db_models`.
 - Database session helpers stay in `app.database`.
 - Auth dependencies stay in `app.deps`.
-- Remaining legacy stage orchestration and text artifacts stay in
-  `app.services.*` until migrated.
 - Video library routes stay in `app.domains.video_library`.
 
 ## Current Modules
@@ -96,6 +94,10 @@ This domain owns the video production control-plane HTTP routes.
   `StartRunRequest` and `OneSentenceVideoRequest`, payload helpers such as
   `_run_payload`, `_asset_payload`, and `_provider_stage_task_payload`,
   HTTP error mapping helpers, and all `/api/video-production/*` route handlers.
+- `video_production_service.py` owns staged video production orchestration,
+  provider stage submission and sync, AI and final audits, asset approval and
+  regeneration, creative patch gates, backtrack triggers, and linked plan stage
+  payload construction.
 
 ## Facade Register
 
@@ -125,7 +127,8 @@ This domain owns the video production control-plane HTTP routes.
 | `app.services.video_production_state` | `app.domains.video_production.video_production_state` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, approved cross-domain consumers, or service modules whose domains have not moved yet. |
 | `app.services.video_production_run_types` | `app.domains.video_production.video_production_run_types` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.video_production_readiness` | `app.domains.video_production.video_production_readiness` | Domain router imports the domain readiness helper directly, and legacy imports remain only in compatibility tests or older callers not yet migrated. |
-| `app.services.one_sentence_video_service` | `app.domains.video_production.one_sentence_video_service` | Keep while app startup/shutdown, video production router, legacy tests, and `video_production_service` compatibility calls import one-sentence orchestration through `app.services`; remove after import inventory is clean. |
+| `app.services.one_sentence_video_service` | `app.domains.video_production.one_sentence_video_service` | Keep while app startup/shutdown, legacy tests, and older callers import one-sentence orchestration through `app.services`; remove after import inventory is clean. |
+| `app.services.video_production_service` | `app.domains.video_production.video_production_service` | Keep while legacy tests and older callers import or monkeypatch staged production orchestration through `app.services`; remove after import inventory is clean. |
 | `app.services.provider_capability_service` | `app.domains.video_production.provider_capability_service` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, approved cross-domain consumers, or service modules whose domains have not moved yet. |
 | `app.services.provider_cost_reservation_service` | `app.domains.video_production.provider_cost_reservation_service` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, approved cross-domain consumers, or service modules whose domains have not moved yet. |
 | `app.services.provider_stage_task_service` | `app.domains.video_production.provider_stage_task_service` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
@@ -138,7 +141,7 @@ This domain owns the video production control-plane HTTP routes.
 - Preserve admin-role protection on every route.
 - Preserve monkeypatch compatibility for `app.routers.video_production`, notably
   helpers like `edit_image_asset`.
-- Preserve service-layer ownership of production state transitions.
+- Preserve video production domain ownership of production state transitions.
 - Preserve background helpers for one-sentence references and real worker steps.
 
 ## Compatibility Cleanup Gates

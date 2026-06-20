@@ -14,7 +14,8 @@ This domain owns AI-assisted image and video asset quality audit routes.
 - Audit gate compatibility imports stay in `app.services.audit_gate` during
   the facade phase.
 - Model registry and runtime model configuration stay in shared services.
-- Video production orchestration stays in `app.services.video_production_service`.
+- Video production orchestration stays in
+  `app.domains.video_production.video_production_service`.
 
 ## Current Modules
 

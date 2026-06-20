@@ -42,7 +42,7 @@ from app.domains.video_production.production_status import (
     PLAN_READY,
 )
 from app.domains.model_configuration.runtime_model_config import RuntimeModelConfigError, resolve_runtime_model_config
-from app.services.video_agency_team import (
+from app.domains.agency_operations.video_agency_team import (
     build_video_agency_team,
     ensure_video_agency_team,
     summarize_video_agency_team,

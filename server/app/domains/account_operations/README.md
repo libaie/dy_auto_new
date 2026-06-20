@@ -109,8 +109,8 @@ business use cases remain in `content_collection`.
 | `app.routers.account_groups` | `app.domains.account_operations.account_groups_router` | Planned PR3 | Account group CRUD and member tests pass with the domain router and all callers have an explicit compatibility path. |
 | `app.routers.channels` | `app.domains.account_operations.channels_router` | Planned PR3 | Channel API, edit, model, service, and notification tests pass with the domain router. |
 | `app.routers.chains` | `app.domains.account_operations.chains_router` | Planned PR3 | Chain API, chain service, task compatibility, and device cancel notification tests pass with the domain router. |
-| `app.services.chain_service` | `app.domains.account_operations.chain_service` | Chain service domain slice | Keep while `rg -n "app\.services\.chain_service" server/app -g "*.py"` returns the approved `task_service` compatibility import; remove only when that command returns no production imports. |
-| `app.services.channel_service` | `app.domains.account_operations.channel_service` | Channel service domain slice | Keep while `rg -n "app\.services\.channel_service" server/app -g "*.py"` returns approved task/device bridge compatibility imports; remove only when that command returns no production imports. |
+| `app.services.chain_service` | `app.domains.account_operations.chain_service` | Chain service domain slice | Keep while legacy imports remain only compatibility tests or migration docs. |
+| `app.services.channel_service` | `app.domains.account_operations.channel_service` | Channel service domain slice | Keep while legacy imports remain only compatibility tests or migration docs. |
 | `app.db_models.Account` / `AccountGroup` / `AccountGroupMember` / `ChainTemplate` / `ChainInstance` / `Channel` / `ChannelItem` | `app.db.models.account_operations` | ORM boundary slices | Keep as compatibility re-exports until production imports use the domain model path. |
 
 ## Migration Checklist
@@ -148,6 +148,6 @@ Do not remove `app.routers.accounts`, `app.routers.account_groups`, `app.routers
 - `server/tests/test_account_operations_notifications.py` proves websocket payloads still reach admins and devices.
 - `app.main` imports account operations routers from `app.domains.account_operations`.
 - Release notes mention the import-path migration.
-- Do not remove `app.services.chain_service` while `server/app/services/task_service.py` imports it; removal requires zero production matches from `rg -n "app\.services\.chain_service" server/app -g "*.py"`.
+- Remove service facades only after cleanup tests prove no production imports remain.
 
 Do not move `server/app/routers/tasks.py`, device polling, content collection, DM, ORM model ownership, or persistence class bodies until separate plans approve those boundaries.

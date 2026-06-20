@@ -11,7 +11,7 @@ from app.deps import verify_device_secret
 from app.models import PollResponse
 from app.domains.prompt_management.prompt_template_service import prompt_template_service
 from app.domains.selector_management.selector_service import selector_service
-from app.domains.task_operations.task_service import task_service
+from app.services.task_service import task_service
 from app.ws_manager import pair_ws_manager
 
 logger = logging.getLogger(__name__)
@@ -57,7 +57,7 @@ async def poll_tasks(
     # resume execution instead of idling forever waiting for a new task.
     from app.db_models import Task as DBTask
     from app.models import TaskStatus
-    from app.domains.task_operations.task_service import _db_task_to_pydantic
+    from app.services.task_service import _db_task_to_pydantic
     running_task = db.query(DBTask).filter(
         DBTask.device_id == device_id,
         DBTask.status == TaskStatus.RUNNING.value,

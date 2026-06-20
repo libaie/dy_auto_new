@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import verify_device_secret
 from app.models import RiskReport, StatsIncrementRequest, TaskProgressReport, TaskResultReport
-from app.domains.task_operations.task_service import task_service
+from app.services.task_service import task_service
 from app.ws_manager import pair_ws_manager
 from app.domains.device_operations.status_ws import _notify_pending_tasks
 

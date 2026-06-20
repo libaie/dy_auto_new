@@ -18,6 +18,8 @@ EXPECTED_DOMAIN_SERVICE_IMPORTS = {
     ("server/app/domains/creative_library/characters_router.py", "ai_generator"),
     ("server/app/domains/creative_library/reference_asset_service.py", "image_creation_service"),
     ("server/app/domains/creative_library/scenes_router.py", "ai_generator"),
+    ("server/app/domains/device_operations/polling.py", "task_service"),
+    ("server/app/domains/device_operations/reporting.py", "task_service"),
     ("server/app/domains/director_planning/director_router.py", "ai_generator"),
     ("server/app/domains/image_generation/image_ab_test_service.py", "image_creation_service"),
     ("server/app/domains/image_generation/image_asset_bridge_service.py", "image_creation_service"),

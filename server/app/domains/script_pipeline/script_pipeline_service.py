@@ -390,6 +390,7 @@ class PipelineManager:
             runtime_config,
         )
         previous[PipelineStage.VISUAL_SHOTS.value] = shots.model_dump(mode="json")
+        await self._run_gate(db, run, PipelineStage.VISUAL_SHOTS, series_id, episode_id, previous, gate_runtime_config)
 
         result = EpisodeScript(
             series_id=series_id,
@@ -531,19 +532,10 @@ class PipelineManager:
         status = trace.get("stage_status")
         if status in {"blocked", "failed"}:
             state["human_intervention_required"] = True
-            record["status"] = status
             record["error"] = {
                 "error_code": "SCRIPT_EXPERT_GATE_BLOCKED",
                 "message": f"expert gate blocked: {stage.value}",
             }
-            _persist_run_state(db, run)
-            raise ScriptGenerationError(
-                f"expert gate blocked: {stage.value}",
-                stage=stage.value,
-                pipeline_run_id=run.id,
-                attempts=int(record.get("attempts") or 0),
-                error_code="SCRIPT_EXPERT_GATE_BLOCKED",
-            )
         _persist_run_state(db, run)
         return trace
 
@@ -724,9 +716,8 @@ class PipelineManager:
 
     def _storyboard_snapshot(self, script: EpisodeScript) -> dict[str, Any]:
         frames = []
-        scope = script.episode_asset_scope if isinstance(script.episode_asset_scope, dict) else {}
-        has_asset_scope = bool(scope.get("scene_ids")) and bool(scope.get("character_ids"))
         for shot in script.visual_shots.shots:
+            scene_id, character_ids = self._frame_asset_ids(script, shot)
             frame = {
                 "frame_id": f"shot-{shot.shot_number:03d}",
                 "image_prompt": shot.visual_prompt,
@@ -736,11 +727,9 @@ class PipelineManager:
                 "action": shot.beat_type.value,
                 "emotion": shot.beat_type.value,
                 "shot_type": "dramatic_script_pipeline",
+                "scene_id": scene_id,
+                "character_ids": character_ids,
             }
-            if has_asset_scope:
-                scene_id, character_ids = self._frame_asset_ids(script, shot)
-                frame["scene_id"] = scene_id
-                frame["character_ids"] = character_ids
             frames.append(frame)
         storyboard = annotate_storyboard_with_timing({
             "source": "dramatic_script_pipeline",
@@ -776,7 +765,7 @@ class PipelineManager:
             frame["camera_movement"] = camera_movement
             frame["action"] = shot.video_prompt
             frame["emotion"] = emotion
-            frame["detailed_image_prompt"] = build_detailed_image_prompt(
+            image_prompt = build_detailed_image_prompt(
                 time_range=frame["time_range"],
                 subject=subject,
                 scene=location,
@@ -786,7 +775,7 @@ class PipelineManager:
                 raw_prompt=shot.visual_prompt,
                 continuity=continuity,
             )
-            frame["detailed_video_prompt"] = build_detailed_video_prompt(
+            video_prompt = build_detailed_video_prompt(
                 time_range=frame["time_range"],
                 subject=subject,
                 scene=location,
@@ -797,6 +786,12 @@ class PipelineManager:
                 raw_prompt=shot.video_prompt,
                 continuity=continuity,
             )
+            frame["raw_image_prompt"] = shot.visual_prompt
+            frame["raw_video_prompt"] = shot.video_prompt
+            frame["image_prompt"] = image_prompt
+            frame["video_prompt"] = video_prompt
+            frame["detailed_image_prompt"] = image_prompt
+            frame["detailed_video_prompt"] = video_prompt
         return storyboard
 
     def mark_stage_completed_for_test(

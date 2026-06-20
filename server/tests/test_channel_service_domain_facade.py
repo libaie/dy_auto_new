@@ -79,7 +79,7 @@ def test_account_operations_adapters_imports_domain_channel_service_only():
 
 def test_task_service_stays_legacy_compatible():
     text = TASK_SERVICE_PATH.read_text(encoding="utf-8")
-    assert "app.services.channel_service" in text
+    assert "app.services.channel_service" not in text
     assert "app.domains.account_operations.channel_service" not in text
 
 
@@ -103,8 +103,7 @@ def test_account_operations_docs_register_channel_service_facade():
         "app.domains.account_operations.channel_service",
         "app.services.channel_service",
         "ChannelService",
-        "approved task/device bridge compatibility imports",
-        "remove only when that command returns no production imports",
+        "legacy imports remain only compatibility tests or migration docs",
     ]:
         assert term in readme
 

@@ -65,13 +65,13 @@ def test_provider_stage_executor_imports_domain_helper_contracts():
         "provider_capability_service",
         "provider_cost_reservation_service",
         "provider_stage_task_service",
+        "production_queue_service",
     ]:
         assert f"app.domains.video_production.{module_name}" in text
         assert f"app.services.{module_name}" not in text
 
     assert "app.domains.production_observability.production_observability_service" in text
     assert "app.services.production_observability" not in text
-    assert "app.services.production_queue_service" in text
 
 
 def test_system_health_router_imports_domain_executor_constant():

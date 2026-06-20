@@ -49,10 +49,11 @@ from app.domains.video_production.video_production_run_types import (
 
 REAL_SHORT_MIN_SECONDS = 5
 REAL_SHORT_MAX_SECONDS = 28800
-PREFERRED_SHOT_SECONDS = 8
+PREFERRED_SHOT_SECONDS = 2
 SERIES_START_TEXT_ARTIFACTS = ("series_bible", "series_story_plan", "season_arc", "continuity_ledger")
 EPISODE_START_TEXT_ARTIFACTS = (
     "episode_outline",
+    "episode_script",
     "storyboard",
     "dialogue",
     "image_prompt",
@@ -281,6 +282,38 @@ def _storyboard_content_text(storyboard: dict) -> str:
     return "\n".join(timed_lines or _storyboard_dialogue_lines(storyboard))
 
 
+def _episode_script_from_storyboard(series: Series, episode: Episode, storyboard: dict) -> dict:
+    frames = storyboard.get("frames") if isinstance(storyboard.get("frames"), list) else []
+    script_frames = []
+    for index, frame in enumerate(frames, start=1):
+        if not isinstance(frame, dict):
+            continue
+        summary = frame.get("narration") or frame.get("image_prompt") or frame.get("frame_id") or f"Frame {index}"
+        script_frames.append({
+            "scene_number": frame.get("scene_number") or index,
+            "frame_id": frame.get("frame_id") or f"frame-{index:03d}",
+            "time_range": frame.get("time_range") or "",
+            "summary": str(summary),
+            "scene_id": frame.get("scene_id"),
+            "character_ids": frame.get("character_ids") or [],
+            "narration": frame.get("narration") or "",
+            "image_prompt": frame.get("image_prompt") or "",
+            "video_prompt": frame.get("video_prompt") or "",
+        })
+    if not script_frames:
+        return {}
+    return {
+        "source": "start_episode_production_storyboard_import",
+        "series_id": series.id,
+        "episode_id": episode.id,
+        "episode_number": int(episode.episode_number or 0),
+        "title": episode.title or f"Episode {episode.episode_number}",
+        "series_title": series.title or "",
+        "logline": series.logline or "",
+        "scenes": script_frames,
+        "storyboard_frame_count": len(script_frames),
+    }
+
 def _create_approved_import_artifact(
     service: AITextArtifactService,
     *,
@@ -346,7 +379,14 @@ def _ensure_episode_start_text_artifacts(
             content_json=storyboard,
             content_text=_storyboard_content_text(storyboard),
         )
-    if isinstance(episode.script_json, dict) and episode.script_json and not service.latest_approved(
+    script_json = episode.script_json if isinstance(episode.script_json, dict) and episode.script_json else {}
+    if not script_json:
+        script_json = _episode_script_from_storyboard(series, episode, storyboard)
+        if script_json:
+            episode.script_json = script_json
+            db.add(episode)
+            db.flush()
+    if script_json and not service.latest_approved(
         target_type="episode",
         target_id=episode.id,
         artifact_type="episode_script",
@@ -358,8 +398,8 @@ def _ensure_episode_start_text_artifacts(
             target_type="episode",
             target_id=episode.id,
             artifact_type="episode_script",
-            content_json=episode.script_json,
-            content_text=json.dumps(episode.script_json, ensure_ascii=False),
+            content_json=script_json,
+            content_text=json.dumps(script_json, ensure_ascii=False),
         )
     dialogue_lines = _storyboard_dialogue_lines(storyboard)
     if not service.latest_approved(
@@ -755,6 +795,53 @@ def _ensure_episode_asset_scope_ready(series: Series, episode: Episode, storyboa
     _raise_episode_asset_scope_missing(series, episode)
 
 
+def _script_gate_statuses(trace: dict | None) -> list[str]:
+    if not isinstance(trace, dict):
+        return []
+    statuses: list[str] = []
+    status = trace.get("stage_status")
+    if isinstance(status, str):
+        statuses.append(status)
+    for value in trace.values():
+        if isinstance(value, dict) and isinstance(value.get("stage_status"), str):
+            statuses.append(value["stage_status"])
+    return statuses
+
+
+def _raise_if_script_generation_blocked(series: Series, episode: Episode, trace: dict | None) -> None:
+    statuses = _script_gate_statuses(trace)
+    if not any(status in {"blocked", "failed"} for status in statuses):
+        return
+    raise ProductionRepairableError(
+        code=ProductionErrorCode.REVIEW_GATE_BLOCKED,
+        message="Script generation expert review is blocked; production cannot start from unapproved script outputs.",
+        cause="script_generation_gate_blocked",
+        repair_action="Open the AI text artifact workbench or script pipeline, fix the blocked script review, then start production again.",
+        repair_route=f"/series/{series.id}/ai-text-artifacts",
+        retryable=True,
+        affected_ids=[episode.id],
+    )
+
+def _raise_if_existing_script_inputs_blocked(
+    service: AITextArtifactService,
+    series: Series,
+    episode: Episode,
+) -> None:
+    if isinstance(episode.script_json, dict):
+        _raise_if_script_generation_blocked(series, episode, episode.script_json.get("agency_trace"))
+    artifact = service.latest_approved(
+        target_type="episode",
+        target_id=episode.id,
+        artifact_type="episode_script",
+    )
+    if not artifact:
+        return
+    review_trace = artifact.review_trace_json if isinstance(artifact.review_trace_json, dict) else None
+    _raise_if_script_generation_blocked(series, episode, review_trace)
+    content = artifact.content_json if isinstance(artifact.content_json, dict) else {}
+    trace = content.get("agency_trace") if isinstance(content.get("agency_trace"), dict) else None
+    _raise_if_script_generation_blocked(series, episode, trace)
+
 def _episode_script_missing(service: AITextArtifactService, episode: Episode) -> bool:
     if isinstance(episode.script_json, dict) and episode.script_json:
         return False
@@ -818,7 +905,7 @@ async def _try_generate_script_storyboard(
 ) -> tuple[dict | None, dict | None]:
     episode_asset_scope = _episode_asset_scope_from_outline(artifact_service, series, episode)
     try:
-        await PipelineManager().start_or_resume(
+        script = await PipelineManager().start_or_resume(
             db,
             series_id=series.id,
             episode_id=episode.id,
@@ -832,6 +919,12 @@ async def _try_generate_script_storyboard(
             target_duration_seconds=target_duration_seconds,
             episode_asset_scope=episode_asset_scope,
         )
+        trace = getattr(script, "agency_trace", None)
+        if not trace and isinstance(episode.script_json, dict):
+            trace = episode.script_json.get("agency_trace")
+        _raise_if_script_generation_blocked(series, episode, trace)
+    except ProductionRepairableError:
+        raise
     except Exception as exc:
         return None, {
             "stage": "script_generation",
@@ -1123,6 +1216,7 @@ async def start_episode_production(
         series_id=series_id,
         episode_id=episode_id,
     )
+    _raise_if_existing_script_inputs_blocked(artifact_service, series, episode)
     if prepare_text_artifacts:
         await generate_series_story_plan(db, series_id)
         db.refresh(series)

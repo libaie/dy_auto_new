@@ -75,7 +75,7 @@ def test_account_operations_adapters_imports_domain_chain_service_only():
 def test_task_service_stays_legacy_compatible():
     text = TASK_SERVICE_PATH.read_text(encoding="utf-8")
 
-    assert "app.services.chain_service" in text
+    assert "app.services.chain_service" not in text
     assert "app.domains.account_operations.chain_service" not in text
 
 
@@ -86,8 +86,8 @@ def test_account_operations_docs_register_chain_service_facade():
         "app.domains.account_operations.chain_service",
         "app.services.chain_service",
         "ChainService",
-        "approved `task_service` compatibility import",
-        "remove only when that command returns no production imports",
+        "legacy imports remain only compatibility tests or migration docs",
+
     ]:
         assert term in readme
 

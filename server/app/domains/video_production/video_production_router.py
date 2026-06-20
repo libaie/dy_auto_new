@@ -418,6 +418,7 @@ async def start_run(
             autostart_images=body.autostart_images,
             run_type=body.run_type,
             auto_repair_policy=body.auto_repair_policy,
+            prepare_text_artifacts=True,
         )
     except ProductionRepairableError as exc:
         raise HTTPException(409, to_http_detail(exc))

@@ -4,8 +4,8 @@ Date: 2026-06-20
 
 ## Goal
 
-Create `app.domains.prompt_management` and move admin prompt template route
-ownership behind a compatibility-preserving domain module.
+Create `app.domains.prompt_management` and move admin prompt template route and
+service ownership behind compatibility-preserving domain modules.
 
 ## PR1: Boundary And Route Snapshot
 
@@ -42,8 +42,13 @@ ownership behind a compatibility-preserving domain module.
 
 - Split rewrite-stream orchestration and websocket notification helpers only
   after this route-boundary migration is stable.
-- Keep `prompt_template_service` stable until a separate service-split plan is
-  approved.
+- Prompt template service logic now lives in
+  `app.domains.prompt_management.prompt_template_service`; keep
+  `app.services.prompt_template_service` as a compatibility facade until
+  direct-domain coverage replaces legacy imports.
+- Keep legacy router monkeypatch paths such as
+  `app.routers.prompt_templates.prompt_template_service.validate_rewrite_request`
+  compatible until callers move to direct domain imports.
 
 ## Verification
 

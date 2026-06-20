@@ -13,7 +13,7 @@ from app.config import get_ai_config_with_key
 from app.database import get_db, SessionLocal
 from app.deps import verify_admin_token, require_role
 from app.services.ai_generator import ai_generator as gen
-from app.services.prompt_template_service import prompt_template_service
+from app.domains.prompt_management.prompt_template_service import prompt_template_service
 
 logger = logging.getLogger("app.routers.prompt_templates")
 

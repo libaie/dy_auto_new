@@ -29,7 +29,11 @@ The migration keeps `app.routers.prompt_templates` as a compatibility facade.
 
 - Do not move device-facing `/api/device/prompt-templates`; that stays in
   `device_operations`.
-- Do not split `prompt_template_service` in this slice.
+- Prompt template CRUD, revision tracking, device payloads, rewrite validation,
+  rewrite output validation, and rewrite prompt construction now live in
+  `app.domains.prompt_management.prompt_template_service`;
+  `app.services.prompt_template_service` remains as a temporary compatibility
+  facade.
 - Do not move prompt template ORM model bodies.
 - Do not change route paths, auth dependencies, SSE event shapes, websocket
   payloads, logger behavior, or existing monkeypatch import paths.
@@ -40,11 +44,14 @@ The migration keeps `app.routers.prompt_templates` as a compatibility facade.
 server/app/domains/prompt_management/
   __init__.py
   README.md
+  prompt_template_service.py
   prompt_templates_router.py
 ```
 
-The first pass is a route-boundary migration. Later work can split rewrite
-streaming and realtime event helpers once the router import boundary is stable.
+This began as a route-boundary migration. Prompt template CRUD, revision, and
+rewrite validation helpers now live in the prompt management domain through
+`PromptTemplateService`. Later work can still split rewrite streaming and
+realtime event helpers once the domain import boundary is stable.
 
 ## Compatibility Strategy
 
@@ -59,6 +66,18 @@ globals().update(_prompt_templates_router.__dict__)
 The domain router keeps the historical logger name
 `app.routers.prompt_templates` because existing security tests assert sensitive
 prompt content is not logged through that logger.
+
+The prompt template service follows the same compatibility rule:
+
+- `app.services.prompt_template_service` ->
+  `app.domains.prompt_management.prompt_template_service`.
+- Keep the facade until the prompt management README cleanup gate passes,
+  including `rg "app\.services\.prompt_template_service" server/app server/tests`
+  showing only compatibility tests, migration docs, or callers from domains
+  that have not moved yet.
+- Keep legacy router monkeypatch paths such as
+  `app.routers.prompt_templates.prompt_template_service.validate_rewrite_request`
+  working during the facade phase.
 
 ## Tests
 

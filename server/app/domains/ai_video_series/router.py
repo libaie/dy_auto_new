@@ -38,7 +38,7 @@ from app.domains.ai_video_series.schemas import (
     StyleLockResponse,
     StyleLockWorkerStepRequest,
 )
-from app.services.asset_lifecycle_service import (
+from app.domains.creative_library.asset_lifecycle_service import (
     AssetLifecycleError,
     delete_or_archive_series,
     unlink_character_from_series,

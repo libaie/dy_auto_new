@@ -65,11 +65,12 @@ def test_reporting_router_imports_domain_stats_service():
     assert "app.services.stats_service" not in text
 
 
-def test_device_stats_increment_route_stays_device_owned_and_legacy_compatible():
+def test_device_stats_increment_route_imports_domain_stats_service_directly():
     text = DEVICE_REPORTING_PATH.read_text(encoding="utf-8")
 
     assert '@router.post("/stats/increment")' in text
-    assert "app.services.stats_service" in text
+    assert "app.domains.reporting.stats_service" in text
+    assert "app.services.stats_service" not in text
 
 
 def test_reporting_docs_register_stats_service_facade():

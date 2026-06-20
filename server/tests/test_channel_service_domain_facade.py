@@ -77,11 +77,18 @@ def test_account_operations_adapters_imports_domain_channel_service_only():
     assert "app.services.channel_service" not in text
 
 
-def test_task_and_device_bridges_stay_legacy_compatible():
-    for path in [TASK_SERVICE_PATH, TASK_ADAPTERS_PATH, DEVICE_REPORTING_PATH]:
+def test_task_bridges_stay_legacy_compatible():
+    for path in [TASK_SERVICE_PATH, TASK_ADAPTERS_PATH]:
         text = path.read_text(encoding="utf-8")
         assert "app.services.channel_service" in text
         assert "app.domains.account_operations.channel_service" not in text
+
+
+def test_device_reporting_imports_domain_channel_service_directly():
+    text = DEVICE_REPORTING_PATH.read_text(encoding="utf-8")
+
+    assert "app.domains.account_operations.channel_service" in text
+    assert "app.services.channel_service" not in text
 
 
 def test_account_operations_docs_register_channel_service_facade():

@@ -113,7 +113,7 @@ def stats_increment(
     """设备端增量统计上报——idempotent: 同一 (task,device,type,target,op_index) 只计一次。
     校验 task→account 归属和 task→device 归属，防止跨账号伪造统计。
     """
-    from app.services.stats_service import stats_service
+    from app.domains.reporting.stats_service import stats_service
     from app.db_models import Task as DBTask, StatsEvent
 
     # 1. Validate task exists and belongs to the claimed account
@@ -199,7 +199,7 @@ async def report_risk(
     if account.status == "active":
         account.status = "risk_controlled"
         # Skip pending channel items for this account
-        from app.services.channel_service import channel_service
+        from app.domains.account_operations.channel_service import channel_service
         channel_service.on_risk_control(db, report.account_id)
         db.commit()
         await pair_ws_manager.broadcast_to_admins({"event": "accounts_changed"})

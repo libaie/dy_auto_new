@@ -39,6 +39,8 @@ repair task routes.
   `run_multimodal_asset_review` for real generated asset review handoff.
 - `agency_creative_patch_contracts.py` owns creative patch enums,
   `CreativePatchProposal`, and `normalize_patch_payload`.
+- `agency_backtrack_policy.py` owns `trigger_backtrack_if_needed` for repeated
+  asset review failure backtracking into upstream auto-repair jobs.
 
 ## Facade Register
 
@@ -53,6 +55,7 @@ repair task routes.
 | `app.services.agency_scorecard_contracts` | `app.domains.agency_operations.agency_scorecard_contracts` | Keep while dirty agency service modules import scorecard contracts from `app.services`; remove after import inventory is clean. |
 | `app.services.agency_multimodal_review` | `app.domains.agency_operations.agency_multimodal_review` | Keep while legacy tests monkeypatch multimodal review through `app.services`; remove after import inventory is clean. |
 | `app.services.agency_creative_patch_contracts` | `app.domains.agency_operations.agency_creative_patch_contracts` | Keep while dirty creative patch service code imports contracts from `app.services`; remove after import inventory is clean. |
+| `app.services.agency_backtrack_policy` | `app.domains.agency_operations.agency_backtrack_policy` | Keep while dirty video production service code imports backtrack policy from `app.services`; remove after import inventory is clean. |
 
 ## Boundaries
 

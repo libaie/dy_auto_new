@@ -3,6 +3,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SERVICES_ROOT = REPO_ROOT / "server/app/services"
+DOMAINS_ROOT = REPO_ROOT / "server/app/domains"
 
 EXPECTED_NON_FACADE_SERVICE_FILES = {
     "agency_console.py",
@@ -22,9 +23,41 @@ EXPECTED_NON_FACADE_SERVICE_FILES = {
     "video_production_readiness.py",
 }
 
+EXPECTED_SERVICE_DOMAIN_TARGETS = {
+    "agency_console.py": "agency_operations",
+    "agency_creative_patch_service.py": "agency_operations",
+    "agency_debate_audit.py": "agency_operations",
+    "agency_orchestrator.py": "agency_operations",
+    "agency_repair_executor.py": "agency_operations",
+    "agency_runtime.py": "agency_operations",
+    "ai_generator.py": "model_configuration",
+    "image_creation_service.py": "image_generation",
+    "one_sentence_video_service.py": "video_production",
+    "production_queue_service.py": "video_production",
+    "production_run_service.py": "video_production",
+    "production_worker_service.py": "video_production",
+    "storyboard_image_service.py": "storyboard_images",
+    "video_agency_team.py": "agency_operations",
+    "video_production_readiness.py": "video_production",
+}
+
 
 def test_service_implementation_inventory_matches_allowlist():
     assert _non_facade_service_files() == EXPECTED_NON_FACADE_SERVICE_FILES
+
+
+def test_service_implementation_files_have_target_domains():
+    assert set(EXPECTED_SERVICE_DOMAIN_TARGETS) == EXPECTED_NON_FACADE_SERVICE_FILES
+    assert all(EXPECTED_SERVICE_DOMAIN_TARGETS.values())
+
+
+def test_service_implementation_targets_are_existing_domains():
+    domain_names = {
+        path.name
+        for path in DOMAINS_ROOT.iterdir()
+        if path.is_dir() and not path.name.startswith("__")
+    }
+    assert set(EXPECTED_SERVICE_DOMAIN_TARGETS.values()) <= domain_names
 
 
 def _non_facade_service_files() -> set[str]:

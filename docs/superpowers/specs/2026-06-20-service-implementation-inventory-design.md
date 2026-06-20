@@ -24,10 +24,17 @@ Add one inventory test that:
 - treats a file containing `from app.domains` as a facade;
 - compares all remaining implementation file names against an explicit
   temporary allowlist.
+- requires every temporary allowlist entry to name its intended target domain.
+- verifies that every target value matches an existing directory under
+  `server/app/domains`.
 
 The allowlist records the current migration debt. Each future service migration
 should remove the migrated file name from this allowlist when the legacy service
-becomes a facade.
+becomes a facade. The target-domain map keeps that debt actionable instead of
+leaving a flat list with no migration destination. `ai_generator.py` is mapped
+to `model_configuration` for now because it owns model/provider API invocation
+plumbing; a later slice can split it further if a dedicated generation domain
+is introduced.
 
 ## Non-Goals
 
@@ -44,4 +51,5 @@ Run:
 ```
 
 Expected: the test passes only when the set of non-facade service files matches
-the explicit allowlist.
+the explicit allowlist, every allowlisted file has a target domain, and each
+target domain exists.

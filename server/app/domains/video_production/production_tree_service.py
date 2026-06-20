@@ -2,10 +2,9 @@ from collections import defaultdict
 
 from sqlalchemy.orm import Session
 
-from app.db.models.video_production import ProductionEpisode, ProductionPlan
+from app.db.models.video_production import ProductionEpisode, ProductionPlan, ProductionScene
 from app.db_models import (
     ProductionJob,
-    ProductionScene,
     ProductionSegment,
     ProductionShot,
     VideoProductionAsset,

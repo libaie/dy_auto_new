@@ -56,27 +56,15 @@ from app.db.models.selector_management import UISelector
 from app.db.models.system_configuration import SystemSetting
 from app.db.models.task_operations import Task
 from app.db.models.video_library import GeneratedVideo
-from app.db.models.video_production import ProductionEpisode, ProductionPlan, ProductionPlanVersion, VideoCollection
+from app.db.models.video_production import (
+    ProductionEpisode,
+    ProductionPlan,
+    ProductionPlanVersion,
+    ProductionScene,
+    VideoCollection,
+)
 
 # ==== 多模型系列生成系统 ====
-
-
-class ProductionScene(Base):
-    __tablename__ = "production_scenes"
-    __table_args__ = (
-        UniqueConstraint("episode_plan_id", "scene_id", name="uq_production_scene_episode_scene"),
-        Index("idx_production_scenes_episode_plan_id", "episode_plan_id"),
-        Index("idx_production_scenes_status", "status"),
-    )
-
-    id = Column(String(36), primary_key=True, default=_uuid)
-    episode_plan_id = Column(String(36), ForeignKey("production_episodes.id", ondelete="CASCADE"), nullable=False)
-    scene_id = Column(String(100), nullable=False)
-    order_index = Column(Integer, nullable=False, default=0)
-    status = Column(String(30), nullable=False, default="planned")
-    location_summary = Column(Text, nullable=True)
-    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
-    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
 
 
 class ProductionShot(Base):

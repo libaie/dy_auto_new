@@ -62,6 +62,24 @@ class ProductionEpisode(Base):
     updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
 
 
+class ProductionScene(Base):
+    __tablename__ = "production_scenes"
+    __table_args__ = (
+        UniqueConstraint("episode_plan_id", "scene_id", name="uq_production_scene_episode_scene"),
+        Index("idx_production_scenes_episode_plan_id", "episode_plan_id"),
+        Index("idx_production_scenes_status", "status"),
+    )
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    episode_plan_id = Column(String(36), ForeignKey("production_episodes.id", ondelete="CASCADE"), nullable=False)
+    scene_id = Column(String(100), nullable=False)
+    order_index = Column(Integer, nullable=False, default=0)
+    status = Column(String(30), nullable=False, default="planned")
+    location_summary = Column(Text, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
+    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
+
+
 class VideoCollection(Base):
     __tablename__ = "video_collections"
 

@@ -11,11 +11,11 @@ from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.config import bj_now
+from app.db.models.video_production import ProductionScene
 from app.db_models import (
     Character,
     Episode,
     ProductionSegment,
-    ProductionScene,
     ProductionShot,
     Scene,
     Series,

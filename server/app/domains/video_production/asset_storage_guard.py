@@ -10,7 +10,7 @@ import httpx
 from sqlalchemy.orm import Session
 
 from app.config import bj_now
-from app.db_models import VideoProductionAsset
+from app.db.models.video_production import VideoProductionAsset
 from app.domains.video_production.production_errors import ProductionErrorCode, ProductionRepairableError
 
 ALLOWED_PROVIDER_SCHEMES = {"https"}

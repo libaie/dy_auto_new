@@ -12,7 +12,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.config import bj_now
-from app.db_models import VideoProductionAsset, VideoReviewRecord
+from app.db.models.video_production import VideoProductionAsset
+from app.db_models import VideoReviewRecord
 
 
 @dataclass

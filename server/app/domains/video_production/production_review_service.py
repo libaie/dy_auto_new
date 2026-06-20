@@ -1,8 +1,8 @@
 from sqlalchemy.orm import Session
 
 from app.config import bj_now
-from app.db.models.video_production import VideoProductionRun
-from app.db_models import VideoProductionAsset, VideoReviewRecord
+from app.db.models.video_production import VideoProductionAsset, VideoProductionRun
+from app.db_models import VideoReviewRecord
 from app.domains.video_production.production_state_contract import asset_is_reviewable
 from app.domains.video_production.video_production_run_types import MOCK_SERIES_SCALE, get_run_type
 from app.domains.video_production.video_production_state import latest_assets_by_frame, recompute_run_gate

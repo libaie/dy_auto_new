@@ -68,6 +68,7 @@ from app.db.models.video_production import (
     ProductionSegment,
     ProductionShot,
     VideoCollection,
+    VideoProductionAsset,
     VideoProductionRun,
 )
 
@@ -163,56 +164,6 @@ class AgencyCreativePatch(Base):
     rejected_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
     updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
-
-
-class VideoProductionAsset(Base):
-    """Intermediate or final asset created by staged production."""
-    __tablename__ = "video_production_assets"
-
-    id = Column(String(36), primary_key=True, default=_uuid)
-    run_id = Column(String(36), ForeignKey("video_production_runs.id", ondelete="CASCADE"), nullable=False)
-    episode_id = Column(String(36), ForeignKey("episodes.id", ondelete="CASCADE"), nullable=False)
-    frame_id = Column(String(100), nullable=False)
-    asset_type = Column(String(30), nullable=False)
-    stage = Column(String(40), nullable=False)
-    url = Column(Text, nullable=True)
-    local_path = Column(Text, nullable=True)
-    thumbnail_url = Column(Text, nullable=True)
-    duration_seconds = Column(Float, nullable=True)
-    version = Column(Integer, nullable=False, default=1)
-    metadata_json = Column(JSON, nullable=True, default=dict)
-    status = Column(String(40), nullable=False, default="generated")
-    pixelle_task_id = Column(String(100), nullable=True)
-    production_segment_id = Column(String(36), ForeignKey("production_segments.id", ondelete="SET NULL"), nullable=True)
-    production_shot_id = Column(String(36), ForeignKey("production_shots.id", ondelete="SET NULL"), nullable=True)
-    target_type = Column(String(30), nullable=True)
-    target_id = Column(String(36), nullable=True)
-    provider_task_id = Column(String(120), nullable=True)
-    provider_stage_task_id = Column(String(36), ForeignKey("provider_stage_tasks.id", ondelete="SET NULL"), nullable=True)
-    prompt_hash = Column(String(64), nullable=True)
-    storage_path = Column(Text, nullable=True)
-    source_url = Column(Text, nullable=True)
-    storage_error_json = Column(JSON, nullable=True, default=dict)
-    provider_response_summary_json = Column(JSON, nullable=True, default=dict)
-    is_latest = Column(Boolean, nullable=False, default=True)
-    source_version = Column(Integer, nullable=False, default=1)
-    copy_status = Column(String(30), nullable=False, default="registered")
-    checksum = Column(String(120), nullable=True)
-    size_bytes = Column(Integer, nullable=True)
-    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
-    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
-
-    __table_args__ = (
-        Index("idx_video_assets_run_stage", "run_id", "stage"),
-        Index("idx_video_assets_run_frame", "run_id", "frame_id"),
-        Index("idx_video_assets_status", "status"),
-        Index("idx_video_assets_production_segment", "production_segment_id"),
-        Index("idx_video_assets_production_shot", "production_shot_id"),
-        Index("idx_video_assets_target", "target_type", "target_id"),
-        Index("idx_video_assets_provider_stage_task", "provider_stage_task_id"),
-        Index("idx_video_assets_segment_latest", "production_segment_id", "asset_type", "is_latest"),
-        UniqueConstraint("run_id", "frame_id", "asset_type", "version", name="uq_video_asset_version"),
-    )
 
 
 class VideoReviewRecord(Base):

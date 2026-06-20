@@ -15,10 +15,10 @@ from app.db.models.video_production import (
     ProviderStageTask,
     ProductionEpisode,
     ProductionPlan,
+    VideoProductionAsset,
     VideoProductionRun,
 )
 from app.db_models import (
-    VideoProductionAsset,
     VideoReviewRecord,
 )
 from app.domains.video_production.production_errors import ProductionErrorCode, ProductionRepairableError, to_http_detail

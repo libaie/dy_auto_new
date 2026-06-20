@@ -1,10 +1,13 @@
 from sqlalchemy.orm import Session
 
-from app.db.models.video_production import ProductionEpisode, ProductionScene, ProductionSegment, ProductionShot
-from app.db_models import (
+from app.db.models.video_production import (
+    ProductionEpisode,
+    ProductionScene,
+    ProductionSegment,
+    ProductionShot,
     VideoProductionAsset,
-    VideoReviewRecord,
 )
+from app.db_models import VideoReviewRecord
 
 
 def _asset_payload(asset: VideoProductionAsset | None) -> dict | None:

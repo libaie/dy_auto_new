@@ -10,11 +10,11 @@ from app.db.models.video_production import (
     ProductionScene,
     ProductionSegment,
     ProductionShot,
+    VideoProductionAsset,
     VideoProductionRun,
 )
 from app.db_models import (
     Episode,
-    VideoProductionAsset,
     VideoReviewRecord,
 )
 from app.domains.agency_operations.agency_backtrack_policy import trigger_backtrack_if_needed

@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 import asyncio
 
 from app.database import get_db
-from app.db_models import Device, DevicePairRequest
+from app.db.models.device_operations import Device, DevicePairRequest
 from app.deps import verify_admin_token, verify_ws_admin_token, require_role
 from app.ws_manager import pair_ws_manager
 
@@ -382,7 +382,8 @@ async def delete_device(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    from app.db_models import Task, DevicePairRequest
+    from app.db.models.device_operations import DevicePairRequest
+    from app.db_models import Task
 
     user_id, role = user
     query = db.query(Device).filter(Device.id == device_id)

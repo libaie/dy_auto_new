@@ -3,7 +3,7 @@ from datetime import datetime, timezone, timedelta
 from sqlalchemy.orm import Session
 from app.config import bj_now
 
-from app.db_models import Device
+from app.db.models.device_operations import Device
 
 
 class DeviceService:

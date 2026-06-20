@@ -138,7 +138,7 @@ device reporting, script assets, and the admin device management surface.
 - `app.domains.device_operations.content_bridge` temporarily owns device-authenticated bridges for content generation, AI proxy, collection reports, comment replies, DM flows, user profiles, and avatars.
 - `app.domains.device_operations.status_lifecycle` owns heartbeat flush, stale-device offline marking, stuck-task handling, and channel item reset behavior.
 - `app.domains.device_operations.device_service` owns `DeviceService` registration, heartbeat, status lookup, and offline marking.
-- `app.db.models.device_operations` owns the `DevicePairRequest` ORM class body.
+- `app.db.models.device_operations` owns the `Device` and `DevicePairRequest` ORM class bodies.
 - `server/app/main.py::_offline_checker` remains as a thin lifespan-compatible wrapper around `status_lifecycle.offline_checker`.
 - Content, collection, and DM endpoints under `/api/device/*` are a temporary bridge; final business ownership belongs to a future `content_collection` domain.
 - Domain non-router modules must avoid FastAPI imports unless they are route assembly modules.
@@ -153,7 +153,7 @@ device reporting, script assets, and the admin device management surface.
 | `/api/device/*` content and DM bridge handlers | Future `content_collection` domain adapters | Deferred | `content_collection` owns those business use cases and adapter tests prove unchanged device response shapes. |
 | `app.services.device_service` | `app.domains.device_operations.device_service` | Device service domain slice | Remove only after `rg -n "app\.services\.device_service" server/app -g "*.py"` returns no production imports and remaining legacy-path tests are migrated or retired. |
 | `app.services.script_service` | `app.domains.device_operations.script_service` | Script service domain slice | Remove only after import inventory shows no production imports of `app.services.script_service` and legacy-path tests are migrated or retired. |
-| `app.db_models.DevicePairRequest` | `app.db.models.device_operations.DevicePairRequest` | ORM boundary slice | Keep as a compatibility re-export until all production imports use `app.db.models.device_operations`. |
+| `app.db_models.Device / DevicePairRequest` | `app.db.models.device_operations.Device / DevicePairRequest` | ORM boundary slices | Keep as compatibility re-exports until all production imports use `app.db.models.device_operations`. |
 
 ## Migration Checklist
 

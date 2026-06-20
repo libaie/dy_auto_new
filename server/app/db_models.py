@@ -12,7 +12,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 
 from app.db.models.ai_text_artifacts import AITextArtifact, AITextArtifactConsumer
-from app.db.models.device_operations import DevicePairRequest
+from app.db.models.device_operations import Device, DevicePairRequest
 from app.db.models.content_collection import ContentTemplate, DMSequence, RepliedComment, SensitiveWord
 from app.db.models.creative_library import CharacterAnchor, ReferenceCategory, ReferenceData, SceneAnchor
 from app.db.models.identity_access import User
@@ -51,34 +51,6 @@ class Account(Base):
     updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
 
     tasks = relationship("Task", back_populates="account")
-
-
-class Device(Base):
-    __tablename__ = "devices"
-
-    id = Column(String(36), primary_key=True, default=_uuid)
-    name = Column(String(100), nullable=False)
-    ip = Column(String(50), nullable=True)
-    status = Column(String(20), nullable=False, default="offline")  # online, offline, maintenance
-    device_secret = Column(String(64), nullable=True, unique=True)  # per-device secret from pairing
-    bound_account_id = Column(String(36), ForeignKey("accounts.id"), nullable=True)
-    user_id = Column(String(36), ForeignKey("users.id"), nullable=True)
-    proxy_config = Column(JSON, nullable=True)  # {"type":"http","host":"...","port":8080,"username":"...","password":"..."}
-    os_version = Column(String(50), nullable=True)
-    app_version = Column(String(20), nullable=True)
-    screen_resolution = Column(String(30), nullable=True)  # e.g. "1080x2400"
-    sdk_version = Column(String(20), nullable=True)  # Android SDK version
-    total_memory = Column(Integer, nullable=True)  # total RAM in bytes
-    manufacturer = Column(String(50), nullable=True)  # e.g. "samsung"
-    product = Column(String(50), nullable=True)
-    device_model = Column(String(50), nullable=True)  # raw model string
-    hardware = Column(String(50), nullable=True)
-    display = Column(String(100), nullable=True)
-    last_seen_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
-    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
-
-    tasks = relationship("Task", back_populates="device")
 
 
 class Task(Base):

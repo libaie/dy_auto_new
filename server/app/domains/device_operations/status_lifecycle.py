@@ -15,7 +15,7 @@ async def offline_checker():
     the database each cycle. Failed heartbeat flushes are requeued so the next
     cycle can retry without losing liveness information.
     """
-    from app.db_models import Device
+    from app.db.models.device_operations import Device
     from app.ws_manager import pair_ws_manager
 
     while True:

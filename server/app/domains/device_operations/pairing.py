@@ -28,7 +28,7 @@ async def create_pair_request(
     3. Otherwise → clean old rejected, create new pending, notify admins
     """
     import uuid
-    from app.db_models import DevicePairRequest, Device
+    from app.db.models.device_operations import Device, DevicePairRequest
 
     # Capture client IP (prefer X-Forwarded-For for reverse proxy setups)
     client_ip = raw_request.headers.get("x-forwarded-for", "").split(",")[0].strip()
@@ -182,7 +182,7 @@ def check_pair_status(
     db: Session = Depends(get_db),
 ):
     """Unauthenticated — device polls for approval result."""
-    from app.db_models import DevicePairRequest, Device
+    from app.db.models.device_operations import Device, DevicePairRequest
 
     pair_req = db.query(DevicePairRequest).filter(
         DevicePairRequest.pairing_token == token,
@@ -210,7 +210,7 @@ def check_pair_status(
 @router.websocket("/ws/pair/{token}")
 async def ws_pair_status(websocket: WebSocket, token: str):
     """Device connects via WS to receive real-time pairing approval result."""
-    from app.db_models import DevicePairRequest, Device
+    from app.db.models.device_operations import Device, DevicePairRequest
 
     db = next(get_db())
     try:

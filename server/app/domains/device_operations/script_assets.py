@@ -97,7 +97,7 @@ def device_list_templates(
 ):
     """Return template list with MD5 hashes for incremental sync.
     Filters by device resolution profile when available."""
-    from app.db_models import Device
+    from app.db.models.device_operations import Device
     from app.domains.selector_management.template_service import template_service
     if not resolution and device_id:
         device = db.query(Device).filter(Device.id == device_id).first()
@@ -116,7 +116,7 @@ def device_download_template(
 ):
     """Download a single template image (binary).
     Priority: explicit resolution query param > device resolution > default."""
-    from app.db_models import Device
+    from app.db.models.device_operations import Device
     from app.domains.selector_management.template_service import template_service
     from fastapi.responses import FileResponse
     if not resolution:
@@ -153,7 +153,7 @@ async def device_calibrate(
     import base64
     from app.domains.selector_management.template_service import template_service
     from app.db.models.selector_management import UISelector
-    from app.db_models import Device
+    from app.db.models.device_operations import Device
 
     resolution = request.resolution
     if not resolution:

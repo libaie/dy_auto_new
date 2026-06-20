@@ -2,25 +2,29 @@ import subprocess
 import sys
 from pathlib import Path
 
-from app.db_models import Base, DevicePairRequest as LegacyDevicePairRequest
+from app.db_models import Base, Device as LegacyDevice, DevicePairRequest as LegacyDevicePairRequest
 
 
 SERVER_ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_device_operations_model_boundary_reexports_device_pair_request():
-    from app.db.models.device_operations import DevicePairRequest
+def test_device_operations_model_boundary_reexports_device_models():
+    from app.db.models.device_operations import Device, DevicePairRequest
 
+    assert Device is LegacyDevice
     assert DevicePairRequest is LegacyDevicePairRequest
-    assert DevicePairRequest.metadata is Base.metadata
-    assert "device_pair_requests" in Base.metadata.tables
+    assert Device.metadata is Base.metadata
+    for table_name in ("devices", "device_pair_requests"):
+        assert table_name in Base.metadata.tables
 
 
 def test_device_operations_model_boundary_imports_in_clean_process():
     code = (
         "import app.db_models as legacy; "
-        "from app.db.models.device_operations import DevicePairRequest; "
+        "from app.db.models.device_operations import Device, DevicePairRequest; "
+        "assert legacy.Device is Device; "
         "assert legacy.DevicePairRequest is DevicePairRequest; "
+        "assert 'devices' in legacy.Base.metadata.tables; "
         "assert 'device_pair_requests' in legacy.Base.metadata.tables"
     )
     result = subprocess.run(

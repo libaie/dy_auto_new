@@ -14,7 +14,8 @@ async def _notify_pending_tasks(db: Session, device_id: str):
     import logging
     logger = logging.getLogger(__name__)
 
-    from app.db_models import Device, Task as DBTask
+    from app.db.models.device_operations import Device
+    from app.db_models import Task as DBTask
     from app.models import TaskStatus
     from datetime import datetime, timezone
     from sqlalchemy import or_, and_
@@ -86,7 +87,7 @@ async def ws_device_status(websocket: WebSocket):
     Authentication: device sends {"type":"auth","device_id":"...","secret":"..."}
     as the first message after connect (not in URL).
     """
-    from app.db_models import Device
+    from app.db.models.device_operations import Device
     from app.config import DEVICE_SECRET
 
     await websocket.accept()

@@ -1,7 +1,8 @@
 """Account CRUD use cases."""
 
 from app.config import bj_now
-from app.db_models import Account, Device, Task as DBTask
+from app.db.models.account_operations import Account
+from app.db_models import Device, Task as DBTask
 
 from .read_models import account_to_dict
 

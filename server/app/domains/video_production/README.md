@@ -21,6 +21,8 @@ This domain owns the video production control-plane HTTP routes.
   HTTP detail serialization.
 - `production_errors.py` owns `ProductionErrorCode`,
   `ProductionRepairableError`, and `to_http_detail`.
+- `production_gate_evaluator.py` owns `STAGE_ASSET_TYPES` and
+  `evaluate_stage_gate` for image, video, and compose stage readiness gates.
 - `production_state_contract.py` owns provider task status constants, cost
   reservation status constants, `asset_is_reviewable`,
   `provider_task_is_active`, and `validate_transition`.
@@ -75,6 +77,7 @@ This domain owns the video production control-plane HTTP routes.
 |---|---|---|
 | `app.routers.video_production` | `app.domains.video_production.video_production_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
 | `app.services.asset_storage_guard` | `app.domains.video_production.asset_storage_guard` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
+| `app.services.production_gate_evaluator` | `app.domains.video_production.production_gate_evaluator` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.production_action_result` | `app.domains.video_production.production_action_result` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.production_cost_service` | `app.domains.video_production.production_cost_service` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.production_cost_summary_service` | `app.domains.video_production.production_cost_summary_service` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
@@ -121,6 +124,13 @@ Do not remove the legacy production action result facade until all of these are 
 - `rg "app\.services\.production_action_result" server/app server/tests` returns only compatibility tests, migration docs, or service modules whose domains have not moved yet.
 - `test_video_production_action_result_facade.py` has been replaced with tests for direct domain imports.
 - Domain-owned production modules import `app.domains.video_production.production_action_result` directly.
+
+Do not remove the legacy production gate evaluator facade until all of these are true:
+
+- `rg "app\.services\.production_gate_evaluator" server/app server/tests` returns only compatibility tests, migration docs, or service modules whose domains have not moved yet.
+- `test_video_production_gate_evaluator_facade.py` has been replaced with tests for direct domain imports.
+- Domain-owned production modules import `app.domains.video_production.production_gate_evaluator` directly.
+- Direct domain gate evaluator coverage proves `evaluate_stage_gate` behavior without legacy imports.
 
 Do not remove the legacy asset storage guard facade until all of these are true:
 

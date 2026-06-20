@@ -15,6 +15,8 @@ repair task routes.
 - Auth dependencies stay in `app.deps`.
 - Creative patch mutation lives in
   `app.domains.agency_operations.agency_creative_patch_service`.
+- Debate audit logic lives in
+  `app.domains.agency_operations.agency_debate_audit`.
 - Provider reservation accounting stays in
   `app.services.provider_cost_reservation_service`.
 

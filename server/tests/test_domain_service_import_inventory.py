@@ -7,6 +7,8 @@ DOMAIN_ROOT = REPO_ROOT / "server/app/domains"
 
 EXPECTED_DOMAIN_SERVICE_IMPORTS = {
     ("server/app/domains/agency_operations/agency_backtrack_policy.py", "production_queue_service"),
+    ("server/app/domains/agency_operations/agency_debate_audit.py", "agency_orchestrator"),
+    ("server/app/domains/agency_operations/agency_debate_audit.py", "production_queue_service"),
     ("server/app/domains/agency_operations/agency_multimodal_review.py", "agency_orchestrator"),
     ("server/app/domains/ai_text_artifacts/ai_text_artifact_service.py", "ai_generator"),
     ("server/app/domains/ai_video_series/read_models.py", "agency_console"),

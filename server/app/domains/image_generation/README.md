@@ -10,6 +10,10 @@ plus image production strategy business logic.
 
 ## Current Modules
 
+- `image_creation_service.py` owns image creation task idempotency, provider
+  payload preparation, Pixelle submit/sync, asset payloads, review decisions,
+  cost writes, selection preview validation, and source/reference image
+  resolution.
 - `image_creation_router.py` owns upload, Pixelle file proxy, task create/read,
   task sync/dispatch, asset list/review, and asset edit endpoints.
 - `image_creation_storage.py` owns `IMAGE_CREATION_ROOT`, `save_upload`,
@@ -59,8 +63,9 @@ plus image production strategy business logic.
 |---|---|---|
 | `app.routers.image_creation` | `app.domains.image_generation.image_creation_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
 | `app.routers.image_production` | `app.domains.image_generation.image_production_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
-| `app.services.image_creation_storage` | `app.domains.image_generation.image_creation_storage` | Keep while `image_creation_service` has an approved image creation service compatibility import; remove only after import inventory shows no production legacy imports. |
-| `app.services.image_production_cost_service` | `app.domains.image_generation.image_production_cost_service` | Keep while `image_creation_service` has an approved image creation service compatibility import; remove only after import inventory shows no production legacy imports. |
+| `app.services.image_creation_service` | `app.domains.image_generation.image_creation_service` | Keep while image routers, image A/B services, storyboard images, review asset edits, reference assets, and legacy tests import or monkeypatch image creation through `app.services`; remove after import inventory is clean. |
+| `app.services.image_creation_storage` | `app.domains.image_generation.image_creation_storage` | Keep while legacy tests or not-yet-moved callers import storage helpers through `app.services`; remove only after import inventory shows no production legacy imports. |
+| `app.services.image_production_cost_service` | `app.domains.image_generation.image_production_cost_service` | Keep while legacy tests or not-yet-moved callers import cost helpers through `app.services`; remove only after import inventory shows no production legacy imports. |
 | `app.services.image_creation_errors` | `app.domains.image_generation.image_creation_errors` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.image_ab_test_service` | `app.domains.image_generation.image_ab_test_service` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.image_asset_bridge_service` | `app.domains.image_generation.image_asset_bridge_service` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |

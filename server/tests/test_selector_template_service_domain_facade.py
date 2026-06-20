@@ -62,6 +62,15 @@ def test_legacy_template_service_module_is_domain_module():
     assert legacy._safe_resolve is domain._safe_resolve
 
 
+def test_services_parent_package_template_service_attribute_is_domain_module():
+    from app.services import template_service as parent_import
+
+    domain = importlib.import_module("app.domains.selector_management.template_service")
+
+    assert parent_import is domain
+    assert parent_import.template_service is domain.template_service
+
+
 def test_template_dir_stays_under_server_app_template_images():
     domain = importlib.import_module("app.domains.selector_management.template_service")
 

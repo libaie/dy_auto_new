@@ -11,7 +11,7 @@ MAIN_PATH = REPO_ROOT / "server/app/main.py"
 DOMAIN_PATH = REPO_ROOT / "server/app/domains/quality_audit"
 README_PATH = DOMAIN_PATH / "README.md"
 LEGACY_AUDIT_PATH = REPO_ROOT / "server/app/routers/audit.py"
-VIDEO_PRODUCTION_SERVICE_PATH = REPO_ROOT / "server/app/services/video_production_service.py"
+VIDEO_PRODUCTION_SERVICE_PATH = REPO_ROOT / "server/app/domains/video_production/video_production_service.py"
 
 
 def test_quality_audit_spec_and_plan_document_boundary():

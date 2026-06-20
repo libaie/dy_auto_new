@@ -8,7 +8,9 @@ This domain owns AI-assisted image and video asset quality audit routes.
 
 ## Not Owned
 
-- `AuditReport` and `AIModel` ORM model definitions stay in `app.db_models`.
+- `AuditReport` ORM model definition lives in `app.db.models.quality_audit`.
+- `AIModel` ORM model definition lives in
+  `app.db.models.model_configuration`.
 - Database session helpers stay in `app.database`.
 - Auth dependencies stay in `app.deps`.
 - Audit gate compatibility imports stay in `app.services.audit_gate` during
@@ -23,6 +25,7 @@ This domain owns AI-assisted image and video asset quality audit routes.
   provider audit calls, `_do_audit`, `_audit_openai_compatible`,
   `_audit_gemini`, payload helpers, JSON parsing, and `AuditReport`
   persistence inside the route.
+- `app.db.models.quality_audit` owns the `AuditReport` ORM class body.
 - `audit_gate.py` owns `classify_audit_gate` for mapping provider audit
   responses into quality gate decisions.
 
@@ -32,6 +35,7 @@ This domain owns AI-assisted image and video asset quality audit routes.
 |---|---|---|
 | `app.routers.audit` | `app.domains.quality_audit.audit_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
 | `app.services.audit_gate` | `app.domains.quality_audit.audit_gate` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
+| `app.db_models.AuditReport` | `app.db.models.quality_audit.AuditReport` | Keep as a compatibility re-export until production imports use the domain model path. |
 
 ## Boundaries
 

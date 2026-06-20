@@ -8,7 +8,8 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import verify_admin_token
-from app.db_models import AuditReport, AIModel
+from app.db.models.model_configuration import AIModel
+from app.db.models.quality_audit import AuditReport
 from app.domains.quality_audit.audit_gate import classify_audit_gate
 from app.domains.system_configuration.crypto import decrypt
 

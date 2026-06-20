@@ -15,6 +15,7 @@ from app.db.models.device_operations import DevicePairRequest
 from app.db.models.content_collection import ContentTemplate, SensitiveWord
 from app.db.models.model_configuration import AIModel
 from app.db.models.prompt_management import PromptTemplate
+from app.db.models.quality_audit import AuditReport
 from app.db.models.selector_management import UISelector
 from app.db.models.system_configuration import SystemSetting
 
@@ -1072,21 +1073,6 @@ class ScriptVisualShot(Base):
     visual_prompt = Column(Text, nullable=False)
     video_prompt = Column(Text, nullable=False)
     duration = Column(Float, nullable=False)
-
-
-class AuditReport(Base):
-    __tablename__ = "audit_reports"
-
-    id = Column(String(36), primary_key=True, default=_uuid)
-    target_type = Column(String(20), nullable=False)
-    target_id = Column(String(36), nullable=False)
-    image_url = Column(Text, nullable=False)
-    auditor_model = Column(String(50), nullable=False)
-    score = Column(Float, nullable=False, default=0.0)
-    pass_fail = Column(Boolean, nullable=False, default=False)
-    issues_json = Column(JSON, nullable=True, default=list)
-    raw_response = Column(Text, nullable=True)
-    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
 
 
 class ReferenceData(Base):

@@ -9,10 +9,10 @@ from typing import Any
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
+from app.db.models.script_pipeline import PipelineRun
 from app.db_models import (
     Episode,
     EpisodeScript as DbEpisodeScript,
-    PipelineRun,
     ScriptDramaticBeat,
     ScriptSceneOutline,
     ScriptVisualShot,

@@ -9,8 +9,8 @@ generation pipeline runtime.
 
 ## Not Owned
 
-- ORM models such as `PipelineRun`, `Episode`, and `Series` stay in
-  `app.db_models`; `GeneratedVideo` lives in `app.db.models.video_library`.
+- ORM models such as `Episode` and `Series` stay in `app.db_models`;
+  `GeneratedVideo` lives in `app.db.models.video_library`.
 - Database session helpers stay in `app.database`.
 - Role dependencies stay in `app.deps`.
 - Pixelle transport stays in `app.services.pixelle_client`.
@@ -34,6 +34,7 @@ generation pipeline runtime.
 - `storyboard_timing.py` owns `annotate_storyboard_with_timing`, shot duration
   normalization, timed storyboard line rendering, and detailed image/video
   prompt timing text.
+- `app.db.models.script_pipeline` owns the `PipelineRun` ORM class body.
 
 ## Facade Register
 
@@ -42,6 +43,7 @@ generation pipeline runtime.
 | `app.routers.pipeline` | `app.domains.script_pipeline.pipeline_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
 | `app.services.script_pipeline` | `app.domains.script_pipeline.script_pipeline_service` | Direct service imports use the domain service path, except compatibility tests and callers whose owning domains have not moved yet. |
 | `app.services.storyboard_timing` | `app.domains.script_pipeline.storyboard_timing` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
+| `app.db_models.PipelineRun` | `app.db.models.script_pipeline.PipelineRun` | Keep as a compatibility re-export until production imports use the domain model path. |
 
 ## Boundaries
 

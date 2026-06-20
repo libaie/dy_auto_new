@@ -61,40 +61,12 @@ from app.db.models.video_production import (
     ProductionPlan,
     ProductionPlanVersion,
     ProductionScene,
+    ProductionSegment,
     ProductionShot,
     VideoCollection,
 )
 
 # ==== 多模型系列生成系统 ====
-
-
-class ProductionSegment(Base):
-    __tablename__ = "production_segments"
-    __table_args__ = (
-        UniqueConstraint("shot_plan_id", "segment_id", "version", name="uq_production_segment_version"),
-        Index("idx_production_segments_shot_plan_id", "shot_plan_id"),
-        Index("idx_production_segments_previous_segment_id", "previous_segment_id"),
-        Index("idx_production_segments_status", "status"),
-    )
-
-    id = Column(String(36), primary_key=True, default=_uuid)
-    shot_plan_id = Column(String(36), ForeignKey("production_shots.id", ondelete="CASCADE"), nullable=False)
-    previous_segment_id = Column(String(36), ForeignKey("production_segments.id", ondelete="SET NULL"), nullable=True)
-    segment_id = Column(String(100), nullable=False)
-    order_index = Column(Integer, nullable=False, default=0)
-    status = Column(String(30), nullable=False, default="planned")
-    duration_seconds = Column(Float, nullable=False, default=5.0)
-    continuity_mode = Column(String(50), nullable=False, default="narrative_cut")
-    version = Column(Integer, nullable=False, default=1)
-    previous_end_frame_url = Column(Text, nullable=True)
-    expected_end_state = Column(Text, nullable=True)
-    retry_count = Column(Integer, nullable=False, default=0)
-    image_prompt = Column(Text, nullable=False, default="")
-    video_prompt = Column(Text, nullable=False, default="")
-    narration = Column(Text, nullable=True)
-    reference_roles_json = Column(JSON, nullable=False, default=list)
-    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
-    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
 
 
 class ProductionJob(Base):

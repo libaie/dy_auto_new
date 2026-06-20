@@ -23,8 +23,7 @@ def _is_linked_run(run: VideoProductionRun) -> bool:
 
 
 def production_segment_frame_ids(db: Session, run: VideoProductionRun) -> list[str]:
-    from app.db.models.video_production import ProductionScene, ProductionShot
-    from app.db_models import ProductionSegment
+    from app.db.models.video_production import ProductionScene, ProductionSegment, ProductionShot
 
     if not _is_linked_run(run):
         return storyboard_frame_ids(run)

@@ -1,8 +1,7 @@
 from sqlalchemy.orm import Session
 
-from app.db.models.video_production import ProductionEpisode, ProductionScene, ProductionShot
+from app.db.models.video_production import ProductionEpisode, ProductionScene, ProductionSegment, ProductionShot
 from app.db_models import (
-    ProductionSegment,
     VideoProductionAsset,
     VideoReviewRecord,
 )

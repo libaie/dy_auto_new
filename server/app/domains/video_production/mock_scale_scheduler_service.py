@@ -11,12 +11,12 @@ from app.db.models.video_production import (
     ProductionPlan,
     ProductionPlanVersion,
     ProductionScene,
+    ProductionSegment,
     ProductionShot,
 )
 from app.db_models import (
     Episode,
     ProductionJob,
-    ProductionSegment,
     Series,
     VideoProductionAsset,
     VideoProductionRun,

@@ -48,6 +48,9 @@ This domain owns the video production control-plane HTTP routes.
   scenes, episodes, and plans.
 - `production_tree_service.py` owns `get_run_tree` and tree payload helpers for
   plan and run production hierarchy endpoints.
+- `review_asset_edit_service.py` owns `ReviewAssetEditError`,
+  `edit_image_asset`, and `void_asset_version` for review-time asset edits and
+  voiding.
 - `video_production_run_types.py` owns `REAL_SHORT_E2E`,
   `MOCK_SERIES_SCALE`, `LEGACY_EPISODE_RUN`, `validate_run_type`, and run type
   classification helpers.
@@ -89,6 +92,7 @@ This domain owns the video production control-plane HTTP routes.
 | `app.services.production_status` | `app.domains.video_production.production_status` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, approved cross-domain consumers, or service modules whose domains have not moved yet. |
 | `app.services.production_status_aggregation` | `app.domains.video_production.production_status_aggregation` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.production_tree_service` | `app.domains.video_production.production_tree_service` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
+| `app.services.review_asset_edit_service` | `app.domains.video_production.review_asset_edit_service` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.video_production_state` | `app.domains.video_production.video_production_state` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, approved cross-domain consumers, or service modules whose domains have not moved yet. |
 | `app.services.video_production_run_types` | `app.domains.video_production.video_production_run_types` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.provider_capability_service` | `app.domains.video_production.provider_capability_service` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, approved cross-domain consumers, or service modules whose domains have not moved yet. |
@@ -177,6 +181,14 @@ Do not remove the legacy production tree service facade until all of these are t
 - `test_video_production_tree_service_facade.py` has been replaced with tests for direct domain imports.
 - Domain-owned production modules import `app.domains.video_production.production_tree_service` directly.
 - Direct domain tree coverage proves `get_run_tree` behavior without legacy imports.
+
+Do not remove the legacy review asset edit service facade until all of these are true:
+
+- `rg "app\.services\.review_asset_edit_service" server/app server/tests` returns only compatibility tests, migration docs, or service modules whose domains have not moved yet.
+- `test_video_production_review_asset_edit_facade.py` has been replaced with tests for direct domain imports.
+- Domain-owned production modules import `app.domains.video_production.review_asset_edit_service` directly.
+- Direct domain review asset edit coverage proves `edit_image_asset` and
+  `void_asset_version` behavior without legacy imports.
 
 Do not remove the legacy video production run types facade until all of these are true:
 

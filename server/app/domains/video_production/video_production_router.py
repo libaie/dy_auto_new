@@ -23,7 +23,7 @@ from app.domains.video_production.production_errors import ProductionErrorCode, 
 from app.domains.video_production.production_review_service import apply_bulk_review_action
 from app.domains.video_production.production_segment_service import retry_segment
 from app.domains.video_production.production_tree_service import get_run_tree
-from app.services.review_asset_edit_service import (
+from app.domains.video_production.review_asset_edit_service import (
     ReviewAssetEditError,
     edit_image_asset,
     void_asset_version,

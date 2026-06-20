@@ -62,6 +62,14 @@ globals().update(_stats_router.__dict__)
 This keeps old imports of `app.routers.stats` resolving to the same module
 object as `app.domains.reporting.stats_router` during the compatibility phase.
 
+The stats service follows the same compatibility rule:
+
+- `app.services.stats_service` -> `app.domains.reporting.stats_service`.
+- Keep the facade until the reporting README cleanup gate passes, including
+  `rg "app\.services\.stats_service" server/app server/tests` showing only
+  compatibility tests, migration docs, or callers from domains that have not
+  moved yet.
+
 ## Tests
 
 The migration adds:

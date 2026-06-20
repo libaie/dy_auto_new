@@ -54,6 +54,8 @@ def test_legacy_reporting_stats_service_module_is_domain_module():
     assert legacy is domain
     assert legacy.StatsService is domain.StatsService
     assert legacy.stats_service is domain.stats_service
+    assert legacy._TASK_TYPE_TO_COLUMN is domain._TASK_TYPE_TO_COLUMN
+    assert legacy._NURTURE_TYPE_TO_COLUMN is domain._NURTURE_TYPE_TO_COLUMN
 
 
 def test_reporting_router_imports_domain_stats_service():
@@ -80,6 +82,7 @@ def test_reporting_docs_register_stats_service_facade():
         assert "app.services.stats_service" in text
         assert "StatsService" in text or "stats_service" in text
 
+    assert "`app.services.stats_service` -> `app.domains.reporting.stats_service`" in design
     assert 'rg "app\\.services\\.stats_service" server/app server/tests' in readme
 
 

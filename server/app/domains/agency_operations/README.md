@@ -33,6 +33,8 @@ repair task routes.
   output summaries into repair tasks and manual gates.
 - `agency_repair_orchestrator.py` owns converting repair tasks into manual
   audit events or auto-repair production jobs.
+- `agency_scorecard_contracts.py` owns `normalize_scorecard` and
+  `scorecard_blocks_stage` for agency scorecard verdict contracts.
 
 ## Facade Register
 
@@ -44,6 +46,7 @@ repair task routes.
 | `app.services.agency_repair_contracts` | `app.domains.agency_operations.agency_repair_contracts` | Keep while dirty service modules import repair contracts from `app.services`; remove after import inventory is clean. |
 | `app.services.agency_repair_classifier` | `app.domains.agency_operations.agency_repair_classifier` | Keep while dirty service modules import the repair classifier from `app.services`; remove after import inventory is clean. |
 | `app.services.agency_repair_orchestrator` | `app.domains.agency_operations.agency_repair_orchestrator` | Keep while dirty service modules import repair orchestration from `app.services`; remove after import inventory is clean. |
+| `app.services.agency_scorecard_contracts` | `app.domains.agency_operations.agency_scorecard_contracts` | Keep while dirty agency service modules import scorecard contracts from `app.services`; remove after import inventory is clean. |
 
 ## Boundaries
 

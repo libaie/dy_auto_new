@@ -62,6 +62,17 @@ and DM sequence business logic remains in `content_collection`.
 - Do not remove router facade tests yet.
 - Do not change public routes, auth dependencies, response shapes, or websocket payloads.
 
+## Task ORM Boundary Allowed
+
+- Move the `Task` persistence class body to `app.db.models.task_operations`.
+- Keep `app.db_models.Task` as a compatibility re-export.
+- Update `task_operations` owner-domain code to import `Task` from the domain ORM path.
+
+## Task ORM Boundary Not Allowed
+
+- Do not change task table names, columns, defaults, relationships, or leasing behavior.
+- Do not move device polling/reporting, channel execution, chain orchestration, content collection, or DM sequence ownership.
+
 ## Ownership Rules
 
 - `app.domains.task_operations` owns the target migration boundary for admin `/api/tasks/*` routes.
@@ -73,6 +84,7 @@ and DM sequence business logic remains in `content_collection`.
 - `app.domains.task_operations.realtime_events` owns `new_task_available`, `task_updated`, `tasks_changed`, and direct device `cancel_task` websocket helper calls.
 - `app.domains.task_operations.adapters` owns narrow adapter calls into `task_service`, `content_service`, `channel_service`, ORM lookups, and websocket manager APIs.
 - `app.domains.task_operations.task_service` owns `TaskService`, task leasing, stale-task recovery, cancellation acknowledgement, and task result persistence.
+- `app.db.models.task_operations` owns the `Task` ORM class body; `app.db_models.Task` remains the compatibility import path during migration.
 - `app.domains.device_operations.polling` and `app.domains.device_operations.reporting` continue to own device-authenticated task leasing, progress, result, heartbeat, and risk reporting.
 - `app.domains.account_operations.chain_use_cases` continues to own chain instance step orchestration.
 - `app.domains.content_collection` continues to own content templates and DM sequence business use cases.
@@ -120,4 +132,4 @@ Do not remove `app.routers.tasks` until all of these are true:
 - `server/tests/test_account_operations_chain_orchestration.py` proves chain orchestration ownership remains outside this domain.
 - `app.main` imports the task router from `app.domains.task_operations`.
 
-Do not move device polling/reporting, chain orchestration, content collection, DM sequence ownership, ORM model ownership, or persistence class bodies until separate plans approve those boundaries.
+Do not move device polling/reporting, chain orchestration, content collection, DM sequence ownership, or additional persistence class bodies until separate plans approve those boundaries.

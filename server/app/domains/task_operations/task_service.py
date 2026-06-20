@@ -6,11 +6,15 @@ from typing import Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import update, or_, and_, null, String, select
 
-from app.db_models import Task as DBTask, Device as DBDevice
+from app.db.models.task_operations import Task
+from app.db_models import Device as DBDevice
 from app.models import TaskType, TaskStatus, Task as PydanticTask
 from app.domains.reporting.stats_service import stats_service
 
 MAX_RETRIES = 3
+
+
+DBTask = Task
 
 
 def _db_task_to_pydantic(task: DBTask, params_override: Optional[dict] = None) -> PydanticTask:

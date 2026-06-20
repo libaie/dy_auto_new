@@ -368,4 +368,3 @@ The implementation is complete when:
 - A stage failure after retry exhaustion raises `ScriptGenerationError` and marks human intervention required.
 - Existing `app.models` imports remain compatible.
 - New focused tests pass.
-

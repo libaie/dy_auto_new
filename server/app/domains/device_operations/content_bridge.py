@@ -252,4 +252,3 @@ def get_user_avatar(douyin_id: str):
     if not os.path.exists(filepath):
         raise HTTPException(status_code=404, detail="Avatar not found")
     return FileResponse(filepath, media_type="image/jpeg")
-

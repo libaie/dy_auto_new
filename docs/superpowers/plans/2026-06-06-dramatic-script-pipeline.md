@@ -1758,4 +1758,3 @@ Scope check:
 - The plan does not replace `one_sentence_video_service.py`.
 - The plan does not change Pixelle composition.
 - The plan does not store or commit API keys.
-

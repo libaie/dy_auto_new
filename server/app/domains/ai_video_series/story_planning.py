@@ -12,7 +12,7 @@ from app.database import SessionLocal
 from app.db.models.ai_video_series import ProductionJob, ProductionPlan, Series
 from app.domains.ai_video_series.artifacts import completed_story_plan_payload
 from app.services.production_queue_service import claim_next_job, fail_job, mark_job_completed
-from app.services.production_status import (
+from app.domains.video_production.production_status import (
     JOB_LEASED,
     JOB_QUEUED,
     JOB_RETRY_WAIT,

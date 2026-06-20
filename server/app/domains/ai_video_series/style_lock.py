@@ -33,7 +33,7 @@ from app.domains.creative_library.reference_asset_service import (
     reference_url_is_usable,
 )
 from app.services.production_queue_service import claim_next_job, fail_job, mark_job_completed
-from app.services.production_status import (
+from app.domains.video_production.production_status import (
     JOB_LEASED,
     JOB_QUEUED,
     JOB_RETRY_WAIT,

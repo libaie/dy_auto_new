@@ -16,7 +16,7 @@ from app.models.asset_anchor import (
     AnchorStatus,
     MAX_PROVIDER_SEED,
 )
-from app.services.production_status import REFERENCE_CHARACTER_ANCHOR, REFERENCE_SCENE_REFERENCE
+from app.domains.video_production.production_status import REFERENCE_CHARACTER_ANCHOR, REFERENCE_SCENE_REFERENCE
 from app.domains.creative_library.reference_asset_service import (
     CHARACTER_REFERENCE_SLOTS,
     SCENE_EMPTY_PLATE_INSTRUCTION,

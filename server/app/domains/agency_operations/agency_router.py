@@ -27,7 +27,7 @@ from app.domains.agency_operations.agency_manifest import (
     read_legacy_expert_markdown,
 )
 from app.domains.production_observability.production_observability_service import _redact as _redact_secret_fields
-from app.services.production_status import JOB_BLOCKED, JOB_FAILED, JOB_QUEUED, JOB_RETRY_WAIT
+from app.domains.video_production.production_status import JOB_BLOCKED, JOB_FAILED, JOB_QUEUED, JOB_RETRY_WAIT
 from app.services.provider_cost_reservation_service import active_reserved_cost
 
 router = APIRouter(prefix="/api/agency", tags=["agency"])

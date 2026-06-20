@@ -80,6 +80,28 @@ class ProductionScene(Base):
     updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
 
 
+class ProductionShot(Base):
+    __tablename__ = "production_shots"
+    __table_args__ = (
+        UniqueConstraint("scene_plan_id", "shot_id", name="uq_production_shot_scene_shot"),
+        Index("idx_production_shots_scene_plan_id", "scene_plan_id"),
+        Index("idx_production_shots_status", "status"),
+    )
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    scene_plan_id = Column(String(36), ForeignKey("production_scenes.id", ondelete="CASCADE"), nullable=False)
+    shot_id = Column(String(100), nullable=False)
+    order_index = Column(Integer, nullable=False, default=0)
+    status = Column(String(30), nullable=False, default="planned")
+    character_ids = Column(JSON, nullable=False, default=list)
+    action = Column(Text, nullable=False, default="")
+    emotion = Column(String(50), nullable=True)
+    shot_type = Column(String(50), nullable=False, default="medium")
+    duration_seconds = Column(Float, nullable=False, default=5.0)
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
+    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
+
+
 class VideoCollection(Base):
     __tablename__ = "video_collections"
 

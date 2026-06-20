@@ -2,12 +2,11 @@ import json
 
 from sqlalchemy.orm import Session
 
-from app.db.models.video_production import ProductionEpisode, ProductionPlan, ProductionScene
+from app.db.models.video_production import ProductionEpisode, ProductionPlan, ProductionScene, ProductionShot
 from app.db_models import (
     Character,
     Episode,
     ProductionSegment,
-    ProductionShot,
     Scene,
     Series,
     VideoProductionRun,

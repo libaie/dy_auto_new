@@ -1070,7 +1070,7 @@ def create_collection(
     db: Session = Depends(get_db),
     user=Depends(require_role("admin")),
 ):
-    from app.services.production_collection_service import create_collection_from_approved_episodes
+    from app.domains.video_production.production_collection_service import create_collection_from_approved_episodes
 
     try:
         collection = create_collection_from_approved_episodes(db, body.series_id)

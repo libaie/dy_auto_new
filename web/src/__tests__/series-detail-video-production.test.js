@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 
 const mocks = vi.hoisted(() => ({
@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   startEpisodeProduction: vi.fn(() => Promise.resolve({ data: { ok: true, run: { id: 'run-1' }, route: '/video-production/run-1' } })),
   getStyleLock: vi.fn(),
   lockSeriesStyle: vi.fn(),
+  listAITextArtifacts: vi.fn(() => Promise.resolve({ data: { ok: true, artifacts: [] } })),
 }))
 
 vi.mock('vue-router', () => ({
@@ -46,6 +47,10 @@ vi.mock('../api/videoProduction.js', () => ({
   createVideoProductionRun: mocks.createVideoProductionRun,
   startImageStage: mocks.startImageStage,
   startEpisodeProduction: mocks.startEpisodeProduction,
+}))
+
+vi.mock('../api/aiTextArtifacts.js', () => ({
+  listAITextArtifacts: mocks.listAITextArtifacts,
 }))
 
 describe('SeriesDetailPage video production launch', () => {
@@ -116,6 +121,12 @@ describe('SeriesDetailPage video production launch', () => {
       },
     })
     mocks.lockSeriesStyle.mockReset()
+    mocks.listAITextArtifacts.mockReset()
+    mocks.listAITextArtifacts.mockResolvedValue({ data: { ok: true, artifacts: [] } })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   it('starts production through one control-plane action and opens the returned route', async () => {
@@ -254,7 +265,7 @@ describe('SeriesDetailPage video production launch', () => {
     const wrapper = mount(SeriesDetailPage)
     await flushPromises()
 
-    expect(wrapper.find('[data-test="start-pipeline"]').text()).toContain('创建下一集生产计划')
+    expect(wrapper.find('[data-test="start-pipeline"]').text()).toContain('生成第 1 集')
     await wrapper.find('[data-test="start-pipeline"]').trigger('click')
     await flushPromises()
 
@@ -326,6 +337,211 @@ describe('SeriesDetailPage video production launch', () => {
     expect(wrapper.html()).not.toContain('href="http://"')
     expect(wrapper.html()).not.toContain('src="http://"')
     expect(wrapper.text()).toContain('链接无效')
+  })
+
+  it('renders linked secondary reference slots when primary slots are empty', async () => {
+    mocks.getSeries.mockResolvedValue({
+      data: {
+        ok: true,
+        series: {
+          id: 'sid',
+          title: 'City Healer',
+          logline: 'One sentence story',
+          total_episodes: 1,
+          genre: 'drama',
+          mode: 'fully_automatic',
+          target_duration: 60,
+          pilot_first: true,
+          characters: [{
+            id: 'char-side',
+            name: 'Lin',
+            role_type: 'protagonist',
+            avatar_front_url: '',
+            avatar_side_url: 'http://127.0.0.1:8000/static/image-creation/outputs/side.png',
+            avatar_threequarter_url: '',
+            avatar_fullbody_url: '',
+          }],
+          scenes: [{
+            id: 'scene-mid',
+            name: 'Office',
+            scene_type: 'indoor',
+            reference_wideshot_url: '',
+            reference_midshot_url: '/static/image-creation/outputs/mid.png',
+            reference_aerial_url: '',
+          }],
+        },
+        episodes: [{ id: 'ep1', episode_number: 1, title: 'Pilot', status: 'pending' }],
+      },
+    })
+    const SeriesDetailPage = (await import('../views/SeriesDetailPage.vue')).default
+    const wrapper = mount(SeriesDetailPage)
+    await flushPromises()
+
+    const sideReference = wrapper.find('[data-test="linked-character-reference-char-side-avatar_side_url"]')
+    const midReference = wrapper.find('[data-test="linked-scene-reference-scene-mid-reference_midshot_url"]')
+
+    expect(sideReference.exists()).toBe(true)
+    expect(sideReference.attributes('src')).toBe('/static/image-creation/outputs/side.png')
+    expect(sideReference.attributes('alt')).toBe('Lin 侧面参考图')
+    expect(midReference.exists()).toBe(true)
+    expect(midReference.attributes('src')).toBe('/static/image-creation/outputs/mid.png')
+    expect(midReference.attributes('alt')).toBe('Office 中景参考图')
+  })
+
+  it('renders reference images as soon as style lock progress reports ready slots', async () => {
+    mocks.getSeries.mockResolvedValue({
+      data: {
+        ok: true,
+        series: {
+          id: 'sid',
+          title: 'City Healer',
+          logline: 'One sentence story',
+          total_episodes: 1,
+          genre: 'drama',
+          mode: 'fully_automatic',
+          target_duration: 60,
+          pilot_first: true,
+          characters: [{
+            id: 'char-live',
+            name: 'Lin',
+            role_type: 'protagonist',
+            avatar_front_url: '',
+            avatar_side_url: '',
+            avatar_threequarter_url: '',
+            avatar_fullbody_url: '',
+          }],
+          scenes: [{
+            id: 'scene-live',
+            name: 'Office',
+            scene_type: 'indoor',
+            reference_wideshot_url: '',
+            reference_midshot_url: '',
+            reference_aerial_url: '',
+          }],
+        },
+        episodes: [{ id: 'ep1', episode_number: 1, title: 'Pilot', status: 'pending' }],
+      },
+    })
+    mocks.getStyleLock.mockResolvedValue({
+      data: {
+        ok: true,
+        locked: false,
+        status: 'locking',
+        version: 2,
+        missing_assets: [],
+        reference_status: {
+          characters: { ready: 1, total: 1 },
+          scenes: { ready: 1, total: 1 },
+        },
+        reference_progress: [{
+          asset_type: 'character',
+          asset_id: 'char-live',
+          asset_name: 'Lin',
+          slot: 'avatar_front_url',
+          status: 'ready',
+          url: '/static/image-creation/outputs/live-front.png',
+        }, {
+          asset_type: 'scene',
+          asset_id: 'scene-live',
+          asset_name: 'Office',
+          slot: 'reference_midshot_url',
+          status: 'ready',
+          url: '/static/image-creation/outputs/live-mid.png',
+        }],
+      },
+    })
+
+    const SeriesDetailPage = (await import('../views/SeriesDetailPage.vue')).default
+    const wrapper = mount(SeriesDetailPage)
+    await flushPromises()
+
+    const characterReference = wrapper.find('[data-test="linked-character-reference-char-live-avatar_front_url"]')
+    const sceneReference = wrapper.find('[data-test="linked-scene-reference-scene-live-reference_midshot_url"]')
+
+    expect(characterReference.exists()).toBe(true)
+    expect(characterReference.attributes('src')).toBe('/static/image-creation/outputs/live-front.png')
+    expect(sceneReference.exists()).toBe(true)
+    expect(sceneReference.attributes('src')).toBe('/static/image-creation/outputs/live-mid.png')
+  })
+
+  it('polls style lock progress and renders each ready reference without a manual refresh', async () => {
+    vi.useFakeTimers()
+    mocks.getSeries.mockResolvedValue({
+      data: {
+        ok: true,
+        series: {
+          id: 'sid',
+          title: 'City Healer',
+          logline: 'One sentence story',
+          total_episodes: 1,
+          genre: 'drama',
+          mode: 'fully_automatic',
+          target_duration: 60,
+          pilot_first: true,
+          characters: [{
+            id: 'char-poll',
+            name: 'Lin',
+            role_type: 'protagonist',
+            avatar_front_url: '',
+            avatar_side_url: '',
+            avatar_threequarter_url: '',
+            avatar_fullbody_url: '',
+          }],
+          scenes: [],
+        },
+        episodes: [{ id: 'ep1', episode_number: 1, title: 'Pilot', status: 'pending' }],
+      },
+    })
+    mocks.getStyleLock
+      .mockResolvedValueOnce({
+        data: {
+          ok: true,
+          locked: false,
+          status: 'locking',
+          version: 2,
+          missing_assets: [],
+          reference_status: {
+            characters: { ready: 0, total: 1 },
+            scenes: { ready: 0, total: 0 },
+          },
+          reference_progress: [],
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          ok: true,
+          locked: false,
+          status: 'locking',
+          version: 2,
+          missing_assets: [],
+          reference_status: {
+            characters: { ready: 1, total: 1 },
+            scenes: { ready: 0, total: 0 },
+          },
+          reference_progress: [{
+            asset_type: 'character',
+            asset_id: 'char-poll',
+            asset_name: 'Lin',
+            slot: 'avatar_front_url',
+            status: 'ready',
+            url: '/static/image-creation/outputs/poll-front.png',
+          }],
+        },
+      })
+
+    const SeriesDetailPage = (await import('../views/SeriesDetailPage.vue')).default
+    const wrapper = mount(SeriesDetailPage)
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="linked-character-reference-char-poll-avatar_front_url"]').exists()).toBe(false)
+
+    await vi.advanceTimersByTimeAsync(5000)
+    await flushPromises()
+
+    const reference = wrapper.find('[data-test="linked-character-reference-char-poll-avatar_front_url"]')
+    expect(reference.exists()).toBe(true)
+    expect(reference.attributes('src')).toBe('/static/image-creation/outputs/poll-front.png')
+    expect(mocks.getSeries).toHaveBeenCalledTimes(1)
   })
 
   it('does not submit style lock twice while a lock request is running', async () => {

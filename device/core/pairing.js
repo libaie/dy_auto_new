@@ -62,7 +62,7 @@ var pairing = {
 
   /**
    * 发起配对请求
-   * @param {string} serverIp - 服务端 IP（不含端口，默认 8000）
+   * @param {string} serverIp - 服务端 IP（不含端口，默认 8001）
    * @param {string} deviceId - 设备 ID
    * @param {string} deviceName - 设备型号
    * @param {string} osVersion - 系统版本
@@ -71,7 +71,7 @@ var pairing = {
    * @returns {Object|null} { pairing_token, status } 或 null
    */
   request: function (serverIp, deviceId, deviceName, osVersion, appVersion, extra) {
-    var port = "8000";
+    var port = "8001";
     var ip = serverIp;
     // 支持 ip:port 格式
     if (serverIp.indexOf(":") !== -1) {

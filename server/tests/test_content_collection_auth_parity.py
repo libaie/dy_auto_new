@@ -27,6 +27,7 @@ EXPECTED_CONTENT_COLLECTION_HTTP_ROUTES = [
     ("/api/data/comments", ("GET",), "list_comments", "app.domains.content_collection.data_router.list_comments", ("get_db", "verify_admin_token")),
     ("/api/data/users", ("GET",), "list_users", "app.domains.content_collection.data_router.list_users", ("get_db", "verify_admin_token")),
     ("/api/data/conversations", ("GET",), "list_conversations", "app.domains.content_collection.data_router.list_conversations", ("get_db", "verify_admin_token")),
+    ("/api/data/conversations/{conversation_id}", ("GET",), "get_conversation", "app.domains.content_collection.data_router.get_conversation", ("get_db", "verify_admin_token")),
     ("/api/data/export/comments", ("GET",), "export_comments", "app.domains.content_collection.data_router.export_comments", ("get_db", "verify_admin_token")),
     ("/api/data/export/users", ("GET",), "export_users", "app.domains.content_collection.data_router.export_users", ("get_db", "verify_admin_token")),
     ("/api/data/export/conversations", ("GET",), "export_conversations", "app.domains.content_collection.data_router.export_conversations", ("get_db", "verify_admin_token")),

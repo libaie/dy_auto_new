@@ -37,6 +37,46 @@
         </div>
       </section>
 
+      <section data-test="consumed-text-artifacts" class="mb-4 rounded border border-slate-800 bg-slate-950/60 p-4">
+        <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <div class="text-sm font-semibold text-slate-200">AI 文本版本</div>
+          <div class="flex flex-wrap gap-2">
+            <button
+              v-if="run?.series_id"
+              type="button"
+              class="rounded border border-slate-700 px-3 py-2 text-xs text-slate-200 hover:border-sky-500 hover:text-sky-200"
+              @click="$router.push(`/series/${run.series_id}/ai-text-artifacts`)"
+            >
+              打开追溯台
+            </button>
+            <button
+              v-if="!consumedTextArtifacts.length"
+              data-test="backfill-text-artifacts"
+              type="button"
+              class="rounded bg-sky-600 px-3 py-2 text-xs text-white hover:bg-sky-500 disabled:opacity-50"
+              :disabled="acting"
+              @click="backfillTextArtifacts"
+            >
+              回填文字追溯
+            </button>
+          </div>
+        </div>
+        <div v-if="consumedTextArtifacts.length" class="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+          <div v-for="artifact in consumedTextArtifacts" :key="artifact.consumer_id || artifact.artifact_id" class="rounded border border-slate-800 p-3 text-xs">
+            <div class="flex items-center justify-between gap-2">
+              <span class="font-mono text-slate-100">{{ artifact.artifact_type }}</span>
+              <span class="rounded border border-emerald-500/30 px-2 py-0.5 font-mono text-emerald-200">v{{ artifact.version }}</span>
+            </div>
+            <div class="mt-2 flex flex-wrap gap-2 text-slate-400">
+              <span>{{ artifact.source_type || '-' }}</span>
+              <span :class="statusClass(artifact.status)">{{ artifact.status || '-' }}</span>
+            </div>
+            <div class="mt-2 break-all font-mono text-slate-500">{{ artifact.artifact_id }}</div>
+          </div>
+        </div>
+        <div v-else class="text-sm text-slate-500">暂无绑定的 AI 文本版本</div>
+      </section>
+
       <section data-test="readiness-blocks" class="mb-4 rounded border border-slate-800 bg-slate-950/60 p-4">
         <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -63,13 +103,46 @@
         <div v-else class="text-sm text-slate-500">暂无阻塞项</div>
       </section>
 
+      <section v-if="run?.episode_id" data-test="storyboard-image-readiness" class="mb-4 rounded border border-slate-800 bg-slate-950/60 p-4">
+        <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div class="text-sm font-semibold text-slate-200">分镜图</div>
+            <div class="mt-1 flex flex-wrap gap-2 text-xs text-slate-400">
+              <span>总数 {{ storyboardImageSummary.total || 0 }}</span>
+              <span class="text-emerald-300">已通过 {{ storyboardImageSummary.approved || 0 }}</span>
+              <span class="text-amber-300">待审 {{ storyboardImageSummary.pending || 0 }}</span>
+              <span class="text-sky-300">生成中 {{ storyboardImageSummary.running || 0 }}</span>
+              <span class="text-slate-500">缺失 {{ storyboardImageSummary.missing || 0 }}</span>
+            </div>
+          </div>
+          <span v-if="storyboardImageError" class="text-xs text-rose-300">{{ storyboardImageError }}</span>
+        </div>
+        <div v-if="storyboardImageFrames.length" class="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+          <div v-for="frame in storyboardImageFrames" :key="frame.frame_id" class="rounded border border-slate-800 p-3 text-xs">
+            <div class="flex items-center justify-between gap-2">
+              <span class="font-mono text-slate-200">{{ frame.time_range || frame.frame_id }}</span>
+              <span :class="storyboardFrameImageStatusClass(frame.status)">{{ storyboardFrameImageStatusLabel(frame.status) }}</span>
+            </div>
+            <div class="mt-2 truncate text-slate-500">{{ frame.asset?.id || frame.task?.id || frame.frame_id }}</div>
+            <button
+              v-if="canPromoteStoryboardImage(frame)"
+              :data-test="`promote-storyboard-image-${frame.asset.id}`"
+              class="mt-3 rounded bg-sky-600 px-3 py-1.5 text-xs text-white hover:bg-sky-500 disabled:opacity-50"
+              :disabled="acting || storyboardImagePromotingId === frame.asset.id"
+              @click="promoteStoryboardFrameImage(frame)"
+            >{{ storyboardImagePromotingId === frame.asset.id ? '处理中...' : '使用为首帧' }}</button>
+          </div>
+        </div>
+        <div v-else class="text-sm text-slate-500">暂无分镜图状态</div>
+      </section>
+
       <section v-if="readiness?.provider_throttle" data-test="provider-throttle" class="mb-4 rounded border border-amber-500/30 bg-amber-950/20 p-4">
         <div class="text-sm font-semibold text-amber-100">Provider 并发额度</div>
         <p class="mt-2 text-sm text-amber-100">当前 {{ readiness.provider_throttle.active_tasks ?? 0 }} / {{ readiness.provider_throttle.max_concurrent_tasks ?? '-' }}</p>
         <p v-if="readiness.provider_throttle.retry_after" class="mt-1 text-xs text-amber-200/80">下次重试：{{ readiness.provider_throttle.retry_after }}</p>
       </section>
 
-      <div v-if="repairSummary.total || repairTasks.length" class="mb-4 space-y-3">
+      <div v-if="repairSummary.total || repairTasks.length || repairLoading || repairError" class="mb-4 space-y-3">
         <AutoRepairSummaryStrip :summary="repairSummary" />
         <AutoRepairTaskList
           :tasks="repairTasks"
@@ -293,6 +366,7 @@ import {
   getSegmentRetryImpact,
   getRunCosts,
   getProviderStageTasks,
+  backfillRunTextArtifacts,
   retryProductionSegment,
   runMockSchedulerStep,
   runRealWorkerStep,
@@ -303,6 +377,7 @@ import {
   startComposeStage,
   syncComposeStage,
 } from '../api/videoProduction.js'
+import { getStoryboardImageState, promoteStoryboardImageAsset } from '../api/storyboardImages.js'
 
 const route = useRoute()
 const runId = route.params.runId
@@ -332,8 +407,14 @@ const repairError = ref('')
 const repairBusyId = ref('')
 const autopilotBusy = ref(false)
 const autopilotTimer = ref(null)
+const statusPollTimer = ref(null)
+const storyboardImageState = ref(null)
+const storyboardImageError = ref('')
+const storyboardImagePromotingId = ref('')
 
 const reviewStatuses = ['image_review_pending', 'image_human_review_required', 'video_review_pending', 'video_human_review_required', 'final_review_pending']
+const statusPollStatuses = new Set(['reference_generation_running', 'image_batch_running', 'video_batch_running', 'composing'])
+const STATUS_POLL_INTERVAL_MS = 5000
 const needsReview = computed(() => reviewStatuses.includes(run.value?.status))
 const providerRunning = computed(() => ['image_batch_running', 'video_batch_running', 'composing'].includes(run.value?.status))
 const isRealProviderRun = computed(() => run.value?.run_type === 'real_short_e2e')
@@ -347,7 +428,10 @@ const runTypeLabels = {
   legacy: '历史剧集生产',
 }
 const runTypeLabel = computed(() => runTypeLabels[run.value?.run_type] || run.value?.run_type || '历史剧集生产')
+const consumedTextArtifacts = computed(() => run.value?.consumed_text_artifacts || [])
 const readinessBlocks = computed(() => readiness.value?.blocks || [])
+const storyboardImageSummary = computed(() => storyboardImageState.value?.summary || {})
+const storyboardImageFrames = computed(() => Array.isArray(storyboardImageState.value?.frames) ? storyboardImageState.value.frames : [])
 const nextRepairAction = computed(() => {
   if (readiness.value?.next_repair_action) return readiness.value.next_repair_action
   const firstRepairBlock = readinessBlocks.value.find(block => block.repair_route)
@@ -374,7 +458,7 @@ const storageFailedRows = computed(() => Object.entries(assetSummary.value || {}
   .filter(row => row.count > 0))
 
 const steps = computed(() => [
-  { key: 'storyboard', label: '分镜', status: run.value?.storyboard_json?.frames?.length ? 'ready' : 'ready' },
+  { key: 'storyboard', label: '分镜', status: run.value?.storyboard_json?.frames?.length ? 'ready' : 'pending' },
   { key: 'images', label: '图片', status: stageStatus(['image_batch_running', 'image_review_pending', 'image_human_review_required', 'image_approved']) },
   { key: 'img_review', label: '图片审查', status: run.value?.status === 'image_approved' ? 'passed' : needsReview.value ? 'blocked' : 'pending' },
   { key: 'videos', label: '视频片段', status: stageStatus(['video_batch_running', 'video_review_pending', 'video_human_review_required', 'video_segments_approved']) },
@@ -508,8 +592,27 @@ async function loadRepairTasks() {
   }
 }
 
-async function load() {
-  loading.value = true
+async function loadStoryboardImages() {
+  if (!run.value?.episode_id || !run.value?.series_id) {
+    storyboardImageState.value = null
+    return
+  }
+  try {
+    const { data } = await getStoryboardImageState(run.value.episode_id, {
+      series_id: run.value.series_id,
+      run_id: run.value.id,
+    })
+    storyboardImageState.value = data?.ok ? data : null
+    storyboardImageError.value = ''
+  } catch (e) {
+    storyboardImageState.value = null
+    storyboardImageError.value = normalizeError(e).message || '分镜图状态加载失败'
+  }
+}
+
+async function load(options = {}) {
+  const silent = options.silent === true
+  if (!silent) loading.value = true
   error.value = ''
   try {
     await Promise.all([
@@ -520,13 +623,51 @@ async function load() {
       loadTree({ page: 1, page_size: treePageSize }),
       loadRepairTasks(),
     ])
+    await loadStoryboardImages()
+    await refreshSelectedSegmentDetail({ silent })
   } catch (e) {
     const detail = normalizeError(e)
     error.value = detail.message
   } finally {
-    loading.value = false
+    if (!silent) loading.value = false
+    scheduleStatusPoll()
     scheduleAutopilot()
   }
+}
+
+function storyboardFrameImageStatusLabel(status) {
+  return {
+    approved: '已通过',
+    pending: '待审',
+    running: '生成中',
+    blocked: '已阻断',
+    missing: '未生成',
+  }[status || 'missing'] || '未生成'
+}
+
+function storyboardFrameImageStatusClass(status) {
+  if (status === 'approved') return 'text-emerald-300'
+  if (status === 'pending' || status === 'running') return 'text-amber-300'
+  if (status === 'blocked') return 'text-rose-300'
+  return 'text-slate-500'
+}
+
+function canPromoteStoryboardImage(frame) {
+  return Array.isArray(frame?.asset?.allowed_actions) && frame.asset.allowed_actions.includes('promote_to_video_asset')
+}
+
+async function promoteStoryboardFrameImage(frame) {
+  if (!frame?.asset?.id || !run.value?.id || !run.value?.episode_id) return
+  storyboardImagePromotingId.value = frame.asset.id
+  await act(async () => {
+    await promoteStoryboardImageAsset(frame.asset.id, {
+      run_id: run.value.id,
+      frame_id: frame.frame_id,
+      episode_id: run.value.episode_id,
+      asset_version: frame.asset.version,
+    })
+  })
+  storyboardImagePromotingId.value = ''
 }
 
 async function loadTree(params = {}) {
@@ -558,20 +699,27 @@ async function loadTree(params = {}) {
 
 async function selectSegment(segment) {
   selectedSegment.value = segment
-  segmentDetailLoading.value = true
+  await refreshSelectedSegmentDetail()
+}
+
+async function refreshSelectedSegmentDetail(options = {}) {
+  if (!selectedSegment.value?.id) return
+  const silent = options.silent === true
+  if (!silent) segmentDetailLoading.value = true
   try {
-    const { data } = await getSegmentDetail(segment.id, { history_limit: 10 })
+    const { data } = await getSegmentDetail(selectedSegment.value.id, { history_limit: 10 })
     segmentDetail.value = data
   } catch (e) {
     segmentDetail.value = { repair: normalizeError(e) }
   } finally {
-    segmentDetailLoading.value = false
+    if (!silent) segmentDetailLoading.value = false
   }
 }
 
 async function act(fn) {
   if (acting.value) return
   clearAutopilotTimer()
+  clearStatusPollTimer()
   acting.value = true
   error.value = ''
   try {
@@ -589,6 +737,27 @@ function clearAutopilotTimer() {
     clearTimeout(autopilotTimer.value)
     autopilotTimer.value = null
   }
+}
+
+function clearStatusPollTimer() {
+  if (statusPollTimer.value) {
+    clearTimeout(statusPollTimer.value)
+    statusPollTimer.value = null
+  }
+}
+
+function shouldPollStatus() {
+  return Boolean(
+    !autopilotEnabled.value
+      && !acting.value
+      && statusPollStatuses.has(run.value?.status),
+  )
+}
+
+function scheduleStatusPoll(delay = STATUS_POLL_INTERVAL_MS) {
+  clearStatusPollTimer()
+  if (!shouldPollStatus()) return
+  statusPollTimer.value = setTimeout(() => load({ silent: true }), delay)
 }
 
 function scheduleAutopilot(delay = 800) {
@@ -628,6 +797,7 @@ async function runAutopilotOnce() {
 }
 
 function startImages() { return act(() => startImageStage(runId)) }
+function backfillTextArtifacts() { return act(() => backfillRunTextArtifacts(runId)) }
 function syncImages() { return act(() => syncImageStage(runId)) }
 function startVideos() { return act(() => startVideoStage(runId)) }
 function syncVideos() { return act(() => syncVideoStage(runId)) }
@@ -682,5 +852,8 @@ async function confirmRetry() {
 }
 
 onMounted(load)
-onBeforeUnmount(clearAutopilotTimer)
+onBeforeUnmount(() => {
+  clearAutopilotTimer()
+  clearStatusPollTimer()
+})
 </script>

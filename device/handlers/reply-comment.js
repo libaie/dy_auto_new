@@ -544,100 +544,51 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
               } catch (e) {}
               if (!hasDMSequence && !dmContent && content) dmContent = content;
               if (hasDMSequence || dmContent) {
-                var recipientId = (userData && userData.douyin_id) || "";
-                if (recipientId) {
-                  var dmClaimResult = apiClient.claimDMRecipient({
-                    account_id: params.account_id,
-                    recipient_douyin_id: recipientId,
-                    recipient_nickname: comment.nickname,
-                  });
-                  if (dmClaimResult && dmClaimResult.claimed) {
-                    var sent, reportedContent;
-                    // DM 序列模板 vs 单条私信
-                    if (hasDMSequence) {
-                      var seqMsgs = this.resolveMessages(params);
-                      if (!seqMsgs || !seqMsgs.map) { seqMsgs = []; }
-                      var dmBtnOk = this.safeClick("dm_entry_btn", 5);
-                      // _sendMessageSequence 内部 safeInput 已做显式等待，无需 sleep
-                      if (dmBtnOk && seqMsgs.length > 0) {
-                        var seqSent = this._sendMessageSequence(seqMsgs, stats, keyword);
-                        sent = seqSent > 0;
-                        reportedContent = seqMsgs.map(function(m){return m.content;}).join(" | ");
-                        if (sent) { try { apiClient.incrementStats(params.account_id, "search_dm", (userData && userData.uniqueId) || "", 1); } catch (e) {} }
-                      } else {
-                        sent = false;
-                        reportedContent = dmContent;
-                      }
-                    } else {
-                      sent = this._sendDM(dmContent);
-                      reportedContent = dmContent;
+                var recipientId = (userData && userData.douyin_id) || this._buildFallbackRecipientId(comment.nickname || "unknown");
+                var dmClaimResult = apiClient.claimDMRecipient({
+                  account_id: params.account_id,
+                  recipient_douyin_id: recipientId,
+                  recipient_nickname: comment.nickname
+                });
+                if (dmClaimResult && dmClaimResult.claimed) {
+                  var sendResults = [];
+                  var sentCount = 0;
+                  if (hasDMSequence) {
+                    var seqMsgs = this.resolveMessages(params);
+                    if (!seqMsgs || !seqMsgs.length) { seqMsgs = []; }
+                    var dmBtnOk = this.safeClick("dm_entry_btn", 5);
+                    if (dmBtnOk) { sleep(1500); }
+                    if (dmBtnOk && seqMsgs.length > 0) {
+                      sendResults = this._sendMessageSequence(seqMsgs, stats, keyword);
+                    } else if (seqMsgs.length > 0) {
+                      sendResults = this._buildDMFailureResults(seqMsgs, keyword, dmBtnOk ? "私信内容为空" : "私信按钮未找到");
                     }
-                    if (sent) {
-                      apiClient.reportDMSend({
-                        conversation_id: dmClaimResult.conversation_id,
-                        stage: dmIntent, intent: dmIntent, keyword: keyword, content: reportedContent,
-                      });
-                      stats.dm_count++;
-                      if (!hasDMSequence) { try { apiClient.incrementStats(params.account_id, "search_dm", (userData && userData.uniqueId) || "", 1); } catch (e) {} }
-                      if (hasDMSequence) {
-                        this._lastDMSendTime = Date.now();
-                        var dailyCount = _incrementDailyDMCount();
-                        logger.info(TAG, "当日DM: " + dailyCount + "/" + (params.server_daily_limit_dm != null ? params.server_daily_limit_dm : (params.max_daily_dm || 75)));
-                      }
-                    } else {
-                      apiClient.releaseDMRecipient({ conversation_id: dmClaimResult.conversation_id });
-                    }
+                    sentCount = this._countSentDMResults(sendResults);
                   } else {
-                    logger.info(TAG, "用户 " + comment.nickname + " 已被其他设备 DM，跳过");
+                    var singleSent = this._sendDM(dmContent);
+                    sendResults = [{
+                      order: 1,
+                      content: dmContent,
+                      status: singleSent ? "sent" : "failed",
+                      error_message: singleSent ? null : "私信发送失败",
+                      sent_at: new Date().toISOString()
+                    }];
+                    sentCount = singleSent ? 1 : 0;
+                  }
+                  this._reportDMSendResults(dmClaimResult.conversation_id, sendResults, params, dmIntent, dmIntent, keyword);
+                  if (sentCount > 0) {
+                    stats.dm_count++;
+                    try { apiClient.incrementStats(params.account_id, "search_dm", recipientId, 1); } catch (e) {}
+                    if (hasDMSequence) {
+                      this._lastDMSendTime = Date.now();
+                      var dailyCount = _incrementDailyDMCount();
+                      logger.info(TAG, "当日DM: " + dailyCount + "/" + (params.server_daily_limit_dm != null ? params.server_daily_limit_dm : (params.max_daily_dm || 75)));
+                    }
+                  } else if (sendResults.length === 0) {
+                    apiClient.releaseDMRecipient({ conversation_id: dmClaimResult.conversation_id });
                   }
                 } else {
-                  var fbNick = comment.nickname || "unknown";
-                  var fbHash = 0;
-                  for (var hi = 0; hi < fbNick.length; hi++) {
-                    fbHash = ((fbHash << 5) - fbHash) + fbNick.charCodeAt(hi); fbHash |= 0;
-                  }
-                  var fallbackId = "fb_" + Math.abs(fbHash).toString(16);
-                  dmClaimResult = apiClient.claimDMRecipient({
-                    account_id: params.account_id,
-                    recipient_douyin_id: fallbackId,
-                    recipient_nickname: comment.nickname,
-                  });
-                  if (dmClaimResult && dmClaimResult.claimed) {
-                    var sent2, reportedContent2;
-                    if (hasDMSequence) {
-                      var seqMsgs2 = this.resolveMessages(params);
-                      if (!seqMsgs2 || !seqMsgs2.map) { seqMsgs2 = []; }
-                      var dmBtnOk2 = this.safeClick("dm_entry_btn", 3);
-                      if (dmBtnOk2) { sleep(1500); }
-                      if (dmBtnOk2 && seqMsgs2.length > 0) {
-                        var seqSent2 = this._sendMessageSequence(seqMsgs2, stats, keyword);
-                        sent2 = seqSent2 > 0;
-                        reportedContent2 = seqMsgs2.map(function(m){return m.content;}).join(" | ");
-                        if (sent2) { try { apiClient.incrementStats(params.account_id, "search_dm", (userData && userData.uniqueId) || "", 1); } catch (e) {} }
-                      } else {
-                        sent2 = false;
-                        reportedContent2 = dmContent;
-                      }
-                    } else {
-                      sent2 = this._sendDM(dmContent);
-                      reportedContent2 = dmContent;
-                    }
-                    if (sent2) {
-                      apiClient.reportDMSend({
-                        conversation_id: dmClaimResult.conversation_id,
-                        stage: dmIntent, intent: dmIntent, keyword: keyword, content: reportedContent2,
-                      });
-                      stats.dm_count++;
-                      if (!hasDMSequence) { try { apiClient.incrementStats(params.account_id, "search_dm", (userData && userData.uniqueId) || "", 1); } catch (e) {} }
-                      if (hasDMSequence) {
-                        this._lastDMSendTime = Date.now();
-                        var dailyCount = _incrementDailyDMCount();
-                        logger.info(TAG, "当日DM: " + dailyCount + "/" + (params.server_daily_limit_dm != null ? params.server_daily_limit_dm : (params.max_daily_dm || 75)));
-                      }
-                    } else {
-                      apiClient.releaseDMRecipient({ conversation_id: dmClaimResult.conversation_id });
-                    }
-                  }
+                  logger.info(TAG, "用户 " + comment.nickname + " 已被其他设备 DM，跳过");
                 }
               }
               sleep(Math.floor(Math.random() * 500 + 800));

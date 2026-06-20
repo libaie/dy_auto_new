@@ -9,7 +9,7 @@ from openpyxl import Workbook
 from sqlalchemy import Integer, asc, cast, desc, func, or_
 
 from app.config import bj_now
-from app.db.models.content_collection import CollectedComment, CollectedUser, Conversation
+from app.db.models.content_collection import CollectedComment, CollectedUser, Conversation, ConversationMessage
 from app.db_models import Device, Task
 
 
@@ -127,6 +127,34 @@ def list_conversations(
     return _paginate(query, skip, limit)
 
 
+def get_conversation(db, user, conversation_id: str):
+    query = db.query(Conversation).filter(Conversation.id == conversation_id)
+    user_id, role = user
+    if role != "admin":
+        query = query.join(Task, Conversation.task_id == Task.id).filter(Task.user_id == user_id)
+    conversation = query.first()
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    messages = db.query(ConversationMessage).filter(
+        ConversationMessage.conversation_id == conversation.id,
+    ).order_by(
+        ConversationMessage.message_order.asc(),
+        ConversationMessage.created_at.asc(),
+        ConversationMessage.id.asc(),
+    ).all()
+    history_incomplete = False
+    if not messages and conversation.last_dm_content:
+        history_incomplete = True
+        message_payloads = [_legacy_conversation_message_payload(conversation)]
+    else:
+        message_payloads = [_conversation_message_payload(message) for message in messages]
+
+    return {
+        "conversation": _conversation_payload(conversation),
+        "messages": message_payloads,
+        "history_incomplete": history_incomplete,
+    }
 def export_comments(
     db,
     user,
@@ -262,15 +290,95 @@ def export_conversations(
     rows = _export_rows(query, skip, limit)
 
     stage_map = {"qualifying": "触达", "nurturing": "培育", "converting": "转化", "follow_up": "跟进"}
-    headers = ["对方昵称", "抖音号", "阶段", "最新消息", "消息总数", "最后发送时间"]
+    message_map = _conversation_message_export_map(db, [r.id for r in rows])
+    headers = ["对方昵称", "抖音号", "阶段", "最新消息", "消息总数", "消息明细", "最后发送时间"]
     data = [[
         r.recipient_nickname or "", r.recipient_douyin_id or "",
         stage_map.get(r.current_stage, r.current_stage or ""),
         r.last_dm_content or "", str(r.total_dm_count or 0),
+        "\n".join(message_map.get(r.id) or ([r.last_dm_content] if r.last_dm_content else [])),
         str(r.last_dm_at or ""),
     ] for r in rows]
 
     return _stream_xlsx(f"conversations_{bj_now().strftime('%Y%m%d')}.xlsx", _build_xlsx(headers, data))
+
+
+def _conversation_payload(conversation: Conversation) -> dict:
+    return {
+        "id": conversation.id,
+        "task_id": conversation.task_id,
+        "account_id": conversation.account_id,
+        "device_id": conversation.device_id,
+        "keyword": conversation.keyword,
+        "recipient_nickname": conversation.recipient_nickname,
+        "recipient_douyin_id": conversation.recipient_douyin_id,
+        "current_stage": conversation.current_stage,
+        "intent": conversation.intent,
+        "last_dm_content": conversation.last_dm_content,
+        "last_dm_at": conversation.last_dm_at,
+        "claimed_at": conversation.claimed_at,
+        "status": conversation.status,
+        "total_dm_count": conversation.total_dm_count,
+        "reply_received_at": conversation.reply_received_at,
+        "created_at": conversation.created_at,
+        "updated_at": conversation.updated_at,
+    }
+
+
+def _conversation_message_payload(message: ConversationMessage) -> dict:
+    return {
+        "id": message.id,
+        "conversation_id": message.conversation_id,
+        "task_id": message.task_id,
+        "device_id": message.device_id,
+        "dm_sequence_id": message.dm_sequence_id,
+        "message_order": message.message_order,
+        "message_key": message.message_key,
+        "direction": message.direction,
+        "content": message.content,
+        "status": message.status,
+        "error_message": message.error_message,
+        "sent_at": message.sent_at,
+        "created_at": message.created_at,
+        "updated_at": message.updated_at,
+    }
+
+
+def _legacy_conversation_message_payload(conversation: Conversation) -> dict:
+    return {
+        "id": None,
+        "conversation_id": conversation.id,
+        "task_id": conversation.task_id,
+        "device_id": conversation.device_id,
+        "dm_sequence_id": None,
+        "message_order": conversation.total_dm_count or 1,
+        "message_key": None,
+        "direction": "outbound",
+        "content": conversation.last_dm_content,
+        "status": "sent",
+        "error_message": None,
+        "sent_at": conversation.last_dm_at,
+        "created_at": conversation.created_at,
+        "updated_at": conversation.updated_at,
+    }
+
+
+def _conversation_message_export_map(db, conversation_ids: list[str]) -> dict[str, list[str]]:
+    if not conversation_ids:
+        return {}
+    messages = db.query(ConversationMessage).filter(
+        ConversationMessage.conversation_id.in_(conversation_ids),
+    ).order_by(
+        ConversationMessage.conversation_id.asc(),
+        ConversationMessage.message_order.asc(),
+        ConversationMessage.created_at.asc(),
+        ConversationMessage.id.asc(),
+    ).all()
+    grouped: dict[str, list[str]] = {}
+    for message in messages:
+        prefix = f"{message.message_order}. " if message.message_order is not None else ""
+        grouped.setdefault(message.conversation_id, []).append(f"{prefix}{message.content or ''}")
+    return grouped
 
 
 def _paginate(query, skip: int, limit: int) -> dict:

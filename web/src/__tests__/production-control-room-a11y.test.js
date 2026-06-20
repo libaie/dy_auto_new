@@ -20,6 +20,9 @@ const mocks = vi.hoisted(() => ({
   syncVideoStage: vi.fn(() => Promise.resolve({ data: { ok: true } })),
   startComposeStage: vi.fn(() => Promise.resolve({ data: { ok: true } })),
   syncComposeStage: vi.fn(() => Promise.resolve({ data: { ok: true } })),
+  listAgencyRepairTasks: vi.fn(() => Promise.resolve({ data: { items: [], summary: {} } })),
+  retryAgencyRepairTask: vi.fn(() => Promise.resolve({ data: { ok: true } })),
+  authorizeAgencyRepairRetry: vi.fn(() => Promise.resolve({ data: { ok: true } })),
 }))
 
 vi.mock('vue-router', () => ({ useRoute: () => mocks.route }))
@@ -40,6 +43,12 @@ vi.mock('../api/videoProduction.js', () => ({
   syncVideoStage: mocks.syncVideoStage,
   startComposeStage: mocks.startComposeStage,
   syncComposeStage: mocks.syncComposeStage,
+}))
+
+vi.mock('../api/agency.js', () => ({
+  listAgencyRepairTasks: mocks.listAgencyRepairTasks,
+  retryAgencyRepairTask: mocks.retryAgencyRepairTask,
+  authorizeAgencyRepairRetry: mocks.authorizeAgencyRepairRetry,
 }))
 
 describe('Production control room accessibility', () => {

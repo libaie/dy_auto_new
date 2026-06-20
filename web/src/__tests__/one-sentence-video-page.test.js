@@ -219,6 +219,21 @@ describe('OneSentenceVideoPage', () => {
     wrapper.unmount()
   })
 
+  it('clamps real short duration to the current materialized production limit', async () => {
+    const wrapper = await mountPage()
+
+    await wrapper.find('[data-test="target-duration-seconds"]').setValue(28800)
+    await submitPrompt(wrapper)
+
+    expect(wrapper.text()).toContain('当前单次真实生产上限 960 秒')
+    expect(mocks.createOneSentenceVideo).toHaveBeenCalledWith(expect.objectContaining({
+      run_type: 'real_short_e2e',
+      target_duration_seconds: 960,
+    }))
+
+    wrapper.unmount()
+  })
+
   it('clamps real short duration below 60 seconds when submitting', async () => {
     const wrapper = await mountPage()
 

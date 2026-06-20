@@ -28,6 +28,12 @@ def _xlsx_data_rows(response):
     return list(sheet.iter_rows(values_only=True))[1:]
 
 
+def _xlsx_rows(response):
+    workbook = load_workbook(io.BytesIO(response.content), read_only=True)
+    sheet = workbook.active
+    return list(sheet.iter_rows(values_only=True))
+
+
 def test_export_users_applies_privacy_filter(db):
     db.add_all([
         CollectedUser(
@@ -91,6 +97,55 @@ def test_export_users_searches_ip_location(db):
     assert response.status_code == 200
     rows = _xlsx_data_rows(response)
     assert [row[0] for row in rows] == ["用户甲"]
+
+
+def test_list_users_searches_source_comment_content(db):
+    db.add_all([
+        CollectedUser(
+            id="user-comment-hz",
+            nickname="评论用户甲",
+            douyin_id="comment-hz",
+            source_comment_content="刚从西湖回来，想找本地向导",
+            created_at=datetime(2026, 5, 1, 9, 0, 0),
+        ),
+        CollectedUser(
+            id="user-comment-bj",
+            nickname="评论用户乙",
+            douyin_id="comment-bj",
+            source_comment_content="北京周末看展",
+            created_at=datetime(2026, 5, 1, 10, 0, 0),
+        ),
+    ])
+    db.commit()
+
+    response = client.get("/api/data/users?search=西湖")
+
+    assert response.status_code == 200
+    items = response.json()["items"]
+    assert [item["douyin_id"] for item in items] == ["comment-hz"]
+    assert items[0]["source_comment_content"] == "刚从西湖回来，想找本地向导"
+
+
+def test_export_users_includes_source_comment_content(db):
+    db.add(
+        CollectedUser(
+            id="user-export-entry-comment",
+            nickname="导出评论用户",
+            douyin_id="export-entry-comment",
+            source_comment_content="刚从西湖回来，想找本地向导",
+            created_at=datetime(2026, 5, 1, 9, 0, 0),
+        )
+    )
+    db.commit()
+
+    response = client.get("/api/data/export/users?search=西湖回来")
+
+    assert response.status_code == 200
+    rows = _xlsx_rows(response)
+    assert "入口评论" in rows[0]
+    comment_index = rows[0].index("入口评论")
+    assert rows[1][0] == "导出评论用户"
+    assert rows[1][comment_index] == "刚从西湖回来，想找本地向导"
 
 
 def test_export_users_respects_frontend_sort_for_current_page(db):

@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   getRunCosts: vi.fn(),
   getProviderStageTasks: vi.fn(),
   getSegmentRetryImpact: vi.fn(),
+  backfillRunTextArtifacts: vi.fn(() => Promise.resolve({ data: { ok: true } })),
   retryProductionSegment: vi.fn(() => Promise.resolve({ data: { ok: true } })),
   startImageStage: vi.fn(() => Promise.resolve({ data: { ok: true } })),
   syncImageStage: vi.fn(() => Promise.resolve({ data: { ok: true } })),
@@ -23,6 +24,8 @@ const mocks = vi.hoisted(() => ({
   listAgencyRepairTasks: vi.fn(),
   retryAgencyRepairTask: vi.fn(() => Promise.resolve({ data: { ok: true } })),
   authorizeAgencyRepairRetry: vi.fn(() => Promise.resolve({ data: { ok: true } })),
+  getStoryboardImageState: vi.fn(() => Promise.resolve({ data: { ok: true, summary: {}, frames: [] } })),
+  promoteStoryboardImageAsset: vi.fn(() => Promise.resolve({ data: { ok: true } })),
 }))
 
 vi.mock('vue-router', () => ({
@@ -39,6 +42,7 @@ vi.mock('../api/videoProduction.js', () => ({
   getRunCosts: mocks.getRunCosts,
   getProviderStageTasks: mocks.getProviderStageTasks,
   getSegmentRetryImpact: mocks.getSegmentRetryImpact,
+  backfillRunTextArtifacts: mocks.backfillRunTextArtifacts,
   retryProductionSegment: mocks.retryProductionSegment,
   startImageStage: mocks.startImageStage,
   syncImageStage: mocks.syncImageStage,
@@ -54,17 +58,25 @@ vi.mock('../api/agency.js', () => ({
   authorizeAgencyRepairRetry: mocks.authorizeAgencyRepairRetry,
 }))
 
-function runPayload(status, runType = 'real_short_e2e', modelTrace = {}) {
+vi.mock('../api/storyboardImages.js', () => ({
+  getStoryboardImageState: mocks.getStoryboardImageState,
+  promoteStoryboardImageAsset: mocks.promoteStoryboardImageAsset,
+}))
+
+function runPayload(status, runType = 'real_short_e2e', modelTrace = {}, consumedTextArtifacts = []) {
   return {
     data: {
       ok: true,
       run: {
         id: 'run-123',
+        series_id: 'sid',
+        episode_id: 'ep1',
         status,
         run_type: runType,
         current_stage: status,
         storyboard_json: { frames: [{ id: 'frame-1' }] },
         model_trace_json: modelTrace,
+        consumed_text_artifacts: consumedTextArtifacts,
       },
       asset_summary: { image: { approved: 1 } },
     },
@@ -155,6 +167,7 @@ async function mountPage(status, runType = 'real_short_e2e', modelTrace = {}) {
       },
     },
   })
+  mountedWrappers.push(wrapper)
   await flushPromises()
   return wrapper
 }
@@ -173,9 +186,12 @@ async function mountPageWithTreeFailure(status) {
       },
     },
   })
+  mountedWrappers.push(wrapper)
   await flushPromises()
   return wrapper
 }
+
+const mountedWrappers = []
 
 describe('VideoProductionMonitorPage', () => {
   beforeEach(() => {
@@ -183,9 +199,16 @@ describe('VideoProductionMonitorPage', () => {
     mocks.route.params.runId = 'run-123'
     mocks.runMockSchedulerStep.mockResolvedValue({ data: { ok: true } })
     mocks.runRealWorkerStep.mockResolvedValue({ data: { ok: true } })
+    mocks.getStoryboardImageState.mockReset()
+    mocks.getStoryboardImageState.mockResolvedValue({ data: { ok: true, summary: {}, frames: [] } })
+    mocks.promoteStoryboardImageAsset.mockReset()
+    mocks.promoteStoryboardImageAsset.mockResolvedValue({ data: { ok: true } })
   })
 
   afterEach(() => {
+    for (const wrapper of mountedWrappers.splice(0)) {
+      wrapper.unmount()
+    }
     vi.useRealTimers()
   })
 
@@ -197,6 +220,139 @@ describe('VideoProductionMonitorPage', () => {
     expect(wrapper.find('[data-test="readiness-blocks"]').text()).toContain('图像审查未完成')
     expect(wrapper.find('[data-test="readiness-blocks"]').text()).toContain('打开审查中心')
     expect(wrapper.find('[data-test="readiness-blocks"]').text()).toContain('/ai-video-review?run_id=run-123')
+  })
+
+  it('shows consumed AI text artifact versions for traceability', async () => {
+    mocks.getVideoProductionRun.mockResolvedValue(runPayload('storyboard_ready', 'real_short_e2e', {}, [
+      {
+        artifact_id: 'artifact-series-bible',
+        artifact_type: 'series_bible',
+        version: 1,
+        status: 'approved',
+        target_type: 'series',
+        target_id: 'series-1',
+        source_type: 'ai',
+      },
+      {
+        artifact_id: 'artifact-storyboard',
+        artifact_type: 'storyboard',
+        version: 3,
+        status: 'approved',
+        target_type: 'episode',
+        target_id: 'episode-1',
+        source_type: 'human_edit',
+      },
+    ]))
+    mocks.getRunReadiness.mockResolvedValue(readinessPayload())
+    mocks.getRunProductionTree.mockResolvedValue(treePayload())
+    mocks.getRunCosts.mockResolvedValue({ data: { ok: true, actual_cost: 0, estimate_status: 'unknown' } })
+    mocks.getProviderStageTasks.mockResolvedValue({ data: { ok: true, tasks: [] } })
+    mocks.listAgencyRepairTasks.mockResolvedValue({
+      data: { summary: { total: 0, active: 0, manual_required: 0, estimated_cost: 0 }, items: [] },
+    })
+
+    const VideoProductionMonitorPage = (await import('../views/VideoProductionMonitorPage.vue')).default
+    const wrapper = mount(VideoProductionMonitorPage, {
+      global: {
+        mocks: {
+          $router: mocks.router,
+        },
+      },
+    })
+    mountedWrappers.push(wrapper)
+    await flushPromises()
+
+    const ledger = wrapper.find('[data-test="consumed-text-artifacts"]')
+    expect(ledger.exists()).toBe(true)
+    expect(ledger.text()).toContain('AI 文本版本')
+    expect(ledger.text()).toContain('series_bible')
+    expect(ledger.text()).toContain('v1')
+    expect(ledger.text()).toContain('storyboard')
+    expect(ledger.text()).toContain('v3')
+    expect(ledger.text()).toContain('human_edit')
+  })
+
+  it('shows storyboard image readiness and promotes approved frame images', async () => {
+    mocks.getStoryboardImageState.mockResolvedValue({
+      data: {
+        ok: true,
+        summary: { total: 2, approved: 1, missing: 1, pending: 0, running: 0, blocked: 0 },
+        frames: [
+          {
+            frame_id: 'shot-001',
+            time_range: '0-2秒',
+            status: 'approved',
+            asset: {
+              id: 'asset-approved',
+              version: 1,
+              url: '/static/image-creation/storyboard.png',
+              allowed_actions: ['promote_to_video_asset'],
+            },
+          },
+          { frame_id: 'shot-002', time_range: '2-4秒', status: 'missing', asset: null },
+        ],
+      },
+    })
+
+    const wrapper = await mountPage('storyboard_ready')
+
+    expect(mocks.getStoryboardImageState).toHaveBeenCalledWith('ep1', { series_id: 'sid', run_id: 'run-123' })
+    expect(wrapper.find('[data-test="storyboard-image-readiness"]').text()).toContain('分镜图')
+    expect(wrapper.find('[data-test="storyboard-image-readiness"]').text()).toContain('已通过 1')
+    expect(wrapper.find('[data-test="storyboard-image-readiness"]').text()).toContain('缺失 1')
+
+    await wrapper.find('[data-test="promote-storyboard-image-asset-approved"]').trigger('click')
+    await flushPromises()
+
+    expect(mocks.promoteStoryboardImageAsset).toHaveBeenCalledWith('asset-approved', {
+      run_id: 'run-123',
+      frame_id: 'shot-001',
+      episode_id: 'ep1',
+      asset_version: 1,
+    })
+  })
+
+  it('backfills missing consumed AI text artifacts from the monitor', async () => {
+    const consumed = [{
+      artifact_id: 'artifact-storyboard',
+      artifact_type: 'storyboard',
+      version: 1,
+      status: 'approved',
+      target_type: 'episode',
+      target_id: 'episode-1',
+      source_type: 'legacy_run_backfill',
+    }]
+    mocks.getVideoProductionRun
+      .mockResolvedValueOnce(runPayload('completed'))
+      .mockResolvedValue(runPayload('completed', 'real_short_e2e', {}, consumed))
+    mocks.getRunReadiness.mockResolvedValue(readinessPayload({ blocks: [] }))
+    mocks.getRunProductionTree.mockResolvedValue(treePayload())
+    mocks.getRunCosts.mockResolvedValue({ data: { ok: true, actual_cost: 0, estimate_status: 'unknown' } })
+    mocks.getProviderStageTasks.mockResolvedValue({ data: { ok: true, tasks: [] } })
+    mocks.listAgencyRepairTasks.mockResolvedValue({
+      data: { summary: { total: 0, active: 0, manual_required: 0, estimated_cost: 0 }, items: [] },
+    })
+
+    const VideoProductionMonitorPage = (await import('../views/VideoProductionMonitorPage.vue')).default
+    const wrapper = mount(VideoProductionMonitorPage, {
+      global: {
+        mocks: {
+          $router: mocks.router,
+        },
+      },
+    })
+    mountedWrappers.push(wrapper)
+    await flushPromises()
+
+    const button = wrapper.find('[data-test="backfill-text-artifacts"]')
+    expect(button.exists()).toBe(true)
+    await button.trigger('click')
+    await flushPromises()
+
+    expect(mocks.backfillRunTextArtifacts).toHaveBeenCalledWith('run-123')
+    expect(mocks.getVideoProductionRun).toHaveBeenCalledTimes(2)
+    expect(wrapper.find('[data-test="consumed-text-artifacts"]').text()).toContain('storyboard')
+    expect(wrapper.find('[data-test="consumed-text-artifacts"]').text()).toContain('legacy_run_backfill')
   })
 
   it('shows agency auto repair tasks on the production monitor', async () => {
@@ -223,6 +379,15 @@ describe('VideoProductionMonitorPage', () => {
     expect(wrapper.text()).toContain('自动返修')
     expect(wrapper.text()).toContain('分镜缺少角色参考图')
     expect(wrapper.text()).not.toMatch(/宸茶|閸|锟/)
+  })
+
+  it('keeps agency auto repair load failures visible on the production monitor', async () => {
+    mocks.listAgencyRepairTasks.mockRejectedValueOnce(new Error('repair API unavailable'))
+
+    const wrapper = await mountPage('image_batch_running')
+
+    expect(mocks.listAgencyRepairTasks).toHaveBeenCalledWith({ run_id: 'run-123', page: 1, page_size: 20 })
+    expect(wrapper.text()).toContain('返修任务加载失败，请稍后重试')
   })
 
   it('shows mock worker controls for mock scale runs and runs one step', async () => {
@@ -389,6 +554,82 @@ describe('VideoProductionMonitorPage', () => {
     await flushPromises()
 
     expect(mocks.startImageStage).not.toHaveBeenCalled()
+  })
+
+  it('polls running production status without autopilot and reveals the review gate', async () => {
+    vi.useFakeTimers()
+    const VideoProductionMonitorPage = (await import('../views/VideoProductionMonitorPage.vue')).default
+    defaultResolvedApis('image_batch_running')
+    mocks.getVideoProductionRun
+      .mockResolvedValueOnce(runPayload('image_batch_running'))
+      .mockResolvedValue(runPayload('image_review_pending'))
+
+    const wrapper = mount(VideoProductionMonitorPage, {
+      global: {
+        mocks: {
+          $router: mocks.router,
+        },
+      },
+    })
+    mountedWrappers.push(wrapper)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('image_batch_running')
+    expect(wrapper.get('[data-test="primary-next-action"]').text()).toContain('运行真实 worker 一步')
+
+    await vi.advanceTimersByTimeAsync(5000)
+    await flushPromises()
+
+    expect(mocks.getVideoProductionRun).toHaveBeenCalledTimes(2)
+    expect(wrapper.text()).toContain('image_review_pending')
+    expect(wrapper.get('[data-test="primary-next-action"]').text()).toContain('需要审查')
+    expect(mocks.startImageStage).not.toHaveBeenCalled()
+  })
+
+  it('refreshes the selected segment detail during status polling so new images appear without page refresh', async () => {
+    vi.useFakeTimers()
+    const VideoProductionMonitorPage = (await import('../views/VideoProductionMonitorPage.vue')).default
+    defaultResolvedApis('image_batch_running')
+    mocks.getSegmentDetail
+      .mockResolvedValueOnce({
+        data: {
+          ok: true,
+          segment: { id: 'seg-1', segment_id: 'seg-a' },
+          latest_assets: {},
+          allowed_actions: ['retry'],
+        },
+      })
+      .mockResolvedValue({
+        data: {
+          ok: true,
+          segment: { id: 'seg-1', segment_id: 'seg-a' },
+          latest_assets: {
+            image: { id: 'asset-live', asset_type: 'image', frame_id: 'frame-1', status: 'review_pending', url: 'live.png' },
+          },
+          allowed_actions: ['retry'],
+        },
+      })
+
+    const wrapper = mount(VideoProductionMonitorPage, {
+      global: {
+        mocks: {
+          $router: mocks.router,
+        },
+      },
+    })
+    mountedWrappers.push(wrapper)
+    await flushPromises()
+
+    await wrapper.find('button[data-test="segment-button"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('暂无素材')
+
+    await vi.advanceTimersByTimeAsync(5000)
+    await flushPromises()
+
+    expect(mocks.getSegmentDetail).toHaveBeenCalledTimes(2)
+    expect(wrapper.text()).toContain('review_pending')
+    expect(wrapper.text()).toContain('live.png')
   })
 
   it('drives a fully automatic real provider run across image, video, and compose stages', async () => {

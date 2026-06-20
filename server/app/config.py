@@ -16,7 +16,7 @@ DATA_DIR = SERVER_DIR / "app" / "data"
 
 # 环境变量
 HOST = os.getenv("HOST", "0.0.0.0")
-PORT = int(os.getenv("PORT", "8000"))
+PORT = int(os.getenv("PORT", "8001"))
 DEBUG = os.getenv("DEBUG", "true").lower() == "true"
 DEVICE_SECRET = os.getenv("DEVICE_SECRET", "change-me-to-a-random-string")
 

@@ -83,8 +83,9 @@ class TestGenerateContent:
         }, headers=HEADERS)
         assert resp.status_code == 404
 
-    def test_generate_content_no_api_key(self, db):
+    def test_generate_content_no_api_key(self, db, monkeypatch):
         """Returns 503 when AI_API_KEY is not set."""
+        monkeypatch.delenv("AI_API_KEY", raising=False)
         from app.services.content_service import content_service
         tpl = content_service.create_template(
             db, name="gen-test", body="关于{keyword}的评论",

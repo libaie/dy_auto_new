@@ -69,14 +69,89 @@ describe('API Clients', () => {
       expect(mockGet).toHaveBeenCalledWith('/series/sid/agency-console')
     })
 
+    it('generateSeriesStoryPlan calls the story-plan endpoint', async () => {
+      const { generateSeriesStoryPlan } = await import('../api/series.js')
+      mockPost.mockResolvedValue({ data: { ok: true } })
+      await generateSeriesStoryPlan('sid')
+      expect(mockPost).toHaveBeenCalledWith('/series/sid/story-plan')
+    })
+
+    it('generateEpisodeScript calls the episode script endpoint', async () => {
+      const { generateEpisodeScript } = await import('../api/series.js')
+      mockPost.mockResolvedValue({ data: { ok: true } })
+      await generateEpisodeScript('sid', 'ep1', { target_duration_seconds: 6 })
+      expect(mockPost).toHaveBeenCalledWith('/series/sid/episodes/ep1/script', { target_duration_seconds: 6 }, { timeout: 600000 })
+    })
+
+    it('autoGenerateAssets uses a long timeout for AI asset generation', async () => {
+      const { autoGenerateAssets } = await import('../api/series.js')
+      mockPost.mockResolvedValue({ data: { ok: true } })
+      await autoGenerateAssets('sid')
+      expect(mockPost).toHaveBeenCalledWith('/series/sid/auto-generate', undefined, { timeout: 600000 })
+    })
+
     it('style lock helpers call the style-lock endpoints', async () => {
       const { getStyleLock, lockSeriesStyle } = await import('../api/series.js')
       mockGet.mockResolvedValue({ data: { ok: true } })
       mockPost.mockResolvedValue({ data: { ok: true } })
       await getStyleLock('sid')
+      await getStyleLock('sid', { silent: true })
       await lockSeriesStyle('sid')
       expect(mockGet).toHaveBeenCalledWith('/series/sid/style-lock')
+      expect(mockGet).toHaveBeenCalledWith('/series/sid/style-lock', { silent: true })
       expect(mockPost).toHaveBeenCalledWith('/series/sid/style-lock', undefined, { timeout: 600000 })
+    })
+  })
+
+  describe('ai text artifact API', () => {
+    it('calls text artifact trace endpoints', async () => {
+      const {
+        listAITextArtifacts,
+        getAITextArtifact,
+        getAITextArtifactLineage,
+        editAITextArtifact,
+        approveAITextArtifact,
+        regenerateAITextArtifact,
+      } = await import('../api/aiTextArtifacts.js')
+      mockGet.mockResolvedValue({ data: { ok: true } })
+      mockPost.mockResolvedValue({ data: { ok: true } })
+
+      await listAITextArtifacts({ series_id: 'sid', artifact_type: 'episode_script' })
+      await getAITextArtifact('artifact-1')
+      await getAITextArtifactLineage('artifact-1')
+      await editAITextArtifact('artifact-1', { content_text: 'edited' })
+      await approveAITextArtifact('artifact-1')
+      await regenerateAITextArtifact('artifact-1', { input_json: { reason: 'retry' } })
+
+      expect(mockGet).toHaveBeenCalledWith('/ai-text-artifacts', { params: { series_id: 'sid', artifact_type: 'episode_script' } })
+      expect(mockGet).toHaveBeenCalledWith('/ai-text-artifacts/artifact-1')
+      expect(mockGet).toHaveBeenCalledWith('/ai-text-artifacts/artifact-1/lineage')
+      expect(mockPost).toHaveBeenCalledWith('/ai-text-artifacts/artifact-1/edit', { content_text: 'edited' })
+      expect(mockPost).toHaveBeenCalledWith('/ai-text-artifacts/artifact-1/approve')
+      expect(mockPost).toHaveBeenCalledWith('/ai-text-artifacts/artifact-1/regenerate', { input_json: { reason: 'retry' } })
+    })
+  })
+
+  describe('storyboard images API', () => {
+    it('calls storyboard image closure endpoints', async () => {
+      const {
+        createStoryboardFrameImageTask,
+        createMissingStoryboardImageTasks,
+        getStoryboardImageState,
+        promoteStoryboardImageAsset,
+      } = await import('../api/storyboardImages.js')
+      mockGet.mockResolvedValue({ data: { ok: true } })
+      mockPost.mockResolvedValue({ data: { ok: true } })
+
+      await createStoryboardFrameImageTask('episode-1', 'shot-001', { series_id: 'series-1' })
+      await createMissingStoryboardImageTasks('episode-1', { series_id: 'series-1' })
+      await getStoryboardImageState('episode-1', { series_id: 'series-1', run_id: 'run-1' })
+      await promoteStoryboardImageAsset('asset-1', { run_id: 'run-1', frame_id: 'shot-001', asset_version: 1 })
+
+      expect(mockPost).toHaveBeenCalledWith('/storyboard-images/episodes/episode-1/frames/shot-001/tasks', { series_id: 'series-1' })
+      expect(mockPost).toHaveBeenCalledWith('/storyboard-images/episodes/episode-1/tasks:batch', { series_id: 'series-1' })
+      expect(mockGet).toHaveBeenCalledWith('/storyboard-images/episodes/episode-1', { params: { series_id: 'series-1', run_id: 'run-1' } })
+      expect(mockPost).toHaveBeenCalledWith('/storyboard-images/assets/asset-1/promote', { run_id: 'run-1', frame_id: 'shot-001', asset_version: 1 })
     })
   })
 
@@ -150,6 +225,13 @@ describe('API Clients', () => {
       mockGet.mockResolvedValue({ data: { ok: true } })
       await getRun('sid', 'rid')
       expect(mockGet).toHaveBeenCalledWith('/pipeline/runs/sid/rid')
+    })
+
+    it('listRuns forwards optional request config', async () => {
+      const { listRuns } = await import('../api/pipeline.js')
+      mockGet.mockResolvedValue({ data: { ok: true } })
+      await listRuns('sid', { silent: true })
+      expect(mockGet).toHaveBeenCalledWith('/pipeline/runs/sid', { silent: true })
     })
 
     it('getRunById calls GET run-id lookup path', async () => {

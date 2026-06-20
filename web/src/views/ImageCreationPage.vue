@@ -835,7 +835,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import {
   createImageTask,
   dispatchQueuedImageTask,
@@ -916,8 +916,11 @@ const abCostConfirmed = ref(false)
 const abRequestToken = ref(0)
 const abCreateIdempotencyKey = ref('')
 const abCreateRequestHash = ref('')
+let taskPollTimer = null
 const abTerminalStatuses = new Set(['winner_selected', 'no_winner', 'cancelled', 'failed'])
 const abDecisionReadyStatuses = new Set(['completed', 'partial_failed'])
+const activeTaskStatuses = new Set(['admission_pending', 'pending', 'queued', 'running', 'processing', 'submitted', 'retry_wait'])
+const TASK_POLL_INTERVAL_MS = 3000
 
 const requiresSource = computed(() => modeAcceptsSource(form.mode))
 const requiresReferences = computed(() => modeAcceptsReferences(form.mode))
@@ -1136,6 +1139,10 @@ onMounted(() => {
   loadStrategies()
 })
 
+onBeforeUnmount(() => {
+  clearTaskPoll()
+})
+
 function setMode(mode) {
   form.mode = mode
   error.value = ''
@@ -1154,10 +1161,56 @@ function applyTaskResponse(response) {
   const data = response?.data?.data || response?.data || response || {}
   task.value = data.task || data || null
   assets.value = Array.isArray(data.assets) ? data.assets : []
+  scheduleTaskPoll()
 }
 
 function updateAsset(updated) {
   assets.value = assets.value.map(asset => (asset.id === updated.id ? { ...asset, ...updated } : asset))
+}
+
+function taskNeedsPolling(currentTask = task.value) {
+  return Boolean(currentTask?.id && activeTaskStatuses.has(String(currentTask.status || '').toLowerCase()))
+}
+
+function taskCanProviderSync(currentTask = task.value) {
+  return Boolean(currentTask?.pixelle_task_id || currentTask?.provider_task_id)
+}
+
+function clearTaskPoll() {
+  if (taskPollTimer) {
+    clearTimeout(taskPollTimer)
+    taskPollTimer = null
+  }
+}
+
+function scheduleTaskPoll() {
+  clearTaskPoll()
+  if (!taskNeedsPolling()) return
+  taskPollTimer = setTimeout(pollTaskOnce, TASK_POLL_INTERVAL_MS)
+}
+
+async function pollTaskOnce() {
+  taskPollTimer = null
+  if (!taskNeedsPolling()) return
+  if (syncing.value) {
+    scheduleTaskPoll()
+    return
+  }
+
+  const taskId = task.value.id
+  try {
+    const response = taskCanProviderSync(task.value)
+      ? await syncImageTask(taskId)
+      : await getImageTask(taskId)
+    if (task.value?.id === taskId) {
+      applyTaskResponse(response)
+    }
+  } catch (e) {
+    if (task.value?.id === taskId) {
+      error.value = normalizeError(e)
+      scheduleTaskPoll()
+    }
+  }
 }
 
 function compactProviderOptions() {

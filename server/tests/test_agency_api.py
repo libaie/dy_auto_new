@@ -55,7 +55,7 @@ def test_list_agency_experts_returns_metadata_only():
 
     assert response.status_code == 200
     data = response.json()
-    assert len(data["experts"]) == 14
+    assert len(data["experts"]) == 15
     assert "reality_checker" not in [expert["expert_id"] for expert in data["experts"]]
     assert "markdown" not in data["experts"][0]
     assert data["experts"][0]["source_commit"] == "13b8800f6f666e8e10ac64f67f1194d2baeefbe0"

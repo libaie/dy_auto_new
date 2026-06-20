@@ -35,7 +35,7 @@ CommentBaseHandler.execute = function (params) {
   var videoCount = (params.video_count === -1) ? this._config.maxVideoCount : (params.video_count || this._config.defaultVideoCount);
   var sortBy = params.sort_by || "";
 
-  aiAnalyzer.useTemplate(params.prompt_template_id);
+  this._prepareAnalyzer(params);
 
   if (!keyword) {
     return { success: false, error: "缺少关键词" };
@@ -63,7 +63,7 @@ CommentBaseHandler.execute = function (params) {
   if (!this._clickSuggestion(keyword)) {
     if (!this._submitSearch()) return { success: false, error: "提交搜索失败" };
   }
-  sleep(2000);
+  if (!this._waitForSearchResults(keyword)) return { success: false, error: "搜索结果页未加载" };
   this._clickVideoTab();
   sleep(1000);
 
@@ -87,7 +87,7 @@ CommentBaseHandler.execute = function (params) {
     // 进入视频
     if (v === 0) {
       // 前置弹窗清洗：排序弹窗残留会拦截视频点击
-      var popupOpen = uiOperator.findElement("sort_latest", 800) || uiOperator.findElement("sort_most_liked", 800);
+      var popupOpen = uiOperator.findElement("sort_latest", 800, true) || uiOperator.findElement("sort_most_liked", 800, true);
       if (popupOpen) {
         logger.warn(TAG, "检测到残留排序弹窗，点击 sort_button 切换关闭");
         this.safeClick("sort_button", 2);
@@ -140,6 +140,10 @@ CommentBaseHandler.execute = function (params) {
  */
 CommentBaseHandler._beforeSearch = function (params) {
   // default: no-op
+};
+
+CommentBaseHandler._prepareAnalyzer = function (params) {
+  aiAnalyzer.useTemplate(params.prompt_template_id);
 };
 
 /**

@@ -1,0 +1,174 @@
+<template>
+  <div class="min-h-screen bg-slate-950 p-6 text-slate-100">
+    <div class="mb-5 flex items-start justify-between gap-4">
+      <div>
+        <h1 class="text-2xl font-semibold">AI 文本追溯台</h1>
+        <p class="mt-1 text-sm text-slate-400">查看 AI 输入、输出、模型 trace，并对文本产出进行人工编辑、批准或重新生成。</p>
+      </div>
+      <button class="rounded border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:bg-slate-900" @click="load">刷新</button>
+    </div>
+
+    <div v-if="loading" class="rounded border border-slate-800 bg-slate-900/70 p-6 text-slate-400">加载中...</div>
+    <div v-else-if="error" class="rounded border border-red-500/40 bg-red-500/10 p-4 text-red-200">{{ error }}</div>
+    <div v-else class="grid gap-4 lg:grid-cols-[20rem_1fr]">
+      <aside class="rounded border border-slate-800 bg-slate-900/60">
+        <div class="border-b border-slate-800 px-4 py-3 text-sm font-medium text-slate-300">文本产物</div>
+        <button
+          v-for="artifact in artifacts"
+          :key="artifact.id"
+          class="block w-full border-b border-slate-800 px-4 py-3 text-left hover:bg-slate-800/70"
+          :class="selectedArtifact?.id === artifact.id ? 'bg-slate-800' : ''"
+          @click="selectArtifact(artifact)"
+        >
+          <div class="flex items-center justify-between gap-2 text-sm">
+            <span class="font-medium text-slate-100">{{ artifact.artifact_type }}</span>
+            <span class="rounded bg-slate-950 px-2 py-0.5 text-xs text-slate-300">v{{ artifact.version }}</span>
+          </div>
+          <div class="mt-1 flex items-center gap-2 text-xs text-slate-500">
+            <span>{{ artifact.status }}</span>
+            <span>{{ artifact.source_type }}</span>
+          </div>
+        </button>
+        <div v-if="!artifacts.length" class="px-4 py-6 text-sm text-slate-500">暂无 AI 文本产物</div>
+      </aside>
+
+      <main v-if="selectedArtifact" class="space-y-4">
+        <section class="rounded border border-slate-800 bg-slate-900/60 p-4">
+          <div class="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <h2 class="text-lg font-semibold">{{ selectedArtifact.artifact_type }} v{{ selectedArtifact.version }}</h2>
+              <div class="mt-1 text-xs text-slate-500">{{ selectedArtifact.status }} · {{ selectedArtifact.source_type }}</div>
+            </div>
+            <div class="flex gap-2">
+              <button data-test="artifact-save-edit" class="rounded bg-cyan-600 px-3 py-2 text-sm text-white hover:bg-cyan-500" @click="saveEdit">保存人工编辑</button>
+              <button data-test="artifact-regenerate" class="rounded bg-indigo-600 px-3 py-2 text-sm text-white hover:bg-indigo-500" @click="regenerate">AI 重新生成</button>
+              <button data-test="artifact-approve" class="rounded bg-emerald-600 px-3 py-2 text-sm text-white hover:bg-emerald-500" @click="approve">批准</button>
+            </div>
+          </div>
+          <textarea
+            data-test="artifact-edit-input"
+            v-model="draftText"
+            rows="12"
+            class="w-full rounded border border-slate-700 bg-slate-950 p-3 font-mono text-sm text-slate-100"
+          />
+          <div class="mt-3 rounded border border-slate-800 bg-slate-950 p-3">
+            <div class="mb-2 text-xs font-semibold uppercase text-slate-500">当前文本预览</div>
+            <pre data-test="artifact-content-preview" class="whitespace-pre-wrap text-sm text-slate-200">{{ draftText }}</pre>
+          </div>
+          <div class="mt-3">
+            <label class="mb-2 block text-xs font-semibold uppercase text-slate-500" for="artifact-regenerate-input">再生成要求</label>
+            <textarea
+              id="artifact-regenerate-input"
+              data-test="artifact-regenerate-input"
+              v-model="regenerateInstruction"
+              rows="3"
+              class="w-full rounded border border-slate-700 bg-slate-950 p-3 text-sm text-slate-100"
+              placeholder="例如：增强结尾钩子，保持人物动机一致"
+            />
+          </div>
+        </section>
+
+        <section class="grid gap-4 xl:grid-cols-3">
+          <div class="rounded border border-slate-800 bg-slate-900/60 p-4">
+            <h3 class="mb-2 text-sm font-semibold text-slate-200">AI 输入</h3>
+            <pre class="max-h-72 overflow-auto whitespace-pre-wrap text-xs text-slate-300">{{ formatJson(selectedArtifact.input_json) }}</pre>
+          </div>
+          <div class="rounded border border-slate-800 bg-slate-900/60 p-4">
+            <h3 class="mb-2 text-sm font-semibold text-slate-200">结构化输出</h3>
+            <pre class="max-h-72 overflow-auto whitespace-pre-wrap text-xs text-slate-300">{{ formatJson(selectedArtifact.content_json) }}</pre>
+          </div>
+          <div class="rounded border border-slate-800 bg-slate-900/60 p-4">
+            <h3 class="mb-2 text-sm font-semibold text-slate-200">模型 Trace</h3>
+            <pre class="max-h-72 overflow-auto whitespace-pre-wrap text-xs text-slate-300">{{ formatJson(selectedArtifact.model_trace_json) }}</pre>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
+import {
+  approveAITextArtifact,
+  editAITextArtifact,
+  listAITextArtifacts,
+  regenerateAITextArtifact,
+} from '../api/aiTextArtifacts.js'
+
+const route = useRoute()
+const artifacts = ref([])
+const selectedArtifact = ref(null)
+const draftText = ref('')
+const regenerateInstruction = ref('')
+const loading = ref(false)
+const error = ref('')
+
+function formatJson(value) {
+  return JSON.stringify(value || {}, null, 2)
+}
+
+function selectArtifact(artifact) {
+  selectedArtifact.value = artifact
+  draftText.value = artifact?.content_text || formatJson(artifact?.content_json)
+  regenerateInstruction.value = ''
+}
+
+async function load(preferredArtifactId = '') {
+  loading.value = true
+  error.value = ''
+  try {
+    const { data } = await listAITextArtifacts({
+      series_id: route.params.seriesId,
+      episode_id: route.query.episode_id,
+    })
+    artifacts.value = data.artifacts || []
+    const preferred = preferredArtifactId
+      ? artifacts.value.find((item) => item.id === preferredArtifactId)
+      : null
+    const current = selectedArtifact.value
+      ? artifacts.value.find((item) => item.id === selectedArtifact.value.id)
+      : null
+    if (preferred) {
+      selectArtifact(preferred)
+    } else if (current) {
+      selectArtifact(current)
+    } else {
+      selectArtifact(artifacts.value[0] || null)
+    }
+  } catch (e) {
+    error.value = e.response?.data?.detail || e.message || '加载 AI 文本产物失败'
+  } finally {
+    loading.value = false
+  }
+}
+
+async function saveEdit() {
+  if (!selectedArtifact.value) return
+  const { data } = await editAITextArtifact(selectedArtifact.value.id, {
+    content_text: draftText.value,
+    content_json: selectedArtifact.value.content_json || {},
+  })
+  await load(data?.artifact?.id)
+}
+
+async function approve() {
+  if (!selectedArtifact.value) return
+  const { data } = await approveAITextArtifact(selectedArtifact.value.id)
+  await load(data?.artifact?.id || selectedArtifact.value.id)
+}
+
+async function regenerate() {
+  if (!selectedArtifact.value) return
+  const { data } = await regenerateAITextArtifact(selectedArtifact.value.id, {
+    input_json: {
+      reason: 'manual_regenerate_request',
+      instruction: regenerateInstruction.value,
+    },
+  })
+  await load(data?.artifact?.id)
+}
+
+onMounted(load)
+</script>

@@ -1,8 +1,9 @@
 """Test series/characters/scenes API endpoints."""
+import json
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app
-from app.db_models import VideoProductionRun
+from app.db_models import AITextArtifact, Character, Episode, ProductionJob, Scene, Series, VideoProductionRun
 
 
 @pytest.fixture
@@ -86,6 +87,321 @@ class TestSeriesAPI:
         assert detail.json()["episodes"][0]["episode_number"] == 1
         assert detail.json()["episodes"][0]["status"] == "pending"
 
+    def test_get_series_requires_admin_auth(self, client, real_auth, db):
+        series = Series(title="Private Series", logline="Hidden", genre="drama")
+        db.add(series)
+        db.commit()
+
+        detail = client.get(f"/api/series/{series.id}")
+
+        assert detail.status_code == 401
+
+    def test_ensure_episode_placeholders_repairs_missing_episodes(self, client, db):
+        series = Series(title="Broken API Series", total_episodes=3, status="draft")
+        db.add(series)
+        db.flush()
+        db.add(Episode(series_id=series.id, episode_number=1, status="done"))
+        db.commit()
+
+        resp = client.post(f"/api/series/{series.id}/ensure-episodes")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["ok"] is True
+        assert data["target_episode_count"] == 3
+        assert data["created_episode_numbers"] == [2, 3]
+        assert data["created_outline_episode_numbers"] == [1, 2, 3]
+        assert data["created_continuity_ledger"] is True
+        numbers = [
+            ep.episode_number
+            for ep in db.query(Episode)
+            .filter(Episode.series_id == series.id)
+            .order_by(Episode.episode_number)
+        ]
+        assert numbers == [1, 2, 3]
+        assert db.query(AITextArtifact).filter_by(
+            series_id=series.id,
+            artifact_type="episode_outline",
+            status="approved",
+        ).count() == 3
+
+    def test_create_series_story_plan_endpoint_enqueues_background_job(self, client, db):
+        series = Series(title="Story API", logline="A family secret returns.", total_episodes=2, status="draft")
+        db.add(series)
+        db.commit()
+
+        resp = client.post(f"/api/series/{series.id}/story-plan")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["ok"] is True
+        assert data["status"] == "planning"
+        assert data["story_planning"]["status"] == "queued"
+        assert data["story_planning"]["job_id"] == data["job_id"]
+        assert db.query(ProductionJob).filter_by(
+            target_type="series",
+            target_id=series.id,
+            stage="story_planning",
+            status="queued",
+        ).count() == 1
+        assert db.query(AITextArtifact).filter_by(
+            series_id=series.id,
+            artifact_type="series_story_plan",
+            status="approved",
+        ).count() == 0
+
+    def test_create_series_story_plan_endpoint_blocks_duplicate_active_job(self, client, db):
+        series = Series(title="Duplicate Story API", logline="A family secret returns.", total_episodes=2, status="draft")
+        db.add(series)
+        db.commit()
+
+        first = client.post(f"/api/series/{series.id}/story-plan")
+        duplicate = client.post(f"/api/series/{series.id}/story-plan")
+
+        assert first.status_code == 200
+        assert duplicate.status_code == 409
+        assert duplicate.json()["detail"]["code"] == "STORY_PLANNING_IN_PROGRESS"
+        assert db.query(ProductionJob).filter_by(target_type="series", target_id=series.id, stage="story_planning").count() == 1
+
+    def test_create_series_story_plan_endpoint_reuses_completed_plan_without_queueing(self, client, db):
+        series = Series(
+            title="Completed Story API",
+            logline="A family secret returns.",
+            total_episodes=2,
+            status="draft",
+            story_bible_json={"story_planning": {"status": "completed", "version": 1, "job_id": "job-done"}},
+        )
+        db.add(series)
+        db.flush()
+        episodes = [
+            Episode(series_id=series.id, episode_number=1, status="pending"),
+            Episode(series_id=series.id, episode_number=2, status="pending"),
+        ]
+        db.add_all(episodes)
+        db.flush()
+        db.add_all([
+            AITextArtifact(
+                series_id=series.id,
+                target_type="series",
+                target_id=series.id,
+                artifact_type="series_story_plan",
+                version=1,
+                status="approved",
+                source_type="ai",
+                content_json={"summary": "The family secret escalates."},
+            ),
+            AITextArtifact(
+                series_id=series.id,
+                target_type="series",
+                target_id=series.id,
+                artifact_type="season_arc",
+                version=1,
+                status="approved",
+                source_type="ai",
+                content_json={"arc_summary": "Truth rises episode by episode."},
+            ),
+            AITextArtifact(
+                series_id=series.id,
+                target_type="series",
+                target_id=series.id,
+                artifact_type="continuity_ledger",
+                version=1,
+                status="approved",
+                source_type="ai",
+                content_json={"mainline": "Keep the secret consistent."},
+            ),
+            AITextArtifact(
+                series_id=series.id,
+                episode_id=episodes[0].id,
+                target_type="episode",
+                target_id=episodes[0].id,
+                artifact_type="episode_outline",
+                version=1,
+                status="approved",
+                source_type="ai",
+                content_json={"episode_number": 1, "episode_goal": "Expose the first clue."},
+            ),
+            AITextArtifact(
+                series_id=series.id,
+                episode_id=episodes[1].id,
+                target_type="episode",
+                target_id=episodes[1].id,
+                artifact_type="episode_outline",
+                version=1,
+                status="approved",
+                source_type="ai",
+                content_json={"episode_number": 2, "episode_goal": "Force a confession."},
+            ),
+        ])
+        db.commit()
+
+        resp = client.post(f"/api/series/{series.id}/story-plan")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["ok"] is True
+        assert data["status"] == "completed"
+        assert data["job_id"] == "job-done"
+        assert data["story_planning"]["status"] == "completed"
+        assert data["story_planning"]["version"] == 1
+        assert len(data["artifacts"]) == 5
+        assert db.query(ProductionJob).filter_by(target_type="series", target_id=series.id, stage="story_planning").count() == 0
+
+    def test_create_series_story_plan_endpoint_does_not_treat_system_backfill_outlines_as_completed(self, client, db):
+        series = Series(
+            title="Backfill Story API",
+            logline="A family secret returns.",
+            total_episodes=2,
+            status="draft",
+            story_bible_json={"story_planning": {"status": "completed", "version": 1, "job_id": "old-job"}},
+        )
+        db.add(series)
+        db.flush()
+        episodes = [
+            Episode(series_id=series.id, episode_number=1, status="pending"),
+            Episode(series_id=series.id, episode_number=2, status="pending"),
+        ]
+        db.add_all(episodes)
+        db.flush()
+        db.add_all([
+            AITextArtifact(
+                series_id=series.id,
+                target_type="series",
+                target_id=series.id,
+                artifact_type="series_story_plan",
+                version=1,
+                status="approved",
+                source_type="ai",
+                content_json={"summary": "The family secret escalates."},
+            ),
+            AITextArtifact(
+                series_id=series.id,
+                target_type="series",
+                target_id=series.id,
+                artifact_type="season_arc",
+                version=1,
+                status="approved",
+                source_type="ai",
+                content_json={"arc_summary": "Truth rises episode by episode."},
+            ),
+            AITextArtifact(
+                series_id=series.id,
+                target_type="series",
+                target_id=series.id,
+                artifact_type="continuity_ledger",
+                version=1,
+                status="approved",
+                source_type="ai",
+                content_json={"mainline": "Keep the secret consistent."},
+            ),
+            AITextArtifact(
+                series_id=series.id,
+                episode_id=episodes[0].id,
+                target_type="episode",
+                target_id=episodes[0].id,
+                artifact_type="episode_outline",
+                version=1,
+                status="approved",
+                source_type="system_backfill",
+                content_json={"episode_number": 1, "episode_goal": "Backfilled placeholder."},
+            ),
+            AITextArtifact(
+                series_id=series.id,
+                episode_id=episodes[1].id,
+                target_type="episode",
+                target_id=episodes[1].id,
+                artifact_type="episode_outline",
+                version=1,
+                status="approved",
+                source_type="system_backfill",
+                content_json={"episode_number": 2, "episode_goal": "Backfilled placeholder."},
+            ),
+        ])
+        db.commit()
+
+        resp = client.post(f"/api/series/{series.id}/story-plan")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["ok"] is True
+        assert data["status"] == "planning"
+        assert data["story_planning"]["status"] == "queued"
+        assert db.query(ProductionJob).filter_by(
+            target_type="series",
+            target_id=series.id,
+            stage="story_planning",
+            status="queued",
+        ).count() == 1
+
+    def test_generate_episode_script_endpoint_creates_script_and_storyboard(self, client, db, monkeypatch):
+        series = Series(title="Script API", logline="A vendor hides a secret.", total_episodes=1, target_duration=6, status="draft")
+        db.add(series)
+        db.flush()
+        episode = Episode(series_id=series.id, episode_number=1, title="Pilot", status="pending")
+        db.add(episode)
+        db.commit()
+
+        async def fake_generate_episode_script_storyboard(db_session, *, series_id, episode_id, target_duration_seconds=None):
+            target = db_session.query(Episode).filter_by(id=episode_id, series_id=series_id).one()
+            target.script_json = {"title": "Pilot", "target_duration_seconds": target_duration_seconds}
+            target.storyboard_json = {
+                "frames": [{
+                    "frame_id": "shot-001",
+                    "time_range": "0-2秒",
+                    "duration": 2,
+                    "narration": "摊主发现秘密账本。",
+                    "image_prompt": "夜市摊位前，摊主看见一本旧账本。",
+                    "video_prompt": "镜头从摊位招牌推向账本。",
+                }]
+            }
+            db_session.add(AITextArtifact(
+                series_id=series_id,
+                episode_id=episode_id,
+                target_type="episode",
+                target_id=episode_id,
+                artifact_type="episode_script",
+                version=1,
+                status="approved",
+                source_type="ai",
+                content_json=target.script_json,
+            ))
+            db_session.add(AITextArtifact(
+                series_id=series_id,
+                episode_id=episode_id,
+                target_type="episode",
+                target_id=episode_id,
+                artifact_type="storyboard",
+                version=1,
+                status="approved",
+                source_type="ai",
+                content_json=target.storyboard_json,
+            ))
+            db_session.commit()
+            return {"script": target.script_json, "storyboard": target.storyboard_json, "artifact_count": 2}
+
+        monkeypatch.setattr(
+            "app.routers.series.generate_episode_script_storyboard",
+            fake_generate_episode_script_storyboard,
+            raising=False,
+        )
+
+        resp = client.post(
+            f"/api/series/{series.id}/episodes/{episode.id}/script",
+            json={"target_duration_seconds": 6},
+        )
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["ok"] is True
+        assert data["script"]["title"] == "Pilot"
+        assert data["storyboard"]["frames"][0]["time_range"] == "0-2秒"
+        assert db.query(AITextArtifact).filter_by(
+            series_id=series.id,
+            episode_id=episode.id,
+            artifact_type="episode_script",
+            status="approved",
+        ).count() == 1
+
     def test_get_series_marks_episode_active_video_run(self, client, db):
         resp = self._create_series(client)
         series_id = resp.json()["series"]["id"]
@@ -132,6 +448,53 @@ class TestSeriesAPI:
         assert series["characters"][0]["avatar_front_url"] == "https://cdn.test/front.png"
         assert series["scenes"][0]["id"] == scene_id
         assert series["scenes"][0]["reference_wideshot_url"] == "/static/refs/wide.png"
+
+    def test_get_series_detail_includes_episode_asset_scope(self, client, db):
+        series = Series(title="Episode Scope API", logline="A secret returns.", total_episodes=1, status="draft")
+        character = Character(name="Scope Lead", role_type="protagonist", gender="female")
+        scene = Scene(name="Scope Room", scene_type="indoor")
+        series.characters.append(character)
+        series.scenes.append(scene)
+        db.add(series)
+        db.flush()
+        episode = Episode(series_id=series.id, episode_number=1, status="pending")
+        db.add(episode)
+        db.flush()
+        db.add(AITextArtifact(
+            series_id=series.id,
+            episode_id=episode.id,
+            target_type="episode",
+            target_id=episode.id,
+            artifact_type="episode_outline",
+            version=1,
+            status="approved",
+            source_type="ai",
+            content_json={
+                "episode_number": 1,
+                "character_ids": [character.id],
+                "scene_ids": [scene.id],
+                "asset_usage": {
+                    "characters": [
+                        {"id": character.id, "name": character.name, "usage": "Carries the episode.", "source": "existing"}
+                    ],
+                    "scenes": [
+                        {"id": scene.id, "name": scene.name, "usage": "Hosts the reveal.", "source": "existing"}
+                    ],
+                },
+                "generated_assets": {"characters": [], "scenes": []},
+            },
+        ))
+        db.commit()
+
+        detail = client.get(f"/api/series/{series.id}")
+
+        assert detail.status_code == 200
+        episode_payload = detail.json()["episodes"][0]
+        assert episode_payload["asset_scope"]["character_ids"] == [character.id]
+        assert episode_payload["asset_scope"]["scene_ids"] == [scene.id]
+        assert episode_payload["asset_scope"]["characters"][0]["name"] == character.name
+        assert episode_payload["asset_scope"]["scenes"][0]["name"] == scene.name
+        assert episode_payload["asset_scope"]["source"] == "episode_outline"
 
     def test_list_series(self, client):
         self._create_series(client, "S1")
@@ -197,7 +560,7 @@ class TestSeriesAPI:
         assert resp.status_code == 200
         assert resp.json() == {"ok": True, "action": "deleted"}
 
-    def test_update_episode(self, client):
+    def test_update_episode(self, client, db):
         series_id = self._create_series(client).json()["series"]["id"]
         detail = client.get(f"/api/series/{series_id}")
         ep_id = detail.json()["episodes"][0]["id"]
@@ -206,6 +569,40 @@ class TestSeriesAPI:
             "title": "初遇", "script_json": {"scenes": []},
         })
         assert resp.status_code == 200
+        artifact = db.query(AITextArtifact).filter_by(
+            series_id=series_id,
+            episode_id=ep_id,
+            target_type="episode",
+            target_id=ep_id,
+            artifact_type="episode_script",
+        ).one()
+        assert artifact.status == "approved"
+        assert artifact.source_type == "human_edit"
+        assert artifact.content_json == {"scenes": []}
+
+    def test_update_episode_rolls_back_when_text_artifact_approval_fails(self, client, db, monkeypatch):
+        from app.services.ai_text_artifact_service import AITextArtifactService
+
+        series_id = self._create_series(client).json()["series"]["id"]
+        detail = client.get(f"/api/series/{series_id}")
+        ep_id = detail.json()["episodes"][0]["id"]
+
+        def fail_approval(self, artifact_id, *, actor_user_id=None, commit=True):
+            raise RuntimeError("approval failed")
+
+        monkeypatch.setattr(AITextArtifactService, "approve_artifact", fail_approval)
+
+        resp = client.put(f"/api/series/{series_id}/episodes/{ep_id}", json={
+            "title": "不应半提交", "script_json": {"scenes": [{"summary": "不应落库"}]},
+        })
+
+        assert resp.status_code == 500
+
+        db.expire_all()
+        episode = db.query(Episode).filter(Episode.id == ep_id).one()
+        assert episode.title != "不应半提交"
+        assert episode.script_json in ({}, None)
+        assert db.query(AITextArtifact).filter_by(series_id=series_id, episode_id=ep_id).count() == 0
 
 
 class TestPipelineAPI:

@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from 'vue'
-import { generateVideoAsync, getTask } from '../../api/pixelle-client.js'
+import { runPixelleVideoGeneration, uploadPixelleFiles } from './pixelleGeneration.js'
 
 const emit = defineEmits(['generate-start', 'generate-result'])
 
@@ -32,35 +32,34 @@ function handleFiles(e) {
 
 async function handleGenerate() {
   if (assetFiles.value.length === 0) return
-  generating.value = true; result.value = null
+  generating.value = true; result.value = null; videoUrl.value = ''
+  progress.value = { percent: 0, message: '正在上传素材...' }
   try {
+    const assetPaths = await uploadPixelleFiles(assetFiles.value)
     const payload = {
       text: videoText.value || 'generated video',
       mode: 'generate',
       n_scenes: 1,
       tts_voice: ttsVoice.value,
       bgm_volume: bgmVolume.value,
+      asset_paths: assetPaths,
+      media_paths: assetPaths,
     }
+    if (videoTitle.value) payload.title = videoTitle.value
     if (mediaWorkflow.value) payload.media_workflow = mediaWorkflow.value
     if (bgmPath.value) payload.bgm_path = bgmPath.value
 
-    const resp = await generateVideoAsync(payload)
-    const taskId = resp.data?.task_id
-    if (!taskId) throw new Error('No task ID')
-
-    // Poll for result
-    await new Promise((resolve, reject) => {
-      let attempts = 0
-      const timer = setInterval(async () => {
-        attempts++; if (attempts > 120) { clearInterval(timer); reject(new Error('Timeout')); return }
-        try {
-          const r = await getTask(taskId)
-          if (r.data.status === 'completed') { clearInterval(timer); result.value = { success: true, taskId }; resolve() }
-          else if (r.data.status === 'failed') { clearInterval(timer); reject(new Error(r.data.error)) }
-          else { progress.value = { percent: Math.min(95, r.data.progress || progress.value.percent + 0.5), message: r.data.status } }
-        } catch {}
-      }, 5000)
+    progress.value = { percent: 2, message: '正在提交任务...' }
+    const done = await runPixelleVideoGeneration(payload, {
+      onProgress: (p) => {
+        progress.value = {
+          percent: p.percent ?? Math.min(95, progress.value.percent + 0.5),
+          message: p.message,
+        }
+      },
     })
+    result.value = done
+    videoUrl.value = done.videoUrl
   } catch (e) {
     result.value = { success: false, error: e.message }
   } finally { generating.value = false }
@@ -122,7 +121,12 @@ async function handleGenerate() {
         </div>
         <p class="text-xs text-slate-400 mt-1">{{ progress.message }}</p>
       </div>
-      <div v-if="result?.success" class="text-xs text-emerald-400">生成完成!</div>
+      <div v-if="result?.success" class="mb-4">
+        <div class="text-xs text-emerald-400 mb-2">生成完成!</div>
+        <video v-if="videoUrl" :src="videoUrl" controls class="w-full rounded-lg" style="max-height:260px"/>
+        <a v-if="videoUrl" :href="videoUrl" download class="mt-2 inline-flex text-xs text-cyan-300 hover:text-cyan-200">下载视频</a>
+        <div v-else class="text-xs text-amber-300">任务已完成，但未返回视频路径</div>
+      </div>
       <div v-if="result && !result.success" class="text-xs text-red-400">{{ result.error }}</div>
     </div>
   </div>

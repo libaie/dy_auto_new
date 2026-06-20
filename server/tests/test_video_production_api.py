@@ -1,6 +1,17 @@
 from fastapi.testclient import TestClient
 
-from app.db_models import Episode, Series, VideoProductionAsset, VideoProductionRun, VideoReviewRecord
+from app.db_models import (
+    Episode,
+    ProductionEpisode,
+    ProductionPlan,
+    ProductionScene,
+    ProductionSegment,
+    ProductionShot,
+    Series,
+    VideoProductionAsset,
+    VideoProductionRun,
+    VideoReviewRecord,
+)
 from app.main import app
 from app.services.review_asset_edit_service import ReviewAssetEditError
 
@@ -216,6 +227,55 @@ def test_review_items_supports_multiple_statuses(db):
     assert resp.status_code == 200
     statuses = {item["status"] for item in resp.json()["items"]}
     assert statuses == {"failed", "regenerating"}
+
+
+def test_review_items_exposes_production_segment_id_for_real_short_retry(db):
+    series, episode = _episode(db)
+    plan = ProductionPlan(series_id=series.id, status="running")
+    db.add(plan)
+    db.flush()
+    production_episode = ProductionEpisode(plan_id=plan.id, episode_id=episode.id, order_index=1)
+    db.add(production_episode)
+    db.flush()
+    scene = ProductionScene(episode_plan_id=production_episode.id, scene_id="scene-1", order_index=1)
+    db.add(scene)
+    db.flush()
+    shot = ProductionShot(scene_plan_id=scene.id, shot_id="shot-1", order_index=1)
+    db.add(shot)
+    db.flush()
+    segment = ProductionSegment(shot_plan_id=shot.id, segment_id="seg-001", order_index=1, version=1)
+    db.add(segment)
+    db.flush()
+    run = VideoProductionRun(
+        series_id=series.id,
+        episode_id=episode.id,
+        status="image_review_pending",
+        current_stage="image_review",
+        production_plan_id=plan.id,
+        production_episode_id=production_episode.id,
+        run_type="real_short_e2e",
+    )
+    db.add(run)
+    db.flush()
+    db.add(VideoProductionAsset(
+        run_id=run.id,
+        episode_id=episode.id,
+        frame_id=segment.id,
+        asset_type="image",
+        stage="image_generation",
+        url="https://cdn.test/image.png",
+        version=1,
+        status="rejected",
+        is_latest=True,
+        production_segment_id=segment.id,
+    ))
+    db.commit()
+
+    resp = client.get("/api/video-production/review-items", params={"run_id": run.id})
+
+    assert resp.status_code == 200
+    item = resp.json()["items"][0]
+    assert item["production_segment_id"] == segment.id
 
 
 def test_review_items_excludes_superseded_asset_versions(db):

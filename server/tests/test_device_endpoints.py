@@ -128,6 +128,100 @@ def test_heartbeat_updates_device():
     assert resp.json()["status"] == "ok"
 
 
+def test_collect_report_saves_entry_comment_on_user(db):
+    from app.db_models import CollectedComment, CollectedUser
+
+    db.query(CollectedComment).delete()
+    db.query(CollectedUser).delete()
+    db.commit()
+
+    resp = client.post("/api/device/collect-report", json={
+        "task_id": "task-entry-comment",
+        "keyword": "杭州旅游",
+        "comment": {
+            "nickname": "评论入口用户",
+            "content": "刚从西湖回来，想找本地向导",
+            "time_str": "2026-06-08T14:00:00",
+        },
+        "user": {
+            "nickname": "评论入口用户",
+            "douyin_id": "entry-comment-user",
+            "fans_count": "128",
+        },
+    }, headers=HEADERS)
+
+    assert resp.status_code == 200
+    user = db.query(CollectedUser).filter_by(douyin_id="entry-comment-user").one()
+    assert user.source_comment_content == "刚从西湖回来，想找本地向导"
+
+    resp = client.post("/api/device/collect-report", json={
+        "task_id": "task-entry-comment",
+        "keyword": "杭州旅游",
+        "comment": {
+            "nickname": "评论入口用户",
+            "content": "第二次评论，明确要亲子游路线",
+            "time_str": "2026-06-08T14:05:00",
+        },
+        "user": {
+            "nickname": "评论入口用户",
+            "douyin_id": "entry-comment-user",
+            "fans_count": "130",
+        },
+    }, headers=HEADERS)
+
+    assert resp.status_code == 200
+    db.refresh(user)
+    assert user.source_comment_content == "第二次评论，明确要亲子游路线"
+
+
+def test_collect_report_skips_user_when_douyin_id_missing(db):
+    from app.db_models import CollectedComment, CollectedUser
+
+    db.query(CollectedComment).delete()
+    db.query(CollectedUser).delete()
+    db.commit()
+
+    resp = client.post("/api/device/collect-report", json={
+        "task_id": "task-entry-comment-fallback",
+        "keyword": "德州扑克",
+        "comment": {
+            "nickname": "评论入口昵称",
+            "content": "评论里说想一起玩",
+            "time_str": "2026-06-11T01:56:00",
+        },
+        "user": {
+            "nickname": "评论入口昵称",
+            "douyin_id": "",
+        },
+    }, headers=HEADERS)
+
+    assert resp.status_code == 200
+    assert resp.json()["comment_saved"] is True
+    assert resp.json()["user_new"] is False
+    assert db.query(CollectedComment).count() == 1
+    assert db.query(CollectedUser).count() == 0
+
+    resp = client.post("/api/device/collect-report", json={
+        "task_id": "task-entry-comment-fallback",
+        "keyword": "德州扑克",
+        "comment": {
+            "nickname": "评论入口昵称",
+            "content": "同一个评论入口昵称的第二条内容",
+            "time_str": "2026-06-11T01:57:00",
+        },
+        "user": {
+            "nickname": "评论入口昵称",
+            "douyin_id": "",
+            "fans_count": "12",
+        },
+    }, headers=HEADERS)
+
+    assert resp.status_code == 200
+    assert resp.json()["user_new"] is False
+    assert db.query(CollectedComment).count() == 2
+    assert db.query(CollectedUser).count() == 0
+
+
 def test_poll_returns_proxy_config(db):
     """Poll response includes proxy config for registered device."""
     from app.db_models import Device

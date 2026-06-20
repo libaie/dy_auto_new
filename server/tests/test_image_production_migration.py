@@ -13,7 +13,7 @@ from app.db_models import ImageProductionMetric
 
 
 SERVER_DIR = Path(__file__).resolve().parents[1]
-CURRENT_ALEMBIC_HEAD = "5f60718293a4"
+CURRENT_ALEMBIC_HEAD = "6a7b8c9d0e1f"
 
 
 def _alembic_config():

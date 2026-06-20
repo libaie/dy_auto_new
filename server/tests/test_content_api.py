@@ -138,8 +138,9 @@ class TestGenerateAPI:
             assert data["content"] == "好吃的内容"
             assert data["template_id"] == tpl["id"]
 
-    def test_generate_no_api_key(self):
+    def test_generate_no_api_key(self, monkeypatch):
         """Generate endpoint should return 503 when AI_API_KEY is not set."""
+        monkeypatch.delenv("AI_API_KEY", raising=False)
         tpl = _create_template(name="gen-test", body="关于{keyword}的评论", variables=["keyword"])
         resp = client.post("/api/content/generate", json={
             "template_id": tpl["id"],

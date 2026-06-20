@@ -9,13 +9,33 @@ from pathlib import Path
 
 from sqlalchemy import text
 
+SMOKE_EXPERT_TIMEOUT_DEFAULT_SECONDS = "180"
+SMOKE_REFERENCE_SYNC_POLL_ATTEMPTS_DEFAULT = "180"
+os.environ.setdefault("DY_AUTO_ONE_SENTENCE_AGENCY_REVIEW_TIMEOUT_SECONDS", SMOKE_EXPERT_TIMEOUT_DEFAULT_SECONDS)
+os.environ.setdefault("DY_AUTO_DEFERRED_STAGE_GATE_TIMEOUT_SECONDS", SMOKE_EXPERT_TIMEOUT_DEFAULT_SECONDS)
+os.environ.setdefault("DY_AUTO_REFERENCE_SYNC_POLL_ATTEMPTS", SMOKE_REFERENCE_SYNC_POLL_ATTEMPTS_DEFAULT)
+
 SERVER_DIR = Path(__file__).resolve().parents[1]
 if str(SERVER_DIR) not in sys.path:
     sys.path.insert(0, str(SERVER_DIR))
 
 from app.database import SessionLocal
 from app.db_models import Episode, GeneratedVideo, VideoProductionAsset, VideoProductionRun
-from app.services.one_sentence_video_service import create_one_sentence_video
+from app.services import one_sentence_video_service as one_sentence_service
+from app.services import reference_asset_service
+
+one_sentence_service.ONE_SENTENCE_AGENCY_REVIEW_TIMEOUT_SECONDS = float(
+    os.getenv("DY_AUTO_ONE_SENTENCE_AGENCY_REVIEW_TIMEOUT_SECONDS", SMOKE_EXPERT_TIMEOUT_DEFAULT_SECONDS)
+)
+reference_asset_service.REFERENCE_SYNC_POLL_ATTEMPTS = int(
+    os.getenv("DY_AUTO_REFERENCE_SYNC_POLL_ATTEMPTS", SMOKE_REFERENCE_SYNC_POLL_ATTEMPTS_DEFAULT)
+)
+
+from app.services.one_sentence_video_service import (
+    ONE_SENTENCE_REFERENCE_RUNNING_STATUS,
+    complete_one_sentence_reference_generation,
+    create_one_sentence_video,
+)
 from app.services.production_worker_service import run_real_worker_step
 from app.services.runtime_model_config import redact_runtime_model_config, resolve_runtime_model_config
 from app.services.video_production_run_types import REAL_SHORT_E2E
@@ -130,6 +150,26 @@ def _run_worker_rounds(db, run_id: str, *, lease_prefix: str, batch_size: int, m
             break
         time.sleep(1)
     return results
+
+
+def _complete_background_reference_if_pending(db, run_id: str) -> VideoProductionRun:
+    run = db.query(VideoProductionRun).filter(VideoProductionRun.id == run_id).one()
+    if run.status != ONE_SENTENCE_REFERENCE_RUNNING_STATUS:
+        return run
+    trace = dict((run.model_trace_json or {}).get("one_sentence") or {})
+    autostart = bool(trace.get("autostart_images_after_references"))
+    _log("reference_generation_resume", run_id=run.id, autostart_images=autostart)
+    asyncio.run(
+        complete_one_sentence_reference_generation(
+            db,
+            run.id,
+            autostart_images=autostart,
+        )
+    )
+    db.expire_all()
+    run = db.query(VideoProductionRun).filter(VideoProductionRun.id == run_id).one()
+    _log("reference_generation_completed", run_status=run.status, current_stage=run.current_stage)
+    return run
 
 
 def _run_stage_until(
@@ -260,6 +300,7 @@ def _main() -> None:
                 materialized_frame_count=(episode.storyboard_json or {}).get("materialized_frame_count"),
             )
 
+        run = _complete_background_reference_if_pending(db, run.id)
         _run_stage_until(
             db,
             run.id,

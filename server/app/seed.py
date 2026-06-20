@@ -42,24 +42,49 @@ def seed_selectors(db: Session) -> tuple[int, int]:
     added = 0
     updated = 0
     for sel in selectors:
+        platform_version = sel.get("platform_version", "default")
+        resolution_profile = sel.get("resolution_profile", "default")
+        selector_fields = {
+            "description": sel.get("description", ""),
+            "category": sel.get("category") or None,
+            "purpose": sel.get("purpose", "locate"),
+            "strategy_logic": sel.get("strategy_logic", "and"),
+            "extract_field": sel.get("extract_field"),
+            "clean_mode": sel.get("clean_mode"),
+            "clean_pattern": sel.get("clean_pattern"),
+            "clean_prompt": sel.get("clean_prompt"),
+        }
+        metadata_updates = {
+            field: selector_fields[field]
+            for field in selector_fields
+            if field in sel
+        }
         existing = db.query(UISelector).filter(
             UISelector.action_name == sel["action_name"],
-            UISelector.platform_version == sel.get("platform_version", "default"),
+            UISelector.platform_version == platform_version,
+            UISelector.resolution_profile == resolution_profile,
         ).first()
         if existing:
             # Only update if YAML version is higher (prevents overwriting manual edits)
             if version > existing.version:
                 existing.strategies = sel["strategies"]
                 existing.version = version
+                for field, value in metadata_updates.items():
+                    setattr(existing, field, value)
                 updated += 1
             continue
         db.add(UISelector(
             action_name=sel["action_name"],
-            platform_version=sel.get("platform_version", "default"),
+            platform_version=platform_version,
+            resolution_profile=resolution_profile,
             strategies=sel["strategies"],
             version=version,
+            **selector_fields,
         ))
         added += 1
+    if added or updated:
+        from app.services.selector_service import _bump_revision
+        _bump_revision(db)
     db.commit()
     return added, updated
 

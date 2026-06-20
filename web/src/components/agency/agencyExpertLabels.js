@@ -1,4 +1,5 @@
 const CORE_EXPERT_IDS = new Set([
+  'story_generator',
   'narrative_designer',
   'visual_storyteller',
   'image_prompt_engineer',
@@ -30,6 +31,7 @@ export const CURRENT_EXPERT_IDS = new Set([
 export const LEGACY_EXPERT_IDS = new Set(['reality_checker'])
 
 export const EXPERT_NAMES = {
+  story_generator: '故事生成专家',
   narrative_designer: '叙事设计师',
   visual_storyteller: '视觉叙事师',
   image_prompt_engineer: '图像提示词工程师',
@@ -48,6 +50,7 @@ export const EXPERT_NAMES = {
 }
 
 export const EXPERT_AVATARS = {
+  story_generator: '故',
   narrative_designer: '叙',
   visual_storyteller: '视',
   image_prompt_engineer: '图',
@@ -66,6 +69,7 @@ export const EXPERT_AVATARS = {
 }
 
 export const PHASE_LABELS = {
+  story_planning: '故事规划',
   style_lock: '风格锁定',
   storyboard: '分镜脚本',
   image_stage: '图像生成',
@@ -161,6 +165,7 @@ const EMBEDDED_ENGLISH_REPLACEMENTS = [
   { pattern: /\bprovider_worker\b/gi, label: '\u6a21\u578b\u4efb\u52a1\u6267\u884c' },
   { pattern: /\bimage_batch_running\b/gi, label: '\u56fe\u50cf\u6279\u6b21\u751f\u6210\u4e2d' },
   { pattern: /\bvideo_batch_running\b/gi, label: '\u89c6\u9891\u6279\u6b21\u751f\u6210\u4e2d' },
+  { pattern: /\bstory_planning\b/gi, label: '\u6545\u4e8b\u89c4\u5212' },
   { pattern: /\bstyle_lock\b/gi, label: '\u98ce\u683c\u9501\u5b9a' },
   { pattern: /\bstoryboard\b/gi, label: '\u5206\u955c\u811a\u672c' },
   { pattern: /\bimage_stage\b/gi, label: '\u56fe\u50cf\u751f\u6210' },
@@ -206,6 +211,7 @@ export const ROLE_LABELS = {
 }
 
 export const SKILL_TEXT = {
+  story_generator: '负责整季故事主线、单集剧情卡、跨集伏笔和人物状态连续性。',
   narrative_designer: '负责叙事结构、角色动机、情绪推进和跨镜头故事连续性。',
   visual_storyteller: '负责视觉叙事、镜头语言、场景氛围和锁定风格一致性。',
   image_prompt_engineer: '负责文生图提示词、角色锚定图和视觉参考图组织。',
@@ -321,6 +327,7 @@ export function decisionLogText(value, field = 'generic', fallback = '') {
   const localized = localizeEmbeddedEnglish(text)
   if (localized) return compactChineseText(localized)
 
+  if (field === 'evidence') return compactChineseText(text) || fallback
   if (/[A-Za-z_]/.test(text)) return fallback
   return compactChineseText(text) || fallback
 }

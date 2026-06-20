@@ -281,6 +281,28 @@ class TestCallApiDispatch:
         mock.assert_awaited_once_with(cfg, "prompt")
 
 
+class TestGenerateCustom:
+    async def test_uses_custom_request_timeout_for_openai_compatible_calls(self, db):
+        gen = AiGeneratorService()
+        mock_client = AsyncMock()
+        mock_client.is_closed = False
+        mock_client.post.return_value = _openai_response("  generated content  ")
+        gen._client = mock_client
+
+        with patch("app.config.get_ai_config_with_key", return_value=_openai_cfg()), \
+             patch("app.services.ai_generator.AI_MAX_RETRIES", 1):
+            result = await gen.generate_custom(
+                db,
+                "system",
+                "user",
+                request_timeout_seconds=180,
+            )
+
+        assert result == "generated content"
+        timeout = mock_client.post.call_args.kwargs["timeout"]
+        assert timeout.read == 180.0
+
+
 class TestGenerateCustomStreamWithConfig:
     async def test_streams_openai_compatible_chunks_without_db(self):
         gen = AiGeneratorService()

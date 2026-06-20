@@ -1,7 +1,7 @@
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from app.db_models import AgencyExpertInvocation, ProductionAuditEvent, Series
+from app.db_models import AgencyCreativePatch, AgencyExpertInvocation, Episode, ProductionAuditEvent, Series
 from app.services.agency_persistence import (
     create_or_resume_invocation,
     finalize_invocation_and_audit,
@@ -170,6 +170,53 @@ def test_finalize_invocation_writes_audit_mirror_and_redacts_nested_payload(db):
     assert audit.payload_json["model_config_snapshot"]["nested"]["token"] == "[REDACTED]"
 
 
+def test_finalize_invocation_creates_creative_patch_rows(db):
+    series = _series(db)
+    episode = Episode(
+        series_id=series.id,
+        episode_number=1,
+        storyboard_json={"frames": [{"frame_id": "shot-001", "image_prompt": "原"}]},
+    )
+    db.add(episode)
+    db.commit()
+    invocation = create_or_resume_invocation(
+        db,
+        idempotency_key="creative-patch-finalize",
+        series_id=series.id,
+        episode_id=episode.id,
+        stage="storyboard",
+        expert_id="prompt_engineer",
+        role="reviewer",
+        source=SOURCE,
+        input_summary={},
+    )
+
+    finalize_invocation_and_audit(
+        db,
+        invocation_id=invocation.id,
+        result_status="warn",
+        output_summary={
+            "decision": "需要改稿",
+            "creative_patches": [{
+                "patch_type": "storyboard_patch",
+                "target_type": "storyboard_frame",
+                "target_id": "shot-001",
+                "stage": "storyboard",
+                "title": "强化钩子",
+                "reason": "前三秒弱。",
+                "before": {"image_prompt": "原"},
+                "after": {"image_prompt": "新"},
+                "apply_policy": "requires_human_approval",
+            }],
+        },
+        evidence=[],
+    )
+
+    patch = db.query(AgencyCreativePatch).one()
+    assert patch.source_invocation_id == invocation.id
+    assert patch.status == "proposed"
+
+
 def test_finalize_invocation_is_idempotent_for_terminal_invocation(db):
     series = _series(db)
     invocation = create_or_resume_invocation(
@@ -212,7 +259,7 @@ def test_finalize_invocation_is_idempotent_for_terminal_invocation(db):
     assert first.id == second.id == stored.id
     assert stored.execution_status == "completed"
     assert stored.result_status == "passed"
-    assert stored.output_summary_json == {"decision": "first"}
+    assert stored.output_summary_json == {"decision": "first", "repair_tasks": []}
     assert stored.evidence_json == [{"message": "first evidence"}]
     assert stored.token_usage_json == {"total_tokens": 10}
     assert stored.error_code is None

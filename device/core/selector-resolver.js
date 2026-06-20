@@ -34,6 +34,8 @@ var selectorResolver = {
   findByCondInParent: function (parent, cond) {
     var matchMode = cond.match_mode || "exact";
     try {
+      if (cond.type === "textContains") return parent.findOne(textContains(cond.value));
+
       if (matchMode === "contains") {
         switch (cond.type) {
           case "text": return parent.findOne(textContains(cond.value));
@@ -56,6 +58,8 @@ var selectorResolver = {
   findAllByCondInParent: function (parent, cond) {
     var matchMode = cond.match_mode || "exact";
     try {
+      if (cond.type === "textContains") return parent.find(textContains(cond.value));
+
       if (matchMode === "contains") {
         switch (cond.type) {
           case "text": return parent.find(textContains(cond.value));

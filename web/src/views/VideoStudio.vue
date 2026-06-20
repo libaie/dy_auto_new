@@ -17,6 +17,7 @@ import { getPixelleConfig, updatePixelleConfig } from '../api/pixelle.js'
 import { listCharacters } from '../api/characters.js'
 import { listScenes } from '../api/scenes.js'
 import PipelineLayerConfig from '../components/video-studio/PipelineLayerConfig.vue'
+import { uploadPixelleFile } from '../components/video-studio/pixelleGeneration.js'
 import { useToastStore } from '../stores/toast.js'
 
 const toast = useToastStore()
@@ -264,9 +265,17 @@ async function handleGenerate() {
     if (cf.bgmMode === 'builtin') {
       payload.bgm_path = cf.bgmId  // full path e.g. bgm/default.mp3
     } else if (cf.bgmMode === 'custom' && cf.customBgmFile) {
-      payload.bgm_path = cf.customBgmFile.name
+      progress.value.message = '正在上传自定义 BGM...'
+      payload.bgm_path = await uploadPixelleFile(cf.customBgmFile)
     }
     if (cf.bgmMode !== 'none') payload.bgm_volume = cf.bgmVolume
+
+    if (vf.refAudioFile) {
+      progress.value.message = '正在上传参考音频...'
+      const refAudioPath = await uploadPixelleFile(vf.refAudioFile)
+      payload.ref_audio_path = refAudioPath
+      payload.reference_audio_path = refAudioPath
+    }
 
     // Character & scene references
     if (selectedCharacterIds.value.length) payload.character_ids = selectedCharacterIds.value

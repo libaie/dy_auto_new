@@ -261,6 +261,64 @@ def test_default_bailian_qwen_37_quality_audit_model_uses_chat_completions_endpo
     assert audit["config_json"]["scene_key"] == "quality_audit"
     assert audit["config_json"]["protocol"] == "openai_chat_completions"
     assert audit["config_json"]["max_tokens"] == 8192
+    assert audit["config_json"]["supports_vision_audit"] is False
+
+
+def test_default_pixelle_compose_model_covers_video_composition():
+    from app.routers.ai_config import DEFAULT_MODELS
+
+    compose = next(m for m in DEFAULT_MODELS if m["name"] == "Pixelle Compose")
+
+    assert compose["model_type"] == "video"
+    assert compose["provider"] == "pixelle"
+    assert compose["model_name"] == "pixelle-compose-local"
+    assert compose["config_json"]["scene_key"] == "video_composition"
+    assert compose["config_json"]["protocol"] == "pixelle_compose"
+    assert compose["config_json"]["supports_video_composition"] is True
+    assert compose["config_json"]["real_paid_allowed"] is True
+    assert compose["config_json"]["supports_external_task_id"] is True
+    assert compose["config_json"]["supports_task_query"] is True
+    assert compose["config_json"]["returns_asset_url"] is True
+    assert compose["config_json"]["returns_usage"] is True
+    assert compose["config_json"]["estimated_cost"] > 0
+    assert compose["config_json"]["settle_missing_usage_with_estimated_cost"] is True
+
+
+def test_seed_ai_models_adds_pixelle_compose_model(db):
+    from app.routers.ai_config import seed_ai_models
+    from app.services.runtime_model_config import resolve_runtime_model_config
+
+    seed_ai_models(db)
+
+    resolved = resolve_runtime_model_config(db, "video_composition")
+
+    assert resolved["provider"] == "pixelle"
+    assert resolved["model"] == "pixelle-compose-local"
+    assert resolved["api_key"] == ""
+
+
+def test_seed_ai_models_updates_existing_pixelle_compose_capabilities(db):
+    from app.routers.ai_config import seed_ai_models
+
+    model = _seed_one(
+        db,
+        name="Pixelle Compose",
+        model_type="video",
+        provider="pixelle",
+        api_key="",
+        model_name="pixelle-compose-local",
+        config_json={"scene_key": "video_composition"},
+    )
+
+    seed_ai_models(db)
+    db.refresh(model)
+
+    assert model.config_json["supports_video_composition"] is True
+    assert model.config_json["real_paid_allowed"] is True
+    assert model.config_json["supports_external_task_id"] is True
+    assert model.config_json["supports_task_query"] is True
+    assert model.config_json["returns_asset_url"] is True
+    assert model.config_json["returns_usage"] is True
 
 
 def test_seed_ai_models_upgrades_unconfigured_legacy_expert_review_default(db):

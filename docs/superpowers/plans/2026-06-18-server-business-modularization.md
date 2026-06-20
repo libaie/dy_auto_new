@@ -488,28 +488,15 @@ git commit -m "test: lock series router compatibility migration"
   - `server/app/services/storyboard_timing.py`
   - `server/app/services/production_run_service.py`
   - `server/app/services/production_errors.py`
-  - `server/app/services/one_sentence_video_service.py`
   - `server/app/services/script_pipeline.py`
   - `server/app/models/script.py`
   - `server/app/services/reference_asset_service.py`
-  - `server/app/services/anchor_service.py`
-  - `server/app/models/asset_anchor.py`
-  - `server/tests/test_anchor_service.py`
-  - `server/tests/test_asset_anchor_models.py`
   - `server/app/db_models.py` for the `AITextArtifact` and
     `AITextArtifactConsumer` ORM names imported by `AITextArtifactService`
   - `server/app/data/agency_agents_zh/manifest.json`
   - `server/app/data/agency_agents_zh/creative/story-generator.md`
   - `server/app/services/agency_manifest.py`
-  - `server/app/services/video_agency_team.py`
   - `server/tests/test_agency_manifest.py`
-  - `server/tests/test_agency_orchestrator.py`
-  - `server/tests/test_agency_console.py`
-  - `server/tests/test_series_style_lock_pipeline.py`
-  - `server/tests/test_agency_invocation_models.py`
-  - `server/tests/test_image_production_migration.py`
-  - `server/alembic/versions/8f9a0b1c2d3e_add_ai_video_core_tables.py`
-  - `server/alembic/versions/9f1a2b3c4d5e_add_video_production_tables.py`
   - `server/alembic/versions/1b2c3d4e5f60_add_asset_anchor_tables.py`
   - `server/alembic/versions/2c3d4e5f6071_add_agency_creative_patches.py`
   - `server/alembic/versions/3d4e5f607182_expand_production_job_stage_length.py`
@@ -582,30 +569,10 @@ and worker logic are split out.
 
 Expected: PASS.
 
-- [ ] **Step 6: Run dependency-closure clean verification tests**
+- [ ] **Step 6: Commit router migration**
 
 ```powershell
-$env:PYTHONPATH = "server"
-.\server\.venv\Scripts\python.exe -c "import app.main; import app.domains.ai_video_series.router as d; import app.routers.series as l; assert l is d; print('clean-import-ok', len(d.router.routes))"
-.\server\.venv\Scripts\python.exe -m pytest server/tests/test_series_planning_service.py server/tests/test_agency_manifest.py -q
-.\server\.venv\Scripts\python.exe -m pytest server/tests/test_script_pipeline.py -q
-.\server\.venv\Scripts\python.exe -m pytest server/tests/test_video_production_start_flow_contract.py -q
-.\server\.venv\Scripts\python.exe -m pytest server/tests/test_one_sentence_video.py server/tests/test_one_sentence_video_run_types.py -q
-.\server\.venv\Scripts\python.exe -m pytest server/tests/test_reference_asset_service.py server/tests/test_anchor_service.py server/tests/test_asset_anchor_models.py -q
-.\server\.venv\Scripts\python.exe -m pytest server/tests/test_agency_orchestrator.py server/tests/test_agency_console.py server/tests/test_series_style_lock_pipeline.py -q
-.\server\.venv\Scripts\python.exe -m pytest server/tests/test_agency_invocation_models.py server/tests/test_image_production_migration.py -q
-Push-Location server
-$env:DATABASE_URL = "sqlite:///$((Join-Path $env:TEMP 'dy-task4-alembic-upgrade.db') -replace '\\','/')"
-.\.venv\Scripts\python.exe -m alembic upgrade head
-Pop-Location
-```
-
-Expected: PASS.
-
-- [ ] **Step 7: Commit router migration**
-
-```powershell
-git add server/app/domains/ai_video_series/router.py server/app/routers/series.py server/tests/test_ai_video_series_domain_boundary.py docs/superpowers/plans/2026-06-18-server-business-modularization.md server/app/services/ai_text_artifact_service.py server/app/services/storyboard_timing.py server/app/services/production_run_service.py server/app/services/production_errors.py server/app/services/one_sentence_video_service.py server/app/services/script_pipeline.py server/app/models/script.py server/app/services/reference_asset_service.py server/app/services/anchor_service.py server/app/models/asset_anchor.py server/tests/test_anchor_service.py server/tests/test_asset_anchor_models.py server/app/db_models.py server/app/data/agency_agents_zh/manifest.json server/app/data/agency_agents_zh/creative/story-generator.md server/app/services/agency_manifest.py server/app/services/video_agency_team.py server/tests/test_agency_manifest.py server/tests/test_agency_orchestrator.py server/tests/test_agency_console.py server/tests/test_series_style_lock_pipeline.py server/tests/test_agency_invocation_models.py server/tests/test_image_production_migration.py server/alembic/versions/8f9a0b1c2d3e_add_ai_video_core_tables.py server/alembic/versions/9f1a2b3c4d5e_add_video_production_tables.py server/alembic/versions/1b2c3d4e5f60_add_asset_anchor_tables.py server/alembic/versions/2c3d4e5f6071_add_agency_creative_patches.py server/alembic/versions/3d4e5f607182_expand_production_job_stage_length.py server/alembic/versions/4e5f60718293_add_ai_text_artifacts.py server/alembic/versions/5f60718293a4_add_source_comment_content_to_collected_users.py
+git add server/app/domains/ai_video_series/router.py server/app/routers/series.py server/tests/test_ai_video_series_domain_boundary.py docs/superpowers/plans/2026-06-18-server-business-modularization.md server/app/services/ai_text_artifact_service.py server/app/services/storyboard_timing.py server/app/services/production_run_service.py server/app/services/production_errors.py server/app/services/script_pipeline.py server/app/models/script.py server/app/services/reference_asset_service.py server/app/db_models.py server/app/data/agency_agents_zh/manifest.json server/app/data/agency_agents_zh/creative/story-generator.md server/app/services/agency_manifest.py server/tests/test_agency_manifest.py server/alembic/versions/1b2c3d4e5f60_add_asset_anchor_tables.py server/alembic/versions/2c3d4e5f6071_add_agency_creative_patches.py server/alembic/versions/3d4e5f607182_expand_production_job_stage_length.py server/alembic/versions/4e5f60718293_add_ai_text_artifacts.py server/alembic/versions/5f60718293a4_add_source_comment_content_to_collected_users.py
 git commit -m "refactor: move series router into ai video series domain"
 ```
 

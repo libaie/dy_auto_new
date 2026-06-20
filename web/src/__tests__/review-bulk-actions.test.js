@@ -6,6 +6,11 @@ const mocks = vi.hoisted(() => ({
   router: { push: vi.fn() },
   listReviewItems: vi.fn(),
   bulkReviewProductionAssets: vi.fn(() => Promise.resolve({ data: { ok: true, result: { approved: 2, skipped_stale: 1 } } })),
+  imageEditProductionAsset: vi.fn(() => Promise.resolve({ data: { ok: true } })),
+  voidProductionAsset: vi.fn(() => Promise.resolve({ data: { ok: true } })),
+  listAgencyRepairTasks: vi.fn(() => Promise.resolve({ data: { items: [], summary: {} } })),
+  retryAgencyRepairTask: vi.fn(() => Promise.resolve({ data: { ok: true } })),
+  authorizeAgencyRepairRetry: vi.fn(() => Promise.resolve({ data: { ok: true } })),
 }))
 
 vi.mock('vue-router', () => ({
@@ -22,6 +27,14 @@ vi.mock('../api/videoProduction.js', () => ({
   syncAssetRegeneration: vi.fn(),
   syncImageStage: vi.fn(),
   runRealWorkerStep: vi.fn(),
+  imageEditProductionAsset: mocks.imageEditProductionAsset,
+  voidProductionAsset: mocks.voidProductionAsset,
+}))
+
+vi.mock('../api/agency.js', () => ({
+  listAgencyRepairTasks: mocks.listAgencyRepairTasks,
+  retryAgencyRepairTask: mocks.retryAgencyRepairTask,
+  authorizeAgencyRepairRetry: mocks.authorizeAgencyRepairRetry,
 }))
 
 describe('AIVideoReviewPage bulk actions', () => {

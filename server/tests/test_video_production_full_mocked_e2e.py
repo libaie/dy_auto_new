@@ -152,34 +152,40 @@ def test_linked_start_to_final_video_mocked_e2e(db, monkeypatch):
 
     async def fake_get_stage_task(db, stage_task_id):
         if stage_task_id == "image-task":
-            segment_id = submitted["image"][0]["production_segment_id"]
             return {
                 "ok": True,
                 "status": "completed",
-                "assets": [{
-                    "frame_id": segment_id,
-                    "asset_type": "image",
-                    "url": "image.png",
-                    "storage_path": f"output/{segment_id}.png",
-                    "checksum": f"checksum-image-{segment_id}",
-                    "copy_status": "persisted",
-                    "metadata": {"duration": 6},
-                }],
+                "assets": [
+                    {
+                        "frame_id": frame["production_segment_id"],
+                        "production_segment_id": frame["production_segment_id"],
+                        "asset_type": "image",
+                        "url": f"image-{frame['production_segment_id']}.png",
+                        "storage_path": f"output/{frame['production_segment_id']}.png",
+                        "checksum": f"checksum-image-{frame['production_segment_id']}",
+                        "copy_status": "persisted",
+                        "metadata": {"duration": frame["duration"]},
+                    }
+                    for frame in submitted["image"]
+                ],
             }
         if stage_task_id == "video-task":
-            segment_id = submitted["video"][0]["production_segment_id"]
             return {
                 "ok": True,
                 "status": "completed",
-                "assets": [{
-                    "frame_id": segment_id,
-                    "asset_type": "video_segment",
-                    "url": "segment.mp4",
-                    "storage_path": f"output/{segment_id}.mp4",
-                    "checksum": f"checksum-video-{segment_id}",
-                    "copy_status": "persisted",
-                    "metadata": {"duration": 6},
-                }],
+                "assets": [
+                    {
+                        "frame_id": frame["production_segment_id"],
+                        "production_segment_id": frame["production_segment_id"],
+                        "asset_type": "video_segment",
+                        "url": f"segment-{frame['production_segment_id']}.mp4",
+                        "storage_path": f"output/{frame['production_segment_id']}.mp4",
+                        "checksum": f"checksum-video-{frame['production_segment_id']}",
+                        "copy_status": "persisted",
+                        "metadata": {"duration": frame["duration"]},
+                    }
+                    for frame in submitted["video"]
+                ],
             }
         return {
             "ok": True,

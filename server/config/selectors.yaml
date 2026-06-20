@@ -70,27 +70,20 @@ selectors:
     type: text
     value: 最新发布
   - priority: 2
-    template: sort_latest.png
-    threshold: 0.8
     type: image
+    template: sort_latest_1779245666090.jpg
+    threshold: 0.8
+    click_mode: press
 - action_name: sort_most_liked
   strategies:
   - priority: 1
     type: text
     value: 最多点赞
-  - priority: 2
-    template: sort_most_liked.png
-    threshold: 0.8
-    type: image
 - action_name: sort_default
   strategies:
   - priority: 1
     type: text
     value: 综合排序
-  - priority: 2
-    template: sort_default.png
-    threshold: 0.8
-    type: image
 - action_name: like_button
   strategies:
   - priority: 1
@@ -258,8 +251,9 @@ selectors:
     type: text
     value: 作者
   - priority: 2
-    type: textContains
+    type: text
     value: 作者
+    match_mode: contains
 - action_name: user_nickname
   category: collect
   platform_version: default
@@ -270,64 +264,1202 @@ selectors:
 - action_name: user_douyin_id
   category: collect
   platform_version: default
+  purpose: extract
+  extract_field: text
+  clean_mode: regex
+  clean_pattern: (?<=抖音号[：:])\s*[a-zA-Z0-9]+
+  strategies:
+  - type: text
+    value: 抖音号：
+    match_mode: contains
+- action_name: user_likes_count
+  category: collect
+  platform_version: default
+  purpose: extract
+  extract_field: text
+  clean_mode: raw
+  strategies:
+  - type: chain
+    steps:
+    - type: text
+      value: 获赞
+    - type: text
+      value: ''
+      nav: sibling
+- action_name: user_follow_count
+  category: collect
+  platform_version: default
+  purpose: extract
+  extract_field: text
+  clean_mode: raw
+  strategies:
+  - type: chain
+    steps:
+    - type: text
+      value: 关注
+    - nav: sibling
+      type: text
+      value: ''
+- action_name: user_fans_count
+  category: collect
+  platform_version: default
+  purpose: extract
+  extract_field: text
+  clean_mode: raw
+  strategies:
+  - type: chain
+    steps:
+    - type: text
+      value: 粉丝
+    - nav: sibling
+      type: text
+      value: ''
+- action_name: user_works_count
+  category: collect
+  platform_version: default
+  purpose: extract
+  extract_field: desc
+  clean_mode: regex
+  clean_pattern: \d+
+  strategies:
+  - type: desc
+    value: 作品
+    match_mode: contains
+- action_name: user_gender
+  category: collect
+  platform_version: default
+  purpose: extract
+  extract_field: desc
+  clean_mode: regex
+  clean_pattern: '[男女]'
+  strategies:
+  - type: desc
+    value: 男
+    match_mode: contains
+  - type: desc
+    value: 女
+    match_mode: contains
+- action_name: user_age
+  category: collect
+  platform_version: default
+  purpose: extract
+  extract_field: desc
+  clean_mode: regex
+  clean_pattern: \d+
+  strategies:
+  - type: desc
+    value: 男
+    match_mode: contains
+  - type: desc
+    value: 女
+    match_mode: contains
+- action_name: user_ip_location
+  category: collect
+  platform_version: default
+  purpose: extract
+  extract_field: desc
+  clean_mode: regex
+  clean_pattern: (?<=IP[：:])\S+
+  strategies:
+  - type: desc
+    value: IP：
+    match_mode: contains
+- action_name: user_is_private
+  category: collect
+  platform_version: default
+  purpose: extract
+  extract_field: text
+  clean_mode: raw
+  strategies:
+  - priority: 1
+    type: text
+    value: 私密账号
+- action_name: feed
+  category: page
+  description: 首页推荐流页面指纹
+  purpose: page_detect
+  strategy_logic: and
+  strategies:
+  - priority: 1
+    type: package
+    value: com.ss.android.ugc.aweme
+  - priority: 2
+    type: text
+    value: 首页
+  - priority: 3
+    type: text
+    value: 推荐
+- action_name: is_search_view
+  category: search
+  description: 搜索页指纹
+  purpose: page_detect
+  strategy_logic: and
+  strategies:
+  - priority: 1
+    type: className
+    value: android.widget.EditText
+  - priority: 2
+    type: text
+    value: 搜索
+- action_name: search_result_list
+  category: search
+  description: 搜索结果页指纹
+  purpose: page_detect
+  strategy_logic: and
+  strategies:
+  - priority: 1
+    type: text
+    value: 综合
+  - priority: 2
+    type: text
+    value: 视频
+- action_name: search_video_list
+  category: search
+  description: 搜索结果-视频列表容器
+  strategies:
+  - priority: 1
+    type: id
+    value: recycler_view
+  - priority: 2
+    type: className
+    value: androidx.recyclerview.widget.RecyclerView
+  - priority: 3
+    type: className
+    value: android.support.v7.widget.RecyclerView
+- action_name: is_video_view
+  category: video
+  description: 视频播放页指纹
+  purpose: page_detect
+  strategy_logic: or
+  strategies:
+  - priority: 1
+    type: id
+    value: com.ss.android.ugc.aweme:id/gle
+  - priority: 2
+    type: desc
+    value: 评论
+  - priority: 3
+    type: desc
+    value: 点赞
+- action_name: video_comment_btn
+  category: video
+  description: 视频评论入口按钮
+  strategies:
+  - priority: 1
+    type: desc
+    value: 评论
+  - priority: 2
+    type: text
+    value: 评论
+  - priority: 3
+    match_mode: contains
+    type: id
+    value: comment
+- action_name: video_comment_input
+  category: comment
+  description: 视频评论输入框
+  strategies:
+  - priority: 1
+    type: text
+    value: 善语结善缘，恶语伤人心
+  - priority: 2
+    match_mode: contains
+    type: text
+    value: 留下你的精彩评论
+  - priority: 3
+    type: className
+    value: android.widget.EditText
+- action_name: is_comment_view
+  category: comment
+  description: 评论面板页指纹
+  purpose: page_detect
+  strategy_logic: and
+  strategies:
+  - priority: 1
+    match_mode: contains
+    type: text
+    value: 评论
+  - priority: 2
+    type: className
+    value: androidx.recyclerview.widget.RecyclerView
+- action_name: comment_off_btn
+  category: comment
+  description: 关闭评论面板按钮
+  strategies:
+  - priority: 1
+    type: desc
+    value: 关闭
+  - priority: 2
+    type: text
+    value: 关闭
+  - priority: 3
+    match_mode: contains
+    type: id
+    value: close
+- action_name: is_comment_end
+  category: comment
+  description: 评论到底提示
+  strategies:
+  - priority: 1
+    match_mode: contains
+    type: text
+    value: 暂时没有更多评论
+  - priority: 2
+    match_mode: contains
+    type: text
+    value: 没有更多评论
+  - priority: 3
+    match_mode: contains
+    type: text
+    value: 到底了
+- action_name: is_user_view
+  category: profile
+  description: 用户主页页指纹
+  purpose: page_detect
+  strategy_logic: and
+  strategies:
+  - priority: 1
+    match_mode: contains
+    type: text
+    value: 关注
+  - priority: 2
+    match_mode: contains
+    type: text
+    value: 粉丝
+  - priority: 3
+    match_mode: contains
+    type: text
+    value: 获赞
+- action_name: is_follow
+  category: profile
+  description: 已关注状态指纹
+  strategies:
+  - priority: 1
+    type: text
+    value: 已关注
+  - priority: 2
+    type: text
+    value: 互相关注
+  - priority: 3
+    type: desc
+    value: 已关注
+- action_name: dm_entry_btn
+  category: dm
+  description: 进入私信会话按钮
+  strategies:
+  - priority: 1
+    type: text
+    value: 私信
+  - priority: 2
+    type: desc
+    value: 私信
+  - priority: 3
+    type: text
+    value: 发消息
+  - priority: 4
+    type: desc
+    value: 发消息
+- action_name: is_dm_view
+  category: dm
+  description: 私信会话页指纹
+  purpose: page_detect
+  strategy_logic: and
+  strategies:
+  - priority: 1
+    type: className
+    value: android.widget.EditText
+  - priority: 2
+    type: text
+    value: 发送
+- action_name: dm_send_failed
+  category: dm
+  description: 私信发送失败提示
+  strategies:
+  - priority: 1
+    match_mode: contains
+    type: text
+    value: 发送失败
+  - priority: 2
+    match_mode: contains
+    type: text
+    value: 未送达
+  - priority: 3
+    match_mode: contains
+    type: text
+    value: 重试
+- action_name: is_shopping_cart
+  category: collect
+  description: 视频小黄车/商品入口指纹
+  strategies:
+  - priority: 1
+    match_mode: contains
+    type: desc
+    value: 购物车
+  - priority: 2
+    match_mode: contains
+    type: text
+    value: 商品
+  - priority: 3
+    match_mode: contains
+    type: text
+    value: 小黄车
+- action_name: off_video
+  category: video
+  description: 关闭视频/返回结果页按钮
+  strategies:
+  - priority: 1
+    type: desc
+    value: 返回
+  - priority: 2
+    type: desc
+    value: 关闭
+  - priority: 3
+    type: coordinate
+    x_percent: 0.06
+    y_percent: 0.05
+- action_name: back_btn
+  strategies:
+  - priority: 1
+    type: desc
+    value: 返回
+  - priority: 2
+    type: id
+    value: com.ss.android.ugc.aweme:id/back_btn
+  platform_version: 38.7.0
+  resolution_profile: default
+- action_name: open_app
+  strategies:
+  - priority: 1
+    type: package
+    value: com.ss.android.ugc.aweme
+  platform_version: 38.7.0
+  resolution_profile: default
+- action_name: search_tab
+  strategies:
+  - priority: 1
+    type: text
+    value: 搜索
+  - priority: 2
+    type: desc
+    value: 搜索
+  - priority: 3
+    type: id
+    value: com.ss.android.ugc.aweme:id/content_container
+  platform_version: 38.7.0
+  resolution_profile: default
+- action_name: search_input
+  strategies:
+  - priority: 1
+    type: className
+    value: android.widget.EditText
+  platform_version: 38.7.0
+  resolution_profile: default
+- action_name: search_button
+  strategies:
+  - priority: 1
+    type: text
+    value: 搜索
+  - priority: 2
+    type: desc
+    value: 搜索
+  platform_version: 38.7.0
+  resolution_profile: default
+- action_name: search_suggestion
+  strategies:
+  - priority: 1
+    type: id
+    value: recycler_view
+  platform_version: 38.7.0
+  resolution_profile: default
+- action_name: search_suggestion_list
+  strategies:
+  - priority: 1
+    type: id
+    value: recycler_view
+  platform_version: 38.7.0
+  resolution_profile: default
+- action_name: video_tab
+  strategies:
+  - priority: 1
+    type: id
+    value: text1
+  platform_version: 38.7.0
+  resolution_profile: default
+- action_name: search_video_tab
+  strategies:
+  - type: text
+    value: 视频
+    priority: 1
+  - type: desc
+    value: 视频
+    match_mode: contains
+    priority: 2
+  platform_version: 38.7.0
+  resolution_profile: default
+- action_name: sort_button
+  strategies:
+  - conditions:
+    - type: desc
+      value: 筛选
+      match_mode: contains
+    - type: desc
+      value: 按钮
+      match_mode: contains
+    logic: and
+    priority: 1
+  platform_version: 38.7.0
+  resolution_profile: default
+- action_name: sort_latest
+  strategies:
+  - type: image
+    template: sort_latest_1779245666090.jpg
+    threshold: 0.8
+    priority: 1
+    click_mode: press
+  - type: text
+    value: 最新发布
+    match_mode: contains
+    priority: 2
+  platform_version: 38.7.0
+  resolution_profile: default
+- action_name: sort_most_liked
+  strategies:
+  - type: text
+    value: 最多点赞
+    match_mode: exact
+    priority: 1
+  - type: text
+    value: 点赞最多
+    match_mode: exact
+    priority: 2
+  - type: text
+    value: 最热
+    match_mode: contains
+    priority: 3
+  - type: text
+    value: 点赞
+    match_mode: contains
+    priority: 4
+  platform_version: 38.7.0
+  resolution_profile: default
+- action_name: sort_default
+  strategies:
+  - type: text
+    value: 综合排序
+    match_mode: exact
+    priority: 1
+  - type: text
+    value: 综合
+    match_mode: contains
+    priority: 2
+  - type: text
+    value: 默认排序
+    match_mode: exact
+    priority: 3
+  platform_version: 38.7.0
+  resolution_profile: default
+- action_name: like_button
+  strategies:
+  - priority: 1
+    conditions:
+    - type: desc
+      value: 喜欢
+      match_mode: contains
+    - type: desc
+      value: 按钮
+      match_mode: contains
+    - type: className
+      value: android.widget.LinearLayout
+      match_mode: exact
+    logic: and
+  - priority: 2
+    conditions:
+    - type: desc
+      value: 点赞
+      match_mode: contains
+    - type: desc
+      value: 按钮
+      match_mode: contains
+    logic: and
+  platform_version: 38.7.0
+  resolution_profile: default
+- action_name: comment_input
+  strategies:
+  - priority: 1
+    type: text
+    value: 善语结善缘，恶语伤人心
+  - priority: 2
+    type: id
+    value: com.ss.android.ugc.aweme:id/comment_et
+  - priority: 3
+    type: desc
+    value: 评论
+  platform_version: 38.7.0
+  resolution_profile: default
+- action_name: comment_submit
+  strategies:
+  - type: image
+    template: template_1778133547129.jpg
+    threshold: 0.85
+    priority: 1
+  platform_version: 38.7.0
+  resolution_profile: default
+- action_name: follow_button
+  strategies:
+  - type: image
+    template: template_1778468403389.jpg
+    threshold: 0.85
+    priority: 1
+    click_mode: click
+  - type: coordinate
+    x_percent: 0.43
+    y_percent: 0.4
+    priority: 2
+  - priority: 3
+    conditions:
+    - type: desc
+      value: 作品
+      match_mode: contains
+    - type: desc
+      value: 按钮
+      match_mode: contains
+    - type: className
+      value: androidx.appcompat.app.ActionBar$Tab
+      match_mode: exact
+    logic: and
+    x_percent: 150
+    y_percent: -150
+  - priority: 4
+    conditions:
+    - type: desc
+      value: 关注
+      match_mode: exact
+    - type: className
+      value: android.widget.Button
+      match_mode: exact
+    logic: and
+  platform_version: 38.7.0
+  resolution_profile: default
+- action_name: profile_more
+  strategies:
+  - priority: 1
+    type: desc
+    value: 更多
+  - priority: 2
+    type: id
+    value: com.ss.android.ugc.aweme:id/detail_right_arrow
+  platform_version: 38.7.0
+  resolution_profile: default
+- action_name: message_button
+  strategies:
+  - priority: 1
+    type: text
+    value: 私信
+  - priority: 2
+    type: desc
+    value: 私信
+  platform_version: 38.7.0
+  resolution_profile: default
+- action_name: dm_input
+  strategies:
+  - priority: 1
+    type: id
+    value: com.ss.android.ugc.aweme:id/et_input
+  - priority: 2
+    type: className
+    value: android.widget.EditText
+  platform_version: 38.7.0
+  resolution_profile: default
+- action_name: dm_send
+  strategies:
+  - priority: 1
+    type: text
+    value: 发送
+  - priority: 2
+    type: desc
+    value: 发送
+  platform_version: 38.7.0
+  resolution_profile: default
+- action_name: comment_reply_button
+  strategies:
+  - priority: 1
+    conditions:
+    - type: text
+      value: 回复
+      match_mode: exact
+    - type: className
+      value: android.widget.TextView
+      match_mode: exact
+    logic: and
+  platform_version: 38.7.0
+  resolution_profile: default
+- action_name: video_author_avatar
+  strategies:
+  - priority: 1
+    type: desc
+    value: 头像
+  - priority: 2
+    type: id
+    value: com.ss.android.ugc.aweme:id/author_avatar
+  - priority: 3
+    type: coordinate
+    x_percent: 0.9
+    y_percent: 0.6
+  platform_version: 38.7.0
+  resolution_profile: default
+- action_name: comment_list
+  strategies:
+  - priority: 1
+    conditions:
+    - type: desc
+      value: 回复
+      match_mode: contains
+    - type: desc
+      value: 按钮
+      match_mode: contains
+    - type: className
+      value: android.widget.FrameLayout
+      match_mode: exact
+    logic: and
+  - type: className
+    value: androidx.recyclerview.widget.RecyclerView
+    priority: 2
+  platform_version: 38.7.0
+  resolution_profile: default
+- action_name: comment_text
+  strategies:
+  - type: id
+    value: com.ss.android.ugc.aweme:id/content
+    priority: 1
+  platform_version: 38.7.0
+  resolution_profile: default
+  purpose: extract
+  extract_field: text
+  clean_mode: raw
+- action_name: comment_author
+  strategies:
+  - type: id
+    value: com.ss.android.ugc.aweme:id/title
+    priority: 1
+  platform_version: 38.7.0
+  resolution_profile: default
+  purpose: extract
+  extract_field: text
+  clean_mode: raw
+- action_name: comment_time
+  strategies:
+  - priority: 1
+    conditions:
+    - type: desc
+      value: 回复
+      match_mode: contains
+    - type: desc
+      value: 按钮
+      match_mode: contains
+    - type: className
+      value: android.widget.FrameLayout
+      match_mode: exact
+    logic: and
+  platform_version: 38.7.0
+  resolution_profile: default
+  purpose: extract
+  extract_field: desc
+  clean_mode: regex
+  clean_pattern: (刚刚|\d+[秒分钟小时天周个月年]前|昨天\s*\d{1,2}:\d{2}|前天\s*\d{1,2}:\d{2}|\d{4}-\d{1,2}-\d{1,2}(?:\s+\d{1,2}:\d{2})?|\d{1,2}-\d{1,2}(?:\s+\d{1,2}:\d{2})?)
+- action_name: comment_like_count
+  strategies:
+  - priority: 1
+    type: id
+    value: com.ss.android.ugc.aweme:id/like_count
+  platform_version: 38.7.0
+  resolution_profile: default
+- action_name: comment_author_avatar
+  strategies:
+  - type: id
+    value: com.ss.android.ugc.aweme:id/avatar
+    priority: 1
+  - type: desc
+    value: 头像
+    priority: 2
+  platform_version: 38.7.0
+  resolution_profile: default
+- action_name: comment_reply_count
+  category: collect
+  platform_version: 38.7.0
+  strategies:
+  - priority: 1
+    type: text
+    value: ''
+  resolution_profile: default
+- action_name: comment_dislike_count
+  category: collect
+  platform_version: 38.7.0
+  strategies:
+  - priority: 1
+    type: text
+    value: ''
+  resolution_profile: default
+- action_name: comment_location
+  category: collect
+  platform_version: 38.7.0
+  strategies:
+  - priority: 1
+    type: text
+    value: ''
+  resolution_profile: default
+- action_name: comment_is_author
+  category: collect
+  platform_version: 38.7.0
+  strategies:
+  - priority: 1
+    type: text
+    value: 作者
+  - priority: 2
+    type: text
+    value: 作者
+    match_mode: contains
+  resolution_profile: default
+- action_name: user_nickname
+  category: collect
+  platform_version: 38.7.0
   strategies:
   - priority: 1
     type: id
     value: com.ss.android.ugc.aweme:id/title
+  resolution_profile: default
+- action_name: user_douyin_id
+  category: collect
+  platform_version: 38.7.0
+  purpose: extract
+  extract_field: text
+  clean_mode: regex
+  clean_pattern: (?<=抖音号[：:])\s*[a-zA-Z0-9]+
+  strategies:
+  - type: text
+    value: 抖音号：
+    match_mode: contains
+  resolution_profile: default
 - action_name: user_likes_count
   category: collect
-  platform_version: default
+  platform_version: 38.7.0
+  purpose: extract
+  extract_field: text
+  clean_mode: raw
   strategies:
-  - priority: 1
-    type: text
-    value: ''
+  - type: chain
+    steps:
+    - type: text
+      value: 获赞
+    - type: text
+      value: ''
+      nav: sibling
+  resolution_profile: default
 - action_name: user_follow_count
   category: collect
-  platform_version: default
+  platform_version: 38.7.0
+  purpose: extract
+  extract_field: text
+  clean_mode: raw
   strategies:
-  - priority: 1
-    type: text
-    value: ''
+  - type: chain
+    steps:
+    - type: text
+      value: 关注
+    - nav: sibling
+      type: text
+      value: ''
+  resolution_profile: default
 - action_name: user_fans_count
   category: collect
-  platform_version: default
+  platform_version: 38.7.0
+  purpose: extract
+  extract_field: text
+  clean_mode: raw
   strategies:
-  - priority: 1
-    type: text
-    value: ''
+  - type: chain
+    steps:
+    - type: text
+      value: 粉丝
+    - nav: sibling
+      type: text
+      value: ''
+  resolution_profile: default
 - action_name: user_works_count
   category: collect
-  platform_version: default
+  platform_version: 38.7.0
+  purpose: extract
+  extract_field: desc
+  clean_mode: regex
+  clean_pattern: \d+
   strategies:
-  - priority: 1
-    type: text
-    value: ''
+  - type: desc
+    value: 作品
+    match_mode: contains
+  resolution_profile: default
 - action_name: user_gender
   category: collect
-  platform_version: default
+  platform_version: 38.7.0
+  purpose: extract
+  extract_field: desc
+  clean_mode: regex
+  clean_pattern: '[男女]'
   strategies:
-  - priority: 1
-    type: text
-    value: ''
+  - type: desc
+    value: 男
+    match_mode: contains
+  - type: desc
+    value: 女
+    match_mode: contains
+  resolution_profile: default
 - action_name: user_age
   category: collect
-  platform_version: default
+  platform_version: 38.7.0
+  purpose: extract
+  extract_field: desc
+  clean_mode: regex
+  clean_pattern: \d+
   strategies:
-  - priority: 1
-    type: text
-    value: ''
+  - type: desc
+    value: 男
+    match_mode: contains
+  - type: desc
+    value: 女
+    match_mode: contains
+  resolution_profile: default
 - action_name: user_ip_location
   category: collect
-  platform_version: default
+  platform_version: 38.7.0
+  purpose: extract
+  extract_field: desc
+  clean_mode: regex
+  clean_pattern: (?<=IP[：:])\S+
   strategies:
-  - priority: 1
-    type: text
-    value: ''
+  - type: desc
+    value: IP：
+    match_mode: contains
+  resolution_profile: default
 - action_name: user_is_private
   category: collect
-  platform_version: default
+  platform_version: 38.7.0
+  purpose: extract
+  extract_field: text
+  clean_mode: raw
   strategies:
   - priority: 1
     type: text
-    value: ''
-version: 2
+    value: 私密账号
+  resolution_profile: default
+- action_name: feed
+  category: page
+  description: 首页推荐流页面指纹
+  purpose: page_detect
+  strategy_logic: and
+  strategies:
+  - priority: 1
+    type: package
+    value: com.ss.android.ugc.aweme
+  - priority: 2
+    type: text
+    value: 首页
+  - priority: 3
+    type: text
+    value: 推荐
+  platform_version: 38.7.0
+  resolution_profile: default
+- action_name: is_search_view
+  category: search
+  description: 搜索页指纹
+  purpose: page_detect
+  strategy_logic: and
+  strategies:
+  - priority: 1
+    type: className
+    value: android.widget.EditText
+  - priority: 2
+    type: text
+    value: 搜索
+  platform_version: 38.7.0
+  resolution_profile: default
+- action_name: search_result_list
+  category: search
+  description: 搜索结果页指纹
+  purpose: page_detect
+  strategy_logic: and
+  strategies:
+  - priority: 1
+    type: text
+    value: 综合
+  - priority: 2
+    type: text
+    value: 视频
+  platform_version: 38.7.0
+  resolution_profile: default
+- action_name: search_video_list
+  category: search
+  description: 搜索结果-视频列表容器
+  strategies:
+  - type: id
+    value: com.ss.android.ugc.aweme:id/desc
+    y_percent: -200
+    priority: 1
+  - type: className
+    value: android.support.v7.widget.RecyclerView
+    priority: 2
+  platform_version: 38.7.0
+  resolution_profile: default
+- action_name: is_video_view
+  category: video
+  description: 视频播放页指纹
+  purpose: page_detect
+  strategy_logic: and
+  strategies:
+  - type: id
+    value: com.ss.android.ugc.aweme:id/share_container
+    match_mode: exact
+    priority: 1
+  - type: desc
+    value: 发布时间
+    match_mode: contains
+    priority: 2
+  platform_version: 38.7.0
+  resolution_profile: default
+- action_name: video_comment_btn
+  category: video
+  description: 视频评论入口按钮
+  strategies:
+  - priority: 1
+    conditions:
+    - type: desc
+      value: 评论
+      match_mode: contains
+    - type: desc
+      value: 按钮
+      match_mode: contains
+    - type: className
+      value: android.widget.LinearLayout
+      match_mode: exact
+    logic: and
+  - type: text
+    value: 评论
+    priority: 2
+  platform_version: 38.7.0
+  resolution_profile: default
+- action_name: video_comment_input
+  category: comment
+  description: 视频评论输入框
+  strategies:
+  - priority: 1
+    conditions:
+    - type: desc
+      value: 插入图片
+      match_mode: exact
+    - type: id
+      value: image
+      match_mode: contains
+    - type: className
+      value: android.widget.ImageView
+      match_mode: exact
+    logic: and
+    x_percent: -300
+  platform_version: 38.7.0
+  resolution_profile: default
+- action_name: is_comment_view
+  category: comment
+  description: 评论面板页指纹
+  purpose: page_detect
+  strategy_logic: and
+  strategies:
+  - type: desc
+    value: 放大评论区
+    priority: 1
+  - type: id
+    value: com.ss.android.ugc.aweme:id/back_btn
+    priority: 2
+  platform_version: 38.7.0
+  resolution_profile: default
+- action_name: comment_off_btn
+  category: comment
+  description: 关闭评论面板按钮
+  strategies:
+  - priority: 1
+    type: desc
+    value: 关闭
+  - priority: 2
+    type: text
+    value: 关闭
+  - priority: 3
+    match_mode: contains
+    type: id
+    value: close
+  platform_version: 38.7.0
+  resolution_profile: default
+- action_name: is_comment_end
+  category: comment
+  description: 评论到底提示
+  strategies:
+  - priority: 1
+    match_mode: contains
+    type: text
+    value: 暂时没有更多评论
+  - priority: 2
+    match_mode: contains
+    type: text
+    value: 没有更多评论
+  - priority: 3
+    match_mode: contains
+    type: text
+    value: 到底了
+  platform_version: 38.7.0
+  resolution_profile: default
+- action_name: is_user_view
+  category: profile
+  description: 用户主页页指纹
+  purpose: page_detect
+  strategy_logic: and
+  strategies:
+  - type: text
+    value: 抖音号
+    match_mode: contains
+    priority: 1
+  - type: text
+    value: 获赞
+    match_mode: exact
+    priority: 2
+  platform_version: 38.7.0
+  resolution_profile: default
+- action_name: is_follow
+  category: profile
+  description: 已关注状态指纹
+  strategies:
+  - priority: 1
+    type: text
+    value: 已关注
+  - priority: 2
+    type: text
+    value: 互相关注
+  - priority: 3
+    type: desc
+    value: 已关注
+  platform_version: 38.7.0
+  resolution_profile: default
+- action_name: dm_entry_btn
+  category: dm
+  description: 进入私信会话按钮
+  strategies:
+  - priority: 1
+    type: text
+    value: 私信
+  - priority: 2
+    type: desc
+    value: 私信
+  - priority: 3
+    type: text
+    value: 发消息
+  - priority: 4
+    type: desc
+    value: 发消息
+  platform_version: 38.7.0
+  resolution_profile: default
+- action_name: is_dm_view
+  category: dm
+  description: 私信会话页指纹
+  purpose: page_detect
+  strategy_logic: and
+  strategies:
+  - priority: 1
+    type: className
+    value: android.widget.EditText
+  - priority: 2
+    type: text
+    value: 发送
+  platform_version: 38.7.0
+  resolution_profile: default
+- action_name: dm_send_failed
+  category: dm
+  description: 私信发送失败提示
+  strategies:
+  - priority: 1
+    match_mode: contains
+    type: text
+    value: 发送失败
+  - priority: 2
+    match_mode: contains
+    type: text
+    value: 未送达
+  - priority: 3
+    match_mode: contains
+    type: text
+    value: 重试
+  platform_version: 38.7.0
+  resolution_profile: default
+- action_name: is_shopping_cart
+  category: collect
+  description: 视频小黄车/商品入口指纹
+  strategies:
+  - priority: 1
+    match_mode: contains
+    type: desc
+    value: 购物车
+  - priority: 2
+    match_mode: contains
+    type: text
+    value: 商品
+  - priority: 3
+    match_mode: contains
+    type: text
+    value: 小黄车
+  platform_version: 38.7.0
+  resolution_profile: default
+- action_name: off_video
+  category: video
+  description: 关闭视频/返回结果页按钮
+  strategies:
+  - priority: 1
+    type: desc
+    value: 返回
+  - priority: 2
+    type: desc
+    value: 关闭
+  - priority: 3
+    type: coordinate
+    x_percent: 0.06
+    y_percent: 0.05
+  platform_version: 38.7.0
+  resolution_profile: default
+- action_name: follow_button
+  strategies:
+  - type: image
+    template: template_1778468403389.jpg
+    threshold: 0.85
+    priority: 1
+    click_mode: click
+  - type: coordinate
+    x_percent: 0.43
+    y_percent: 0.4
+    priority: 2
+  - priority: 3
+    conditions:
+    - type: desc
+      value: 作品
+      match_mode: contains
+    - type: desc
+      value: 按钮
+      match_mode: contains
+    - type: className
+      value: androidx.appcompat.app.ActionBar$Tab
+      match_mode: exact
+    logic: and
+    x_percent: 150
+    y_percent: -150
+  - priority: 4
+    conditions:
+    - type: desc
+      value: 关注
+      match_mode: exact
+    - type: className
+      value: android.widget.Button
+      match_mode: exact
+    logic: and
+  platform_version: 38.7.0
+  resolution_profile: 1080x2340
+version: 8

@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 import pytest
 
-from app.db_models import AgencyExpertInvocation, AIModel, Character, Episode, ProductionSegment, Scene, Series, VideoProductionRun
+from app.db_models import AgencyExpertInvocation, AIModel, AITextArtifact, AITextArtifactConsumer, Character, Episode, ProductionSegment, Scene, Series, VideoProductionRun
 from app.main import app
 from app.services.agency_runtime import AgencyRuntimeResult
 from app.services.crypto import encrypt
@@ -34,6 +34,14 @@ async def _agency_pass(self, **kwargs):
             "findings": [],
             "recommendations": [],
             "required_changes": [],
+            "scorecard": {
+                "overall_score": 95,
+                "pass_threshold": 80,
+                "verdict": "pass",
+                "dimensions": [{"key": "quality", "score": 95, "threshold": 80}],
+                "repair_intent": "none",
+                "confidence": 0.9,
+            },
         },
         evidence=[],
         token_usage={},
@@ -143,24 +151,148 @@ def test_one_sentence_video_creates_locked_storyboard_and_run(db, monkeypatch):
     series = db.query(Series).filter_by(id=body["series"]["id"]).one()
     episode = db.query(Episode).filter_by(id=body["episode"]["id"]).one()
     run = db.query(VideoProductionRun).filter_by(id=body["run"]["id"]).one()
+    episodes = db.query(Episode).filter_by(series_id=series.id).order_by(Episode.episode_number).all()
 
     assert series.logline.startswith("一个年轻探险家")
+    assert series.total_episodes == 30
+    assert [ep.episode_number for ep in episodes] == list(range(1, 31))
+    assert episodes[0].id == episode.id
+    assert all(ep.status == "pending" for ep in episodes[1:])
     assert series.story_bible_json["style_lock"]["locked"] is True
     assert series.story_bible_json["style_lock"]["source"] == "one_sentence"
     assert series.story_bible_json["style_lock"]["agency_trace"]["error_code"] == "EXPERT_MODEL_CONFIG_MISSING"
     assert episode.storyboard_json["frame_count"] == 8
     assert sum(frame["duration"] for frame in episode.storyboard_json["frames"]) == 60
     assert all(frame["duration"] <= 8 for frame in episode.storyboard_json["frames"])
+    expected_start = 0
+    for frame in episode.storyboard_json["frames"]:
+        expected_end = expected_start + frame["duration"]
+        assert frame["start_second"] == expected_start
+        assert frame["end_second"] == expected_end
+        assert frame["time_range"] == f"{expected_start}-{expected_end}秒"
+        assert frame["time_range"] in frame["image_prompt"]
+        assert frame["time_range"] in frame["video_prompt"]
+        assert f"{frame['duration']}秒" in frame["video_prompt"]
+        expected_start = expected_end
     assert episode.storyboard_json["agency_trace"]["error_code"] == "EXPERT_MODEL_CONFIG_MISSING"
+    artifacts = db.query(AITextArtifact).filter_by(series_id=series.id).all()
+    artifact_types = {artifact.artifact_type for artifact in artifacts}
+    assert {
+        "series_bible",
+        "series_story_plan",
+        "season_arc",
+        "episode_outline",
+        "continuity_ledger",
+        "storyboard",
+        "dialogue",
+        "image_prompt",
+        "video_prompt",
+    }.issubset(artifact_types)
+    episode_outlines = [
+        artifact for artifact in artifacts if artifact.artifact_type == "episode_outline"
+    ]
+    assert len(episode_outlines) == 30
+    outline_by_episode = {artifact.content_json["episode_number"]: artifact for artifact in episode_outlines}
+    assert outline_by_episode[1].content_json["episode_goal"].startswith("建立")
+    assert outline_by_episode[1].run_id == run.id
+    assert outline_by_episode[1].production_plan_id == run.production_plan_id
+    for episode_number in range(2, 31):
+        assert outline_by_episode[episode_number].run_id is None
+        assert outline_by_episode[episode_number].production_plan_id is None
+    assert outline_by_episode[1].content_json["hook"]
+    assert outline_by_episode[1].content_json["cliffhanger"]
+    assert outline_by_episode[2].content_json["previous_episode_handoff"]
+    continuity = next(artifact for artifact in artifacts if artifact.artifact_type == "continuity_ledger")
+    assert continuity.content_json["total_episodes"] == 30
+    assert continuity.content_json["character_states"][0]["character_id"]
+    assert all(artifact.status == "approved" for artifact in artifacts)
+    bound_artifact_ids = {
+        consumer.artifact_id
+        for consumer in db.query(AITextArtifactConsumer).filter_by(run_id=run.id)
+    }
+    current_run_artifact_ids = {
+        artifact.id
+        for artifact in artifacts
+        if artifact.target_type == "series" or artifact.target_id == episode.id
+    }
+    future_outline_ids = {
+        artifact.id
+        for artifact in episode_outlines
+        if artifact.target_id != episode.id
+    }
+    assert current_run_artifact_ids.issubset(bound_artifact_ids)
+    assert future_outline_ids.isdisjoint(bound_artifact_ids)
     frame = episode.storyboard_json["frames"][0]
     assert frame["character_ids"]
     assert frame["scene_id"]
     assert frame["image_prompt"]
     assert frame["video_prompt"]
     assert frame["duration"] == 8
+    assert frame["time_range"] == "0-8秒"
     assert run.production_link_status == "linked"
     assert run.status == "storyboard_ready"
-    assert db.query(ProductionSegment).count() == 8
+    segments = db.query(ProductionSegment).order_by(ProductionSegment.order_index).all()
+    assert len(segments) == 8
+    assert segments[0].duration_seconds == 8
+    assert "0-8秒" in segments[0].image_prompt
+    assert "0-8秒" in segments[0].video_prompt
+    assert "8秒" in segments[0].video_prompt
+
+
+def test_one_sentence_storyboard_strips_format_directives_from_narration_and_prompts(db, monkeypatch):
+    _mock_reference_generation(monkeypatch)
+    client = TestClient(app)
+
+    resp = client.post("/api/video-production/one-sentence", json={
+        "prompt": "一把红伞在雨夜石板路上缓缓前行，电影感，竖屏，15秒以内",
+        "target_duration_seconds": 5,
+        "budget_limit": 1,
+        "autostart_images": False,
+    })
+
+    assert resp.status_code == 200
+    episode = db.query(Episode).filter_by(id=resp.json()["episode"]["id"]).one()
+    frame = episode.storyboard_json["frames"][0]
+
+    for field in ("narration", "image_prompt", "video_prompt"):
+        assert "竖屏" not in frame[field]
+        assert "15秒" not in frame[field]
+    assert "@Image" not in frame["image_prompt"]
+    assert "@Image" not in frame["video_prompt"]
+    assert "@Image" in frame["reference_instructions"]
+    assert "no text" not in frame["image_prompt"]
+    assert "no logo" not in frame["image_prompt"]
+    assert "no watermark" not in frame["image_prompt"]
+    assert "no text" in frame["negative_prompt"]
+    assert "extra fingers" in frame["negative_prompt"]
+
+
+def test_one_sentence_chinese_storyboard_uses_static_image_prompts_and_chinese_narration(db, monkeypatch):
+    _mock_reference_generation(monkeypatch)
+    client = TestClient(app)
+
+    resp = client.post("/api/video-production/one-sentence", json={
+        "prompt": "雨夜石板路上，一把红伞突然停在老剧院门口，伞下人递出一封带火漆印章的旧信，镜头在伞沿雨滴上收束。",
+        "target_duration_seconds": 15,
+        "budget_limit": 1,
+        "autostart_images": False,
+    })
+
+    assert resp.status_code == 200
+    episode = db.query(Episode).filter_by(id=resp.json()["episode"]["id"]).one()
+    frames = episode.storyboard_json["frames"]
+
+    assert [frame["narration"] for frame in frames] == [
+        "雨夜里，线索突然递到眼前。",
+        "那封旧信，把他推向剧院深处。",
+        "火漆印章背后，到底是谁在等？",
+    ]
+    forbidden = ("Start with", "Advance the action", "End on", "Shot 1", "Shot 2", "Shot 3")
+    for frame in frames:
+        assert all(phrase not in frame["image_prompt"] for phrase in forbidden)
+        assert "镜头在伞沿雨滴上收束" not in frame["image_prompt"]
+        assert "lens" in frame["image_prompt"]
+        assert "smooth camera movement" not in frame["video_prompt"]
 
 
 def test_one_sentence_video_splits_15_second_smoke_into_multiple_shots(db, monkeypatch):
@@ -249,7 +381,7 @@ def test_one_sentence_video_infers_live_action_style_from_reality_health_prompt(
     assert "photorealistic live-action" in style_lock["visual_style"]["prompt"]
     assert "no anime" in style_lock["visual_style"]["negative_prompt"]
     assert "photorealistic live-action" in episode.storyboard_json["frames"][0]["image_prompt"]
-    assert "no cartoon" in episode.storyboard_json["frames"][0]["image_prompt"]
+    assert "no cartoon" in episode.storyboard_json["frames"][0]["negative_prompt"]
 
 
 def test_one_sentence_video_blocks_when_style_or_storyboard_expert_blocks(db, monkeypatch):
@@ -298,11 +430,14 @@ def test_one_sentence_real_provider_accepts_long_duration_after_shot_segmentatio
     assert episode.storyboard_json["frame_count"] > 3
 
 
-def test_one_sentence_real_provider_accepts_28800_second_upper_bound_with_short_segments(db, monkeypatch):
+def test_one_sentence_real_provider_rejects_duration_beyond_real_short_limit(db, monkeypatch):
     _expert_review_model(db)
     _mock_reference_generation(monkeypatch)
     monkeypatch.setattr("app.services.agency_runtime.AgencySkillRuntime.invoke", _agency_pass)
     client = TestClient(app)
+
+    before_series_count = db.query(Series).count()
+    before_segment_count = db.query(ProductionSegment).count()
 
     resp = client.post("/api/video-production/one-sentence", json={
         "prompt": "A serialized mystery follows one archivist across a whole night of linked investigations.",
@@ -311,20 +446,10 @@ def test_one_sentence_real_provider_accepts_28800_second_upper_bound_with_short_
         "autostart_images": False,
     })
 
-    assert resp.status_code == 200
-    body = resp.json()
-    episode = db.query(Episode).filter_by(id=body["episode"]["id"]).one()
-    segments = db.query(ProductionSegment).all()
-    assert episode.storyboard_json["total_duration"] == 28800
-    assert episode.storyboard_json["frame_count"] == 3600
-    assert episode.storyboard_json["materialized_frame_count"] <= 120
-    assert len(episode.storyboard_json["frames"]) == episode.storyboard_json["materialized_frame_count"]
-    assert sum(frame["duration"] for frame in episode.storyboard_json["frames"]) == episode.storyboard_json["materialized_duration"]
-    assert episode.storyboard_json["storyboard_window"]["remaining_frame_count"] > 0
-    assert episode.storyboard_json["storyboard_window"]["remaining_duration"] > 0
-    assert segments
-    assert len(segments) == episode.storyboard_json["materialized_frame_count"]
-    assert all(float(segment.duration_seconds) <= 8 for segment in segments)
+    assert resp.status_code == 400
+    assert "no more than 960 seconds" in resp.text
+    assert db.query(Series).count() == before_series_count
+    assert db.query(ProductionSegment).count() == before_segment_count
 
 
 def test_one_sentence_video_autostarts_image_stage(db, monkeypatch):
@@ -429,6 +554,56 @@ async def test_one_sentence_reference_generation_timeout_returns_pending_run(db,
 
 
 @pytest.mark.asyncio
+async def test_one_sentence_reference_provider_still_running_returns_pending_run(db, monkeypatch):
+    from app.services.one_sentence_video_service import create_one_sentence_video
+    from app.services.reference_asset_service import ReferenceAssetError
+
+    async def queued_character_references(db, character_id, slot="all"):
+        raise ReferenceAssetError(
+            "REFERENCE_PROVIDER_STILL_RUNNING",
+            "Reference image provider is still running",
+            {
+                "image_task_id": "reference-task-queued",
+                "status": "queued",
+                "signed_source_url": "https://cdn.test/private.png?X-Tos-Signature=secret",
+                "detail": {"api_key": "secret"},
+            },
+        )
+
+    async def fail_if_scene_called(db, scene_id, slot="all"):
+        raise AssertionError("scene references should wait for the queued character reference first")
+
+    monkeypatch.setattr(
+        "app.services.reference_asset_service.generate_character_reference_images",
+        queued_character_references,
+    )
+    monkeypatch.setattr(
+        "app.services.reference_asset_service.generate_scene_reference_images",
+        fail_if_scene_called,
+    )
+
+    result = await create_one_sentence_video(
+        db,
+        prompt="A realistic diabetes education host explains a simple breakfast choice.",
+        target_duration_seconds=60,
+        budget_limit=1,
+        autostart_images=True,
+    )
+
+    series = db.query(Series).filter_by(id=result["series"].id).one()
+    style_lock = series.story_bible_json["style_lock"]
+    assert style_lock["reference_generation_trace"]["error_code"] == "REFERENCE_PROVIDER_STILL_RUNNING"
+    assert style_lock["reference_generation_trace"]["details"]["image_task_id"] == "reference-task-queued"
+    assert "next_reference_check_at" in style_lock["reference_generation_trace"]
+    assert "signed_source_url" not in style_lock["reference_generation_trace"]["details"]
+    assert "detail" not in style_lock["reference_generation_trace"]["details"]
+    assert result["run"].status == "reference_generation_running"
+    assert result["run"].current_stage == "reference_generation"
+    assert result["background_reference_pending"] is True
+    assert db.query(VideoProductionRun).filter_by(id=result["run"].id).count() == 1
+
+
+@pytest.mark.asyncio
 async def test_one_sentence_background_reference_completion_refreshes_storyboard_and_segments(db, monkeypatch):
     from app.services.one_sentence_video_service import (
         complete_one_sentence_reference_generation,
@@ -476,7 +651,109 @@ async def test_one_sentence_background_reference_completion_refreshes_storyboard
     assert style_lock["characters"][0]["reference_urls"]
     assert style_lock["scenes"][0]["reference_urls"]
     assert episode.storyboard_json["frames"][0]["reference_urls"]
+    assert episode.storyboard_json["frames"][0]["time_range"] == "0-8秒"
+    artifacts = db.query(AITextArtifact).filter_by(series_id=series.id).all()
+    artifact_types = {artifact.artifact_type for artifact in artifacts}
+    assert {
+        "series_bible",
+        "series_story_plan",
+        "season_arc",
+        "episode_outline",
+        "continuity_ledger",
+        "storyboard",
+        "dialogue",
+        "image_prompt",
+        "video_prompt",
+    }.issubset(artifact_types)
+    assert all(artifact.status == "approved" for artifact in artifacts)
+    bound_artifact_ids = {
+        consumer.artifact_id
+        for consumer in db.query(AITextArtifactConsumer).filter_by(run_id=completed.id)
+    }
+    current_run_artifact_ids = {
+        artifact.id
+        for artifact in artifacts
+        if artifact.target_type == "series" or artifact.target_id == episode.id
+    }
+    future_outline_ids = {
+        artifact.id
+        for artifact in artifacts
+        if artifact.artifact_type == "episode_outline" and artifact.target_id != episode.id
+    }
+    assert current_run_artifact_ids.issubset(bound_artifact_ids)
+    assert future_outline_ids.isdisjoint(bound_artifact_ids)
     assert all(segment.reference_roles_json for segment in db.query(ProductionSegment).all())
+
+    artifact_count = db.query(AITextArtifact).filter_by(series_id=series.id).count()
+    consumer_count = db.query(AITextArtifactConsumer).filter_by(run_id=completed.id).count()
+
+    completed_again = await complete_one_sentence_reference_generation(db, run_id, autostart_images=False)
+
+    assert completed_again.id == completed.id
+    assert db.query(AITextArtifact).filter_by(series_id=series.id).count() == artifact_count
+    assert db.query(AITextArtifactConsumer).filter_by(run_id=completed.id).count() == consumer_count
+
+
+@pytest.mark.asyncio
+async def test_one_sentence_background_reference_completion_keeps_running_provider_pending(db, monkeypatch):
+    from app.services.one_sentence_video_service import (
+        complete_one_sentence_reference_generation,
+        create_one_sentence_video,
+    )
+    from app.services.reference_asset_service import ReferenceAssetError
+
+    async def slow_character_references(db, character_id, slot="all"):
+        import asyncio
+
+        await asyncio.sleep(1)
+        return {"ok": True}
+
+    async def slow_scene_references(db, scene_id, slot="all"):
+        import asyncio
+
+        await asyncio.sleep(1)
+        return {"ok": True}
+
+    monkeypatch.setattr("app.services.one_sentence_video_service.ONE_SENTENCE_REFERENCE_TIMEOUT_SECONDS", 0.01)
+    monkeypatch.setattr(
+        "app.services.reference_asset_service.generate_character_reference_images",
+        slow_character_references,
+    )
+    monkeypatch.setattr(
+        "app.services.reference_asset_service.generate_scene_reference_images",
+        slow_scene_references,
+    )
+    result = await create_one_sentence_video(
+        db,
+        prompt="A realistic diabetes education host explains a simple breakfast choice.",
+        target_duration_seconds=60,
+        budget_limit=1,
+        autostart_images=True,
+    )
+    run_id = result["run"].id
+    run = db.query(VideoProductionRun).filter_by(id=run_id).one()
+    run.error_message = "old blocked reference error"
+    db.commit()
+
+    async def queued_character_references(db, character_id, slot="all"):
+        raise ReferenceAssetError(
+            "REFERENCE_PROVIDER_STILL_RUNNING",
+            "Reference image provider is still running",
+            {"image_task_id": "reference-task-queued", "status": "running"},
+        )
+
+    monkeypatch.setattr(
+        "app.services.reference_asset_service.generate_character_reference_images",
+        queued_character_references,
+    )
+
+    completed = await complete_one_sentence_reference_generation(db, run_id, autostart_images=True)
+
+    assert completed.status == "reference_generation_running"
+    assert completed.current_stage == "reference_generation"
+    assert completed.error_message is None
+    assert completed.model_trace_json["one_sentence"]["reference_generation"]["error_code"] == "REFERENCE_PROVIDER_STILL_RUNNING"
+    assert "next_reference_check_at" in completed.model_trace_json["one_sentence"]["reference_generation"]
 
 
 def test_one_sentence_reference_generation_running_readiness_has_no_review_blocks(db):
@@ -515,6 +792,88 @@ def test_one_sentence_reference_generation_running_readiness_has_no_review_block
     assert readiness["next_action"]["key"] == "wait_reference_generation"
     assert readiness["needs_review"] is False
     assert readiness["blocks"] == []
+
+
+@pytest.mark.asyncio
+async def test_one_sentence_reference_provider_error_points_to_ai_config(db, monkeypatch):
+    from app.services.one_sentence_video_service import create_one_sentence_video
+    from app.services.production_errors import ProductionRepairableError
+    from app.services.reference_asset_service import ReferenceAssetError
+
+    async def missing_reference_model(db, character_id, slot="all"):
+        raise ReferenceAssetError("REFERENCE_MODEL_NOT_CONFIGURED", "No image model configured", {})
+
+    monkeypatch.setattr(
+        "app.services.reference_asset_service.generate_character_reference_images",
+        missing_reference_model,
+    )
+
+    with pytest.raises(ProductionRepairableError) as exc_info:
+        await create_one_sentence_video(
+            db,
+            prompt="A real educator explains a simple breakfast choice.",
+            target_duration_seconds=60,
+            budget_limit=1,
+            autostart_images=True,
+        )
+
+    assert exc_info.value.repair_route == "/ai-config"
+
+
+@pytest.mark.asyncio
+async def test_one_sentence_empty_reference_assets_point_to_asset_library(db, monkeypatch):
+    from app.services.one_sentence_video_service import create_one_sentence_video
+    from app.services.production_errors import ProductionRepairableError
+
+    async def no_reference_urls(*args, **kwargs):
+        return {"ok": True, "generated": [], "missing_assets": []}
+
+    monkeypatch.setattr(
+        "app.services.reference_asset_service.generate_character_reference_images",
+        no_reference_urls,
+    )
+    monkeypatch.setattr(
+        "app.services.reference_asset_service.generate_scene_reference_images",
+        no_reference_urls,
+    )
+
+    with pytest.raises(ProductionRepairableError) as exc_info:
+        await create_one_sentence_video(
+            db,
+            prompt="A real educator explains a simple breakfast choice.",
+            target_duration_seconds=60,
+            budget_limit=1,
+            autostart_images=True,
+        )
+
+    assert exc_info.value.repair_route == "/characters"
+
+
+def test_one_sentence_reference_worker_skips_until_next_check_at():
+    from datetime import timedelta
+
+    from app.config import bj_now
+    from app.main import _one_sentence_reference_check_due
+
+    now = bj_now()
+    run = VideoProductionRun(
+        status="reference_generation_running",
+        current_stage="reference_generation",
+        model_trace_json={
+            "one_sentence": {
+                "reference_generation": {
+                    "error_code": "REFERENCE_PROVIDER_STILL_RUNNING",
+                    "next_reference_check_at": (now + timedelta(seconds=30)).isoformat(),
+                }
+            }
+        },
+    )
+    assert _one_sentence_reference_check_due(run, now=now) is False
+
+    run.model_trace_json["one_sentence"]["reference_generation"]["next_reference_check_at"] = (
+        now - timedelta(seconds=1)
+    ).isoformat()
+    assert _one_sentence_reference_check_due(run, now=now) is True
 
 
 @pytest.mark.asyncio

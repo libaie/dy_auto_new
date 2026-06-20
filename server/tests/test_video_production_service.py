@@ -1,6 +1,6 @@
 import pytest
 
-from app.db_models import Episode, Series, VideoProductionAsset, VideoProductionRun
+from app.db_models import Episode, Series, VideoProductionAsset, VideoProductionRun, VideoReviewRecord
 from app.services.video_production_service import (
     approve_asset,
     create_regenerated_image_asset,
@@ -8,6 +8,7 @@ from app.services.video_production_service import (
     latest_approved_assets_by_frame,
     mark_image_stage_assets,
 )
+from tests.video_production_control_plane_helpers import linked_segment_context
 
 
 def _episode_with_storyboard(db):
@@ -110,6 +111,67 @@ def test_approve_asset_records_human_review(db):
     db.refresh(asset)
     assert asset.status == "approved"
     assert latest_approved_assets_by_frame(db, run.id)["frame-001"].id == asset.id
+
+
+def test_approve_asset_is_idempotent_for_already_approved_latest_asset(db):
+    series, episode = _episode_with_storyboard(db)
+    run = create_run_from_episode(db, series.id, episode.id)
+    asset = mark_image_stage_assets(db, run, [{
+        "frame_id": "frame-001",
+        "asset_type": "image",
+        "url": "https://cdn.test/image.png",
+        "local_path": "output/image.png",
+        "metadata": {},
+    }], pixelle_task_id="stage-1")[0]
+    asset.copy_status = "persisted"
+    asset.checksum = "image-checksum"
+    asset.storage_path = "output/image.png"
+    db.commit()
+
+    first = approve_asset(db, asset.id, reviewer_user_id="user-1", comment="auto approved")
+    second = approve_asset(db, asset.id, reviewer_user_id="user-1", comment="clicked stale approve")
+
+    assert first.id == second.id == asset.id
+    assert second.status == "approved"
+    assert db.query(VideoReviewRecord).filter_by(
+        asset_id=asset.id,
+        review_type="human",
+        status="approved",
+    ).count() == 1
+
+
+def test_approve_linked_image_asset_promotes_segment_status(db):
+    ctx = linked_segment_context(db, segment_status="image_review_pending")
+    asset = ctx["asset"]
+    segment = ctx["segment"]
+    asset.status = "review_pending"
+    asset.copy_status = "persisted"
+    asset.checksum = "image-checksum"
+    asset.storage_path = "output/image.png"
+    db.commit()
+
+    approve_asset(db, asset.id, reviewer_user_id="user-1", comment="image ok")
+
+    db.refresh(segment)
+    assert segment.status == "image_approved"
+
+
+def test_approve_linked_video_asset_promotes_segment_status(db):
+    ctx = linked_segment_context(db, segment_status="video_review_pending")
+    asset = ctx["asset"]
+    segment = ctx["segment"]
+    asset.asset_type = "video_segment"
+    asset.stage = "video_generation"
+    asset.status = "review_pending"
+    asset.copy_status = "persisted"
+    asset.checksum = "video-checksum"
+    asset.storage_path = "output/video.mp4"
+    db.commit()
+
+    approve_asset(db, asset.id, reviewer_user_id="user-1", comment="video ok")
+
+    db.refresh(segment)
+    assert segment.status == "video_approved"
 
 
 def test_regeneration_marks_old_asset_and_creates_next_version(db):

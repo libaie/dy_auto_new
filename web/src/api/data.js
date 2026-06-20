@@ -11,3 +11,8 @@ export function listUsers(params = {}) {
 export function listConversations(params = {}) {
   return client.get('/data/conversations', { params })
 }
+
+
+export function getConversation(id) {
+  return client.get('/data/conversations/' + encodeURIComponent(id))
+}

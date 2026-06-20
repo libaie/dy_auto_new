@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 
 const mocks = vi.hoisted(() => ({
@@ -54,9 +54,12 @@ vi.mock('../api/imageProduction.js', () => ({
 async function mountPage() {
   const Page = (await import('../views/ImageCreationPage.vue')).default
   const wrapper = mount(Page)
+  mountedWrappers.push(wrapper)
   await flushPromises()
   return wrapper
 }
+
+const mountedWrappers = []
 
 describe('ImageCreationPage', () => {
   beforeEach(() => {
@@ -157,6 +160,13 @@ describe('ImageCreationPage', () => {
         },
       },
     })
+  })
+
+  afterEach(() => {
+    for (const wrapper of mountedWrappers.splice(0)) {
+      wrapper.unmount()
+    }
+    vi.useRealTimers()
   })
 
   it('renders Chinese mode controls and disables submit without prompt', async () => {
@@ -1297,6 +1307,46 @@ describe('ImageCreationPage', () => {
     expect(wrapper.text()).toContain('已完成')
     expect(wrapper.text()).not.toContain('completed')
     expect(wrapper.text()).toContain('review_pending')
+  })
+
+  it('automatically polls an active task and renders each completed image asset', async () => {
+    vi.useFakeTimers()
+    mocks.createImageTask.mockResolvedValueOnce({
+      data: {
+        task: { id: 'task-live', status: 'running', pixelle_task_id: 'pixelle-live' },
+        assets: [],
+      },
+    })
+    mocks.syncImageTask.mockResolvedValueOnce({
+      data: {
+        task: { id: 'task-live', status: 'running', pixelle_task_id: 'pixelle-live' },
+        assets: [{
+          id: 'asset-live-1',
+          image_url: 'https://img.example/live-1.png',
+          status: 'review_pending',
+          version: 1,
+          prompt: '第一张实时回显图',
+          allowed_actions: ['approve'],
+          review_gate: { status: 'manual_review_pending' },
+        }],
+      },
+    })
+    const wrapper = await mountPage()
+
+    await wrapper.get('[data-testid="image-prompt"]').setValue('自动回显图像任务')
+    await wrapper.get('[data-testid="image-create-submit"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="task-results-live"]').text()).not.toContain('第一张实时回显图')
+
+    await vi.advanceTimersByTimeAsync(3000)
+    await flushPromises()
+
+    expect(mocks.syncImageTask).toHaveBeenCalledWith('task-live')
+    expect(wrapper.get('[data-testid="task-results-live"]').text()).toContain('第一张实时回显图')
+    expect(wrapper.find('img[src="https://img.example/live-1.png"]').exists()).toBe(true)
+
+    wrapper.unmount()
   })
 
   it('shows queued task status and manually dispatches queued tasks', async () => {

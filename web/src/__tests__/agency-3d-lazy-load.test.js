@@ -35,6 +35,17 @@ vi.mock('../api/series.js', () => ({
   })),
 }))
 
+vi.mock('../api/agency.js', () => ({
+  listAgencyRepairTasks: vi.fn(() => Promise.resolve({ data: { items: [], summary: {} } })),
+  retryAgencyRepairTask: vi.fn(() => Promise.resolve({ data: { ok: true } })),
+  authorizeAgencyRepairRetry: vi.fn(() => Promise.resolve({ data: { ok: true } })),
+  listAgencyCreativePatches: vi.fn(() => Promise.resolve({ data: { items: [], summary: {} } })),
+  updateAgencyCreativePatch: vi.fn(() => Promise.resolve({ data: { ok: true } })),
+  approveAgencyCreativePatch: vi.fn(() => Promise.resolve({ data: { ok: true } })),
+  rejectAgencyCreativePatch: vi.fn(() => Promise.resolve({ data: { ok: true } })),
+  applyAgencyCreativePatch: vi.fn(() => Promise.resolve({ data: { ok: true } })),
+}))
+
 vi.mock('../components/agency/AgencyTeamMap3D.vue', () => {
   lazyState.loadCount += 1
   return {

@@ -1,5 +1,5 @@
 import pytest
-from app.db_models import Character, ImageCreationAsset, ImageCreationTask, Scene, Series
+from app.db_models import Character, CharacterAnchor, ImageCreationAsset, ImageCreationTask, Scene, SceneAnchor, Series
 
 
 @pytest.mark.asyncio
@@ -54,6 +54,7 @@ async def test_character_single_slot_generation_updates_only_requested_url_and_m
 
     db.expire_all()
     saved = db.query(Character).filter(Character.id == character.id).one()
+    anchor = db.query(CharacterAnchor).filter_by(character_id=character.id, reference_slot="avatar_side_url").one()
     assert saved.avatar_side_url == "https://cdn.test/lin-side.png"
     assert saved.avatar_front_url is None
     assert saved.avatar_threequarter_url is None
@@ -61,6 +62,10 @@ async def test_character_single_slot_generation_updates_only_requested_url_and_m
     assert saved.meta_json["reference_generation"]["avatar_side_url"]["url"] == "https://cdn.test/lin-side.png"
     assert saved.meta_json["reference_generation"]["avatar_side_url"]["prompt"] == prompts[0]
     assert saved.meta_json["reference_generation"]["avatar_side_url"]["generated_at"]
+    assert anchor.name == "Lin"
+    assert anchor.anchor_image_url == "https://cdn.test/lin-side.png"
+    assert anchor.ref_mode == "controlnet_face"
+    assert anchor.status == "locked"
 
 
 @pytest.mark.asyncio
@@ -77,8 +82,11 @@ async def test_scene_all_slots_generation_updates_all_reference_urls(db, monkeyp
     db.add(scene)
     db.commit()
 
+    prompts = []
+
     async def fake_generate_reference_url(db_session, prompt, scene_key="image_generation", **kwargs):
-        return f"https://cdn.test/{len(prompt)}.png"
+        prompts.append(prompt)
+        return f"https://cdn.test/scene-{len(prompts)}.png"
 
     monkeypatch.setattr(reference_asset_service, "generate_reference_url", fake_generate_reference_url)
 
@@ -91,9 +99,17 @@ async def test_scene_all_slots_generation_updates_all_reference_urls(db, monkeyp
         "reference_aerial_url",
     ]
     assert result["missing_assets"] == []
+    assert len(prompts) == 3
+    for prompt in prompts:
+        lowered = prompt.lower()
+        assert "empty environment plate" in lowered
+        assert "no people" in lowered
+        assert "no humans" in lowered
+        assert "no characters" in lowered
 
     db.expire_all()
     saved = db.query(Scene).filter(Scene.id == scene.id).one()
+    anchors = db.query(SceneAnchor).filter_by(scene_id=scene.id).all()
     assert saved.reference_wideshot_url
     assert saved.reference_midshot_url
     assert saved.reference_aerial_url
@@ -102,6 +118,12 @@ async def test_scene_all_slots_generation_updates_all_reference_urls(db, monkeyp
         "reference_midshot_url",
         "reference_aerial_url",
     }
+    assert {anchor.reference_slot for anchor in anchors} == {
+        "reference_wideshot_url",
+        "reference_midshot_url",
+        "reference_aerial_url",
+    }
+    assert {anchor.ref_mode for anchor in anchors} == {"image_to_image"}
 
 
 @pytest.mark.asyncio
@@ -330,6 +352,44 @@ async def test_generate_reference_url_polls_running_provider_task_until_asset_re
 
     assert url == "http://127.0.0.1:8000/static/image-creation/outputs/reference-ready.png"
     assert calls["count"] == 2
+
+
+@pytest.mark.asyncio
+async def test_generate_reference_url_reports_provider_still_running_after_poll_budget(db, monkeypatch):
+    from app.services import reference_asset_service
+
+    async def fake_create_image_task(db_session, payload):
+        task = ImageCreationTask(
+            mode="text_to_image",
+            output_mode="single",
+            capability_key="text_to_image",
+            status="running",
+            prompt=payload["prompt"],
+            pixelle_task_id="stage-task-slow",
+            provider_task_id="stage-task-slow",
+        )
+        db_session.add(task)
+        db_session.commit()
+        db_session.refresh(task)
+        return task
+
+    async def fake_sync_image_task(db_session, task_id):
+        task = db_session.query(ImageCreationTask).filter(ImageCreationTask.id == task_id).one()
+        task.status = "running"
+        db_session.commit()
+        db_session.refresh(task)
+        return task
+
+    monkeypatch.setattr("app.services.image_creation_service.create_image_task", fake_create_image_task)
+    monkeypatch.setattr("app.services.image_creation_service.sync_image_task", fake_sync_image_task)
+    monkeypatch.setattr(reference_asset_service, "REFERENCE_SYNC_POLL_ATTEMPTS", 1)
+    monkeypatch.setattr(reference_asset_service, "REFERENCE_SYNC_POLL_DELAY_SECONDS", 0)
+
+    with pytest.raises(reference_asset_service.ReferenceAssetError) as exc_info:
+        await reference_asset_service.generate_reference_url(db, "reference prompt")
+
+    assert exc_info.value.code == "REFERENCE_PROVIDER_STILL_RUNNING"
+    assert exc_info.value.details["status"] == "running"
 
 
 @pytest.mark.asyncio

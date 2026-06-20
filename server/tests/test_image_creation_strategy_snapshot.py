@@ -3,12 +3,13 @@ from uuid import uuid4
 import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import IntegrityError
 
 from app.db_models import AIModel, ImageCreationTask, ImageCreationAsset, ImageProductionCostEvent, ImageProductionPolicyVersion
 from app.deps import verify_admin_token
 from app.main import app
 from app.services.crypto import encrypt
-from app.services.image_creation_service import create_image_task, _redact_provider_error
+from app.services.image_creation_service import create_image_task, sync_image_task, _redact_provider_error
 from app.services.image_production_strategy_service import create_strategy
 from app.services.image_selection_preview_service import create_selection_preview
 
@@ -710,6 +711,108 @@ def test_sync_image_task_redacts_failed_status_and_records_fallback_trace(db, mo
     assert "secret-plain" not in persisted_text
     assert "plain-token-value" not in persisted_text
     assert "nested-secret-value" not in persisted_text
+
+
+@pytest.mark.asyncio
+async def test_sync_image_task_reuses_existing_canonical_asset(db, monkeypatch):
+    task = ImageCreationTask(
+        mode="text_to_image",
+        capability_key="text_to_image",
+        status="running",
+        prompt="duplicate canonical asset",
+        pixelle_task_id="stage-duplicate-canonical",
+        provider="qwen-image",
+    )
+    db.add(task)
+    db.flush()
+    db.add(ImageCreationAsset(
+        task_id=task.id,
+        slot_key="first-provider-slot",
+        group_id="stage-duplicate-canonical",
+        group_index=0,
+        version=1,
+        url="https://cdn.test/first.png",
+        status="approved",
+    ))
+    db.commit()
+
+    async def fake_get_stage_task(db_arg, task_id):
+        assert task_id == "stage-duplicate-canonical"
+        return {
+            "status": "completed",
+            "assets": [{
+                "url": "/static/image-creation/outputs/second.png",
+                "slot_key": "second-provider-slot",
+                "group_id": "stage-duplicate-canonical",
+                "group_index": 0,
+            }],
+        }
+
+    monkeypatch.setattr("app.services.image_creation_service.get_stage_task", fake_get_stage_task)
+
+    synced = await sync_image_task(db, task.id)
+
+    assert synced.status == "completed"
+    assert db.query(ImageCreationAsset).filter(ImageCreationAsset.task_id == task.id).count() == 1
+
+
+@pytest.mark.asyncio
+async def test_sync_image_task_recovers_duplicate_asset_commit_race(db, monkeypatch):
+    task = ImageCreationTask(
+        mode="text_to_image",
+        capability_key="text_to_image",
+        status="running",
+        prompt="duplicate commit race",
+        pixelle_task_id="stage-duplicate-race",
+        provider="qwen-image",
+    )
+    db.add(task)
+    db.flush()
+    db.add(ImageCreationAsset(
+        task_id=task.id,
+        slot_key="stage-duplicate-race:0",
+        group_id="stage-duplicate-race",
+        group_index=0,
+        version=1,
+        url="https://cdn.test/first.png",
+        status="approved",
+    ))
+    db.commit()
+
+    async def fake_get_stage_task(db_arg, task_id):
+        assert task_id == "stage-duplicate-race"
+        return {
+            "status": "completed",
+            "assets": [{
+                "url": "/static/image-creation/outputs/race.png",
+                "slot_key": "stage-duplicate-race:0",
+                "group_id": "stage-duplicate-race",
+                "group_index": 0,
+            }],
+        }
+
+    original_commit = db.commit
+    raised = False
+
+    def race_commit():
+        nonlocal raised
+        if not raised:
+            raised = True
+            raise IntegrityError(
+                "UNIQUE constraint failed: index 'uq_image_asset_canonical_slot_version'",
+                {},
+                Exception("uq_image_asset_canonical_slot_version"),
+            )
+        return original_commit()
+
+    monkeypatch.setattr("app.services.image_creation_service.get_stage_task", fake_get_stage_task)
+    monkeypatch.setattr(db, "commit", race_commit)
+
+    synced = await sync_image_task(db, task.id)
+
+    assert raised is True
+    assert synced.status == "completed"
+    assert db.query(ImageCreationAsset).filter(ImageCreationAsset.task_id == task.id).count() == 1
 
 
 def test_task_payload_includes_production_timeline(db, monkeypatch):

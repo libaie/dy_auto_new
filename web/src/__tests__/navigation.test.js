@@ -100,6 +100,13 @@ describe('getCategoryByRoute', () => {
     })).toBe('ai-video')
   })
 
+  it('matches collection builder as an AI video route', () => {
+    expect(getCategoryByRoute({
+      path: '/series/abc123/collection-builder',
+      matched: [{ path: '/' }, { path: '/series/:seriesId/collection-builder' }],
+    })).toBe('ai-video')
+  })
+
   it('matches dynamic route /director/:x/:y via deepest matched entry', () => {
     expect(getCategoryByRoute({
       path: '/director/s1/e1',
@@ -109,5 +116,18 @@ describe('getCategoryByRoute', () => {
 
   it('falls back to ops for unknown routes', () => {
     expect(getCategoryByRoute({ path: '/nonexistent' })).toBe('ops')
+  })
+})
+
+describe('router guards', () => {
+  it('redirects non-admin users away from video production monitor routes', async () => {
+    const router = (await import('../router/index.js')).default
+
+    router._authStore = { isLoggedIn: true, isAdmin: false }
+    await router.push('/video-production/run-guard')
+    await router.isReady()
+
+    expect(router.currentRoute.value.path).toBe('/')
+    router._authStore = null
   })
 })

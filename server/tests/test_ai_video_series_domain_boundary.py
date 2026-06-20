@@ -99,6 +99,7 @@ def _is_allowed_domain_facade(text: str) -> bool:
         and "app.domains.ai_video_series" in text
     )
 
+
 def _is_ai_video_series_module(module_name: str) -> bool:
     return module_name == "app.domains.ai_video_series" or module_name.startswith(
         "app.domains.ai_video_series."

@@ -147,6 +147,11 @@ const routes = [
         component: () => import('../views/AgencyConsolePage.vue'),
       },
       {
+        path: 'series/:seriesId/ai-text-artifacts',
+        name: 'AITextArtifactWorkbench',
+        component: () => import('../views/AITextArtifactWorkbenchPage.vue'),
+      },
+      {
         path: 'series/:seriesId/collection-builder',
         name: 'CollectionBuilder',
         component: () => import('../views/CollectionBuilderPage.vue'),
@@ -192,7 +197,7 @@ const router = createRouter({
 const ADMIN_ONLY_PATHS = [
   '/accounts', '/account-groups', '/devices', '/chain-templates', '/chain-instances',
   '/selectors', '/settings', '/prompt-templates', '/ai-config', '/dict-manage',
-  '/characters', '/scenes', '/series', '/director', '/pipeline', '/ai-video-review', '/one-sentence-video', '/image-creation', '/image-production/strategies', '/stats',
+  '/characters', '/scenes', '/series', '/director', '/pipeline', '/ai-video-review', '/one-sentence-video', '/video-production', '/image-creation', '/image-production/strategies', '/stats',
   '/users',
 ]
 

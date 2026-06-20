@@ -27,3 +27,31 @@ export function retryAgencyRepairTask(jobId) {
 export function authorizeAgencyRepairRetry(jobId, payload) {
   return client.post(`/agency/repair-tasks/${jobId}/authorize-retry`, payload)
 }
+
+export function listAgencyCreativePatches(params = {}) {
+  return client.get('/agency/creative-patches', { params })
+}
+
+export function updateAgencyCreativePatch(patchId, payload) {
+  return client.patch(`/agency/creative-patches/${patchId}`, payload)
+}
+
+export function approveAgencyCreativePatch(patchId) {
+  return client.post(`/agency/creative-patches/${patchId}/approve`)
+}
+
+export function rejectAgencyCreativePatch(patchId, payload) {
+  return client.post(`/agency/creative-patches/${patchId}/reject`, payload)
+}
+
+export function applyAgencyCreativePatch(patchId) {
+  return client.post(`/agency/creative-patches/${patchId}/apply`)
+}
+
+export function applyApprovedAgencyCreativePatches(payload) {
+  return client.post('/agency/creative-patches/apply-approved', payload)
+}
+
+export function runAgencyAssetMultimodalReview(assetId) {
+  return client.post(`/agency/assets/${assetId}/multimodal-review`)
+}

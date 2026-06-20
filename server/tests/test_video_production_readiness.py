@@ -1,7 +1,8 @@
 from fastapi.testclient import TestClient
 
-from app.db_models import Episode, Series, VideoProductionAsset, VideoProductionRun
+from app.db_models import Episode, ProductionJob, ProductionPlan, Series, VideoProductionAsset, VideoProductionRun
 from app.main import app
+from app.services.production_status import JOB_BLOCKED
 from app.services.video_production_run_types import REAL_SHORT_E2E
 
 
@@ -369,3 +370,33 @@ def test_readiness_can_complete_final_for_final_review_pending(db):
     assert resp.status_code == 200
     readiness = resp.json()["readiness"]
     assert readiness["can_complete_final"] is True
+
+
+def test_readiness_blocks_final_review_when_compose_job_blocked_without_final_asset(db):
+    run = _run(db, status="final_review_pending", current_stage="final_review")
+    plan = ProductionPlan(series_id=run.series_id, status="running")
+    db.add(plan)
+    db.flush()
+    run.production_plan_id = plan.id
+    job = ProductionJob(
+        plan_id=plan.id,
+        stage="episode_compose",
+        status=JOB_BLOCKED,
+        target_type="episode",
+        target_id=run.episode_id,
+        error_code="COMPOSE_PREFLIGHT_BLOCKED",
+        error_message="Compose preflight needs repair.",
+        idempotency_key=f"{run.id}:episode_compose",
+    )
+    db.add(job)
+    db.commit()
+
+    resp = client.get(f"/api/video-production/runs/{run.id}/readiness")
+
+    assert resp.status_code == 200
+    readiness = resp.json()["readiness"]
+    assert readiness["can_complete_final"] is False
+    assert readiness["needs_review"] is True
+    assert readiness["next_action"]["key"] == "repair_provider_stage"
+    assert readiness["blocks"][0]["code"] == "COMPOSE_PREFLIGHT_BLOCKED"
+    assert readiness["blocks"][0]["repair_route"] == f"/video-production/{run.id}"

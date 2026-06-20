@@ -20,6 +20,9 @@ const mocks = vi.hoisted(() => ({
   syncVideoStage: vi.fn(() => Promise.resolve({ data: { ok: true } })),
   startComposeStage: vi.fn(() => Promise.resolve({ data: { ok: true } })),
   syncComposeStage: vi.fn(() => Promise.resolve({ data: { ok: true } })),
+  listAgencyRepairTasks: vi.fn(() => Promise.resolve({ data: { items: [], summary: {} } })),
+  retryAgencyRepairTask: vi.fn(() => Promise.resolve({ data: { ok: true } })),
+  authorizeAgencyRepairRetry: vi.fn(() => Promise.resolve({ data: { ok: true } })),
 }))
 
 vi.mock('vue-router', () => ({
@@ -43,6 +46,12 @@ vi.mock('../api/videoProduction.js', () => ({
   syncVideoStage: mocks.syncVideoStage,
   startComposeStage: mocks.startComposeStage,
   syncComposeStage: mocks.syncComposeStage,
+}))
+
+vi.mock('../api/agency.js', () => ({
+  listAgencyRepairTasks: mocks.listAgencyRepairTasks,
+  retryAgencyRepairTask: mocks.retryAgencyRepairTask,
+  authorizeAgencyRepairRetry: mocks.authorizeAgencyRepairRetry,
 }))
 
 function runPayload(status = 'video_review_pending') {

@@ -117,6 +117,20 @@ def test_one_sentence_rejects_unknown_run_type_before_db_write(db):
     assert resp.status_code == 400
     assert resp.json()["detail"]["code"] == "INVALID_RUN_TYPE"
     assert resp.json()["detail"]["error_code"] == "INVALID_RUN_TYPE"
+    assert resp.json()["detail"]["repair_route"] == "/one-sentence-video"
+    assert _counts(db) == before
+
+
+def test_real_short_e2e_rejects_duration_above_materialized_contract_before_db_write(db):
+    before = _counts(db)
+
+    resp = client.post(
+        "/api/video-production/one-sentence",
+        json=_payload(target_duration_seconds=961, run_type=REAL_SHORT_E2E),
+    )
+
+    assert resp.status_code == 400
+    assert "no more than 960 seconds" in resp.json()["detail"]
     assert _counts(db) == before
 
 
@@ -203,6 +217,7 @@ async def test_real_short_image_stage_blocks_empty_reference_payload_before_prov
         budget_limit=1,
         autostart_images=False,
         run_type=REAL_SHORT_E2E,
+        prepare_text_artifacts=False,
     )
 
     with pytest.raises(ProductionRepairableError) as exc_info:

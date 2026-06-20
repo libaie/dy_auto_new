@@ -110,6 +110,38 @@ var uiOperator = {
     } catch (e) { return false; }
   },
 
+  _applyStrategyOffset: function (element, strategy) {
+    if (!element || !strategy || (strategy.x_percent == null && strategy.y_percent == null)) return element;
+
+    if (element.isImage) {
+      var imageElement = {
+        isImage: true,
+        x: element.x,
+        y: element.y,
+        score: element.score,
+      };
+      if (strategy.x_percent != null) imageElement.x += strategy.x_percent;
+      if (strategy.y_percent != null) imageElement.y += strategy.y_percent;
+      return imageElement;
+    }
+
+    if (element.isCoordinate || element.isPackage) return element;
+
+    try {
+      var b = element.bounds();
+      if (!b) return element;
+      var cx = b.centerX();
+      var cy = b.centerY();
+      var elW = b.right - b.left;
+      var elH = b.bottom - b.top;
+      if (strategy.x_percent != null) cx += Math.round(elW * strategy.x_percent / 100);
+      if (strategy.y_percent != null) cy += Math.round(elH * strategy.y_percent / 100);
+      return { isCoordinate: true, x: cx, y: cy, sourceElement: element };
+    } catch (e) {
+      return element;
+    }
+  },
+
   /**
    * 使用选择器查找控件（仅返回屏幕内的元素，避免 RecyclerView 复用导致的离屏匹配）
    * @param {string} actionName - 操作名称
@@ -228,6 +260,8 @@ var uiOperator = {
    * 按条件查找元素（支持 text/id/desc/className 类型 + match_mode）
    */
   _findByCondition: function (cond) {
+    if (cond.type === "textContains") return textContains(cond.value).find();
+
     var matchMode = cond.match_mode || "exact";
     if (matchMode === "contains") {
       switch (cond.type) {
@@ -255,7 +289,8 @@ var uiOperator = {
     var actual;
     try {
       switch (cond.type) {
-        case "text": actual = el.text(); break;
+        case "text":
+        case "textContains": actual = el.text(); break;
         case "desc": actual = el.desc(); break;
         case "id": actual = el.id(); break;
         case "className": actual = el.className(); break;
@@ -263,7 +298,7 @@ var uiOperator = {
       }
     } catch (e) { return false; }
     if (!actual) return false;
-    if (matchMode === "contains") return actual.indexOf(cond.value) !== -1;
+    if (cond.type === "textContains" || matchMode === "contains") return actual.indexOf(cond.value) !== -1;
     return actual === cond.value;
   },
 
@@ -351,6 +386,7 @@ var uiOperator = {
     var matchMode = strategy.match_mode || "exact";
     if (matchMode === "contains") {
       switch (strategy.type) {
+        case "textContains": all = textContains(strategy.value).find(); break;
         case "text": all = textContains(strategy.value).find(); break;
         case "id": all = idContains(strategy.value).find(); break;
         case "desc": all = descContains(strategy.value).find(); break;
@@ -359,6 +395,7 @@ var uiOperator = {
       }
     } else {
       switch (strategy.type) {
+        case "textContains": all = textContains(strategy.value).find(); break;
         case "text": all = text(strategy.value).find(); break;
         case "id": all = id(strategy.value).find(); break;
         case "desc": all = desc(strategy.value).find(); break;
@@ -394,6 +431,7 @@ var uiOperator = {
     var matchMode = strategy.match_mode || "exact";
     if (matchMode === "contains") {
       switch (strategy.type) {
+        case "textContains": return textContains(strategy.value).find();
         case "text": return textContains(strategy.value).find();
         case "id": return idContains(strategy.value).find();
         case "desc": return descContains(strategy.value).find();
@@ -402,6 +440,7 @@ var uiOperator = {
       }
     }
     switch (strategy.type) {
+      case "textContains": return textContains(strategy.value).find();
       case "text": return text(strategy.value).find();
       case "id": return id(strategy.value).find();
       case "desc": return desc(strategy.value).find();
@@ -482,7 +521,7 @@ var uiOperator = {
    * @param {number} timeout - 超时时间（毫秒），默认 5000
    * @returns {Array} UiObject 数组，找不到返回空数组
    */
-  findElements: function (actionName, timeout) {
+  findElements: function (actionName, timeout, quiet) {
     timeout = timeout || 5000;
     var selector = selectorLoader.get(actionName);
     if (!selector) {
@@ -501,8 +540,13 @@ var uiOperator = {
         var s = strategies[i];
         var all = this._findManyByStrategy(s);
         if (all && all.length > 0) {
-          // 只保留屏幕内的元素
-          var visible = all.filter(function (el) { return self._isOnScreen(el); });
+          // 只保留屏幕内的元素，并与 findElement 保持一致应用策略偏移
+          var visible = [];
+          for (var vi = 0; vi < all.length; vi++) {
+            if (self._isOnScreen(all[vi])) {
+              visible.push(self._applyStrategyOffset(all[vi], s));
+            }
+          }
           if (visible.length > 0) {
             var label = s.conditions ? "conditions(" + (s.logic || "and") + ")" : (s.type || "unknown");
             logger.debug(TAG, "通过 " + label + " 找到 " + visible.length + "/" + all.length + " 个可见元素: '" + actionName + "'");
@@ -513,7 +557,7 @@ var uiOperator = {
       sleep(500);
     }
 
-    logger.warn(TAG, "未找到元素列表: " + actionName);
+    if (!quiet) logger.warn(TAG, "未找到元素列表: " + actionName);
     return [];
   },
 

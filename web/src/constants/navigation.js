@@ -89,6 +89,8 @@ export const ROUTE_CATEGORY_MAP = {
   '/prompt-templates': 'ai-video',
   '/series/:id': 'ai-video',
   '/series/:seriesId/agency-console': 'ai-video',
+  '/series/:seriesId/ai-text-artifacts': 'ai-video',
+  '/series/:seriesId/collection-builder': 'ai-video',
   '/director/:seriesId/:episodeId': 'ai-video',
   '/pipeline/:runId': 'ai-video',
   '/ai-video-review': 'ai-video',

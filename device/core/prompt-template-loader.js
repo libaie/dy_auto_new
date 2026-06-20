@@ -62,7 +62,7 @@ var promptTemplateLoader = global.__promptTemplateLoader || {
    * @returns {Object|null} { id, name, industry, content }
    */
   get: function (id) {
-    if (id && this._cache[id]) return this._cache[id];
+    if (id) return this._cache[id] || null;
     // 查找默认模板
     if (this._defaultId && this._cache[this._defaultId]) return this._cache[this._defaultId];
     // 取第一个可用模板

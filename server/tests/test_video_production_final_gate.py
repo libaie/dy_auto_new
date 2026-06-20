@@ -210,7 +210,28 @@ def test_ai_audit_approval_does_not_complete_final_writeback(db, monkeypatch):
     assert db.query(GeneratedVideo).filter_by(pixelle_task_id=run.id).count() == 0
 
 
-def test_autopilot_final_audit_auto_approves_and_writes_back(db, monkeypatch):
+def test_final_audit_records_runtime_model_name(db, monkeypatch):
+    run, episode = _run_ready_for_final(db)
+    run.status = "final_review_pending"
+    run.current_stage = "final_review"
+    asset = _final_asset(db, run, episode)
+    monkeypatch.setattr(
+        "app.services.video_production_service.resolve_runtime_model_config",
+        lambda db, scene: {"provider": "bailian", "api_key": "x", "model": "qwen3.7-plus"},
+    )
+    monkeypatch.setattr(
+        "app.routers.audit._do_audit",
+        lambda model, url, text: {"score": 0.99, "pass_fail": True, "issues": []},
+    )
+
+    run_final_audit_for_asset(db, run, asset)
+
+    review = db.query(VideoReviewRecord).filter_by(asset_id=asset.id, review_type="ai").one()
+    assert review.model_trace_json["auditor_model"] == "bailian"
+    assert review.model_trace_json["auditor_model_name"] == "qwen3.7-plus"
+
+
+def test_autopilot_final_audit_still_requires_human_approval(db, monkeypatch):
     run, episode = _run_ready_for_final(db)
     run.status = "final_review_pending"
     run.current_stage = "final_review"
@@ -223,17 +244,15 @@ def test_autopilot_final_audit_auto_approves_and_writes_back(db, monkeypatch):
 
     audited = run_final_audit_for_asset(db, run, asset)
 
-    assert audited.status == "approved"
+    assert audited.status == "review_pending"
     db.refresh(run)
     db.refresh(episode)
-    auto_review = db.query(VideoReviewRecord).filter_by(asset_id=asset.id, review_type="auto").one()
-    assert auto_review.status == "approved"
-    assert auto_review.model_trace_json["auto_review_policy"]["source"] == "autopilot"
-    assert run.status == "completed"
-    assert run.current_stage == "completed"
-    assert episode.status == "done"
-    assert episode.video_url == "output/final.mp4"
-    assert db.query(GeneratedVideo).filter_by(pixelle_task_id=run.id).count() == 1
+    assert db.query(VideoReviewRecord).filter_by(asset_id=asset.id, review_type="auto").count() == 0
+    assert run.status == "final_review_pending"
+    assert run.current_stage == "final_review"
+    assert episode.status == "pending"
+    assert episode.video_url is None
+    assert db.query(GeneratedVideo).filter_by(pixelle_task_id=run.id).count() == 0
 
 
 def test_human_approve_final_asset_requires_latest_final_gate(db):

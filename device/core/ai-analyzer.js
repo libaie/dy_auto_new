@@ -19,7 +19,8 @@ var aiAnalyzer = {
    * 不传 id 或找不到时回退到 prompts-config.js 本地配置
    * @param {string} [id] — 模板 ID
    */
-  useTemplate: function (id) {
+  useTemplate: function (id, fallbackIndustry) {
+    fallbackIndustry = fallbackIndustry || "health";
     var loader = require("./prompt-template-loader");
     var tmpl = id ? loader.get(id) : null;
     if (tmpl && tmpl.content) {
@@ -35,9 +36,9 @@ var aiAnalyzer = {
       }
     } else {
       promptsConfig.setOverride(null);
-      promptsConfig.setIndustry("health");
+      promptsConfig.setIndustry(fallbackIndustry);
       this._destCache = {};
-      if (id) logger.warn(TAG, "模板 " + id + " 未找到，使用本地默认配置");
+      if (id) logger.warn(TAG, "模板 " + id + " 未找到，使用本地默认配置: " + fallbackIndustry);
     }
   },
 
@@ -386,6 +387,8 @@ var aiAnalyzer = {
     for (var tierKey in an.tiers) {
       tierLines.push("- " + tierKey + ": " + an.tiers[tierKey]);
     }
+    var tierKeys = Object.keys(an.tiers);
+    var exampleIntent = tierKeys[0] || "other";
     var tierText = tierLines.join("\n");
 
     return "你具有评论语义分析能力。当前视频的搜索关键词是【" + searchKeyword + "】，它代表了视频的主题和内容方向，评论与关键词关联越紧密，越可能是有真实需求的用户。\n\n" +
@@ -426,7 +429,7 @@ var aiAnalyzer = {
       "  \"score\": 75,\n" +
       "  \"tier\": \"high\",\n" +
       "  \"dimensions\": {\n" +
-      "    \"intent\": \"health_consult\",\n" +
+      "    \"intent\": \"" + exampleIntent + "\",\n" +
       "    \"sentiment\": \"neutral\",\n" +
       "    \"focus\": \"quality\",\n" +
       "    \"profile\": { \"role\": \"unknown\", \"spending\": \"mid\" },\n" +

@@ -20,6 +20,7 @@ from app.db.models.content_collection import (
     CollectedUser,
     ContentTemplate,
     Conversation,
+    ConversationMessage,
     DMSequence,
     RepliedComment,
     SensitiveWord,

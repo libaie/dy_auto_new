@@ -42,7 +42,7 @@
             <span class="text-zinc-300">{{ copy.expectedResult }}：</span>{{ text(task.expected_result, '完成后返回审查闸门') }}
           </p>
           <p>
-            <span class="text-zinc-300">{{ copy.nextGate }}：</span>{{ task.recheck_required ? copy.recheckPending : '等待下一步处理' }}
+            <span class="text-zinc-300">{{ copy.nextGate }}：</span>{{ task.recheck_required ? copy.recheckPending : copy.repairGate }}
           </p>
           <p v-if="affectedTextFor(task)">
             <span class="text-zinc-300">影响对象：</span>{{ affectedTextFor(task) }}

@@ -70,6 +70,7 @@ def test_one_sentence_real_short_zero_budget_fails_before_db_mutation(db):
 
     assert response.status_code in {400, 409}
     assert response.json()["detail"]["code"] == "BUDGET_EXCEEDED"
+    assert response.json()["detail"]["repair_route"] == "/one-sentence-video"
     assert _counts(db) == before
 
 
@@ -82,6 +83,7 @@ def test_one_sentence_real_short_missing_budget_fails_before_db_mutation(db):
 
     assert response.status_code in {400, 409}
     assert response.json()["detail"]["code"] == "BUDGET_EXCEEDED"
+    assert response.json()["detail"]["repair_route"] == "/one-sentence-video"
     assert _counts(db) == before
 
 

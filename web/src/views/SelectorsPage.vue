@@ -39,29 +39,43 @@ const actionDescriptions = {
   search_suggestion: '搜索建议词',
   search_suggestion_list: '搜索联想词列表容器',
   search_video_tab: '搜索结果-视频标签页',
+  search_result_list: '搜索结果页指纹',
   search_video_list: '搜索结果-视频列表容器',
+  feed: '首页推荐流页面指纹',
+  is_search_view: '搜索页指纹',
+  is_video_view: '视频播放页指纹',
+  is_comment_view: '评论面板页指纹',
+  is_user_view: '用户主页页指纹',
+  is_dm_view: '私信会话页指纹',
   video_tab: '视频标签页',
   video_author_avatar: '视频作者头像（点击进入主页）',
+  off_video: '关闭视频/返回结果页按钮',
   sort_button: '排序按钮',
   sort_latest: '最新排序选项',
   sort_most_liked: '最多点赞排序选项',
   sort_default: '默认排序选项',
   like_button: '点赞按钮',
   follow_button: '关注按钮',
+  is_follow: '已关注状态指纹',
+  is_shopping_cart: '视频小黄车/商品入口指纹',
   comment_input: '评论输入框',
   comment_submit: '评论提交按钮',
+  comment_off_btn: '关闭评论面板按钮',
   comment_reply_button: '评论回复按钮',
   comment_reply_input: '评论回复输入框',
   comment_reply_submit: '评论回复提交按钮',
   comment_list: '评论列表容器',
+  is_comment_end: '评论到底提示',
   comment_text: '评论内容文本',
   comment_author: '评论作者昵称',
   comment_time: '评论发布时间',
   comment_like_count: '评论点赞数',
   comment_author_avatar: '评论作者头像',
   message_button: '私信按钮',
+  dm_entry_btn: '进入私信会话按钮',
   dm_input: '私信输入框',
   dm_send: '私信发送按钮',
+  dm_send_failed: '私信发送失败提示',
   profile_more: '个人主页更多菜单',
 }
 
@@ -118,6 +132,7 @@ const categoryTabs = [
   { key: 'search', label: '搜索相关' },
   { key: 'comment', label: '评论相关' },
   { key: 'dm', label: '私信相关' },
+  { key: 'profile', label: '主页相关' },
   { key: 'video', label: '视频相关' },
   { key: 'sort', label: '排序相关' },
   { key: 'system', label: '系统相关' },
@@ -131,6 +146,8 @@ const categoryOptions = [
   { value: 'search', label: '搜索相关' },
   { value: 'comment', label: '评论相关' },
   { value: 'dm', label: '私信相关' },
+  { value: 'profile', label: '主页相关' },
+  { value: 'page', label: '页面相关' },
   { value: 'video', label: '视频相关' },
   { value: 'sort', label: '排序相关' },
   { value: 'system', label: '系统相关' },
@@ -147,6 +164,8 @@ const categoryColorMap = {
   search: 'bg-blue-500/15 text-blue-300 border-blue-500/25',
   comment: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25',
   dm: 'bg-pink-500/15 text-pink-300 border-pink-500/25',
+  profile: 'bg-teal-500/15 text-teal-300 border-teal-500/25',
+  page: 'bg-amber-500/15 text-amber-300 border-amber-500/25',
   video: 'bg-amber-500/15 text-amber-300 border-amber-500/25',
   sort: 'bg-violet-500/15 text-violet-300 border-violet-500/25',
   system: 'bg-slate-500/15 text-slate-300 border-slate-500/25',
@@ -167,7 +186,11 @@ const filteredSelectors = computed(() => {
     list = list.filter(s => _matchVersion(s) === versionFilter.value)
   }
   if (categoryFilter.value !== 'all') {
-    list = list.filter(s => (s.category || '') === categoryFilter.value)
+    if (categoryFilter.value === 'page_detect') {
+      list = list.filter(s => s.purpose === 'page_detect')
+    } else {
+      list = list.filter(s => (s.category || '') === categoryFilter.value)
+    }
   }
   return list
 })
@@ -180,6 +203,9 @@ const categoryCounts = computed(() => {
   for (const s of base) {
     const cat = s.category || ''
     counts[cat] = (counts[cat] || 0) + 1
+    if (s.purpose === 'page_detect' && cat !== 'page_detect') {
+      counts.page_detect = (counts.page_detect || 0) + 1
+    }
   }
   return counts
 })

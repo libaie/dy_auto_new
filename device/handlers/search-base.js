@@ -72,7 +72,9 @@ SearchBaseHandler.execute = function (params) {
     }
   }
 
-  sleep(2000);
+  if (!this._waitForSearchResults(keyword)) {
+    return { success: false, error: "搜索结果页未加载" };
+  }
 
   // 4. 点击"视频" tab
   this._clickVideoTab();
@@ -98,7 +100,7 @@ SearchBaseHandler.execute = function (params) {
     if (i === 0) {
       // ==== 首视频：前置弹窗清洗 + 状态断言 + 失败重试 ====
       // 排序弹窗残留会拦截视频点击——不能用 back()（抖音搜索结果页 back 直接回首页）
-      var popupOpen = uiOperator.findElement("sort_latest", 800) || uiOperator.findElement("sort_most_liked", 800);
+      var popupOpen = uiOperator.findElement("sort_latest", 800, true) || uiOperator.findElement("sort_most_liked", 800, true);
       if (popupOpen) {
         logger.warn(TAG, "检测到残留排序弹窗，点击 sort_button 切换关闭");
         this.safeClick("sort_button", 2);
@@ -264,6 +266,41 @@ SearchBaseHandler._clickSuggestion = function (keyword) {
 };
 
 /**
+ * 等待搜索动作真正进入结果页。
+ * 抖音点击联想词/搜索按钮后有时不会跳转，必须显式校验，避免后续流程误判为“已无结果”而直接跳过。
+ */
+SearchBaseHandler._waitForSearchResults = function (keyword, timeoutMs) {
+  timeoutMs = timeoutMs || 10000;
+  var intervalMs = 500;
+  var attempts = Math.max(1, Math.ceil(timeoutMs / intervalMs));
+  logger.info(TAG, "等待搜索结果页: '" + keyword + "'");
+
+  for (var i = 0; i < attempts; i++) {
+    if (uiOperator.isOnPage("search_result_list", 300)) {
+      flowContext.enter("search");
+      logger.info(TAG, "搜索结果页已加载: search_result_list");
+      return true;
+    }
+    if (uiOperator.findElement("search_video_tab", 300, true)) {
+      flowContext.enter("search");
+      logger.info(TAG, "搜索结果页已加载: search_video_tab");
+      return true;
+    }
+    if (uiOperator.findElement("search_video_list", 300, true)) {
+      flowContext.enter("search");
+      logger.info(TAG, "搜索结果页已加载: search_video_list");
+      return true;
+    }
+    sleep(intervalMs);
+  }
+
+  var page = "";
+  try { page = uiOperator.detectPage ? uiOperator.detectPage() : ""; } catch (e) {}
+  logger.warn(TAG, "搜索结果页未加载: '" + keyword + "', 当前页面=" + (page || "未知"));
+  return false;
+};
+
+/**
  * 点击"视频" tab
  * 优先使用选择器系统，回退到硬编码
  */
@@ -391,7 +428,7 @@ SearchBaseHandler._sortResults = function (sortBy) {
 
   // 关弹窗：抖音选完排序后可能自动关，也可能不关。连点可能反而重新打开。
   // 策略：先等 800ms 等自动关闭动画完成，再图找图判断，开着才关，关完验证
-  var stillOpen = uiOperator.findElement(actionName, 2000);
+  var stillOpen = uiOperator.findElement(actionName, 2000, true);
   if (stillOpen) {
     logger.info(TAG, "排序弹窗未关闭，点击关闭");
     var closeBtn = uiOperator.findElement("sort_button", 2000);
@@ -399,7 +436,7 @@ SearchBaseHandler._sortResults = function (sortBy) {
       uiOperator.clickElement(closeBtn);
       sleep(600);
       // 验证：如果还在，说明刚才那下可能反而打开了，再关一次
-      if (uiOperator.findElement(actionName, 1000)) {
+      if (uiOperator.findElement(actionName, 1000, true)) {
         logger.info(TAG, "排序弹窗仍在，再次关闭");
         closeBtn = uiOperator.findElement("sort_button", 1000);
         if (closeBtn) { uiOperator.clickElement(closeBtn); sleep(500); }
@@ -424,7 +461,7 @@ SearchBaseHandler.searchSortAndOpenFirstResult = function (keyword, sortBy) {
   if (!this._clickSuggestion(keyword)) {
     if (!this._submitSearch()) return false;
   }
-  sleep(3000);
+  if (!this._waitForSearchResults(keyword)) return false;
   this._clickVideoTab();
   sleep(2000);
   if (sortBy) {
@@ -454,6 +491,11 @@ SearchBaseHandler._clickSearchResult = function (index) {
   var screenH = device.height;
 
   function isVisible(el) {
+    if (!el) return false;
+    if (el.isCoordinate || el.isImage || el.isPress) {
+      return el.x >= 0 && el.y >= 0 && el.x < screenW && el.y < screenH;
+    }
+    if (el.isPackage) return true;
     try {
       var b = el.bounds();
       if (!b) return false;
@@ -464,9 +506,13 @@ SearchBaseHandler._clickSearchResult = function (index) {
   }
 
   function tryClick(el) {
-    if (el.clickable()) return el.click();
-    var b = el.bounds();
-    if (b) return press(b.centerX(), b.centerY(), 80);
+    if (!el) return false;
+    if (el.isCoordinate || el.isImage || el.isPress || el.isPackage) return uiOperator.clickElement(el);
+    try {
+      if (el.clickable && el.clickable()) return el.click();
+      var b = el.bounds && el.bounds();
+      if (b) return press(b.centerX(), b.centerY(), 80);
+    } catch (e) {}
     return false;
   }
 
@@ -492,7 +538,6 @@ SearchBaseHandler._clickSearchResult = function (index) {
         if (seenCount === index) {
           if (tryClick(items[i])) {
             logger.info(TAG, "点击视频: 第" + (index+1) + "个(策略)"); sleep(2000);
-            this.safeClick("off_video", 1);
             return true;
           }
           return false;
@@ -511,7 +556,6 @@ SearchBaseHandler._clickSearchResult = function (index) {
           if (cnt === index) {
             if (tryClick(children[c])) {
               logger.info(TAG, "点击视频: 第" + (index+1) + "个(兜底)"); sleep(2000);
-              this.safeClick("off_video", 1);
               return true;
             }
             return false;
@@ -576,7 +620,7 @@ SearchBaseHandler.searchAndOpenFirstResult = function (keyword) {
   if (!this._clickSuggestion(keyword)) {
     if (!this._submitSearch()) return false;
   }
-  sleep(3000);
+  if (!this._waitForSearchResults(keyword)) return false;
   this._clickVideoTab();
   sleep(2000);
   if (!this._clickSearchResult(0)) return false;
@@ -781,42 +825,119 @@ SearchBaseHandler.applyVariables = function (template, vars) {
 /**
  * 发送消息序列通用循环（拟人输入 + 延迟）
  */
+SearchBaseHandler._countSentDMResults = function (results) {
+  var count = 0;
+  if (!results) return count;
+  for (var i = 0; i < results.length; i++) {
+    if (results[i] && results[i].status === "sent") count++;
+  }
+  return count;
+};
+
+SearchBaseHandler._buildFallbackRecipientId = function (nickname) {
+  var value = nickname || "unknown";
+  var hash = 0;
+  for (var i = 0; i < value.length; i++) {
+    hash = ((hash << 5) - hash) + value.charCodeAt(i);
+    hash |= 0;
+  }
+  return "fb_" + Math.abs(hash).toString(16);
+};
+
+SearchBaseHandler._buildDMMessageKey = function (conversationId, params, order) {
+  var taskId = (params && params.task_id) || conversationId || "task";
+  var sequenceId = (params && params.dm_sequence_id) || "single";
+  return taskId + ":" + sequenceId + ":" + order;
+};
+
+SearchBaseHandler._reportDMSendResults = function (conversationId, results, params, stage, intent, keyword) {
+  if (!conversationId || !results || results.length === 0) return 0;
+  var apiClient = require("../core/api-client");
+  var reported = 0;
+  for (var i = 0; i < results.length; i++) {
+    var result = results[i];
+    if (!result) continue;
+    var order = result.order != null ? result.order : (i + 1);
+    try {
+      apiClient.reportDMSend({
+        conversation_id: conversationId,
+        task_id: (params && params.task_id) || null,
+        dm_sequence_id: (params && params.dm_sequence_id) || null,
+        message_order: order,
+        message_key: this._buildDMMessageKey(conversationId, params, order),
+        stage: stage,
+        intent: intent,
+        keyword: keyword,
+        content: result.content || "",
+        status: result.status || "sent",
+        error_message: result.error_message || null
+      });
+      reported++;
+    } catch (e) {
+      logger.warn(TAG, "DM发送结果上报失败: " + e.message);
+    }
+  }
+  return reported;
+};
+
+SearchBaseHandler._buildDMFailureResults = function (messages, keyword, errorMessage) {
+  var results = [];
+  if (!messages) return results;
+  for (var i = 0; i < messages.length; i++) {
+    var msg = messages[i] || {};
+    var order = msg.order != null ? msg.order : (i + 1);
+    var content = this.applyVariables(msg.content || "", {keyword: keyword || ""});
+    results.push({
+      order: order,
+      content: content,
+      status: "failed",
+      error_message: errorMessage,
+      sent_at: new Date().toISOString()
+    });
+  }
+  return results;
+};
+
 SearchBaseHandler._sendMessageSequence = function (messages, stats, keyword) {
-  var sentCount = 0;
+  var results = [];
   var antiDetect = require("../core/anti-detect");
   antiDetect._skipDisabled = true;
   try {
     for (var i = 0; i < messages.length; i++) {
-    var msg = messages[i];
-    var content = this.applyVariables(msg.content, {keyword: keyword || ""});
-    var inputOk = this.safeInput("dm_input", content);
-    if (!inputOk) {
-      logger.warn(TAG, "DM序列[" + (i + 1) + "/" + messages.length + "]输入失败，跳过本条");
-      continue;
-    }
-    sleep(500);
-    var sendBtn = uiOperator.findElement("dm_send", 3000);
-    if (!sendBtn) {
-      logger.warn(TAG, "DM序列[" + (i + 1) + "/" + messages.length + "]发送按钮未找到，本条未发送");
-      continue;
-    }
-    uiOperator.clickElement(sendBtn);
-    sleep(1000);
-    var sendFailed = !!uiOperator.findElement("dm_send_failed", 2000, true);
-    if (sendFailed) {
-      logger.warn(TAG, "DM序列[" + (i + 1) + "/" + messages.length + "]发送失败，停止向该用户发送后续私信");
-      break;
-    }
-    sentCount++;
-    var extraDelay = msg.delay_ms != null ? msg.delay_ms : (Math.floor(Math.random() * 3000) + 2000);
-    sleep(extraDelay);
-    stats.details.push("dm_sent[" + (i + 1) + "/" + messages.length + "]: "
-      + content.substring(0, 30));
+      var msg = messages[i] || {};
+      var order = msg.order != null ? msg.order : (i + 1);
+      var content = this.applyVariables(msg.content || "", {keyword: keyword || ""});
+      var inputOk = this.safeInput("dm_input", content);
+      if (!inputOk) {
+        logger.warn(TAG, "DM序列[" + (i + 1) + "/" + messages.length + "]输入失败，跳过本条");
+        results.push({ order: order, content: content, status: "failed", error_message: "输入失败", sent_at: new Date().toISOString() });
+        continue;
+      }
+      sleep(500);
+      var sendBtn = uiOperator.findElement("dm_send", 3000);
+      if (!sendBtn) {
+        logger.warn(TAG, "DM序列[" + (i + 1) + "/" + messages.length + "]发送按钮未找到，本条未发送");
+        results.push({ order: order, content: content, status: "failed", error_message: "发送按钮未找到", sent_at: new Date().toISOString() });
+        continue;
+      }
+      uiOperator.clickElement(sendBtn);
+      sleep(1000);
+      var sendFailed = !!uiOperator.findElement("dm_send_failed", 2000, true);
+      if (sendFailed) {
+        logger.warn(TAG, "DM序列[" + (i + 1) + "/" + messages.length + "]发送失败，停止向该用户发送后续私信");
+        results.push({ order: order, content: content, status: "failed", error_message: "发送失败", sent_at: new Date().toISOString() });
+        break;
+      }
+      results.push({ order: order, content: content, status: "sent", error_message: null, sent_at: new Date().toISOString() });
+      var extraDelay = msg.delay_ms != null ? msg.delay_ms : (Math.floor(Math.random() * 3000) + 2000);
+      sleep(extraDelay);
+      if (stats && stats.details) {
+        stats.details.push("dm_sent[" + (i + 1) + "/" + messages.length + "]: " + content.substring(0, 30));
+      }
     }
   } finally {
     antiDetect._skipDisabled = false;
   }
-  return sentCount;
+  return results;
 };
-
 module.exports = SearchBaseHandler;

@@ -29,7 +29,7 @@
 
 ```mermaid
 flowchart LR
-  Web["Vue 管理后台\nlocalhost:3000"] -->|"REST / SSE / WS"| Server["FastAPI 服务端\nlocalhost:8000"]
+  Web["Vue 管理后台\nlocalhost:3000"] -->|"REST / SSE / WS"| Server["FastAPI 服务端\nlocalhost:8001"]
   Device["Android AutoJS6 设备端"] -->|"HTTP poll / report"| Server
   Server -->|"WS 推送"| Device
   Server --> DB[("SQLite / MySQL")]
@@ -122,9 +122,9 @@ python app/main.py
 
 服务端默认监听：
 
-- API: `http://localhost:8000`
-- OpenAPI: `http://localhost:8000/docs`
-- 基础健康检查: `GET http://localhost:8000/health`
+- API: `http://localhost:8001`
+- OpenAPI: `http://localhost:8001/docs`
+- 基础健康检查: `GET http://localhost:8001/health`
 
 服务端启动时会执行：
 
@@ -138,7 +138,7 @@ python app/main.py
 
 ```powershell
 cd server
-uvicorn app.main:app --host 0.0.0.0 --port 8000
+uvicorn app.main:app --host 0.0.0.0 --port 8001
 ```
 
 ### 3. 启动前端
@@ -152,11 +152,11 @@ npm run dev
 前端默认地址：
 
 - Web: `http://localhost:3000`
-- Vite dev server 会把 `/api` 和 WebSocket 请求代理到 `http://localhost:8000`
+- Vite dev server 会把 `/api` 和 WebSocket 请求代理到 `http://localhost:8001`
 - 如需改后端地址，设置 `VITE_API_PROXY_TARGET`
 
 ```powershell
-$env:VITE_API_PROXY_TARGET = "http://localhost:8000"
+$env:VITE_API_PROXY_TARGET = "http://localhost:8001"
 npm run dev
 ```
 
@@ -171,7 +171,7 @@ npm run dev
 
 基本流程：
 
-1. 确保服务端可被手机访问，例如电脑局域网 IP `http://192.168.x.x:8000`。
+1. 确保服务端可被手机访问，例如电脑局域网 IP `http://192.168.x.x:8001`。
 2. 将 `device/` 脚本导入 AutoJS6，入口为 `device/main.js`。
 3. 首次运行时设备端显示配对界面，输入服务端地址。
 4. 在管理后台设备页面审批配对。
@@ -196,7 +196,7 @@ python .\_pack_device.py
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
 | `HOST` | `0.0.0.0` | 服务端监听地址 |
-| `PORT` | `8000` | 服务端监听端口 |
+| `PORT` | `8001` | 服务端监听端口 |
 | `DEBUG` | `true` | 调试模式 |
 | `DATABASE_URL` | `sqlite:///server/app/data/dy_auto.db` | 数据库连接；生产可切 MySQL |
 | `DEVICE_SECRET` | `change-me-to-a-random-string` | 设备配对/通信密钥，生产必须修改 |
@@ -301,7 +301,7 @@ node device/test/human-input.node-test.js
 常用健康检查：
 
 ```powershell
-Invoke-RestMethod http://localhost:8000/health
+Invoke-RestMethod http://localhost:8001/health
 ```
 
 登录后可访问真实 provider readiness：
@@ -374,7 +374,7 @@ alembic upgrade head
 
 确认：
 
-- 服务端已启动在 `http://localhost:8000`。
+- 服务端已启动在 `http://localhost:8001`。
 - Vite proxy 目标正确，必要时设置 `VITE_API_PROXY_TARGET`。
 - 浏览器请求路径以 `/api` 开头时由 Vite 代理转发。
 
@@ -390,10 +390,10 @@ alembic upgrade head
 
 确认：
 
-- 手机能访问电脑局域网 IP 和端口，例如 `http://192.168.x.x:8000`。
+- 手机能访问电脑局域网 IP 和端口，例如 `http://192.168.x.x:8001`。
 - `DEVICE_SECRET` 与服务端一致。
 - 管理后台已审批配对请求。
-- 防火墙没有阻止 8000 端口。
+- 防火墙没有阻止 8001 端口。
 
 ### 设备脚本运行异常
 

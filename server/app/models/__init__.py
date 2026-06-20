@@ -641,11 +641,16 @@ class DMClaimRecipientResponse(BaseModel):
 
 class DMSendReportRequest(BaseModel):
     conversation_id: str
+    task_id: str | None = None
     stage: str = "qualifying"
     intent: str | None = None
     keyword: str | None = None
     content: str
-
+    dm_sequence_id: str | None = None
+    message_order: int | None = None
+    message_key: str | None = None
+    status: str = "sent"
+    error_message: str | None = None
 
 class DMReleaseRecipientRequest(BaseModel):
     conversation_id: str
@@ -664,4 +669,13 @@ from app.models.script import (
     SceneOutlineList,
     VisualShot,
     VisualShotList,
+)
+from app.models.asset_anchor import (
+    AnchorProviderPayload,
+    AnchorReferenceImage,
+    AnchorReferenceMode,
+    AnchorStatus,
+    CharacterAnchor,
+    ComposedShotPrompt,
+    SceneAnchor,
 )

@@ -23,6 +23,8 @@ describe('AutoRepairTaskList', () => {
 
     expect(wrapper.text()).toContain('分镜参考信息缺失')
     expect(wrapper.text()).toContain('分镜缺少角色参考图')
+    expect(wrapper.text()).toContain('完成返修后重新进入质量门')
+    expect(wrapper.text()).not.toContain('等待下一步处理')
     expect(wrapper.text()).toContain('重试返修')
     expect(wrapper.text()).not.toMatch(/瀹歌尪|闁|閸|锟|\?{3,}/)
 

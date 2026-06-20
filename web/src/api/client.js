@@ -36,14 +36,18 @@ export function handleUnauthorizedResponse() {
 client.interceptors.response.use(
   (response) => response,
   (error) => {
+    const config = error.config || {}
+    const silent = config.silent === true
     // 401 → redirect to login
     if (error.response && error.response.status === 401) {
-      handleUnauthorizedResponse()
+      if (!silent && config.skipAuthRedirect !== true) {
+        handleUnauthorizedResponse()
+      }
       return Promise.reject(error)
     }
 
     // All other errors → show toast
-    if (_toastHandler) {
+    if (_toastHandler && !silent && config.skipGlobalErrorToast !== true) {
       const data = error.response?.data
       const message = data?.detail || data?.message || (error.response ? `请求失败 (${error.response.status})` : '网络连接失败，请检查网络')
       _toastHandler(message)

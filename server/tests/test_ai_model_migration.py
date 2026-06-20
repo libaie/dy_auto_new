@@ -62,7 +62,11 @@ def test_migration_returns_result_structure(client, db):
 
 
 def test_seedance_env_migration_uses_ark_plan_v3(client, db, monkeypatch):
+    import app.config as config
+
+    monkeypatch.delenv("AI_API_KEY", raising=False)
     monkeypatch.setenv("SEEDANCE_API_KEY", "test-seedance-key")
+    monkeypatch.setattr(config, "PIXELLE_VIDEO_URL", "http://localhost:8500")
 
     result = migrate_legacy_settings(db)
 

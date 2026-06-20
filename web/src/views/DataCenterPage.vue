@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { listComments, listUsers, listConversations } from '../api/data.js'
+import { listComments, listUsers, listConversations, getConversation } from '../api/data.js'
 import { listAccounts } from '../api/accounts.js'
 import { useToastStore } from '../stores/toast.js'
 import { useWebSocket } from '../composables/useWebSocket.js'
@@ -39,6 +39,45 @@ const sortOrder = ref('desc')
 // Ref data
 const accounts = ref([])
 const newDataBadge = ref({ comments: 0, users: 0, conversations: 0 })
+
+const conversationDetailOpen = ref(false)
+const conversationDetailLoading = ref(false)
+const conversationDetailError = ref('')
+const selectedConversation = ref(null)
+const conversationMessages = ref([])
+const conversationHistoryIncomplete = ref(false)
+const conversationFailedCount = computed(() => conversationMessages.value.filter(m => m.status === 'failed').length)
+
+function messageStatusLabel(status) {
+  return status === 'failed' ? '失败' : '已发送'
+}
+
+function messageStatusClass(status) {
+  return status === 'failed' ? 'bg-rose-500/15 text-rose-300' : 'bg-emerald-500/15 text-emerald-300'
+}
+
+async function openConversationDetail(conv) {
+  selectedConversation.value = conv
+  conversationMessages.value = []
+  conversationHistoryIncomplete.value = false
+  conversationDetailError.value = ''
+  conversationDetailOpen.value = true
+  conversationDetailLoading.value = true
+  try {
+    const resp = await getConversation(conv.id)
+    selectedConversation.value = resp.data.conversation || conv
+    conversationMessages.value = resp.data.messages || []
+    conversationHistoryIncomplete.value = !!resp.data.history_incomplete
+  } catch {
+    conversationDetailError.value = '详情加载失败'
+  } finally {
+    conversationDetailLoading.value = false
+  }
+}
+
+function closeConversationDetail() {
+  conversationDetailOpen.value = false
+}
 
 // URL sync
 watch(() => route.query.tab, (val) => {
@@ -432,6 +471,13 @@ onMounted(async () => {
             <span class="text-slate-400 truncate">{{ [user.intended_province, user.intended_city, user.intended_attraction].filter(Boolean).join(' · ') }}</span>
           </div>
 
+          <div v-if="user.source_comment_content"
+               class="mx-4 mb-3 px-3 py-2 rounded-lg text-xs"
+               style="background: rgba(14,165,233,0.06); border: 1px solid rgba(14,165,233,0.1);">
+            <p class="text-[10px] text-slate-500 mb-1">入口评论</p>
+            <p class="text-slate-300 leading-relaxed break-words max-h-10 overflow-hidden">{{ user.source_comment_content }}</p>
+          </div>
+
           <!-- Footer: Meta -->
           <div class="flex items-center gap-2 text-[11px] text-slate-500 px-4 py-2.5 border-t" style="border-color: rgba(255,255,255,0.04);">
             <span v-if="user.gender || user.age" class="inline-flex items-center gap-1">
@@ -461,7 +507,7 @@ onMounted(async () => {
         <p class="text-sm text-slate-500">暂无私信数据</p>
       </div>
       <div v-else class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <div v-for="conv in items" :key="conv.id" class="card p-4 hover:border-sky-500/30 transition-colors cursor-default">
+        <div v-for="conv in items" :key="conv.id" data-testid="conversation-card" role="button" tabindex="0" @click="openConversationDetail(conv)" @keydown.enter="openConversationDetail(conv)" class="card p-4 hover:border-sky-500/30 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-sky-500/40">
           <div class="flex items-center justify-between mb-3">
             <div class="flex items-center gap-3 min-w-0">
               <div class="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0" style="background: linear-gradient(135deg, #06b6d4, #3b82f6);">
@@ -485,6 +531,67 @@ onMounted(async () => {
       </div>
     </div>
 
+    <div v-if="conversationDetailOpen" class="fixed inset-0 z-50 flex justify-end">
+      <div class="absolute inset-0 bg-slate-950/60" @click="closeConversationDetail"></div>
+      <aside class="relative h-full w-full max-w-xl overflow-y-auto border-l p-5 shadow-2xl" style="background: var(--bg-page); border-color: var(--border-default);">
+        <div class="flex items-start justify-between gap-4 mb-5">
+          <div class="min-w-0">
+            <p class="text-xs text-slate-500 mb-1">私信会话</p>
+            <h2 class="text-lg font-semibold text-white truncate">{{ selectedConversation?.recipient_nickname || '未知收件人' }}</h2>
+            <p class="text-xs text-slate-500 font-mono truncate">{{ selectedConversation?.recipient_douyin_id || '-' }}</p>
+          </div>
+          <button @click="closeConversationDetail" class="shrink-0 rounded-lg border px-2.5 py-1.5 text-sm text-slate-300 hover:bg-white/5" style="border-color: var(--border-default);">关闭</button>
+        </div>
+
+        <div v-if="selectedConversation" class="grid grid-cols-3 gap-2 mb-5 text-xs">
+          <div class="rounded-lg border p-3" style="border-color: var(--border-subtle); background: var(--bg-surface);">
+            <p class="text-slate-500 mb-1">阶段</p>
+            <span class="px-2 py-0.5 rounded-full font-medium" :class="stageBadgeClass(selectedConversation.current_stage)">{{ stageLabel(selectedConversation.current_stage) }}</span>
+          </div>
+          <div class="rounded-lg border p-3" style="border-color: var(--border-subtle); background: var(--bg-surface);">
+            <p class="text-slate-500 mb-1">成功</p>
+            <p class="text-slate-200 font-semibold">{{ selectedConversation.total_dm_count || 0 }} 条</p>
+          </div>
+          <div class="rounded-lg border p-3" style="border-color: var(--border-subtle); background: var(--bg-surface);">
+            <p class="text-slate-500 mb-1">失败</p>
+            <p class="text-rose-300 font-semibold">{{ conversationFailedCount }} 条</p>
+          </div>
+        </div>
+
+        <div v-if="conversationDetailError" class="mb-4 rounded-lg border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
+          {{ conversationDetailError }}
+        </div>
+        <div v-if="conversationHistoryIncomplete" class="mb-4 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
+          历史会话，仅保留最后一条摘要
+        </div>
+
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-sm font-semibold text-slate-200">消息流水</h3>
+          <span class="text-xs text-slate-500">{{ conversationMessages.length }} 条</span>
+        </div>
+
+        <div v-if="conversationDetailLoading" class="py-12 text-center text-sm text-slate-500">加载中...</div>
+        <div v-else-if="conversationMessages.length === 0" class="py-12 text-center text-sm text-slate-500">暂无消息流水</div>
+        <div v-else class="space-y-3">
+          <div v-for="message in conversationMessages" :key="message.id || message.message_key || message.message_order" class="rounded-lg border p-3" style="border-color: var(--border-subtle); background: var(--bg-surface);">
+            <div class="flex items-center justify-between gap-3 mb-2">
+              <div class="flex items-center gap-2 min-w-0">
+                <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-sky-500/15 text-xs font-semibold text-sky-300">{{ message.message_order || '-' }}</span>
+                <span class="truncate text-xs text-slate-500">{{ message.dm_sequence_id || 'single' }}</span>
+              </div>
+              <span class="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium" :class="messageStatusClass(message.status)">{{ messageStatusLabel(message.status) }}</span>
+            </div>
+            <p class="whitespace-pre-wrap break-words text-sm leading-6 text-slate-200">{{ message.content }}</p>
+            <div class="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+              <span>{{ message.sent_at ? formatDate(message.sent_at) : '-' }}</span>
+              <span v-if="message.task_id" class="font-mono">任务 {{ message.task_id }}</span>
+              <span v-if="message.device_id" class="font-mono">设备 {{ message.device_id }}</span>
+            </div>
+            <p v-if="message.error_message" class="mt-2 text-xs text-rose-300">{{ message.error_message }}</p>
+          </div>
+        </div>
+      </aside>
+    </div>
     <!-- Pagination -->
     <div v-if="total > pageSize" class="flex items-center justify-between mt-6">
       <span class="text-sm text-slate-500">共 {{ total }} 条</span>

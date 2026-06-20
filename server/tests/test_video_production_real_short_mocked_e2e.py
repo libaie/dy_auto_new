@@ -258,7 +258,7 @@ def test_real_short_e2e_requires_human_image_video_and_final_gates(db, monkeypat
     assert run.status == "completed"
 
 
-def test_real_short_e2e_autopilot_completes_without_human_review_when_audit_model_missing(db, monkeypatch):
+def test_real_short_e2e_autopilot_stops_for_final_human_review_when_audit_model_missing(db, monkeypatch):
     submitted = {"image": {}, "video": {}, "compose": {}}
 
     class FakeAgencyOrchestrator:
@@ -435,6 +435,22 @@ def test_real_short_e2e_autopilot_completes_without_human_review_when_audit_mode
     run = db.query(VideoProductionRun).filter_by(id=run_id).one()
     episode = db.query(Episode).filter_by(id=episode_id).one()
     final_asset = db.query(VideoProductionAsset).filter_by(run_id=run_id, asset_type="final_video").one()
+    assert final_asset.status == "review_pending"
+    assert db.query(GeneratedVideo).filter_by(pixelle_task_id=run_id).count() == 0
+    assert episode.video_url is None
+    assert episode.status != "done"
+    assert run.status == "final_review_pending"
+
+    approve_final = client.post(
+        f"/api/video-production/assets/{final_asset.id}/review",
+        json={"action": "approve", "comment": "final human approval"},
+    )
+    assert approve_final.status_code == 200
+
+    db.expire_all()
+    run = db.query(VideoProductionRun).filter_by(id=run_id).one()
+    episode = db.query(Episode).filter_by(id=episode_id).one()
+    final_asset = db.query(VideoProductionAsset).filter_by(id=final_asset.id).one()
     assert final_asset.status == "approved"
     assert db.query(GeneratedVideo).filter_by(pixelle_task_id=run_id).count() == 1
     assert episode.video_url == "output/final-autopilot.mp4"

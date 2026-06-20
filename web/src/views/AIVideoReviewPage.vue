@@ -309,6 +309,7 @@ import {
   syncAssetRegeneration,
   syncImageStage,
   runRealWorkerStep,
+  retryProductionSegment,
   imageEditProductionAsset,
   voidProductionAsset,
 } from '../api/videoProduction.js'
@@ -703,7 +704,14 @@ async function regenerate() {
   if (!selected.value) return
   acting.value = true
   try {
-    await startAssetRegeneration(selected.value.id)
+    if (isRealShortRun.value) {
+      if (!selected.value.production_segment_id) {
+        throw new Error('当前素材缺少片段绑定，请返回生产监控台处理返修')
+      }
+      await retryProductionSegment(selected.value.production_segment_id)
+    } else {
+      await startAssetRegeneration(selected.value.id)
+    }
     await load()
   } catch (e) {
     error.value = e.response?.data?.detail || e.message || '启动重生成失败'

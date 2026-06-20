@@ -6,8 +6,7 @@ const prompt = ref('')
 const aspectRatio = ref('9:16')
 const duration = ref(5)
 const resolution = ref('720p')
-const imageFiles = ref([])
-const imagePreviews = ref([])
+const imageUrlText = ref('')
 
 const generating = ref(false)
 const progress = ref({ percent: 0, message: '' })
@@ -22,10 +21,11 @@ const ratios = [
   { value: '4:3', label: '4:3' },
 ]
 
-function handleImages(e) {
-  const files = Array.from(e.target.files || [])
-  imageFiles.value = files
-  imagePreviews.value = files.map(f => URL.createObjectURL(f))
+function imageUrls() {
+  return imageUrlText.value
+    .split(/[\n,]/)
+    .map((item) => item.trim())
+    .filter(Boolean)
 }
 
 async function handleGenerate() {
@@ -42,11 +42,8 @@ async function handleGenerate() {
       aspect_ratio: aspectRatio.value,
       duration: duration.value,
       resolution: resolution.value,
-      image_urls: [],
+      image_urls: imageUrls(),
     }
-
-    // 如果有上传图片，先占位；实际需上传到可公网访问的 URL 后填入
-    // 注：Seedance 的 image_url 需要公网可访问的 URL，后续可扩展上传功能
 
     const resp = await seedanceGenerate(payload)
     if (!resp.data?.ok) {
@@ -103,13 +100,10 @@ async function handleGenerate() {
             class="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm resize-none"/>
         </div>
         <div>
-          <label class="block text-xs text-slate-400 mb-1">参考图片 (可选)</label>
-          <input type="file" multiple accept="image/*" @change="handleImages"
-            class="w-full text-xs text-slate-400 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:text-xs file:bg-emerald-500/20 file:text-emerald-300 file:border-0"/>
-          <div v-if="imagePreviews.length" class="flex gap-2 mt-2 overflow-x-auto">
-            <img v-for="(url, i) in imagePreviews" :key="i" :src="url" class="w-16 h-16 object-cover rounded-lg"/>
-          </div>
-          <p class="text-[11px] text-slate-500 mt-1">图生视频模式，图片需上传至公网 URL 后填入（后续支持）</p>
+          <label class="block text-xs text-slate-400 mb-1">参考图片 URL (可选)</label>
+          <textarea v-model="imageUrlText" rows="3" placeholder="每行一个可公网访问的图片 URL"
+            class="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm resize-none"/>
+          <p class="text-[11px] text-slate-500 mt-1">Seedance 图生视频需要公网可访问的图片 URL</p>
         </div>
       </div>
     </div>

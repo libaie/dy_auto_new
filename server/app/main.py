@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 
-from app.config import bj_now
+from app.config import HOST, PORT, bj_now
 from app.database import get_db, init_db, SessionLocal
 from app.seed import seed_all
 from app.domains.account_operations import accounts_router, account_groups_router, chains_router, channels_router
@@ -43,6 +43,21 @@ from app.domains.task_operations import tasks_router
 from app.domains.video_production import video_production_router
 from app.domains.video_library import videos_router
 from app.services.ai_generator import ai_generator
+
+
+def _one_sentence_reference_check_due(run, now=None) -> bool:
+    from datetime import datetime
+
+    trace = dict((run.model_trace_json or {}).get("one_sentence") or {})
+    reference_trace = trace.get("reference_generation") if isinstance(trace.get("reference_generation"), dict) else {}
+    next_check_at = reference_trace.get("next_reference_check_at")
+    if not next_check_at:
+        return True
+    try:
+        due_at = datetime.fromisoformat(str(next_check_at))
+    except ValueError:
+        return True
+    return due_at <= (now or bj_now())
 
 
 async def _style_lock_worker(interval_seconds: float | None = None, batch_size: int | None = None):
@@ -150,6 +165,8 @@ async def _one_sentence_reference_worker(interval_seconds: float | None = None, 
                 .all()
             )
             for run in runs:
+                if not _one_sentence_reference_check_due(run):
+                    continue
                 trace = dict((run.model_trace_json or {}).get("one_sentence") or {})
                 autostart = bool(trace.get("autostart_images_after_references"))
                 try:
@@ -281,4 +298,4 @@ def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host=HOST, port=PORT)

@@ -23,6 +23,10 @@ SearchCollectHandler._beforeSearch = function (params) {
   this._currentDest = aiAnalyzer.resolveDestination(params.keyword);
 };
 
+SearchCollectHandler._prepareAnalyzer = function (params) {
+  aiAnalyzer.useTemplate(params.prompt_template_id, "general");
+};
+
 SearchCollectHandler._initStats = function (params) {
   return { success_count: 0, fail_count: 0, details: [],
     _taskId: params.task_id || "", _keyword: params.keyword || "" };
@@ -53,18 +57,21 @@ SearchCollectHandler._processComments = function (params, stats, videoIndex) {
   var taskId = params.task_id || "";
   var maxComments = (params.count === -1) ? Infinity : (params.count || 50);
   var maxAgeSecs;
+  var maxAgeLabel;
   if (params.max_age_seconds !== undefined && params.max_age_seconds !== null) {
     maxAgeSecs = params.max_age_seconds;
+    maxAgeLabel = (maxAgeSecs === -1) ? "不限" : (maxAgeSecs + " 秒");
   } else {
     var days = params.max_age_days;
     if (days === undefined || days === null) days = 30;
     maxAgeSecs = (days === -1) ? -1 : days * 86400;
+    maxAgeLabel = (days === -1) ? "不限" : (days + " 天");
   }
   var maxAgeMs = (maxAgeSecs === -1) ? Infinity : maxAgeSecs * 1000;
   var now = new Date();
   var cutoff = (maxAgeMs === Infinity) ? new Date(0) : new Date(now.getTime() - maxAgeMs);
 
-  var dataSourceType = uiOperator.findElement("is_shopping_cart", 500) ? 1 : 0;
+  var dataSourceType = uiOperator.findElement("is_shopping_cart", 500, true) ? 1 : 0;
   logger.info(TAG, "[耗时] 数据来源类型: " + (dataSourceType === 1 ? "带货视频" : "普通视频"));
 
   var collected = 0;
@@ -74,6 +81,7 @@ SearchCollectHandler._processComments = function (params, stats, videoIndex) {
   var consecutiveOld = 0;
   var scroll = 0;
   var reopenFailed = false;
+  var lastScreenSignature = "";
   var t0 = Date.now();
 
   while (true) {
@@ -82,7 +90,7 @@ SearchCollectHandler._processComments = function (params, stats, videoIndex) {
       break;
     }
     if (consecutiveOld >= 5) {
-      logger.info(TAG, "[耗时] 连续 " + consecutiveOld + " 轮评论日期均超过 " + maxAgeDays + " 天, 停止");
+      logger.info(TAG, "[耗时] 连续 " + consecutiveOld + " 轮评论日期均超过 " + maxAgeLabel + ", 停止");
       break;
     }
 
@@ -96,6 +104,7 @@ SearchCollectHandler._processComments = function (params, stats, videoIndex) {
     var localSkipped = 0;
     var aiSkipped = 0;
     var dupSkipped = 0;
+    var screenKeys = [];
     var tScrollStart = Date.now();
 
     for (var i = 0; i < items.length; i++) {
@@ -103,6 +112,9 @@ SearchCollectHandler._processComments = function (params, stats, videoIndex) {
       var tItem = Date.now();
       var comment = commentUtils.parseCommentItem(items[i], this);
       if (!comment) { logger.debug(TAG, "  [" + i + "] 解析失败 (" + (Date.now() - tItem) + "ms)"); continue; }
+      var commentText = comment.text || "";
+      var dedupKey = comment.nickname + "|" + commentText.substring(0, 80);
+      screenKeys.push(dedupKey);
       if (comment.isAuthor) { logger.debug(TAG, "  [" + i + "] 作者评论，跳过"); continue; }
       if (!commentUtils.localPreFilter(comment.text)) {
         localSkipped++;
@@ -123,7 +135,6 @@ SearchCollectHandler._processComments = function (params, stats, videoIndex) {
         continue;
       }
 
-      var dedupKey = comment.nickname + "|" + comment.text.substring(0, 80);
       if (seenComments[dedupKey]) { dupSkipped++; continue; }
       seenComments[dedupKey] = true;
 
@@ -140,7 +151,7 @@ SearchCollectHandler._processComments = function (params, stats, videoIndex) {
       if (!visitedUsers[comment.nickname]) {
         visitedUsers[comment.nickname] = true;
         try {
-          userData = this._collectUserData(items[i]);
+          userData = this._collectUserData(items[i], comment);
         } catch (e) { logger.warn(TAG, "用户数据采集失败: " + e.message); }
         needReopen = true;
       }
@@ -169,6 +180,13 @@ SearchCollectHandler._processComments = function (params, stats, videoIndex) {
 
     logger.info(TAG, "[耗时] ══ 第 " + scroll + " 轮完成: 符合=" + validThisScroll + " AI淘汰=" + aiSkipped + " 过期=" + oldThisScroll + " 本地淘汰=" + localSkipped + " 重复=" + dupSkipped);
 
+    var screenSignature = screenKeys.join("||");
+    if (screenSignature && screenSignature === lastScreenSignature && validThisScroll === 0 && oldThisScroll === 0) {
+      logger.info(TAG, "[耗时] 可见评论未变化，停止当前视频采集");
+      break;
+    }
+    lastScreenSignature = screenSignature;
+
     if (validThisScroll === 0 && oldThisScroll === 0) {
       consecutiveEmpty = aiSkipped > 0 ? 0 : consecutiveEmpty + 1;
       consecutiveOld = 0;
@@ -184,7 +202,7 @@ SearchCollectHandler._processComments = function (params, stats, videoIndex) {
     uiOperator.swipeUp();
     sleep(500);
 
-    if (uiOperator.findElement("is_comment_end", 500)) {
+    if (uiOperator.findElement("is_comment_end", 500, true)) {
       logger.info(TAG, "[耗时] 评论已到底(is_comment_end), 停止 (第 " + scroll + " 次滚动)");
       break;
     }
@@ -239,7 +257,7 @@ SearchCollectHandler._collectCommentData = function (item, comment) {
   return data;
 };
 
-SearchCollectHandler._collectUserData = function (item) {
+SearchCollectHandler._collectUserData = function (item, comment) {
   var avatarEl = this._findChildBySelector(item, "comment_author_avatar");
   if (!avatarEl) { logger.warn(TAG, "头像未找到"); return null; }
   if (avatarEl.isImage || avatarEl.isCoordinate) { logger.warn(TAG, "头像为虚拟元素"); return null; }
@@ -254,9 +272,15 @@ SearchCollectHandler._collectUserData = function (item) {
       press(b.centerX(), b.centerY(), 80);
     }
   } catch (e) { logger.warn(TAG, "头像点击失败"); return null; }
-  sleep(1700);
+  if (uiOperator.waitForPage && !uiOperator.waitForPage("is_user_view", 5000)) {
+    logger.warn(TAG, "点击头像后未检测到主页，继续尝试采集可见字段");
+  }
+  sleep(500);
 
-  var data = commentUtils.collectProfileData({ uploadAvatar: false });
+  var data = commentUtils.collectProfileData({
+    uploadAvatar: false,
+    fallbackNickname: comment && comment.nickname,
+  });
 
   if (avatarBase64 && data && data.douyin_id) {
     try { apiClient.uploadUserAvatar(data.douyin_id, avatarBase64); } catch (e) {}

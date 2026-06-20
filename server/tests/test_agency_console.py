@@ -8,7 +8,7 @@ from sqlalchemy.orm import sessionmaker
 from fastapi.testclient import TestClient
 from app.deps import verify_admin_token
 from app.main import app
-from app.db_models import AgencyExpertInvocation, AIModel, Episode, Series, PipelineRun, VideoProductionRun
+from app.db_models import AgencyCreativePatch, AgencyExpertInvocation, AIModel, Episode, Series, PipelineRun, VideoProductionRun
 from app.services.agency_runtime import AgencyRuntimeResult
 from app.services.agency_orchestrator import STAGE_DAG
 from app.services.crypto import encrypt
@@ -50,6 +50,14 @@ async def _agency_pass(self, **kwargs):
             "findings": [],
             "recommendations": ["继续下一阶段"],
             "required_changes": [],
+            "scorecard": {
+                "overall_score": 95,
+                "pass_threshold": 80,
+                "verdict": "pass",
+                "dimensions": [{"key": "quality", "score": 95, "threshold": 80}],
+                "repair_intent": "none",
+                "confidence": 0.9,
+            },
         },
         evidence=[],
         token_usage={},
@@ -107,6 +115,7 @@ def test_agency_console_returns_pending_steps_without_style_lock(db):
     stage_graph = data["stage_graph"]
     assert [node["stage"] for node in stage_graph] == list(STAGE_DAG)
     assert {node["stage"]: node["label"] for node in stage_graph} == {
+        "story_planning": "故事规划",
         "style_lock": "\u98ce\u683c\u9501\u5b9a",
         "storyboard": "\u5206\u955c\u811a\u672c",
         "image_stage": "\u56fe\u50cf\u751f\u6210",
@@ -138,6 +147,100 @@ def test_agency_console_returns_pending_steps_without_style_lock(db):
     assert "compose_quality_reviewer" in [role["id"] for role in data["agency_team"]["quality_roles"]]
     assert data["production_steps"][0]["id"] == "input"
     assert any(step["id"] == "style_lock" and step["status"] == "pending" for step in data["production_steps"])
+
+
+def test_agency_console_surfaces_style_lock_trace_error_in_decision_log(db):
+    client = TestClient(app)
+    series = Series(
+        title="City Healer",
+        logline="A doctor solves urban mysteries.",
+        genre="drama",
+        total_episodes=1,
+        target_duration=60,
+        mode="fully_automatic",
+        story_bible_json={
+            "style_lock": {
+                "locked": True,
+                "version": 1,
+                "agency_trace": {
+                    "stage_status": "completed",
+                    "error_code": "STYLE_LOCK_REVIEW_TIMEOUT",
+                    "error_message": "Style lock expert review exceeded 30 seconds.",
+                },
+            },
+        },
+    )
+    db.add(series)
+    db.flush()
+    db.add(Episode(series_id=series.id, episode_number=1, status="pending"))
+    db.commit()
+
+    resp = client.get(f"/api/series/{series.id}/agency-console")
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["agency_trace_status"] == "blocked"
+    assert len(data["decision_log"]) == 1
+    entry = data["decision_log"][0]
+    assert entry["stage"] == "style_lock"
+    assert entry["expert_id"] == "style_lock_quality_reviewer"
+    assert entry["result_status"] == "blocked"
+    assert "风格锁" in entry["decision"]
+    assert entry["required_changes"] == ["检查外部视频服务状态后从失败层重试"]
+    assert "STYLE_LOCK_REVIEW_TIMEOUT" in entry["evidence"]
+    assert entry["next_action"] == "检查外部视频服务状态后从失败层重试"
+
+
+def test_agency_console_includes_creative_patch_summary(db):
+    client = TestClient(app)
+    series = Series(
+        title="City Healer",
+        logline="A doctor solves urban mysteries.",
+        genre="drama",
+        total_episodes=1,
+        target_duration=60,
+    )
+    db.add(series)
+    db.flush()
+    episode = Episode(series_id=series.id, episode_number=1, status="pending")
+    db.add(episode)
+    db.flush()
+    patch = AgencyCreativePatch(
+        series_id=series.id,
+        episode_id=episode.id,
+        stage="storyboard",
+        expert_id="prompt_engineer",
+        patch_type="storyboard_patch",
+        target_type="storyboard_frame",
+        target_id="shot-001",
+        title="强化前三秒",
+        reason="钩子太弱。",
+        before_json={"image_prompt": "原提示"},
+        after_json={"image_prompt": "强钩子提示"},
+        status="proposed",
+        priority="high",
+    )
+    db.add(patch)
+    db.commit()
+
+    resp = client.get(f"/api/series/{series.id}/agency-console")
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["creative_patch_summary"]["total"] == 1
+    assert data["creative_patch_summary"]["blocking"] == 1
+    assert data["creative_patches"] == [{
+        "id": patch.id,
+        "stage": "storyboard",
+        "expert_id": "prompt_engineer",
+        "patch_type": "storyboard_patch",
+        "target_type": "storyboard_frame",
+        "target_id": "shot-001",
+        "title": "强化前三秒",
+        "status": "proposed",
+        "priority": "high",
+        "created_at": patch.created_at.isoformat(),
+    }]
 
 
 def test_agency_console_rejects_non_admin_role(db):

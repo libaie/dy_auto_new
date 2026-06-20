@@ -12,6 +12,12 @@ const mocks = vi.hoisted(() => ({
   startAssetRegeneration: vi.fn(() => Promise.resolve({ data: { ok: true } })),
   syncAssetRegeneration: vi.fn(() => Promise.resolve({ data: { ok: true } })),
   syncImageStage: vi.fn(() => Promise.resolve({ data: { ok: true } })),
+  runRealWorkerStep: vi.fn(() => Promise.resolve({ data: { ok: true } })),
+  imageEditProductionAsset: vi.fn(() => Promise.resolve({ data: { ok: true, asset: { id: 'asset-2' } } })),
+  voidProductionAsset: vi.fn(() => Promise.resolve({ data: { ok: true } })),
+  listAgencyRepairTasks: vi.fn(() => Promise.resolve({ data: { summary: {}, items: [] } })),
+  retryAgencyRepairTask: vi.fn(() => Promise.resolve({ data: { ok: true } })),
+  authorizeAgencyRepairRetry: vi.fn(() => Promise.resolve({ data: { ok: true } })),
 }))
 
 vi.mock('vue-router', () => ({
@@ -28,6 +34,15 @@ vi.mock('../api/videoProduction.js', () => ({
   startAssetRegeneration: mocks.startAssetRegeneration,
   syncAssetRegeneration: mocks.syncAssetRegeneration,
   syncImageStage: mocks.syncImageStage,
+  runRealWorkerStep: mocks.runRealWorkerStep,
+  imageEditProductionAsset: mocks.imageEditProductionAsset,
+  voidProductionAsset: mocks.voidProductionAsset,
+}))
+
+vi.mock('../api/agency.js', () => ({
+  listAgencyRepairTasks: mocks.listAgencyRepairTasks,
+  retryAgencyRepairTask: mocks.retryAgencyRepairTask,
+  authorizeAgencyRepairRetry: mocks.authorizeAgencyRepairRetry,
 }))
 
 function reviewAssetPayload(overrides = {}) {
@@ -72,6 +87,7 @@ describe('AIVideoReviewPage boundary approval gates', () => {
     mocks.getVideoProductionRun.mockResolvedValue({
       data: { ok: true, run: { status: 'image_review_pending', run_type: 'real_short_e2e' } },
     })
+    mocks.listAgencyRepairTasks.mockResolvedValue({ data: { summary: {}, items: [] } })
   })
 
   it.each([

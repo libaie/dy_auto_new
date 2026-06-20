@@ -18,7 +18,7 @@ from app.services.agency_contracts import (
 )
 
 
-CURRENT_ALEMBIC_HEAD = "5f60718293a4"
+CURRENT_ALEMBIC_HEAD = "6a7b8c9d0e1f"
 
 
 def test_agency_invocation_migration_depends_on_control_plane_convergence():

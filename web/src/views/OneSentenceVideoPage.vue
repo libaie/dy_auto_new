@@ -315,11 +315,17 @@ const reviewStatuses = new Set([
   'final_review_pending',
 ])
 const terminalErrorStatuses = new Set(['failed', 'blocked'])
+const REAL_SHORT_MAX_SECONDS = 960
+const MOCK_SCALE_MAX_SECONDS = 28800
 
-const durationBounds = computed(() => ({ min: 60, max: 28800 }))
+const durationBounds = computed(() => (
+  mode.value === 'real_short_e2e'
+    ? { min: 60, max: REAL_SHORT_MAX_SECONDS }
+    : { min: 60, max: MOCK_SCALE_MAX_SECONDS }
+))
 const durationHelp = computed(() => (
   mode.value === 'real_short_e2e'
-    ? '真实模式支持长视频，会拆成多镜头和短片段执行。'
+    ? `当前单次真实生产上限 ${REAL_SHORT_MAX_SECONDS} 秒，会拆成多镜头和短片段执行。`
     : '模拟长剧调度允许长时长，可用于 28800 秒等规模测试。'
 ))
 const modeHelp = computed(() => (
@@ -376,13 +382,13 @@ function setMode(nextMode) {
 
 function clampRealDuration(value) {
   const seconds = Number(value) || 60
-  return Math.min(28800, Math.max(60, seconds))
+  return Math.min(REAL_SHORT_MAX_SECONDS, Math.max(60, seconds))
 }
 
 function submitDuration() {
   const seconds = Number(form.target_duration_seconds) || 60
   if (mode.value === 'real_short_e2e') return clampRealDuration(seconds)
-  return seconds
+  return Math.min(MOCK_SCALE_MAX_SECONDS, Math.max(60, seconds))
 }
 
 function isAfterImage(status) {

@@ -27,6 +27,7 @@ EXPECTED_DATA_ROUTER_SNAPSHOT = [
     ("GET", "/api/data/comments", "list_comments"),
     ("GET", "/api/data/users", "list_users"),
     ("GET", "/api/data/conversations", "list_conversations"),
+    ("GET", "/api/data/conversations/{conversation_id}", "get_conversation"),
     ("GET", "/api/data/export/comments", "export_comments"),
     ("GET", "/api/data/export/users", "export_users"),
     ("GET", "/api/data/export/conversations", "export_conversations"),

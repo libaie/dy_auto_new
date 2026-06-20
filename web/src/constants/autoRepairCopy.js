@@ -33,6 +33,7 @@ export const AUTO_REPAIR_COPY = {
   repairAction: '返修动作',
   expectedResult: '预期结果',
   nextGate: '下一步',
+  repairGate: '完成返修后重新进入质量门',
   costImpact: '成本影响',
   noExtraCost: '不产生额外付费调用',
   recheckPending: '返修后仍需人工复审',

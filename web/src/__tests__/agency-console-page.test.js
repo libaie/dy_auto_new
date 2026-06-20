@@ -1,7 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import AgencyConsolePage from '../views/AgencyConsolePage.vue'
-import { getAgencyExpert } from '../api/agency.js'
+import {
+  applyAgencyCreativePatch,
+  approveAgencyCreativePatch,
+  getAgencyExpert,
+  listAgencyRepairTasks,
+  listAgencyCreativePatches,
+  retryAgencyRepairTask,
+  updateAgencyCreativePatch,
+} from '../api/agency.js'
 import { getAgencyConsole } from '../api/series.js'
 
 const routeState = vi.hoisted(() => ({ query: {} }))
@@ -22,6 +30,47 @@ vi.mock('../api/agency.js', () => ({
       markdown: '# 提示词工程师\n\n负责把故事意图拆解为稳定提示词。',
     },
   })),
+  listAgencyCreativePatches: vi.fn(() => Promise.resolve({
+    data: {
+      summary: { total: 1, blocking: 1, proposed: 1, edited: 0, approved: 0, applied: 0, rejected: 0 },
+      items: [{
+        id: 'patch-1',
+        stage: 'storyboard',
+        patch_type: 'storyboard_patch',
+        target_type: 'storyboard_frame',
+        target_id: 'shot-001',
+        title: '强化前三秒钩子',
+        reason: '原分镜冲突不够强。',
+        before: { image_prompt: '原画面' },
+        after: { image_prompt: '新画面' },
+        status: 'proposed',
+        priority: 'high',
+        source_invocation_id: 'inv-1',
+      }],
+    },
+  })),
+  updateAgencyCreativePatch: vi.fn(() => Promise.resolve({ data: { ok: true } })),
+  approveAgencyCreativePatch: vi.fn(() => Promise.resolve({ data: { ok: true } })),
+  rejectAgencyCreativePatch: vi.fn(() => Promise.resolve({ data: { ok: true } })),
+  applyAgencyCreativePatch: vi.fn(() => Promise.resolve({ data: { ok: true } })),
+  listAgencyRepairTasks: vi.fn(() => Promise.resolve({
+    data: {
+      summary: { total: 1, blocking: 1, queued: 0, running: 0, failed: 1, manual_required: 0, recheck_required: 0 },
+      items: [{
+        id: 'repair-job-1',
+        type: 'storyboard_missing_references',
+        stage: 'image_stage',
+        status: 'failed',
+        reason: '图像阶段参考图缺失',
+        repair_action_label: '去处理图像问题',
+        repair_route: '/ai-video-review?run_id=run-1',
+        affected_ids: ['seg-1'],
+        retry_actions: { retry_enabled: true, primary_label: '重试返修' },
+      }],
+    },
+  })),
+  retryAgencyRepairTask: vi.fn(() => Promise.resolve({ data: { ok: true } })),
+  authorizeAgencyRepairRetry: vi.fn(() => Promise.resolve({ data: { ok: true } })),
 }))
 
 vi.mock('../api/series.js', () => ({
@@ -29,6 +78,7 @@ vi.mock('../api/series.js', () => ({
     data: {
       ok: true,
       series: { id: 'sid', title: '城市疗愈师' },
+      latest_run: { id: 'run-1', status: 'image_review_pending' },
       agency_trace_status: 'failed',
       expert_team: [
         { expert_id: 'narrative_designer', name: '叙事设计师', phases: ['storyboard'], role_type: 'core' },
@@ -120,6 +170,17 @@ vi.mock('../api/series.js', () => ({
         { id: 'style_lock', label: '风格锁定', status: 'completed' },
         { id: 'provider_worker', label: 'Provider Worker', status: 'image_batch_running', summary: 'waiting worker result' },
       ],
+      creative_patch_summary: { total: 1, blocking: 1, proposed: 1, applied: 0 },
+      creative_patches: [{
+        id: 'patch-1',
+        stage: 'storyboard',
+        patch_type: 'storyboard_patch',
+        target_type: 'storyboard_frame',
+        target_id: 'shot-001',
+        title: '强化前三秒钩子',
+        status: 'proposed',
+        priority: 'high',
+      }],
     },
   })),
 }))
@@ -129,6 +190,12 @@ describe('AgencyConsolePage', () => {
     routeState.query = {}
     getAgencyConsole.mockClear()
     getAgencyExpert.mockClear()
+    listAgencyCreativePatches.mockClear()
+    listAgencyRepairTasks.mockClear()
+    retryAgencyRepairTask.mockClear()
+    updateAgencyCreativePatch.mockClear()
+    approveAgencyCreativePatch.mockClear()
+    applyAgencyCreativePatch.mockClear()
   })
 
   it('renders the production command center with Chinese labels only', async () => {
@@ -141,9 +208,14 @@ describe('AgencyConsolePage', () => {
     expect(wrapper.text()).toContain('生产总览')
     expect(wrapper.text()).toContain('阶段流转')
     expect(wrapper.text()).toContain('专家席位')
+    expect(wrapper.text()).toContain('创作补丁')
     expect(wrapper.text()).toContain('进入 3D 专家人物化')
     expect(wrapper.text()).toContain('轨迹失败')
     expect(wrapper.text()).toContain('专家轨迹存在阻断')
+    expect(wrapper.find('[data-test="agency-blocking-message"]').text()).toContain('下方「决策日志」')
+    expect(wrapper.find('[data-test="agency-blocking-message"]').text()).toContain('必须修改')
+    expect(wrapper.find('[data-test="jump-to-decision-log"]').exists()).toBe(true)
+    expect(wrapper.find('#agency-decision-log').exists()).toBe(true)
     expect(wrapper.text()).toContain('风格锁定')
     expect(wrapper.text()).toContain('专家调用拓扑')
     expect(wrapper.text()).toContain('专家席位地图')
@@ -185,6 +257,52 @@ describe('AgencyConsolePage', () => {
     expect(wrapper.text()).not.toContain('Expert Team')
   })
 
+  it('renders the director workbench tab and handles patch actions', async () => {
+    routeState.query = { tab: 'workbench' }
+    const wrapper = mount(AgencyConsolePage)
+    await flushPromises()
+
+    expect(listAgencyCreativePatches).toHaveBeenCalledWith({ series_id: 'sid', run_id: 'run-1' })
+    expect(wrapper.text()).toContain('短视频导演台')
+    expect(wrapper.text()).toContain('创作补丁')
+    expect(wrapper.text()).toContain('强化前三秒钩子')
+    expect(wrapper.text()).toContain('原画面')
+    expect(wrapper.text()).toContain('新画面')
+
+    await wrapper.find('textarea[data-field="image_prompt"]').setValue('人工调整后的画面')
+    await wrapper.find('button[data-action="save"]').trigger('click')
+    await flushPromises()
+    await wrapper.find('button[data-action="approve"]').trigger('click')
+    await flushPromises()
+    await wrapper.find('button[data-action="apply"]').trigger('click')
+    await flushPromises()
+
+    expect(updateAgencyCreativePatch).toHaveBeenCalledWith('patch-1', { after: { image_prompt: '人工调整后的画面' } })
+    expect(approveAgencyCreativePatch).toHaveBeenCalledWith('patch-1')
+    expect(applyAgencyCreativePatch).toHaveBeenCalledWith('patch-1')
+  })
+
+  it('shows concrete auto-repair tasks and can retry them from the command center', async () => {
+    const wrapper = mount(AgencyConsolePage)
+    await flushPromises()
+
+    expect(listAgencyRepairTasks).toHaveBeenCalledWith({
+      series_id: 'sid',
+      run_id: 'run-1',
+      page: 1,
+      page_size: 20,
+    })
+    const repairList = wrapper.find('[data-test="auto-repair-task-list"]')
+    expect(repairList.exists()).toBe(true)
+    expect(repairList.text()).toContain('图像阶段参考图缺失')
+    expect(repairList.text()).toContain('去处理图像问题')
+
+    await repairList.find('button').trigger('click')
+    await flushPromises()
+
+    expect(retryAgencyRepairTask).toHaveBeenCalledWith('repair-job-1')
+  })
+
   it('can open the 3D expert map directly from the expert query tab', async () => {
     routeState.query = { tab: 'experts' }
     const wrapper = mount(AgencyConsolePage)
@@ -219,6 +337,8 @@ describe('AgencyConsolePage', () => {
         expert_invocations: [],
         decision_log: [],
         production_steps: [],
+        creative_patch_summary: { total: 0, blocking: 0 },
+        creative_patches: [],
       },
     })
 

@@ -134,6 +134,8 @@ def test_linked_run_image_frames_are_built_from_segments(db):
 
     run, segments = _linked_run_with_segments(db)
     segment = segments[0]
+    run.storyboard_json = {"frames": [{"frame_id": "shot-1", "negative_prompt": "no text, no logo"}]}
+    db.commit()
 
     frames = image_stage_frames(run, db=db)
 
@@ -144,6 +146,7 @@ def test_linked_run_image_frames_are_built_from_segments(db):
     assert frames[0]["narration"] == segment.narration
     assert frames[0]["reference_urls"] == ["https://example.test/hero-1.png"]
     assert frames[0]["reference_instructions"]
+    assert frames[0]["negative_prompt"] == "no text, no logo"
     assert frames[0]["style_constraints"]["source_version"] == segment.version
 
 
@@ -156,6 +159,7 @@ def test_legacy_run_image_frames_still_use_storyboard(db):
 
     assert frames[0]["frame_id"] == "frame-001"
     assert frames[0]["image_prompt"] == "legacy prompt"
+    assert frames[0]["negative_prompt"] == ""
     assert "production_segment_id" not in frames[0]
 
 
@@ -340,7 +344,7 @@ def test_real_worker_continues_provider_submit_when_deferred_agency_gate_times_o
 
     async def submit_image(db, run_id, episode_id, frames, model_config, template_config=None):
         submitted["frames"] = frames
-        return {"ok": True, "stage_task_id": "image-task-timeout-continue"}
+        return {"ok": True, "stage_task_id": "image-job-timeout-continue"}
 
     async def get_stage_task(db, stage_task_id):
         frame = submitted["frames"][0]
@@ -357,7 +361,7 @@ def test_real_worker_continues_provider_submit_when_deferred_agency_gate_times_o
             "usage": {"cost": 0.01, "units": {"images": 1}},
         }
 
-    monkeypatch.setattr("app.services.production_worker_service.DEFERRED_STAGE_GATE_TIMEOUT_SECONDS", 0.01)
+    monkeypatch.setenv("DY_AUTO_DEFERRED_STAGE_GATE_TIMEOUT_SECONDS", "0.01")
     def fake_runtime_config(db, scene):
         return {
         "provider": "test",
@@ -392,6 +396,68 @@ def test_real_worker_continues_provider_submit_when_deferred_agency_gate_times_o
     assert trace["error_code"] == "DEFERRED_STAGE_REVIEW_TIMEOUT"
     assert db.query(ProductionJob).filter_by(plan_id=run.production_plan_id, stage="image_generation", status="completed").count() == 1
     assert db.query(VideoProductionAsset).filter_by(run_id=run.id, asset_type="image").count() == 1
+
+
+def test_image_job_spec_strips_references_for_text_only_image_model(db, monkeypatch):
+    from app.services.production_worker_service import _image_stage_context_for_model, _job_spec
+
+    run, segments = _linked_run_with_segments(db, count=1, run_type=REAL_SHORT_E2E, budget_limit=1.0)
+    segments[0].image_prompt = (
+        "@Image 1 locks the protagonist face, hairstyle, outfit, and body proportions. "
+        "Hero waits under a red umbrella, no text."
+    )
+    db.add(segments[0])
+    db.flush()
+    job = ProductionJob(
+        plan_id=run.production_plan_id,
+        target_type="production_segment",
+        target_id=segments[0].id,
+        stage="image_generation",
+        status="queued",
+        idempotency_key=f"{run.id}:{segments[0].id}:image_generation:test",
+    )
+    db.add(job)
+    db.commit()
+
+    monkeypatch.setattr(
+        "app.services.production_worker_service.resolve_runtime_model_config",
+        lambda db, scene: {
+            "provider": "qwen-image",
+            "model": "qwen-image-2.0-pro",
+            "config": {
+                "capabilities": {"text_to_image": True, "multi_reference_to_image": False},
+                "limits": {"max_reference_images": 0},
+            },
+        },
+    )
+
+    spec = _job_spec(db, run, job)
+    frame = spec["payload"]["frame"]
+
+    assert frame["reference_urls"] == []
+    assert frame["reference_instructions"] == ""
+    assert "@Image" not in frame["image_prompt"]
+
+    context = _image_stage_context_for_model(
+        {
+            "storyboard": {"frames": [{"image_prompt": "@Image 1 locks identity. Clean frame"}]},
+            "episode_storyboard": {"frames": [{"reference_urls": ["https://example.test/ref.png"]}]},
+            "frames": [frame],
+        },
+        frame["provider_parameters"],
+    )
+
+    assert context["provider_reference_policy"] == "text_only_no_reference_images"
+    assert context["storyboard"]["frames"][0]["image_prompt"] == "Clean frame"
+    assert context["episode_storyboard"]["frames"][0]["reference_urls"] == []
+
+
+def test_deferred_stage_gate_timeout_can_be_extended_with_env(monkeypatch):
+    from app.services.production_worker_service import _deferred_stage_gate_timeout_seconds
+
+    monkeypatch.setenv("DY_AUTO_DEFERRED_STAGE_GATE_TIMEOUT_SECONDS", "180")
+
+    assert _deferred_stage_gate_timeout_seconds() == 180
 
 
 def test_legacy_start_images_blocks_paid_model_direct_submit(db, monkeypatch):
@@ -462,6 +528,73 @@ def test_real_short_start_videos_defers_video_stage_agency_gate_to_worker(db, mo
     assert response.status_code == 200
     assert response.json()["run"]["status"] == "video_batch_running"
     assert db.query(ProductionJob).filter_by(plan_id=run.production_plan_id, stage="video_generation").count() == len(segments)
+
+
+def test_video_stage_worker_context_declares_single_segment_review_scope(db, monkeypatch):
+    from app.services.production_worker_service import run_real_worker_step
+
+    captured = {}
+    run, segments = _linked_run_with_segments(db, count=3, run_type=REAL_SHORT_E2E, budget_limit=1.0)
+    for segment in segments:
+        _asset(db, run, segment, asset_type="image", url=f"https://cdn.test/{segment.id}.png")
+    run.status = "image_approved"
+    db.commit()
+    client.post(f"/api/video-production/runs/{run.id}/start-videos")
+
+    async def capture_gate(db, run, stage, context):
+        captured[stage] = context
+        return {"stage_status": "passed", "invocation_ids": [], "invocations": []}
+
+    async def submit_video(**kwargs):
+        frame = kwargs["frames"][0]
+        return {
+            "ok": True,
+            "status": "completed",
+            "assets": [{
+                "frame_id": frame["production_segment_id"],
+                "production_segment_id": frame["production_segment_id"],
+                "asset_type": "video_segment",
+                "url": "https://cdn.test/video.mp4",
+                "source_url": "https://cdn.test/video.mp4",
+                "metadata": {"duration": frame["duration"]},
+            }],
+            "usage": {"cost": 0.01, "units": {"videos": 1}},
+        }
+
+    async def get_stage_task(db, provider_task_id):
+        return await submit_video(frames=[captured["video_stage"]["frames"][0]])
+
+    def fake_runtime_config(db, scene):
+        return {
+            "provider": "test",
+            "model_name": scene,
+            "api_key": "test-key",
+            "config": {
+                "real_paid_allowed": True,
+                "supports_external_task_id": True,
+                "supports_task_query": True,
+                "returns_asset_url": True,
+                "returns_usage": True,
+                "estimated_cost": 0.01,
+                "max_concurrent_tasks": 3,
+            },
+        }
+
+    monkeypatch.setenv("DY_AUTO_PROVIDER_SUBMIT_WORKER_COUNT", "1")
+    monkeypatch.setattr("app.services.production_worker_service.resolve_runtime_model_config", fake_runtime_config)
+    monkeypatch.setattr("app.services.video_production_service.resolve_runtime_model_config", fake_runtime_config)
+    monkeypatch.setattr("app.services.video_production_service._guard_provider_stage", capture_gate)
+    monkeypatch.setattr("app.services.video_production_service.submit_video_batch", submit_video)
+    monkeypatch.setattr("app.services.video_production_service.get_stage_task", get_stage_task)
+
+    result = run_real_worker_step(db, run.id, lease_id="video-worker", batch_size=1)
+
+    assert result["processed"] == 1
+    scope = captured["video_stage"]["job_scope"]
+    assert scope["mode"] == "single_production_segment_job"
+    assert scope["current_frame_count"] == 1
+    assert scope["total_frame_count"] == 3
+    assert "other segments are queued separately" in scope["review_instruction"]
 
 
 def test_real_short_compose_route_enqueues_job_without_legacy_submit(db, monkeypatch):

@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   voidProductionAsset: vi.fn(() => Promise.resolve({ data: { ok: true } })),
   syncImageStage: vi.fn(() => Promise.resolve({ data: { ok: true } })),
   runRealWorkerStep: vi.fn(() => Promise.resolve({ data: { ok: true } })),
+  retryProductionSegment: vi.fn(() => Promise.resolve({ data: { ok: true } })),
   listAgencyRepairTasks: vi.fn(() => Promise.resolve({ data: { summary: {}, items: [] } })),
   retryAgencyRepairTask: vi.fn(() => Promise.resolve({ data: { ok: true } })),
   authorizeAgencyRepairRetry: vi.fn(() => Promise.resolve({ data: { ok: true } })),
@@ -35,6 +36,7 @@ vi.mock('../api/videoProduction.js', () => ({
   voidProductionAsset: mocks.voidProductionAsset,
   syncImageStage: mocks.syncImageStage,
   runRealWorkerStep: mocks.runRealWorkerStep,
+  retryProductionSegment: mocks.retryProductionSegment,
 }))
 
 vi.mock('../api/agency.js', () => ({
@@ -191,7 +193,40 @@ describe('AIVideoReviewPage', () => {
     vi.unstubAllGlobals()
   })
 
-  it('regenerate button calls startAssetRegeneration and reloads', async () => {
+  it('regenerate button uses queued segment retry for real short runs', async () => {
+    mocks.route.query = { run_id: 'run-1' }
+    mocks.listReviewItems.mockResolvedValue({
+      data: {
+        ok: true,
+        items: [{
+          id: 'asset-3',
+          run_id: 'run-1',
+          frame_id: 'frame-003',
+          production_segment_id: 'seg-003',
+          version: 1,
+          asset_type: 'image',
+          status: 'rejected',
+          stage: 'image_generation',
+          url: 'https://cdn.test/img3.png',
+        }],
+      },
+    })
+
+    const AIVideoReviewPage = (await import('../views/AIVideoReviewPage.vue')).default
+    const wrapper = mount(AIVideoReviewPage)
+    await flushPromises()
+
+    const regenBtn = wrapper.findAll('button').find(btn => btn.text() === '重新生成')
+    await regenBtn.trigger('click')
+    await flushPromises()
+
+    expect(mocks.retryProductionSegment).toHaveBeenCalledWith('seg-003')
+    expect(mocks.startAssetRegeneration).not.toHaveBeenCalled()
+    expect(mocks.listReviewItems).toHaveBeenCalledTimes(2)
+  })
+
+  it('legacy mock-scale regenerate still calls direct asset regeneration', async () => {
+    mocks.getVideoProductionRun.mockResolvedValue({ data: { ok: true, run: { status: 'image_review_pending', run_type: 'mock_series_scale' } } })
     mocks.listReviewItems.mockResolvedValue({
       data: {
         ok: true,
@@ -217,7 +252,7 @@ describe('AIVideoReviewPage', () => {
     await flushPromises()
 
     expect(mocks.startAssetRegeneration).toHaveBeenCalledWith('asset-3')
-    expect(mocks.listReviewItems).toHaveBeenCalledTimes(2)
+    expect(mocks.retryProductionSegment).not.toHaveBeenCalled()
   })
 
   it('shows reference evidence and submits image edit instruction with the selected version', async () => {

@@ -8,6 +8,7 @@ from app.db_models import (
     CollectedUser as LegacyCollectedUser,
     ContentTemplate as LegacyContentTemplate,
     Conversation as LegacyConversation,
+    ConversationMessage as LegacyConversationMessage,
     DMSequence as LegacyDMSequence,
     RepliedComment as LegacyRepliedComment,
     SensitiveWord as LegacySensitiveWord,
@@ -23,6 +24,7 @@ def test_content_collection_model_boundary_reexports_template_and_sensitive_word
         CollectedUser,
         ContentTemplate,
         Conversation,
+        ConversationMessage,
         DMSequence,
         RepliedComment,
         SensitiveWord,
@@ -32,6 +34,7 @@ def test_content_collection_model_boundary_reexports_template_and_sensitive_word
     assert CollectedUser is LegacyCollectedUser
     assert ContentTemplate is LegacyContentTemplate
     assert Conversation is LegacyConversation
+    assert ConversationMessage is LegacyConversationMessage
     assert DMSequence is LegacyDMSequence
     assert RepliedComment is LegacyRepliedComment
     assert SensitiveWord is LegacySensitiveWord
@@ -39,6 +42,7 @@ def test_content_collection_model_boundary_reexports_template_and_sensitive_word
     assert CollectedUser.metadata is Base.metadata
     assert ContentTemplate.metadata is Base.metadata
     assert Conversation.metadata is Base.metadata
+    assert ConversationMessage.metadata is Base.metadata
     assert DMSequence.metadata is Base.metadata
     assert RepliedComment.metadata is Base.metadata
     assert SensitiveWord.metadata is Base.metadata
@@ -46,6 +50,7 @@ def test_content_collection_model_boundary_reexports_template_and_sensitive_word
     assert "collected_users" in Base.metadata.tables
     assert "content_templates" in Base.metadata.tables
     assert "conversations" in Base.metadata.tables
+    assert "conversation_messages" in Base.metadata.tables
     assert "dm_sequences" in Base.metadata.tables
     assert "replied_comments" in Base.metadata.tables
     assert "sensitive_words" in Base.metadata.tables
@@ -54,11 +59,11 @@ def test_content_collection_model_boundary_reexports_template_and_sensitive_word
 def test_content_collection_model_boundary_imports_in_clean_process():
     code = (
         "import app.db_models as legacy; "
-        "from app.db.models.content_collection import CollectedComment, CollectedUser, ContentTemplate, Conversation, DMSequence, RepliedComment, SensitiveWord; "
+        "from app.db.models.content_collection import CollectedComment, CollectedUser, ContentTemplate, Conversation, ConversationMessage, DMSequence, RepliedComment, SensitiveWord; "
         "assert legacy.CollectedComment is CollectedComment; "
         "assert legacy.CollectedUser is CollectedUser; "
         "assert legacy.ContentTemplate is ContentTemplate; "
-        "assert legacy.Conversation is Conversation; "
+        "assert legacy.Conversation is Conversation; assert legacy.ConversationMessage is ConversationMessage; "
         "assert legacy.DMSequence is DMSequence; "
         "assert legacy.RepliedComment is RepliedComment; "
         "assert legacy.SensitiveWord is SensitiveWord"

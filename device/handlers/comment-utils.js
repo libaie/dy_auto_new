@@ -17,7 +17,7 @@ var commentUtils = {
    */
   openComments: function () {
     // 1. 先检测评论区是否已打开
-    var items = uiOperator.findElements("comment_list", 500);
+    var items = uiOperator.findElements("comment_list", 500, true);
     if (items && items.length > 0) {
       logger.debug(TAG, "评论区已打开 (" + items.length + " 条可见)");
       return true;
@@ -29,7 +29,7 @@ var commentUtils = {
       if (commentBtn) {
         uiOperator.clickElement(commentBtn);
         sleep(1500);
-        items = uiOperator.findElements("comment_list", 2000);
+        items = uiOperator.findElements("comment_list", 2000, true);
         if (items && items.length > 0) {
           logger.debug(TAG, "评论区已打开 (" + items.length + " 条)");
           return true;
@@ -44,7 +44,7 @@ var commentUtils = {
     if (commentBtn) {
       uiOperator.clickElement(commentBtn);
       sleep(1500);
-      items = uiOperator.findElements("comment_list", 1000);
+      items = uiOperator.findElements("comment_list", 1000, true);
       if (items && items.length > 0) return true;
     }
 
@@ -287,6 +287,7 @@ localPreFilter: function (text) {
     options = options || {};
     var data = { nickname: "", douyin_id: "", likes_count: "", follow_count: "",
       fans_count: "", works_count: "", gender: "", age: "", ip_location: "", is_private: "否" };
+    if (options.fallbackNickname) data.nickname = options.fallbackNickname;
 
     var fields = {
       "user_nickname": "nickname", "user_douyin_id": "douyin_id",
@@ -306,6 +307,7 @@ localPreFilter: function (text) {
         }
       } catch (e) {}
     }
+    if (data.nickname) hasData = true;
 
     // 清除 IP 属地前缀
     if (data.ip_location) data.ip_location = data.ip_location.replace(/^[·•・\s]+/, "");

@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   listComments: vi.fn(),
   listUsers: vi.fn(),
   listConversations: vi.fn(),
+  getConversation: vi.fn(),
   listAccounts: vi.fn(),
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
@@ -22,6 +23,7 @@ vi.mock('../api/data.js', () => ({
   listComments: mocks.listComments,
   listUsers: mocks.listUsers,
   listConversations: mocks.listConversations,
+  getConversation: mocks.getConversation,
 }))
 
 vi.mock('../api/accounts.js', () => ({
@@ -64,6 +66,7 @@ describe('DataCenterPage export filters', () => {
     mocks.listComments.mockResolvedValue({ data: { items: [], total: 0 } })
     mocks.listUsers.mockResolvedValue({ data: { items: [], total: 0 } })
     mocks.listConversations.mockResolvedValue({ data: { items: [], total: 0 } })
+    mocks.getConversation.mockResolvedValue({ data: { conversation: null, messages: [], history_incomplete: false } })
     mocks.listAccounts.mockResolvedValue({ data: { accounts: [] } })
     mocks.fetch.mockResolvedValue({
       ok: true,
@@ -138,5 +141,83 @@ describe('DataCenterPage export filters', () => {
     expect(url.searchParams.get('sort_order')).toBe('asc')
     expect(url.searchParams.get('skip')).toBe('40')
     expect(url.searchParams.get('limit')).toBe('20')
+  })
+
+  it('renders source comment content on user cards', async () => {
+    const wrapper = await mountPage()
+
+    wrapper.vm.activeTab = 'users'
+    wrapper.vm.items = [{
+      id: 'user-entry-comment',
+      nickname: '评论入口用户',
+      douyin_id: 'entry-comment-user',
+      source_comment_content: '刚从西湖回来，想找本地向导',
+    }]
+    await nextTick()
+
+    expect(wrapper.text()).toContain('入口评论')
+    expect(wrapper.text()).toContain('刚从西湖回来，想找本地向导')
+  })
+  it('opens a conversation detail drawer with ordered messages', async () => {
+    mocks.route.query = { tab: 'conversations' }
+    mocks.listConversations.mockResolvedValue({
+      data: {
+        items: [{
+          id: 'conv-1',
+          recipient_nickname: '张三',
+          recipient_douyin_id: 'douyin-zhang',
+          current_stage: 'nurturing',
+          total_dm_count: 2,
+          last_dm_content: '第二条',
+          last_dm_at: '2026-06-20T10:00:00',
+        }],
+        total: 1,
+      },
+    })
+    mocks.getConversation.mockResolvedValue({
+      data: {
+        conversation: {
+          id: 'conv-1',
+          recipient_nickname: '张三',
+          recipient_douyin_id: 'douyin-zhang',
+          current_stage: 'nurturing',
+          total_dm_count: 2,
+          last_dm_content: '第二条',
+          last_dm_at: '2026-06-20T10:00:00',
+        },
+        history_incomplete: false,
+        messages: [
+          { id: 'm1', message_order: 1, content: '第一条', status: 'sent', dm_sequence_id: 'seq-1', sent_at: '2026-06-20T09:59:00' },
+          { id: 'm2', message_order: 2, content: '第二条', status: 'failed', error_message: '发送失败', sent_at: null },
+        ],
+      },
+    })
+
+    const wrapper = await mountPage()
+    await wrapper.get('[data-testid="conversation-card"]').trigger('click')
+    await flushPromises()
+
+    expect(mocks.getConversation).toHaveBeenCalledWith('conv-1')
+    expect(wrapper.text()).toContain('消息流水')
+    expect(wrapper.text()).toContain('第一条')
+    expect(wrapper.text()).toContain('第二条')
+    expect(wrapper.text()).toContain('失败')
+    expect(wrapper.text()).toContain('seq-1')
+  })
+
+  it('keeps the conversation list visible when detail loading fails', async () => {
+    mocks.route.query = { tab: 'conversations' }
+    mocks.listConversations.mockResolvedValue({
+      data: { items: [{ id: 'conv-error', recipient_nickname: '李四', recipient_douyin_id: 'douyin-li', current_stage: 'qualifying', total_dm_count: 1, last_dm_content: '旧摘要' }], total: 1 },
+    })
+    mocks.getConversation.mockRejectedValue(new Error('network'))
+
+    const wrapper = await mountPage()
+    await wrapper.get('[data-testid="conversation-card"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('李四')
+    expect(wrapper.text()).toContain('旧摘要')
+    expect(wrapper.text()).toContain('详情加载失败')
   })
 })

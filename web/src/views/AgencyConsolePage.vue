@@ -43,15 +43,48 @@
         </section>
       </header>
 
-      <section v-if="activeTab === 'control' && blockingMessage" class="mb-5 rounded-lg border border-rose-500/40 bg-rose-950/40 p-4 text-rose-100">
-        <div class="text-sm font-semibold">阻断提示</div>
-        <p class="mt-1 text-sm leading-6">{{ blockingMessage }}</p>
+      <section
+        v-if="activeTab === 'control' && blockingMessage"
+        data-test="agency-blocking-message"
+        class="mb-5 rounded-lg border border-rose-500/40 bg-rose-950/40 p-4 text-rose-100"
+      >
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div class="text-sm font-semibold">阻断提示</div>
+            <p class="mt-1 text-sm leading-6">{{ blockingMessage }}</p>
+            <p class="mt-1 text-xs leading-5 text-rose-100/75">修复线索在下方「决策日志」卡片的「必须修改 / 下一步 / 返修动作」字段。</p>
+          </div>
+          <button
+            type="button"
+            data-test="jump-to-decision-log"
+            class="rounded-md border border-rose-200/50 px-3 py-2 text-xs font-medium text-rose-50 hover:bg-rose-200/10"
+            @click="scrollToDecisionLog"
+          >
+            跳到决策日志
+          </button>
+        </div>
       </section>
 
       <AutoRepairSummaryStrip
         v-if="activeTab === 'control' && repairSummary.total"
         class="mb-5"
         :summary="repairSummary"
+      />
+      <AutoRepairTaskList
+        v-if="activeTab === 'control' && (repairTasks.length || repairLoading || repairError)"
+        class="mb-5"
+        :tasks="repairTasks"
+        :loading="repairLoading"
+        :error="repairError"
+        :busy-id="repairBusyId"
+        @manual-action="handleRepairManualAction"
+        @retry="retryRepairTask"
+      />
+
+      <CreativePatchSummaryStrip
+        v-if="activeTab === 'control' && creativePatchSummary.total"
+        class="mb-5"
+        :summary="creativePatchSummary"
       />
 
       <nav class="mb-5 inline-flex rounded-lg border border-white/10 bg-zinc-900/80 p-1" aria-label="专家控制台视图">
@@ -63,6 +96,15 @@
           @click="activeTab = 'control'"
         >
           生产指挥台
+        </button>
+        <button
+          type="button"
+          data-tab="workbench"
+          class="rounded-md px-4 py-2 text-sm font-medium transition"
+          :class="activeTab === 'workbench' ? 'bg-cyan-400 text-zinc-950 shadow shadow-cyan-950/40' : 'text-zinc-300 hover:bg-white/5 hover:text-white'"
+          @click="activeTab = 'workbench'"
+        >
+          短视频导演台
         </button>
         <button
           type="button"
@@ -113,6 +155,8 @@
             :items="decisionLog"
             :expert-team="expertTeam"
             :stages="stageGraph"
+            @manual-action="handleRepairManualAction"
+            @retry="retryRepairTask"
           />
         </div>
 
@@ -132,6 +176,20 @@
         </aside>
       </section>
 
+      <CreativePatchWorkbench
+        v-else-if="activeTab === 'workbench'"
+        :summary="creativePatchSummary"
+        :patches="creativePatches"
+        :loading="patchLoading"
+        :error="patchError"
+        :busy-id="patchBusyId"
+        @save="saveCreativePatch"
+        @approve="approveCreativePatch"
+        @reject="rejectCreativePatch"
+        @apply="applyCreativePatch"
+        @open-invocation="openPatchInvocation"
+      />
+
       <AgencyTeamMap3D
         v-else
         :experts="expertTeam"
@@ -147,6 +205,16 @@
 <script setup>
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import {
+  applyAgencyCreativePatch,
+  authorizeAgencyRepairRetry,
+  approveAgencyCreativePatch,
+  listAgencyCreativePatches,
+  listAgencyRepairTasks,
+  rejectAgencyCreativePatch,
+  retryAgencyRepairTask,
+  updateAgencyCreativePatch,
+} from '../api/agency.js'
 import { getAgencyConsole } from '../api/series.js'
 import AgencyDecisionLog from '../components/agency/AgencyDecisionLog.vue'
 import AgencyExpertDrawer from '../components/agency/AgencyExpertDrawer.vue'
@@ -155,6 +223,9 @@ import AgencyStageRail from '../components/agency/AgencyStageRail.vue'
 import AgencyStatusBadge from '../components/agency/AgencyStatusBadge.vue'
 import AgencyTeamMap2D from '../components/agency/AgencyTeamMap2D.vue'
 import AutoRepairSummaryStrip from '../components/agency/AutoRepairSummaryStrip.vue'
+import AutoRepairTaskList from '../components/agency/AutoRepairTaskList.vue'
+import CreativePatchSummaryStrip from '../components/agency/CreativePatchSummaryStrip.vue'
+import CreativePatchWorkbench from '../components/agency/CreativePatchWorkbench.vue'
 import { expertRoleGroup, phaseLabel, safeDisplayText, stepName } from '../components/agency/agencyExpertLabels.js'
 
 const route = useRoute()
@@ -164,20 +235,36 @@ const consoleData = ref(null)
 const selectedExpertId = ref('')
 const loading = ref(true)
 const error = ref('')
-const activeTab = ref(route.query?.tab === 'experts' ? 'experts' : 'control')
+const activeTab = ref(route.query?.tab === 'experts' ? 'experts' : route.query?.tab === 'workbench' ? 'workbench' : 'control')
+const creativePatches = ref([])
+const patchLoading = ref(false)
+const patchError = ref('')
+const patchBusyId = ref('')
+const repairTasks = ref([])
+const repairTaskSummary = ref({})
+const repairLoading = ref(false)
+const repairError = ref('')
+const repairBusyId = ref('')
 let disposed = false
+let consolePollTimer = null
+
+const CONSOLE_POLL_INTERVAL_MS = 5000
+const TERMINAL_RUN_STATUSES = new Set(['completed', 'cancelled', 'failed_terminal'])
 
 const stageGraph = computed(() => consoleData.value?.stage_graph || [])
 const expertTeam = computed(() => consoleData.value?.expert_team || [])
 const expertInvocations = computed(() => consoleData.value?.expert_invocations || [])
 const decisionLog = computed(() => consoleData.value?.decision_log || [])
 const productionSteps = computed(() => consoleData.value?.production_steps || [])
-const repairSummary = computed(() => consoleData.value?.repair_summary || {})
+const repairSummary = computed(() => (
+  Object.keys(repairTaskSummary.value || {}).length ? repairTaskSummary.value : consoleData.value?.repair_summary || {}
+))
+const creativePatchSummary = computed(() => consoleData.value?.creative_patch_summary || {})
 const qualityExpertCount = computed(() => expertTeam.value.filter(expert => expertRoleGroup(expert) === 'quality').length)
 
 const isEmpty = computed(() => {
   if (!consoleData.value) return true
-  return !stageGraph.value.length && !expertInvocations.value.length && !productionSteps.value.length
+  return !stageGraph.value.length && !expertInvocations.value.length && !productionSteps.value.length && !creativePatches.value.length
 })
 
 const blockingMessage = computed(() => {
@@ -221,6 +308,10 @@ function openExpert(expertId) {
   selectedExpertId.value = expertId
 }
 
+function scrollToDecisionLog() {
+  document.getElementById('agency-decision-log')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
 function stageLabel(stage) {
   return phaseLabel(stage?.stage, stage?.label)
 }
@@ -235,21 +326,169 @@ function stepSummary(step) {
   return safeDisplayText(text, '该步骤已记录运行摘要。')
 }
 
-async function load() {
+async function load(options = {}) {
   if (disposed) return
-  loading.value = true
+  const silent = options?.silent === true
+  if (!silent) loading.value = true
   error.value = ''
   try {
     const { data } = await getAgencyConsole(route.params.seriesId)
     if (disposed) return
     if (!data?.ok) throw new Error('加载失败')
     consoleData.value = data
+    creativePatches.value = data.creative_patches || []
+    await Promise.all([
+      ((data.creative_patch_summary?.total || 0) > 0 || creativePatches.value.length)
+        ? refreshCreativePatches()
+        : Promise.resolve(),
+      refreshRepairTasks(),
+    ])
   } catch (err) {
     if (disposed) return
     console.error('Agency console load failed', err)
     error.value = '专家控制台加载失败，请稍后重试。'
   } finally {
-    if (!disposed) loading.value = false
+    if (!disposed && !silent) loading.value = false
+    scheduleConsolePoll()
+  }
+}
+
+async function refreshCreativePatches() {
+  if (disposed) return
+  patchLoading.value = true
+  patchError.value = ''
+  try {
+    const params = { series_id: route.params.seriesId }
+    const runId = consoleData.value?.latest_run?.id
+    if (runId) params.run_id = runId
+    const { data } = await listAgencyCreativePatches(params)
+    if (disposed) return
+    creativePatches.value = data?.items || []
+    if (consoleData.value) {
+      consoleData.value = {
+        ...consoleData.value,
+        creative_patch_summary: data?.summary || {},
+      }
+    }
+  } catch (err) {
+    if (disposed) return
+    console.error('Creative patch load failed', err)
+    patchError.value = '创作补丁加载失败，请稍后重试。'
+  } finally {
+    if (!disposed) patchLoading.value = false
+  }
+}
+
+function normalizeRepairTask(task) {
+  const retryActions = { ...(task?.retry_actions || {}) }
+  if (retryActions.paid_authorization_required === undefined && retryActions.paid_authorize_required !== undefined) {
+    retryActions.paid_authorization_required = retryActions.paid_authorize_required
+  }
+  return { ...(task || {}), retry_actions: retryActions }
+}
+
+function repairTaskParams() {
+  const params = { series_id: route.params.seriesId, page: 1, page_size: 20 }
+  const runId = consoleData.value?.latest_run?.id
+  if (runId) params.run_id = runId
+  return params
+}
+
+async function refreshRepairTasks() {
+  if (disposed || !consoleData.value) return
+  repairLoading.value = true
+  repairError.value = ''
+  try {
+    const { data } = await listAgencyRepairTasks(repairTaskParams())
+    if (disposed) return
+    repairTasks.value = (data?.items || []).map(normalizeRepairTask)
+    repairTaskSummary.value = data?.summary || {}
+  } catch (err) {
+    if (disposed) return
+    console.error('Repair task load failed', err)
+    repairTasks.value = []
+    repairTaskSummary.value = {}
+    repairError.value = '返修任务加载失败，请稍后重试。'
+  } finally {
+    if (!disposed) repairLoading.value = false
+  }
+}
+
+async function handleCreativePatchAction(patch, action) {
+  if (!patch?.id) return
+  patchBusyId.value = patch.id
+  patchError.value = ''
+  try {
+    await action()
+    await refreshCreativePatches()
+  } catch (err) {
+    console.error('Creative patch action failed', err)
+    patchError.value = '创作补丁处理失败，请稍后重试。'
+  } finally {
+    patchBusyId.value = ''
+  }
+}
+
+function saveCreativePatch(patch) {
+  return handleCreativePatchAction(patch, () => updateAgencyCreativePatch(patch.id, { after: patch.after || {} }))
+}
+
+function approveCreativePatch(patch) {
+  return handleCreativePatchAction(patch, () => approveAgencyCreativePatch(patch.id))
+}
+
+function rejectCreativePatch(patch) {
+  return handleCreativePatchAction(patch, () => rejectAgencyCreativePatch(patch.id, { reason: '人工拒绝该补丁' }))
+}
+
+function applyCreativePatch(patch) {
+  return handleCreativePatchAction(patch, () => applyAgencyCreativePatch(patch.id))
+}
+
+function openPatchInvocation() {
+  activeTab.value = 'control'
+}
+
+function handleRepairManualAction(task) {
+  if (!task?.repair_route) return
+  if (String(task.repair_route).startsWith('/')) {
+    router.push(task.repair_route)
+    return
+  }
+  window.location.href = task.repair_route
+}
+
+async function retryRepairTask(task, authorizationPayload = null) {
+  if (!task?.id || repairBusyId.value) return
+  repairBusyId.value = task.id
+  repairError.value = ''
+  try {
+    if (authorizationPayload) {
+      await authorizeAgencyRepairRetry(task.id, authorizationPayload)
+    } else {
+      await retryAgencyRepairTask(task.id)
+    }
+    await load({ silent: true })
+  } catch (err) {
+    console.error('Repair retry failed', err)
+    repairError.value = '返修重试失败，请稍后重试。'
+  } finally {
+    repairBusyId.value = ''
+  }
+}
+
+function shouldPollConsole() {
+  const status = consoleData.value?.latest_run?.status
+  return Boolean(status && !TERMINAL_RUN_STATUSES.has(status))
+}
+
+function scheduleConsolePoll() {
+  if (consolePollTimer) {
+    clearTimeout(consolePollTimer)
+    consolePollTimer = null
+  }
+  if (!disposed && shouldPollConsole()) {
+    consolePollTimer = setTimeout(() => load({ silent: true }), CONSOLE_POLL_INTERVAL_MS)
   }
 }
 
@@ -257,5 +496,6 @@ onMounted(load)
 
 onBeforeUnmount(() => {
   disposed = true
+  if (consolePollTimer) clearTimeout(consolePollTimer)
 })
 </script>

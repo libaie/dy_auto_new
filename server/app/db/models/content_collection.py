@@ -142,3 +142,32 @@ class Conversation(Base):
     account = relationship("Account")
     device = relationship("Device")
     task = relationship("Task")
+    messages = relationship("ConversationMessage", back_populates="conversation", cascade="all, delete-orphan")
+
+
+class ConversationMessage(Base):
+    """Single outbound DM message ledger row."""
+    __tablename__ = "conversation_messages"
+    __table_args__ = (
+        UniqueConstraint("conversation_id", "message_key", name="uq_conversation_message_key"),
+        Index("ix_conversation_messages_conversation_order", "conversation_id", "message_order"),
+        Index("ix_conversation_messages_task_id", "task_id"),
+        Index("ix_conversation_messages_status", "status"),
+    )
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    conversation_id = Column(String(36), ForeignKey("conversations.id"), nullable=False, index=True)
+    task_id = Column(String(36), ForeignKey("tasks.id"), nullable=True)
+    device_id = Column(String(36), ForeignKey("devices.id"), nullable=True)
+    dm_sequence_id = Column(String(36), nullable=True, index=True)
+    message_order = Column(Integer, nullable=True)
+    message_key = Column(String(200), nullable=False)
+    direction = Column(String(20), nullable=False, default="outbound")
+    content = Column(Text, nullable=False)
+    status = Column(String(20), nullable=False, default="sent")
+    error_message = Column(Text, nullable=True)
+    sent_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
+    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
+
+    conversation = relationship("Conversation", back_populates="messages")

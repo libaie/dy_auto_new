@@ -73,6 +73,10 @@ export function getVideoProductionRun(runId) {
   return client.get(`/video-production/runs/${runId}`)
 }
 
+export function backfillRunTextArtifacts(runId) {
+  return client.post(`/video-production/runs/${runId}/backfill-text-artifacts`)
+}
+
 export function getRunReadiness(runId) {
   return client.get(`/video-production/runs/${runId}/readiness`)
 }

@@ -157,6 +157,217 @@ def test_dm_bridge_claim_release_and_send_response_shapes():
     assert send_report.json() == {"ok": True}
 
 
+def test_dm_send_report_records_idempotent_message_ledger(db):
+    from app.db_models import Task
+
+    db.add(Task(
+        id="dm-ledger-task",
+        type="reply_comment",
+        account_id="acc-001",
+        device_id=None,
+        status="running",
+        params={},
+    ))
+    db.commit()
+
+    with TestClient(app) as client:
+        claim = client.post(
+            "/api/device/dm-claim-recipient",
+            json={
+                "account_id": "acc-001",
+                "recipient_douyin_id": "dm-ledger-recipient",
+                "recipient_nickname": "Ledger Recipient",
+            },
+            headers=HEADERS,
+        )
+        payload = {
+            "conversation_id": claim.json()["conversation_id"],
+            "task_id": "dm-ledger-task",
+            "stage": "qualifying",
+            "intent": "interested",
+            "keyword": "tea",
+            "content": "First message",
+            "dm_sequence_id": "sequence-one",
+            "message_order": 1,
+            "message_key": "conversation-one:sequence-one:1",
+            "status": "sent",
+        }
+
+        first = client.post("/api/device/dm-send-report", json=payload, headers=HEADERS)
+        duplicate = client.post("/api/device/dm-send-report", json=payload, headers=HEADERS)
+        late_failed_payload = {**payload, "status": "failed", "error_message": "late failure"}
+        late_failed = client.post("/api/device/dm-send-report", json=late_failed_payload, headers=HEADERS)
+
+    from app.db_models import Conversation, ConversationMessage
+
+    assert first.status_code == 200
+    assert duplicate.status_code == 200
+    assert late_failed.status_code == 200
+    messages = db.query(ConversationMessage).filter_by(conversation_id=payload["conversation_id"]).all()
+    assert len(messages) == 1
+    assert messages[0].content == "First message"
+    assert messages[0].message_order == 1
+    assert messages[0].message_key == "conversation-one:sequence-one:1"
+    assert messages[0].status == "sent"
+
+    conversation = db.query(Conversation).filter_by(id=payload["conversation_id"]).one()
+    assert conversation.task_id == "dm-ledger-task"
+    assert conversation.total_dm_count == 1
+    assert conversation.last_dm_content == "First message"
+
+
+def test_dm_send_report_dedupes_legacy_payload_retries(db):
+    with TestClient(app) as client:
+        claim = client.post(
+            "/api/device/dm-claim-recipient",
+            json={
+                "account_id": "acc-001",
+                "recipient_douyin_id": "dm-legacy-retry-recipient",
+                "recipient_nickname": "Legacy Retry Recipient",
+            },
+            headers=HEADERS,
+        )
+        payload = {
+            "conversation_id": claim.json()["conversation_id"],
+            "stage": "qualifying",
+            "intent": "interested",
+            "keyword": "tea",
+            "content": "Legacy single message",
+        }
+        first = client.post("/api/device/dm-send-report", json=payload, headers=HEADERS)
+        retry = client.post("/api/device/dm-send-report", json=payload, headers=HEADERS)
+
+    from app.db_models import Conversation, ConversationMessage
+
+    assert first.status_code == 200
+    assert retry.status_code == 200
+    messages = db.query(ConversationMessage).filter_by(conversation_id=payload["conversation_id"]).all()
+    assert len(messages) == 1
+    assert messages[0].message_key.startswith("legacy:")
+    conversation = db.query(Conversation).filter_by(id=payload["conversation_id"]).one()
+    assert conversation.total_dm_count == 1
+
+
+def test_dm_send_report_rejects_task_from_other_account(db):
+    from app.db_models import Task
+
+    db.add(Task(
+        id="wrong-account-task",
+        type="reply_comment",
+        account_id="acc-002",
+        device_id=None,
+        status="running",
+        params={},
+    ))
+    db.commit()
+
+    with TestClient(app) as client:
+        claim = client.post(
+            "/api/device/dm-claim-recipient",
+            json={
+                "account_id": "acc-001",
+                "recipient_douyin_id": "dm-wrong-task-recipient",
+                "recipient_nickname": "Wrong Task Recipient",
+            },
+            headers=HEADERS,
+        )
+        response = client.post(
+            "/api/device/dm-send-report",
+            json={
+                "conversation_id": claim.json()["conversation_id"],
+                "task_id": "wrong-account-task",
+                "stage": "qualifying",
+                "intent": "interested",
+                "keyword": "tea",
+                "content": "Wrong task message",
+                "message_order": 1,
+                "message_key": "wrong-account-task:single:1",
+                "status": "sent",
+            },
+            headers=HEADERS,
+        )
+
+    assert response.status_code == 403
+def test_dm_claim_reuses_failed_only_conversation_for_retry(db):
+    from app.db_models import Task
+
+    db.add(Task(
+        id="retry-task",
+        type="search_dm",
+        account_id="acc-001",
+        device_id=None,
+        status="running",
+        params={},
+    ))
+    db.commit()
+
+    with TestClient(app) as client:
+        first_claim = client.post(
+            "/api/device/dm-claim-recipient",
+            json={
+                "account_id": "acc-001",
+                "recipient_douyin_id": "dm-failed-retry-recipient",
+                "recipient_nickname": "Failed Retry Recipient",
+            },
+            headers=HEADERS,
+        )
+        failed = client.post(
+            "/api/device/dm-send-report",
+            json={
+                "conversation_id": first_claim.json()["conversation_id"],
+                "task_id": "retry-task",
+                "stage": "qualifying",
+                "intent": "search_dm",
+                "keyword": "tea",
+                "content": "Could not send",
+                "dm_sequence_id": "seq-retry",
+                "message_order": 1,
+                "message_key": "retry-task:seq-retry:1",
+                "status": "failed",
+                "error_message": "发送按钮未找到",
+            },
+            headers=HEADERS,
+        )
+        retry_claim = client.post(
+            "/api/device/dm-claim-recipient",
+            json={
+                "account_id": "acc-001",
+                "recipient_douyin_id": "dm-failed-retry-recipient",
+                "recipient_nickname": "Failed Retry Recipient",
+            },
+            headers=HEADERS,
+        )
+        success = client.post(
+            "/api/device/dm-send-report",
+            json={
+                "conversation_id": retry_claim.json()["conversation_id"],
+                "task_id": "retry-task",
+                "stage": "qualifying",
+                "intent": "search_dm",
+                "keyword": "tea",
+                "content": "Retried successfully",
+                "dm_sequence_id": "seq-retry",
+                "message_order": 1,
+                "message_key": "retry-task:seq-retry:1",
+                "status": "sent",
+            },
+            headers=HEADERS,
+        )
+
+    from app.db_models import Conversation, ConversationMessage
+
+    assert first_claim.status_code == 200
+    assert first_claim.json()["claimed"] is True
+    assert failed.status_code == 200
+    assert retry_claim.status_code == 200
+    assert retry_claim.json() == {"claimed": True, "conversation_id": first_claim.json()["conversation_id"]}
+    assert success.status_code == 200
+    messages = db.query(ConversationMessage).filter_by(conversation_id=first_claim.json()["conversation_id"]).all()
+    assert len(messages) == 1
+    assert messages[0].status == "sent"
+    assert messages[0].content == "Retried successfully"
+    conversation = db.query(Conversation).filter_by(id=first_claim.json()["conversation_id"]).one()
+    assert conversation.total_dm_count == 1
 def test_user_profile_and_avatar_bridge_response_shapes():
     with TestClient(app) as client:
         profile = client.post(

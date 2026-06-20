@@ -6,6 +6,7 @@ var logger = require("../utils/logger");
 var uiOperator = require("../core/ui-operator");
 var flowContext = require("../core/flow-context");
 var crashRecovery = require("../core/crash-recovery");
+var commentUtils = require("./comment-utils");
 
 var TAG = "搜索私信";
 
@@ -73,25 +74,54 @@ SearchDMHandler._interactWithVideo = function (content, stats) {
     navigationDepth = 1;
     flowContext.enter("profile");
 
+    var profileData = commentUtils.collectProfileData({ fallbackNickname: "视频作者", uploadAvatar: false }) || {};
+    var recipientNickname = profileData.nickname || "视频作者";
+    var recipientId = profileData.douyin_id || this._buildFallbackRecipientId(recipientNickname);
+    var dmClaimResult = apiClient.claimDMRecipient({
+      account_id: params.account_id,
+      recipient_douyin_id: recipientId,
+      recipient_nickname: recipientNickname
+    });
+    if (!dmClaimResult || !dmClaimResult.claimed) {
+      logger.info(TAG, "视频作者已存在私信会话，跳过");
+      return false;
+    }
+
     // 2. 点击私信按钮进入聊天室 — 增加重试次数应对弱网
     var messageClicked = this.safeClick("dm_entry_btn", 5);
     if (!messageClicked) {
       logger.warn(TAG, "私信按钮未找到");
+      this._reportDMSendResults(
+        dmClaimResult.conversation_id,
+        this._buildDMFailureResults(messages, params.keyword, "私信按钮未找到"),
+        params,
+        "qualifying",
+        "search_dm",
+        params.keyword
+      );
       return false;
     }
     // safeClick 已确认元素出现并点击，safeInput 内部 wait 5s 足够聊天室加载
     navigationDepth = 2;
     flowContext.enter("dm");
 
-    // 3. 发送消息序列
-    var sentCount = this._sendMessageSequence(messages, stats, params.keyword);
+    // 3. 发送消息序列并逐条上报会话流水
+    var results = this._sendMessageSequence(messages, stats, params.keyword);
+    var sentCount = this._countSentDMResults(results);
+    this._reportDMSendResults(
+      dmClaimResult.conversation_id,
+      results,
+      params,
+      "qualifying",
+      "search_dm",
+      params.keyword
+    );
     if (sentCount <= 0) {
       logger.warn(TAG, "私信序列没有成功发送任何消息");
       return false;
     }
-    try { apiClient.incrementStats(params.account_id, "search_dm", "", 1); } catch (e) {}
-    return true;
-  } finally {
+    try { apiClient.incrementStats(params.account_id, "search_dm", recipientId, 1); } catch (e) {}
+    return true;  } finally {
     // ==== 页面状态恢复：确保退出时回到视频详情页 ====
     if (navigationDepth >= 2) {
       back(); sleep(800);

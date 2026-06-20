@@ -66,6 +66,23 @@ def test_collection_rejects_missing_series(db):
         raise AssertionError("Expected missing series error")
 
 
+def test_collection_rejects_empty_deliverable_episode_set(db):
+    series = Series(title="Empty Collection", logline="No videos", genre="drama")
+    db.add(series)
+    db.flush()
+    db.add(Episode(series_id=series.id, episode_number=1, status="pending", duration_seconds=30))
+    db.commit()
+
+    try:
+        create_collection_from_approved_episodes(db, series.id)
+    except ValueError as exc:
+        assert "没有可打包剧集" in str(exc)
+    else:
+        raise AssertionError("Expected empty collection error")
+
+    assert db.query(VideoCollection).count() == 0
+
+
 def test_collection_endpoint_returns_collection_payload(db):
     series, done, _pending, done_later = _series_with_episodes(db)
 
@@ -85,3 +102,14 @@ def test_collection_endpoint_returns_400_for_missing_series(db):
     resp = client.post("/api/video-production/collections", json={"series_id": "missing-series"})
 
     assert resp.status_code == 400
+
+
+def test_collection_endpoint_rejects_empty_collection(db):
+    series = Series(title="Empty Collection", logline="No videos", genre="drama")
+    db.add(series)
+    db.commit()
+
+    resp = client.post("/api/video-production/collections", json={"series_id": series.id})
+
+    assert resp.status_code == 400
+    assert "没有可打包剧集" in resp.json()["detail"]

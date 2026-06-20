@@ -331,6 +331,42 @@ async def test_generate_series_story_plan_creates_episode_specific_assets_from_s
 
 
 @pytest.mark.asyncio
+async def test_generate_series_story_plan_missing_episode_ids_falls_back_to_primary_asset_only(db, monkeypatch):
+    from app.services import series_planning_service as planning
+
+    series = Series(title="Fallback Scope", logline="A family secret returns.", total_episodes=1, status="draft")
+    lead, home = _add_series_assets(series, character_name="Lead", scene_name="Home")
+    series.characters.append(Character(name="Supporting", role_type="supporting", gender="female"))
+    series.scenes.append(Scene(name="Office", scene_type="indoor"))
+    db.add(series)
+    db.flush()
+    episode = Episode(series_id=series.id, episode_number=1, title="Pilot", status="pending")
+    db.add(episode)
+    db.commit()
+
+    payload = _planning_payload(total_episodes=1)
+    payload["episode_outlines"][0]["character_ids"] = []
+    payload["episode_outlines"][0]["scene_ids"] = []
+
+    async def fake_story_generator(**_kwargs):
+        return SimpleNamespace(
+            parsed=payload,
+            source_type="ai",
+            model_trace={"stage": "story_planning", "stage_status": "expert", "expert_id": "story_generator"},
+        )
+
+    monkeypatch.setattr(planning, "generate_story_plan_with_expert", fake_story_generator, raising=False)
+
+    await planning.generate_series_story_plan(db, series.id, force=True)
+    outline = _latest_outline(db, episode.id)
+
+    assert outline["character_ids"] == [lead.id]
+    assert outline["scene_ids"] == [home.id]
+    assert outline["asset_usage"]["characters"][0]["source"] == "fallback"
+    assert outline["asset_usage"]["scenes"][0]["source"] == "fallback"
+
+
+@pytest.mark.asyncio
 async def test_generate_series_story_plan_idempotent_when_ai_or_fallback_artifacts_already_approved(db, monkeypatch):
     from app.services import series_planning_service as planning
 

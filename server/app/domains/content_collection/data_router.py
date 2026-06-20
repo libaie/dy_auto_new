@@ -93,6 +93,17 @@ def list_conversations(
     )
 
 
+@router.get("/conversations/{conversation_id}")
+def get_conversation(
+    conversation_id: str,
+    db: Session = Depends(get_db),
+    user = Depends(verify_admin_token),
+):
+    return read_models.get_conversation(
+        db=db,
+        user=user,
+        conversation_id=conversation_id,
+    )
 @router.get("/export/comments")
 def export_comments(
     keyword: Optional[str] = Query(None),

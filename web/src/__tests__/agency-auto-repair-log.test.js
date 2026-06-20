@@ -33,7 +33,7 @@ describe('AgencyDecisionLog auto repair transparency', () => {
     expect(wrapper.text()).toContain('分镜脚本')
     expect(wrapper.text()).toContain('分镜缺少角色参考图')
     expect(wrapper.text()).toContain('返修动作')
-    expect(wrapper.text()).toContain('等待下一步处理')
+    expect(wrapper.text()).toContain('完成返修后重新进入质量门')
     expect(wrapper.text()).not.toMatch(/Invalid JSON|Provider|宸茶|閸|锟/)
   })
 })

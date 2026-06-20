@@ -92,6 +92,91 @@ async def test_runtime_parses_valid_json_and_redacts_model_config():
 
 
 @pytest.mark.asyncio
+async def test_runtime_preserves_optional_creative_patches():
+    async def fake_client(system_prompt, user_prompt, config):
+        return _valid_output(
+            decision="需要改稿",
+            creative_patches=[{
+                "patch_type": "storyboard_patch",
+                "target_type": "storyboard_frame",
+                "target_id": "shot-001",
+                "stage": "storyboard",
+                "title": "强化前三秒钩子",
+                "reason": "冲突不够强。",
+                "before": {"image_prompt": "原"},
+                "after": {"image_prompt": "新"},
+                "apply_policy": "requires_human_approval",
+            }],
+        )
+
+    runtime = AgencySkillRuntime(model_client=fake_client)
+    result = await runtime.invoke(
+        db=None,
+        expert_id="prompt_engineer",
+        stage="storyboard",
+        role="reviewer",
+        stage_context={"frame_count": 1},
+        runtime_config=_runtime_config(),
+    )
+
+    assert result.output_summary["creative_patches"][0]["patch_type"] == "storyboard_patch"
+
+
+@pytest.mark.asyncio
+async def test_runtime_preserves_optional_scorecard():
+    async def fake_client(system_prompt, user_prompt, config):
+        assert '"scorecard"' in system_prompt
+        return _valid_output(
+            decision="通过",
+            scorecard={
+                "overall_score": 91,
+                "pass_threshold": 80,
+                "verdict": "pass",
+                "dimensions": [{"key": "continuity", "score": 91}],
+            },
+        )
+
+    runtime = AgencySkillRuntime(model_client=fake_client)
+    result = await runtime.invoke(
+        db=None,
+        expert_id="image_review_quality_reviewer",
+        stage="image_review",
+        role="qa",
+        stage_context={"frame_count": 1},
+        runtime_config=_runtime_config(),
+    )
+
+    assert result.output_summary["scorecard"]["overall_score"] == 91
+    assert result.output_summary["scorecard"]["schema_version"] == "agency.scorecard.v1"
+
+
+@pytest.mark.asyncio
+async def test_runtime_can_send_multimodal_user_content():
+    captured = {}
+
+    async def fake_client(system_prompt, user_prompt, config):
+        captured["user_prompt"] = user_prompt
+        return _valid_output(decision="reviewed from image evidence")
+
+    runtime = AgencySkillRuntime(model_client=fake_client)
+    await runtime.invoke(
+        db=None,
+        expert_id="image_review_quality_reviewer",
+        stage="image_review",
+        role="qa",
+        stage_context={
+            "asset_review": {
+                "media_inputs": [{"type": "image_url", "url": "https://cdn.test/shot.png"}],
+                "prompt": "original image prompt",
+            }
+        },
+        runtime_config=_runtime_config(),
+    )
+
+    assert "https://cdn.test/shot.png" in str(captured["user_prompt"])
+
+
+@pytest.mark.asyncio
 async def test_runtime_extracts_json_from_fenced_model_output():
     async def fenced_client(system_prompt, user_prompt, config):
         return f"```json\n{_valid_output(decision='wrapped json')}\n```"
@@ -200,8 +285,8 @@ async def test_runtime_missing_required_fields_map_to_named_error():
 async def test_runtime_redacts_model_output_before_returning_it():
     async def fake_client(system_prompt, user_prompt, config):
         return _valid_output(
-            decision="Authorization: Bearer sk-live-secret",
-            findings=[{"api_key": "sk-hidden"}, "full system prompt: do not expose"],
+            decision="Authorization: Bearer live-secret-token",
+            findings=[{"api_key": "hidden-secret-token"}, "full system prompt: do not expose"],
             recommendations=["safe"],
             required_changes=["Bearer token leaked"],
             evidence=[{"nested": {"Authorization": "Bearer hidden"}}],
@@ -218,8 +303,8 @@ async def test_runtime_redacts_model_output_before_returning_it():
     )
 
     serialized = json.dumps({"summary": result.output_summary, "evidence": result.evidence})
-    assert "sk-live-secret" not in serialized
-    assert "sk-hidden" not in serialized
+    assert "live-secret-token" not in serialized
+    assert "hidden-secret-token" not in serialized
     assert "Bearer hidden" not in serialized
     assert "full system prompt" not in serialized
     assert result.output_summary["recommendations"] == ["safe"]
@@ -227,7 +312,7 @@ async def test_runtime_redacts_model_output_before_returning_it():
 
 @pytest.mark.asyncio
 async def test_runtime_redacts_bare_configured_secret_values_from_model_output():
-    bare_api_key = "sk-runtime-secret-123"
+    bare_api_key = "runtime-secret-token-123"
 
     async def fake_client(system_prompt, user_prompt, config):
         return _valid_output(
@@ -312,6 +397,62 @@ async def test_default_client_sends_openai_compatible_request_payload_headers_an
     assert seen["payload"]["model"] == "mock-model"
     assert seen["payload"]["messages"][0]["role"] == "system"
     assert seen["payload"]["messages"][1]["role"] == "user"
+
+
+@pytest.mark.asyncio
+async def test_default_client_sends_multimodal_content_parts():
+    seen = {}
+
+    def handler(request):
+        seen["payload"] = json.loads(request.content)
+        return httpx.Response(200, json={"choices": [{"message": {"content": _valid_output()}}]})
+
+    runtime = AgencySkillRuntime(http_transport=httpx.MockTransport(handler))
+    result = await runtime.invoke(
+        db=None,
+        expert_id="image_review_quality_reviewer",
+        stage="image_review",
+        role="qa",
+        stage_context={
+            "asset_review": {
+                "media_inputs": [{"type": "image_url", "url": "https://cdn.test/shot.png"}],
+            }
+        },
+        runtime_config=_runtime_config(),
+    )
+
+    content = seen["payload"]["messages"][1]["content"]
+    assert result.result_status == "passed"
+    assert content[0]["type"] == "text"
+    assert content[1] == {"type": "image_url", "image_url": {"url": "https://cdn.test/shot.png"}}
+
+
+@pytest.mark.asyncio
+async def test_default_client_sends_video_content_parts():
+    seen = {}
+
+    def handler(request):
+        seen["payload"] = json.loads(request.content)
+        return httpx.Response(200, json={"choices": [{"message": {"content": _valid_output()}}]})
+
+    runtime = AgencySkillRuntime(http_transport=httpx.MockTransport(handler))
+    result = await runtime.invoke(
+        db=None,
+        expert_id="video_review_quality_reviewer",
+        stage="video_review",
+        role="qa",
+        stage_context={
+            "asset_review": {
+                "media_inputs": [{"type": "video_url", "url": "https://cdn.test/shot.mp4"}],
+            }
+        },
+        runtime_config=_runtime_config(),
+    )
+
+    content = seen["payload"]["messages"][1]["content"]
+    assert result.result_status == "passed"
+    assert content[0]["type"] == "text"
+    assert content[1] == {"type": "video_url", "video_url": {"url": "https://cdn.test/shot.mp4"}}
 
 
 @pytest.mark.asyncio

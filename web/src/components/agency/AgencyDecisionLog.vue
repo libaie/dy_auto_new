@@ -1,5 +1,5 @@
 <template>
-  <section class="rounded-lg border border-white/10 bg-zinc-900/80 p-4">
+  <section id="agency-decision-log" data-test="agency-decision-log" class="rounded-lg border border-white/10 bg-zinc-900/80 p-4">
     <div class="mb-3 flex flex-wrap items-start justify-between gap-3">
       <div>
         <h2 class="text-lg font-semibold text-white">决策日志</h2>
@@ -44,7 +44,7 @@
                 v-if="isHistorical(item)"
                 class="rounded border border-violet-300/30 bg-violet-400/10 px-2 py-0.5 text-[11px] text-violet-100"
               >
-                历史审查记录
+                历史审计记录
               </span>
             </div>
             <p class="mt-2 text-sm leading-6 text-zinc-300">{{ decisionText(item.decision || item.summary || item.repair_action) }}</p>

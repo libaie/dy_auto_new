@@ -13,7 +13,8 @@ repair task routes.
   stay in `app.db_models`.
 - Database session helpers stay in `app.database`.
 - Auth dependencies stay in `app.deps`.
-- Creative patch mutation stays in `app.services.agency_creative_patch_service`.
+- Creative patch mutation lives in
+  `app.domains.agency_operations.agency_creative_patch_service`.
 - Provider reservation accounting stays in
   `app.services.provider_cost_reservation_service`.
 

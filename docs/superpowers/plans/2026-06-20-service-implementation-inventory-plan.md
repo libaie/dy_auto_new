@@ -4,7 +4,7 @@
 
 **Goal:** Add automated inventory gates for the remaining implementation files in `server/app/services`.
 
-**Architecture:** A pytest file scans git-tracked direct files in `server/app/services`, treats files importing `app.domains` as compatibility facades, compares the remaining file names with a temporary allowlist, separately tracks mixed facades that still define top-level implementation, and validates a target-domain map for each remaining implementation file.
+**Architecture:** A pytest file scans committed direct files in `server/app/services`, treats files importing `app.domains` as compatibility facades, compares the remaining file names with a temporary allowlist, separately tracks mixed facades that still define top-level implementation, and validates a target-domain map for each remaining implementation file.
 
 **Tech Stack:** Python stdlib `pathlib`, pytest.
 
@@ -119,31 +119,31 @@ def test_service_implementation_targets_are_existing_domains():
 
 Expected: PASS.
 
-### Task 4: Ignore Untracked Service Drafts
+### Task 4: Ignore Uncommitted Service Drafts
 
 **Files:**
 
 - Modify: `server/tests/test_service_implementation_inventory.py`
 
-- [ ] **Step 1: Add the failing untracked-file test**
+- [ ] **Step 1: Add the failing uncommitted-file test**
 
 ```python
 import subprocess
 
 
 def test_non_facade_inventory_ignores_untracked_files():
-    assert _non_facade_service_files() <= _tracked_service_file_names()
+    assert _non_facade_service_files() <= _committed_service_file_names()
 
 
-def _tracked_service_file_names() -> set[str]:
+def _committed_service_file_names() -> set[str]:
     result = subprocess.run(
-        ["git", "ls-files", "--", "server/app/services/*.py"],
+        ["git", "ls-tree", "-r", "--name-only", "HEAD", "--", "server/app/services"],
         cwd=REPO_ROOT,
         capture_output=True,
         check=True,
         text=True,
     )
-    return {Path(line).name for line in result.stdout.splitlines()}
+    return {Path(line).name for line in result.stdout.splitlines() if line.endswith(".py")}
 ```
 
 - [ ] **Step 2: Run red**
@@ -152,25 +152,29 @@ def _tracked_service_file_names() -> set[str]:
 .\server\.venv\Scripts\python.exe -m pytest server/tests/test_service_implementation_inventory.py -q
 ```
 
-Expected: FAIL when the local worktree has an untracked service file such as
-`storyboard_image_service.py`.
+Expected: FAIL when the local worktree has an uncommitted service file such as
+`agency_creative_patch_service.py`.
 
-- [ ] **Step 3: Scan tracked files only**
+- [ ] **Step 3: Scan committed files only**
 
 ```python
-def _tracked_service_file_names() -> set[str]:
-    return {path.name for path in _tracked_service_files()}
+def _committed_service_file_names() -> set[str]:
+    return {path.name for path in _committed_service_files()}
 
 
 def _tracked_service_files() -> list[Path]:
+    return _committed_service_files()
+
+
+def _committed_service_files() -> list[Path]:
     result = subprocess.run(
-        ["git", "ls-files", "--", "server/app/services/*.py"],
+        ["git", "ls-tree", "-r", "--name-only", "HEAD", "--", "server/app/services"],
         cwd=REPO_ROOT,
         capture_output=True,
         check=True,
         text=True,
     )
-    return [REPO_ROOT / line for line in result.stdout.splitlines()]
+    return [REPO_ROOT / line for line in result.stdout.splitlines() if line.endswith(".py")]
 ```
 
 Use `_tracked_service_files()` in `_non_facade_service_files()` and

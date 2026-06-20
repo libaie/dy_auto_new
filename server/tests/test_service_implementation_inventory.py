@@ -9,8 +9,6 @@ DOMAINS_ROOT = REPO_ROOT / "server/app/domains"
 
 EXPECTED_NON_FACADE_SERVICE_FILES = {
     "agency_console.py",
-    "agency_creative_patch_service.py",
-    "agency_debate_audit.py",
     "agency_orchestrator.py",
     "agency_repair_executor.py",
     "agency_runtime.py",
@@ -30,8 +28,6 @@ EXPECTED_MIXED_FACADE_SERVICE_FILES = {
 
 EXPECTED_SERVICE_DOMAIN_TARGETS = {
     "agency_console.py": "agency_operations",
-    "agency_creative_patch_service.py": "agency_operations",
-    "agency_debate_audit.py": "agency_operations",
     "agency_orchestrator.py": "agency_operations",
     "agency_repair_executor.py": "agency_operations",
     "agency_runtime.py": "agency_operations",
@@ -51,7 +47,7 @@ def test_service_implementation_inventory_matches_allowlist():
 
 
 def test_non_facade_inventory_ignores_untracked_files():
-    assert _non_facade_service_files() <= _tracked_service_file_names()
+    assert _non_facade_service_files() <= _committed_service_file_names()
 
 
 def test_mixed_facade_implementation_inventory_matches_allowlist():
@@ -106,16 +102,20 @@ def _imports_domains(text: str) -> bool:
     return "from app.domains" in text or "import app.domains" in text
 
 
-def _tracked_service_file_names() -> set[str]:
-    return {path.name for path in _tracked_service_files()}
+def _committed_service_file_names() -> set[str]:
+    return {path.name for path in _committed_service_files()}
 
 
 def _tracked_service_files() -> list[Path]:
+    return _committed_service_files()
+
+
+def _committed_service_files() -> list[Path]:
     result = subprocess.run(
-        ["git", "ls-files", "--", "server/app/services/*.py"],
+        ["git", "ls-tree", "-r", "--name-only", "HEAD", "--", "server/app/services"],
         cwd=REPO_ROOT,
         capture_output=True,
         check=True,
         text=True,
     )
-    return [REPO_ROOT / line for line in result.stdout.splitlines()]
+    return [REPO_ROOT / line for line in result.stdout.splitlines() if line.endswith(".py")]

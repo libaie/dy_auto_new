@@ -9,7 +9,7 @@ from app.config import bj_now
 from app.db_models import AgencyExpertInvocation, VideoProductionRun
 from app.domains.production_observability.production_observability_service import record_production_event
 from app.domains.video_production.video_production_run_types import get_run_type
-from app.services.agency_creative_patch_service import create_patches_for_invocation
+from app.domains.agency_operations.agency_creative_patch_service import create_patches_for_invocation
 from app.domains.agency_operations.agency_repair_classifier import classify_repair_tasks
 from app.domains.agency_operations.agency_repair_orchestrator import enqueue_repair_tasks_for_invocation
 

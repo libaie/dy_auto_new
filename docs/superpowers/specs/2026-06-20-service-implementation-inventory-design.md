@@ -19,7 +19,7 @@ WIP in the worktree. Moving them in this slice would mix concerns.
 
 Add one inventory test that:
 
-- scans git-tracked direct Python files under `server/app/services`;
+- scans committed direct Python files under `server/app/services`;
 - ignores `__init__.py`;
 - treats a file containing `from app.domains` as a facade;
 - separately inventories files that import `app.domains` but still define
@@ -40,9 +40,9 @@ migration destination. `ai_generator.py` is mapped to `model_configuration` for
 now because it owns model/provider API invocation plumbing; a later slice can
 split it further if a dedicated generation domain is introduced.
 
-The inventory intentionally ignores untracked files so a local worktree draft
-cannot make the committed test suite depend on files that are not part of the
-commit.
+The inventory intentionally ignores uncommitted files so a local worktree draft
+or staged change cannot make the committed test suite depend on files that are
+not part of the commit.
 
 ## Non-Goals
 

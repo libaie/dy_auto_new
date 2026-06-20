@@ -85,7 +85,7 @@ async def poll_tasks(
     proxy = device_info.get("proxy_config") if device_info else None
 
     # DM sequence templates for device sync — include sequences referenced by this task.
-    from app.services.dm_sequence_visibility import get_device_visible_dm_sequences
+    from app.domains.content_collection.dm_sequence_visibility import get_device_visible_dm_sequences
     task_seq_id = (task.params or {}).get("dm_sequence_id") if task else None
     dm_seqs = get_device_visible_dm_sequences(
         db,

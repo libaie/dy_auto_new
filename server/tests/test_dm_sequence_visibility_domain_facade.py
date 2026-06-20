@@ -70,11 +70,11 @@ def test_content_collection_mutations_imports_domain_visibility_only():
     assert "app.services.dm_sequence_visibility" not in text
 
 
-def test_device_polling_stays_device_owned_and_legacy_compatible():
+def test_device_polling_imports_domain_visibility_directly():
     text = DEVICE_POLLING_PATH.read_text(encoding="utf-8")
 
-    assert "app.services.dm_sequence_visibility" in text
-    assert "app.domains.content_collection.dm_sequence_visibility" not in text
+    assert "app.domains.content_collection.dm_sequence_visibility" in text
+    assert "app.services.dm_sequence_visibility" not in text
 
 
 def test_content_collection_docs_register_dm_sequence_visibility_facade():

@@ -9,8 +9,8 @@ from app.config import ANTI_DETECT_CONFIG, ANTI_DETECT_CONFIG_VERSION, DEVICE_CO
 from app.database import get_db
 from app.deps import verify_device_secret
 from app.models import PollResponse
-from app.services.prompt_template_service import prompt_template_service
-from app.services.selector_service import selector_service
+from app.domains.prompt_management.prompt_template_service import prompt_template_service
+from app.domains.selector_management.selector_service import selector_service
 from app.services.task_service import task_service
 from app.ws_manager import pair_ws_manager
 

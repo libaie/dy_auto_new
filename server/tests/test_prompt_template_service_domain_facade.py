@@ -90,12 +90,12 @@ def test_legacy_router_facade_preserves_prompt_template_service_patch_path():
     assert domain_router.prompt_template_service is service_domain.prompt_template_service
 
 
-def test_device_prompt_templates_stay_device_owned_and_legacy_compatible():
+def test_device_prompt_templates_import_domain_service_directly():
     text = DEVICE_SCRIPT_ASSETS_PATH.read_text(encoding="utf-8")
 
     assert '@router.get("/prompt-templates")' in text
-    assert "app.services.prompt_template_service" in text
-    assert "app.domains.prompt_management.prompt_template_service" not in text
+    assert "app.domains.prompt_management.prompt_template_service" in text
+    assert "app.services.prompt_template_service" not in text
 
 
 def test_prompt_management_docs_register_prompt_template_service_facade():

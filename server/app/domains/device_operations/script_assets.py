@@ -7,8 +7,8 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.deps import verify_admin_token, verify_device_secret
-from app.services.prompt_template_service import prompt_template_service
-from app.services.selector_service import selector_service
+from app.domains.prompt_management.prompt_template_service import prompt_template_service
+from app.domains.selector_management.selector_service import selector_service
 from app.ws_manager import pair_ws_manager
 
 router = APIRouter()
@@ -98,7 +98,7 @@ def device_list_templates(
     """Return template list with MD5 hashes for incremental sync.
     Filters by device resolution profile when available."""
     from app.db_models import Device
-    from app.services.template_service import template_service
+    from app.domains.selector_management.template_service import template_service
     if not resolution and device_id:
         device = db.query(Device).filter(Device.id == device_id).first()
         if device and device.screen_resolution:
@@ -117,7 +117,7 @@ def device_download_template(
     """Download a single template image (binary).
     Priority: explicit resolution query param > device resolution > default."""
     from app.db_models import Device
-    from app.services.template_service import template_service
+    from app.domains.selector_management.template_service import template_service
     from fastapi.responses import FileResponse
     if not resolution:
         resolution = "default"
@@ -151,7 +151,7 @@ async def device_calibrate(
     """Device uploads auto-calibrated image templates.
     Saves templates and upserts UISelector rows for this resolution profile."""
     import base64
-    from app.services.template_service import template_service
+    from app.domains.selector_management.template_service import template_service
     from app.db_models import UISelector, Device
 
     resolution = request.resolution
@@ -208,7 +208,7 @@ async def device_calibrate(
                 db.add(new_sel)
         uploaded += 1
 
-    from app.services.selector_service import _bump_revision
+    from app.domains.selector_management.selector_service import _bump_revision
     _bump_revision(db)
     db.commit()
 

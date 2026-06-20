@@ -86,13 +86,13 @@ def test_selectors_router_imports_domain_template_service_only():
     assert "app.services.template_service" not in text
 
 
-def test_device_template_routes_stay_device_owned_and_legacy_compatible():
+def test_device_template_routes_import_domain_service_directly():
     text = DEVICE_SCRIPT_ASSETS_PATH.read_text(encoding="utf-8")
 
     assert '.get("/templates")' in text
     assert '.get("/templates/{filename}")' in text
-    assert "app.services.template_service" in text
-    assert "app.domains.selector_management.template_service" not in text
+    assert "app.domains.selector_management.template_service" in text
+    assert "app.services.template_service" not in text
 
 
 def test_selector_management_docs_register_template_service_facade():

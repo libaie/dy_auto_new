@@ -7,7 +7,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import verify_admin_token
-from app.db_models import Scene
+from app.db.models.creative_library import Scene
 from app.services.ai_generator import ai_generator
 from app.domains.creative_library.asset_ai_rewrite_service import (
     AssetAiRewriteError,

@@ -5,7 +5,7 @@ from json import JSONDecodeError
 
 from sqlalchemy.orm import Session
 
-from app.db_models import Character, Scene
+from app.db.models.creative_library import Character, Scene
 from app.services.ai_generator import ai_generator
 
 

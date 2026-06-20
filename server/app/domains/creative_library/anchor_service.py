@@ -6,9 +6,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.db.models.creative_library import CharacterAnchor as CharacterAnchorRow
-from app.db.models.creative_library import SceneAnchor as SceneAnchorRow
-from app.db_models import Character, Scene
+from app.db.models.creative_library import Character, CharacterAnchor as CharacterAnchorRow, Scene, SceneAnchor as SceneAnchorRow
 from app.models.asset_anchor import (
     AnchorProviderPayload,
     AnchorReferenceImage,

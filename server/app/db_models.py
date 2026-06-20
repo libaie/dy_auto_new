@@ -14,7 +14,14 @@ from sqlalchemy.orm import relationship
 from app.db.models.ai_text_artifacts import AITextArtifact, AITextArtifactConsumer
 from app.db.models.device_operations import Device, DevicePairRequest
 from app.db.models.content_collection import ContentTemplate, DMSequence, RepliedComment, SensitiveWord
-from app.db.models.creative_library import CharacterAnchor, ReferenceCategory, ReferenceData, SceneAnchor
+from app.db.models.creative_library import (
+    Character,
+    CharacterAnchor,
+    ReferenceCategory,
+    ReferenceData,
+    Scene,
+    SceneAnchor,
+)
 from app.db.models.identity_access import User
 from app.db.models.model_configuration import AIModel
 from app.db.models.prompt_management import PromptTemplate
@@ -282,46 +289,6 @@ class Conversation(Base):
 
 
 # ==== 多模型系列生成系统 ====
-
-class Character(Base):
-    __tablename__ = "characters"
-
-    id = Column(String(36), primary_key=True, default=_uuid)
-    name = Column(String(100), nullable=False)
-    role_type = Column(String(20), nullable=False, default="protagonist")
-    gender = Column(String(10), nullable=False, default="male")
-    age_range = Column(String(20), nullable=True)
-    personality = Column(Text, nullable=True)
-    appearance_desc = Column(Text, nullable=True)
-    outfit_desc = Column(Text, nullable=True)
-    avatar_front_url = Column(Text, nullable=True)
-    avatar_side_url = Column(Text, nullable=True)
-    avatar_threequarter_url = Column(Text, nullable=True)
-    avatar_fullbody_url = Column(Text, nullable=True)
-    default_voice_id = Column(String(100), nullable=True)
-    meta_json = Column(JSON, nullable=True, default=dict)
-    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
-    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
-    anchors = relationship("CharacterAnchor", back_populates="character", cascade="all, delete-orphan")
-
-
-class Scene(Base):
-    __tablename__ = "scenes"
-
-    id = Column(String(36), primary_key=True, default=_uuid)
-    name = Column(String(100), nullable=False)
-    scene_type = Column(String(20), nullable=False, default="indoor")
-    location_desc = Column(Text, nullable=True)
-    lighting = Column(String(50), nullable=True)
-    mood = Column(String(50), nullable=True)
-    reference_wideshot_url = Column(Text, nullable=True)
-    reference_midshot_url = Column(Text, nullable=True)
-    reference_aerial_url = Column(Text, nullable=True)
-    meta_json = Column(JSON, nullable=True, default=dict)
-    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
-    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
-    anchors = relationship("SceneAnchor", back_populates="scene", cascade="all, delete-orphan")
-
 
 class Series(Base):
     __tablename__ = "series"

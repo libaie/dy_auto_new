@@ -68,6 +68,7 @@ from app.db.models.video_production import (
     ProductionSegment,
     ProductionShot,
     VideoCollection,
+    VideoProductionRun,
 )
 
 # ==== 多模型系列生成系统 ====
@@ -162,38 +163,6 @@ class AgencyCreativePatch(Base):
     rejected_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
     updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
-
-
-class VideoProductionRun(Base):
-    """One staged automated production attempt for an episode."""
-    __tablename__ = "video_production_runs"
-
-    id = Column(String(36), primary_key=True, default=_uuid)
-    series_id = Column(String(36), ForeignKey("series.id", ondelete="CASCADE"), nullable=False)
-    episode_id = Column(String(36), ForeignKey("episodes.id", ondelete="CASCADE"), nullable=False)
-    status = Column(String(40), nullable=False, default="draft")
-    current_stage = Column(String(40), nullable=False, default="draft")
-    run_type = Column(String(40), nullable=False, default="legacy_episode_run")
-    pixelle_stage_task_id = Column(String(100), nullable=True)
-    production_plan_id = Column(String(36), ForeignKey("production_plans.id", ondelete="SET NULL"), nullable=True)
-    production_episode_id = Column(String(36), ForeignKey("production_episodes.id", ondelete="SET NULL"), nullable=True)
-    production_link_status = Column(String(30), nullable=False, default="legacy_unlinked")
-    storyboard_json = Column(JSON, nullable=True, default=dict)
-    model_trace_json = Column(JSON, nullable=True, default=dict)
-    edit_manifest_json = Column(JSON, nullable=True, default=dict)
-    error_message = Column(Text, nullable=True)
-    started_at = Column(DateTime, nullable=True)
-    completed_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
-    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
-
-    __table_args__ = (
-        Index("idx_video_production_runs_series_episode", "series_id", "episode_id"),
-        Index("idx_video_production_runs_status", "status"),
-        Index("idx_video_production_runs_type", "run_type"),
-        Index("idx_video_production_runs_production_links", "production_plan_id", "production_episode_id"),
-        Index("idx_video_production_runs_link_status", "production_link_status"),
-    )
 
 
 class VideoProductionAsset(Base):

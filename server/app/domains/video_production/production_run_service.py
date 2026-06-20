@@ -2,13 +2,19 @@ import json
 
 from sqlalchemy.orm import Session
 
-from app.db.models.video_production import ProductionEpisode, ProductionPlan, ProductionScene, ProductionSegment, ProductionShot
+from app.db.models.video_production import (
+    ProductionEpisode,
+    ProductionPlan,
+    ProductionScene,
+    ProductionSegment,
+    ProductionShot,
+    VideoProductionRun,
+)
 from app.db_models import (
     Character,
     Episode,
     Scene,
     Series,
-    VideoProductionRun,
 )
 from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
 from app.domains.ai_video_series.series_planning_service import (

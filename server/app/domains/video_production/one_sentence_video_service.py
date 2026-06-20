@@ -11,13 +11,12 @@ from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.config import bj_now
-from app.db.models.video_production import ProductionScene, ProductionSegment, ProductionShot
+from app.db.models.video_production import ProductionScene, ProductionSegment, ProductionShot, VideoProductionRun
 from app.db_models import (
     Character,
     Episode,
     Scene,
     Series,
-    VideoProductionRun,
 )
 from app.domains.agency_operations.agency_orchestrator import AgencyOrchestrator
 from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService

@@ -1,7 +1,8 @@
 from sqlalchemy.orm import Session
 
 from app.config import bj_now
-from app.db_models import VideoProductionAsset, VideoProductionRun
+from app.db.models.video_production import VideoProductionRun
+from app.db_models import VideoProductionAsset
 
 
 IMAGE_READY_STATUS = "image_approved"

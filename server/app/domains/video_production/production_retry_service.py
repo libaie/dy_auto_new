@@ -1,11 +1,8 @@
 from sqlalchemy.orm import Session
 
 from app.config import bj_now
-from app.db.models.video_production import ProductionScene, ProductionSegment, ProductionShot
-from app.db_models import (
-    VideoProductionAsset,
-    VideoProductionRun,
-)
+from app.db.models.video_production import ProductionScene, ProductionSegment, ProductionShot, VideoProductionRun
+from app.db_models import VideoProductionAsset
 from app.domains.video_production.production_queue_service import enqueue_job
 
 

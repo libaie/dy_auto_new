@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
-from app.db_models import VideoProductionAsset, VideoProductionRun
+from app.db.models.video_production import VideoProductionRun
+from app.db_models import VideoProductionAsset
 from app.domains.production_observability.production_observability_service import record_production_event
 from app.domains.video_production.video_production_state import production_segment_frame_ids
 

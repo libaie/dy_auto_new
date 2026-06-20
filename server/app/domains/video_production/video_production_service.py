@@ -5,11 +5,16 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from app.config import PIXELLE_CONFIG_PATH, bj_now
-from app.db.models.video_production import ProductionPlan, ProductionScene, ProductionSegment, ProductionShot
+from app.db.models.video_production import (
+    ProductionPlan,
+    ProductionScene,
+    ProductionSegment,
+    ProductionShot,
+    VideoProductionRun,
+)
 from app.db_models import (
     Episode,
     VideoProductionAsset,
-    VideoProductionRun,
     VideoReviewRecord,
 )
 from app.domains.agency_operations.agency_backtrack_policy import trigger_backtrack_if_needed

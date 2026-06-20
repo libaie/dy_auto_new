@@ -14,12 +14,12 @@ from app.db.models.video_production import (
     ProductionScene,
     ProductionSegment,
     ProductionShot,
+    VideoProductionRun,
 )
 from app.db_models import (
     Episode,
     Series,
     VideoProductionAsset,
-    VideoProductionRun,
 )
 from app.domains.video_production.production_status import (
     JOB_COMPLETED,

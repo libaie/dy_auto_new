@@ -1,7 +1,7 @@
 import pytest
 
 from app.config import bj_now
-from app.db_models import (
+from app.db.models import (
     AgencyCreativePatch,
     Episode,
     ProductionEpisode,
@@ -13,9 +13,9 @@ from app.db_models import (
     Series,
     VideoProductionRun,
 )
-from app.services.production_errors import ProductionErrorCode
-from app.services.video_production_run_types import REAL_SHORT_E2E
-from app.services.video_production_service import VideoProductionError, start_image_stage
+from app.domains.video_production.production_errors import ProductionErrorCode
+from app.domains.video_production.video_production_run_types import REAL_SHORT_E2E
+from app.domains.video_production.video_production_service import VideoProductionError, start_image_stage
 
 
 def _storyboard_run(db, *, patch_status="proposed"):
@@ -79,7 +79,7 @@ async def test_applied_creative_patch_does_not_block_image_stage(db, monkeypatch
     async def agency_pass(*args, **kwargs):
         return {"stage_status": "passed", "invocation_ids": [], "invocations": []}
 
-    monkeypatch.setattr("app.services.video_production_service._guard_provider_stage", agency_pass)
+    monkeypatch.setattr("app.domains.video_production.video_production_service._guard_provider_stage", agency_pass)
 
     with pytest.raises(VideoProductionError, match="image_generation"):
         await start_image_stage(db, run.id)
@@ -165,7 +165,7 @@ def _linked_run_with_worker_job(db):
 
 
 def test_real_worker_step_blocks_pending_creative_patch_before_provider(db, monkeypatch):
-    from app.services.production_worker_service import run_real_worker_step
+    from app.domains.video_production.production_worker_service import run_real_worker_step
 
     run, _segment, patch = _linked_run_with_worker_job(db)
 
@@ -187,8 +187,8 @@ def test_real_worker_step_blocks_pending_creative_patch_before_provider(db, monk
     async def fail_submit_image_batch(*args, **kwargs):
         raise AssertionError("worker submitted a provider task while creative patches are pending")
 
-    monkeypatch.setattr("app.services.production_worker_service.resolve_runtime_model_config", fake_config)
-    monkeypatch.setattr("app.services.video_production_service.submit_image_batch", fail_submit_image_batch)
+    monkeypatch.setattr("app.domains.video_production.production_worker_service.resolve_runtime_model_config", fake_config)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_image_batch", fail_submit_image_batch)
 
     result = run_real_worker_step(db, run.id, lease_id="creative-gate-worker", batch_size=1)
 

@@ -1,4 +1,4 @@
-from app.db_models import (
+from app.db.models import (
     ProductionAuditEvent,
     ProductionEpisode,
     ProductionJob,
@@ -6,8 +6,8 @@ from app.db_models import (
     ProductionSegment,
     ProductionShot,
 )
-from app.services.production_status import JOB_COMPLETED, JOB_QUEUED
-from app.services.production_worker_service import run_real_worker_step
+from app.domains.video_production.production_status import JOB_COMPLETED, JOB_QUEUED
+from app.domains.video_production.production_worker_service import run_real_worker_step
 from tests.test_agency_repair_loop import _series_plan_run
 
 

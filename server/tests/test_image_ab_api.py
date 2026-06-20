@@ -3,8 +3,8 @@ from types import SimpleNamespace
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.routers import image_production as router_module
-from app.services.image_creation_errors import image_error
+from app.domains.image_generation import image_production_router as router_module
+from app.domains.image_generation.image_creation_errors import image_error
 
 
 client = TestClient(app)

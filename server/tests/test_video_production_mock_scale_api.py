@@ -3,11 +3,11 @@ from types import SimpleNamespace
 import pytest
 from fastapi.testclient import TestClient
 
-from app.db_models import Episode, ProductionJob, ProductionSegment, Series, VideoProductionAsset, VideoProductionRun
+from app.db.models import Episode, ProductionJob, ProductionSegment, Series, VideoProductionAsset, VideoProductionRun
 from app.main import app
-from app.services.production_status import JOB_COMPLETED, JOB_QUEUED
-from app.services.video_production_run_types import MOCK_SERIES_SCALE
-from app.services.video_production_service import start_compose_stage, start_image_stage, start_video_stage
+from app.domains.video_production.production_status import JOB_COMPLETED, JOB_QUEUED
+from app.domains.video_production.video_production_run_types import MOCK_SERIES_SCALE
+from app.domains.video_production.video_production_service import start_compose_stage, start_image_stage, start_video_stage
 
 
 client = TestClient(app)
@@ -112,7 +112,7 @@ async def test_mock_series_scale_cannot_enter_real_provider_stages(db, monkeypat
     async def fail_if_called(*args, **kwargs):
         raise AssertionError("mock_series_scale entered provider stage")
 
-    monkeypatch.setattr("app.services.video_production_service._guard_provider_stage", fail_if_called)
+    monkeypatch.setattr("app.domains.video_production.video_production_service._guard_provider_stage", fail_if_called)
 
     with pytest.raises(Exception) as exc_info:
         await starter(db, run_id)
@@ -138,15 +138,15 @@ def test_mock_series_scale_cannot_start_asset_regeneration_provider_path(db, mon
     db.commit()
 
     monkeypatch.setattr(
-        "app.services.video_production_service.resolve_runtime_model_config",
+        "app.domains.video_production.video_production_service.resolve_runtime_model_config",
         lambda db, scene: {"provider": "mock", "api_key": "x", "model_name": scene},
     )
 
     async def fail_submit(*args, **kwargs):
         raise AssertionError("mock_series_scale entered provider submit")
 
-    monkeypatch.setattr("app.services.video_production_service.submit_image_batch", fail_submit)
-    monkeypatch.setattr("app.services.video_production_service.submit_video_batch", fail_submit)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_image_batch", fail_submit)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_video_batch", fail_submit)
 
     resp = client.post(f"/api/video-production/assets/{asset.id}/start-regeneration")
 

@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.db_models import AgencyCreativePatch, AgencyExpertInvocation, AITextArtifact, Character, Episode, Scene, Series
+from app.db.models import AgencyCreativePatch, AgencyExpertInvocation, AITextArtifact, Character, Episode, Scene, Series
 
 
 RICH_OUTLINE_FIELDS = {
@@ -84,7 +84,7 @@ def _add_series_assets(series, *, character_name="Lin", scene_name="House"):
 
 
 def test_ensure_episode_placeholders_creates_missing_episodes_idempotently(db):
-    from app.services.series_planning_service import ensure_episode_placeholders
+    from app.domains.ai_video_series.series_planning_service import ensure_episode_placeholders
 
     series = Series(title="Broken", total_episodes=3, status="draft")
     db.add(series)
@@ -109,7 +109,7 @@ def test_ensure_episode_placeholders_creates_missing_episodes_idempotently(db):
 
 
 def test_series_completion_requires_all_target_episodes_done(db):
-    from app.services.series_planning_service import is_series_completed, next_episode_number
+    from app.domains.ai_video_series.series_planning_service import is_series_completed, next_episode_number
 
     series = Series(title="Pilot only", total_episodes=3, status="draft")
     db.add(series)
@@ -122,7 +122,7 @@ def test_series_completion_requires_all_target_episodes_done(db):
 
 
 def test_ensure_series_continuity_artifacts_creates_connected_episode_outlines(db):
-    from app.services.series_planning_service import ensure_episode_placeholders, ensure_series_continuity_artifacts
+    from app.domains.ai_video_series.series_planning_service import ensure_episode_placeholders, ensure_series_continuity_artifacts
 
     series = Series(
         title="Continuity Series",
@@ -156,8 +156,8 @@ def test_ensure_series_continuity_artifacts_creates_connected_episode_outlines(d
 
 
 def test_ensure_series_continuity_artifacts_preserves_existing_approved_outline(db):
-    from app.services.ai_text_artifact_service import AITextArtifactService
-    from app.services.series_planning_service import ensure_series_continuity_artifacts
+    from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
+    from app.domains.ai_video_series.series_planning_service import ensure_series_continuity_artifacts
 
     series = Series(title="Manual Outline", logline="Keep edits.", total_episodes=1, status="draft")
     db.add(series)
@@ -191,8 +191,7 @@ def test_ensure_series_continuity_artifacts_preserves_existing_approved_outline(
 
 @pytest.mark.asyncio
 async def test_generate_series_story_plan_creates_approved_story_artifacts_and_rich_outlines(db, monkeypatch):
-    from app.services import series_planning_service as planning
-
+    from app.domains.ai_video_series import series_planning_service as planning
     calls = []
 
     async def fake_story_generator(**kwargs):
@@ -268,8 +267,7 @@ async def test_generate_series_story_plan_creates_approved_story_artifacts_and_r
 
 @pytest.mark.asyncio
 async def test_generate_series_story_plan_creates_episode_specific_assets_from_story_output(db, monkeypatch):
-    from app.services import series_planning_service as planning
-
+    from app.domains.ai_video_series import series_planning_service as planning
     series = Series(title="Asset Scope", logline="A hidden heir returns.", total_episodes=2, status="draft")
     lead, home = _add_series_assets(series, character_name="Lin Xia", scene_name="Lin Home")
     db.add(series)
@@ -332,8 +330,7 @@ async def test_generate_series_story_plan_creates_episode_specific_assets_from_s
 
 @pytest.mark.asyncio
 async def test_generate_series_story_plan_missing_episode_ids_falls_back_to_primary_asset_only(db, monkeypatch):
-    from app.services import series_planning_service as planning
-
+    from app.domains.ai_video_series import series_planning_service as planning
     series = Series(title="Fallback Scope", logline="A family secret returns.", total_episodes=1, status="draft")
     lead, home = _add_series_assets(series, character_name="Lead", scene_name="Home")
     series.characters.append(Character(name="Supporting", role_type="supporting", gender="female"))
@@ -368,8 +365,7 @@ async def test_generate_series_story_plan_missing_episode_ids_falls_back_to_prim
 
 @pytest.mark.asyncio
 async def test_generate_series_story_plan_idempotent_when_ai_or_fallback_artifacts_already_approved(db, monkeypatch):
-    from app.services import series_planning_service as planning
-
+    from app.domains.ai_video_series import series_planning_service as planning
     call_count = 0
 
     async def fake_story_generator(**_kwargs):
@@ -419,8 +415,8 @@ async def test_generate_series_story_plan_idempotent_when_ai_or_fallback_artifac
 
 @pytest.mark.asyncio
 async def test_generate_series_story_plan_preserves_human_edit_approved_episode_outline(db, monkeypatch):
-    from app.services import series_planning_service as planning
-    from app.services.ai_text_artifact_service import AITextArtifactService
+    from app.domains.ai_video_series import series_planning_service as planning
+    from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
 
     async def fake_story_generator(**_kwargs):
         return SimpleNamespace(
@@ -480,8 +476,8 @@ async def test_generate_series_story_plan_preserves_human_edit_approved_episode_
 
 @pytest.mark.asyncio
 async def test_generate_series_story_plan_preserves_valid_human_asset_ids_and_adds_usage(db, monkeypatch):
-    from app.services import series_planning_service as planning
-    from app.services.ai_text_artifact_service import AITextArtifactService
+    from app.domains.ai_video_series import series_planning_service as planning
+    from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
 
     async def fake_story_generator(**_kwargs):
         return SimpleNamespace(
@@ -530,8 +526,7 @@ async def test_generate_series_story_plan_preserves_valid_human_asset_ids_and_ad
 
 @pytest.mark.asyncio
 async def test_generate_series_story_plan_falls_back_when_ai_generation_raises(db, monkeypatch):
-    from app.services import series_planning_service as planning
-
+    from app.domains.ai_video_series import series_planning_service as planning
     async def fake_story_generator(**_kwargs):
         raise RuntimeError("AI API not configured")
 
@@ -581,7 +576,7 @@ async def test_generate_series_story_plan_falls_back_when_ai_generation_raises(d
 
 @pytest.mark.asyncio
 async def test_story_generator_runtime_finalizes_safe_invocation_without_repair_side_effects(db):
-    from app.services.story_generator_expert import generate_story_plan_with_expert
+    from app.domains.ai_video_series.story_generator_expert import generate_story_plan_with_expert
 
     captured = {}
 

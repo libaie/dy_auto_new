@@ -1,7 +1,7 @@
 """Task service tests — DB-backed."""
 import pytest
 from app.models import TaskType, TaskStatus
-from app.services.task_service import task_service
+from app.domains.task_operations.task_service import task_service
 from app.database import SessionLocal, get_db
 from app.main import app
 
@@ -142,8 +142,8 @@ def test_check_cancelled_running_none(db):
 
 def test_quota_blocks_task_assignment(db):
     """When ALL pending tasks are over quota, get_pending_task returns None."""
-    from app.services.stats_service import stats_service
-    from app.db_models import Task as DBTask, Account
+    from app.domains.reporting.stats_service import stats_service
+    from app.db.models import Task as DBTask, Account
 
     quota_account = "acc-quota-test"
     # Create account first
@@ -175,8 +175,8 @@ def test_quota_blocks_task_assignment(db):
 
 def test_quota_allows_non_exhausted_tasks(db):
     """Tasks of non-exhausted types should still be assignable."""
-    from app.services.stats_service import stats_service
-    from app.db_models import Task as DBTask, Account
+    from app.domains.reporting.stats_service import stats_service
+    from app.db.models import Task as DBTask, Account
 
     quota_account2 = "acc-quota-test2"
     # Create account first
@@ -201,8 +201,8 @@ def test_quota_allows_non_exhausted_tasks(db):
 
 def test_nurture_direct_task_respects_follow_quota(db):
     """Nurture tasks with follow subtasks should not be assigned after follow quota is exhausted."""
-    from app.services.stats_service import stats_service
-    from app.db_models import Task as DBTask, Account
+    from app.domains.reporting.stats_service import stats_service
+    from app.db.models import Task as DBTask, Account
 
     account_id = "acc-nurture-follow-quota"
     account = Account(id=account_id, nickname="nurture-follow-quota", daily_limits={
@@ -235,8 +235,8 @@ def test_nurture_direct_task_respects_follow_quota(db):
 def test_report_completed_does_not_increment_stats(db):
     """report_result should NOT increment stats — device-side POST /api/device/stats/increment is the single source of truth.
     This prevents double-counting when both incremental and batch stats are reported."""
-    from app.services.stats_service import stats_service
-    from app.db_models import Account
+    from app.domains.reporting.stats_service import stats_service
+    from app.db.models import Account
 
     stats_account = "acc-stats-test2"
     account = Account(id=stats_account, nickname="stats-test2", daily_limits={"likes": 50, "comments": 20, "follows": 20, "dms": 10, "replies": 15})
@@ -258,8 +258,8 @@ def test_report_completed_does_not_increment_stats(db):
 
 def test_all_candidates_over_quota_returns_none(db):
     """When all 10+ candidates are over quota, returns None."""
-    from app.services.stats_service import stats_service
-    from app.db_models import Task as DBTask, Account
+    from app.domains.reporting.stats_service import stats_service
+    from app.db.models import Task as DBTask, Account
 
     # Cancel all existing pending tasks
     db.query(DBTask).filter(DBTask.status == TaskStatus.PENDING.value).update(
@@ -290,7 +290,7 @@ def test_get_pending_task_stale_recovery_increments_retry(db, monkeypatch):
     If it fails in CI due to transaction/session quirks, the logic is independently
     verified by test_offline_checker_logic_increments_retry.
     """
-    from app.db_models import Task as DBTask, Device as DBDevice
+    from app.db.models import Task as DBTask, Device as DBDevice
     from app.config import bj_now
     from datetime import timedelta
 
@@ -329,7 +329,7 @@ def test_get_pending_task_stale_recovery_increments_retry(db, monkeypatch):
 
 def test_offline_checker_logic_increments_retry(db):
     """Verify the stuck task logic: retry_count increment + MAX_RETRIES capping."""
-    from app.db_models import Task as DBTask
+    from app.db.models import Task as DBTask
     from app.config import bj_now
     from datetime import timedelta
 
@@ -344,7 +344,7 @@ def test_offline_checker_logic_increments_retry(db):
     # Simulate stuck task logic (same as _offline_checker)
     now = bj_now()
     stuck_cutoff = now - timedelta(minutes=10)
-    from app.services.task_service import MAX_RETRIES as _MAX_RETRIES
+    from app.domains.task_operations.task_service import MAX_RETRIES as _MAX_RETRIES
     stuck_tasks = db.query(DBTask).filter(
         DBTask.status == "running",
         DBTask.started_at.isnot(None),

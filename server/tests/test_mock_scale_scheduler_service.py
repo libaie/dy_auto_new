@@ -1,11 +1,11 @@
 import asyncio
 import time
 
-from app.db_models import ProductionEpisode, ProductionJob, ProductionPlan, ProductionSegment, VideoProductionAsset
-from app.services.mock_scale_scheduler_service import create_mock_scale_run, advance_mock_scheduler
-from app.services.production_status import JOB_COMPLETED, JOB_LEASED, JOB_QUEUED
-from app.services.production_tree_service import get_run_tree
-from app.services.video_production_run_types import MOCK_SERIES_SCALE
+from app.db.models import ProductionEpisode, ProductionJob, ProductionPlan, ProductionSegment, VideoProductionAsset
+from app.domains.video_production.mock_scale_scheduler_service import create_mock_scale_run, advance_mock_scheduler
+from app.domains.video_production.production_status import JOB_COMPLETED, JOB_LEASED, JOB_QUEUED
+from app.domains.video_production.production_tree_service import get_run_tree
+from app.domains.video_production.video_production_run_types import MOCK_SERIES_SCALE
 
 
 def test_create_240_minute_mock_scale_run_links_plan_episode_and_jobs(db):
@@ -197,13 +197,13 @@ def test_advance_mock_scheduler_does_not_complete_run_while_job_is_leased(db):
 
 
 def test_one_sentence_mock_scale_routes_to_provider_free_service(db, monkeypatch):
-    from app.services.one_sentence_video_service import create_one_sentence_video
+    from app.domains.video_production.one_sentence_video_service import create_one_sentence_video
 
     async def fail_if_real_provider_path(*args, **kwargs):
         raise AssertionError("mock_series_scale entered real provider path")
 
     monkeypatch.setattr(
-        "app.services.production_run_service.start_episode_production",
+        "app.domains.video_production.production_run_service.start_episode_production",
         fail_if_real_provider_path,
     )
 

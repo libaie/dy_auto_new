@@ -1,6 +1,6 @@
 import pytest
-from app.db_models import Episode, Series, VideoProductionAsset, VideoProductionRun, VideoReviewRecord
-from app.services.video_production_service import start_video_stage, sync_video_stage_results
+from app.db.models import Episode, Series, VideoProductionAsset, VideoProductionRun, VideoReviewRecord
+from app.domains.video_production.video_production_service import start_video_stage, sync_video_stage_results
 
 
 async def _agency_pass(*args, **kwargs):
@@ -42,9 +42,9 @@ async def test_start_video_stage_submits_approved_images(db, monkeypatch):
         calls.append({"run_id": run_id, "frames": frames, "model_config": model_config})
         return {"ok": True, "stage_task_id": "video-task-1"}
 
-    monkeypatch.setattr("app.services.video_production_service.resolve_runtime_model_config", lambda db, scene: {"provider": "mock", "scene_key": scene})
-    monkeypatch.setattr("app.services.video_production_service._guard_provider_stage", _agency_pass)
-    monkeypatch.setattr("app.services.video_production_service.submit_video_batch", fake_submit_video_batch)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.resolve_runtime_model_config", lambda db, scene: {"provider": "mock", "scene_key": scene})
+    monkeypatch.setattr("app.domains.video_production.video_production_service._guard_provider_stage", _agency_pass)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_video_batch", fake_submit_video_batch)
 
     updated = await start_video_stage(db, run.id)
     assert updated.status == "video_batch_running"
@@ -64,9 +64,9 @@ async def test_start_video_stage_falls_back_to_storage_path_without_provider_url
         calls.append({"run_id": run_id, "frames": frames, "model_config": model_config})
         return {"ok": True, "stage_task_id": "video-task-1"}
 
-    monkeypatch.setattr("app.services.video_production_service.resolve_runtime_model_config", lambda db, scene: {"provider": "mock", "scene_key": scene})
-    monkeypatch.setattr("app.services.video_production_service._guard_provider_stage", _agency_pass)
-    monkeypatch.setattr("app.services.video_production_service.submit_video_batch", fake_submit_video_batch)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.resolve_runtime_model_config", lambda db, scene: {"provider": "mock", "scene_key": scene})
+    monkeypatch.setattr("app.domains.video_production.video_production_service._guard_provider_stage", _agency_pass)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_video_batch", fake_submit_video_batch)
 
     await start_video_stage(db, run.id)
 
@@ -86,9 +86,9 @@ async def test_start_video_stage_prefers_data_image_source_for_provider_input(db
         calls.append({"run_id": run_id, "frames": frames, "model_config": model_config})
         return {"ok": True, "stage_task_id": "video-task-1"}
 
-    monkeypatch.setattr("app.services.video_production_service.resolve_runtime_model_config", lambda db, scene: {"provider": "mock", "scene_key": scene})
-    monkeypatch.setattr("app.services.video_production_service._guard_provider_stage", _agency_pass)
-    monkeypatch.setattr("app.services.video_production_service.submit_video_batch", fake_submit_video_batch)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.resolve_runtime_model_config", lambda db, scene: {"provider": "mock", "scene_key": scene})
+    monkeypatch.setattr("app.domains.video_production.video_production_service._guard_provider_stage", _agency_pass)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_video_batch", fake_submit_video_batch)
 
     await start_video_stage(db, run.id)
 
@@ -107,9 +107,9 @@ async def test_start_video_stage_runs_image_review_before_video_generation(db, m
     async def fake_submit_video_batch(db, run_id, frames, model_config, template_config=None):
         return {"ok": True, "stage_task_id": "video-task-1"}
 
-    monkeypatch.setattr("app.services.video_production_service.resolve_runtime_model_config", lambda db, scene: {"provider": "mock", "scene_key": scene})
-    monkeypatch.setattr("app.services.video_production_service._guard_provider_stage", fake_guard)
-    monkeypatch.setattr("app.services.video_production_service.submit_video_batch", fake_submit_video_batch)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.resolve_runtime_model_config", lambda db, scene: {"provider": "mock", "scene_key": scene})
+    monkeypatch.setattr("app.domains.video_production.video_production_service._guard_provider_stage", fake_guard)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_video_batch", fake_submit_video_batch)
 
     await start_video_stage(db, run.id)
 
@@ -133,9 +133,9 @@ async def test_sync_video_stage_saves_segments_and_ai_review(db, monkeypatch):
             "metadata": {"duration": 5},
         }]}
 
-    monkeypatch.setattr("app.services.video_production_service.get_stage_task", fake_get_stage_task)
-    monkeypatch.setattr("app.services.video_production_service.resolve_runtime_model_config", lambda db, scene: {"provider": "mock", "api_key": "x", "model_name": "audit"})
-    monkeypatch.setattr("app.routers.audit._do_audit", lambda model, url, text: {"score": 0.95, "pass_fail": True, "issues": []})
+    monkeypatch.setattr("app.domains.video_production.video_production_service.get_stage_task", fake_get_stage_task)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.resolve_runtime_model_config", lambda db, scene: {"provider": "mock", "api_key": "x", "model_name": "audit"})
+    monkeypatch.setattr("app.domains.quality_audit.audit_router._do_audit", lambda model, url, text: {"score": 0.95, "pass_fail": True, "issues": []})
 
     assets = await sync_video_stage_results(db, run.id)
     assert assets[0].asset_type == "video_segment"

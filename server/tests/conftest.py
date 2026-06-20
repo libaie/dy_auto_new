@@ -4,7 +4,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.db_models import Base, Task, ChainInstance, DailyStats, Account, AccountGroup, AccountGroupMember, Channel, ChannelItem, CollectedComment, CollectedUser, Conversation, Character, Scene, CharacterAnchor, SceneAnchor, Series, Episode, PipelineRun, GeneratedVideo, AuditReport, ReferenceData, AIModel, User, SystemSetting, VideoProductionRun, VideoProductionAsset, VideoReviewRecord, ImageProductionPolicyVersion, ImageProductionStrategy, ImageProductionStrategyVersion, ImageSelectionPreview, ImageCreationTask, ImageCreationAsset, ImageProductionCostEvent, ImageProductionAbAttempt, ImageProductionAbGroup, ImageProductionMetric, ImageCreationReviewRecord, AgencyCreativePatch, AgencyExpertInvocation, AITextArtifact, AITextArtifactConsumer, ProductionAuditEvent, ProductionCostEvent, ProductionJob, ProductionSegment, ProductionShot, ProductionScene, ProductionEpisode, ProductionPlanVersion, ProductionPlan, VideoCollection, EpisodeScript, ScriptDramaticBeat, ScriptSceneOutline, ScriptVisualShot, series_characters, series_scenes
+from app.db.models import Base, Task, ChainInstance, DailyStats, Account, AccountGroup, AccountGroupMember, Channel, ChannelItem, CollectedComment, CollectedUser, Conversation, Character, Scene, CharacterAnchor, SceneAnchor, Series, Episode, PipelineRun, GeneratedVideo, AuditReport, ReferenceData, AIModel, User, SystemSetting, VideoProductionRun, VideoProductionAsset, VideoReviewRecord, ImageProductionPolicyVersion, ImageProductionStrategy, ImageProductionStrategyVersion, ImageSelectionPreview, ImageCreationTask, ImageCreationAsset, ImageProductionCostEvent, ImageProductionAbAttempt, ImageProductionAbGroup, ImageProductionMetric, ImageCreationReviewRecord, AgencyCreativePatch, AgencyExpertInvocation, AITextArtifact, AITextArtifactConsumer, ProductionAuditEvent, ProductionCostEvent, ProductionJob, ProductionSegment, ProductionShot, ProductionScene, ProductionEpisode, ProductionPlanVersion, ProductionPlan, VideoCollection, EpisodeScript, ScriptDramaticBeat, ScriptSceneOutline, ScriptVisualShot, series_characters, series_scenes
 from app.database import get_db
 from app.main import app
 from app.config import ADMIN_USERNAME, ADMIN_PASSWORD
@@ -80,7 +80,7 @@ def _isolate_test(test_db):
     _seed_test_identity(session)
     session.close()
     # Reset login rate limiter state (test_admin_auth.py fills it up)
-    from app.routers.auth import _failed_attempts
+    from app.domains.identity_access.auth_router import _failed_attempts
     _failed_attempts.clear()
     yield
 

@@ -3,7 +3,7 @@ from types import SimpleNamespace
 from fastapi.testclient import TestClient
 import pytest
 
-from app.db_models import (
+from app.db.models import (
     AITextArtifact,
     AITextArtifactConsumer,
     ProductionAuditEvent,
@@ -20,14 +20,14 @@ from app.db_models import (
     Scene,
 )
 from app.main import app
-from app.services.video_production_run_types import MOCK_SERIES_SCALE, REAL_SHORT_E2E
+from app.domains.video_production.video_production_run_types import MOCK_SERIES_SCALE, REAL_SHORT_E2E
 
 
 @pytest.fixture(autouse=True)
 def stub_series_story_plan_for_start_flow(monkeypatch):
     async def fake_generate_series_story_plan(db_session, series_id, force=False):
-        from app.db_models import AITextArtifact, Episode
-        from app.services.ai_text_artifact_service import AITextArtifactService
+        from app.db.models import AITextArtifact, Episode
+        from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
 
         service = AITextArtifactService(db_session)
         series = db_session.query(Series).filter_by(id=series_id).one()
@@ -144,7 +144,7 @@ def stub_series_story_plan_for_start_flow(monkeypatch):
             "artifacts": db_session.query(AITextArtifact).filter_by(series_id=series_id).count(),
         }
 
-    monkeypatch.setattr("app.services.production_run_service.generate_series_story_plan", fake_generate_series_story_plan)
+    monkeypatch.setattr("app.domains.video_production.production_run_service.generate_series_story_plan", fake_generate_series_story_plan)
 
 
 def _series_episode(db, *, locked=True, storyboard=True):
@@ -204,7 +204,7 @@ def test_start_flow_auto_generates_missing_storyboard_before_creating_run(db, mo
         "continuity_notes":"保持真实纪录片质感。"}]}
         """
 
-    monkeypatch.setattr("app.services.ai_generator.ai_generator.generate_custom", fake_generate_custom)
+    monkeypatch.setattr("app.domains.model_configuration.ai_generator.ai_generator.generate_custom", fake_generate_custom)
 
     resp = client.post("/api/video-production/runs/start", json={
         "series_id": series.id,
@@ -308,7 +308,7 @@ def test_start_flow_prefers_script_pipeline_storyboard_when_missing(db, monkeypa
             }
             db_session.flush()
 
-    monkeypatch.setattr("app.services.production_run_service.PipelineManager", FakePipelineManager)
+    monkeypatch.setattr("app.domains.video_production.production_run_service.PipelineManager", FakePipelineManager)
 
     resp = client.post("/api/video-production/runs/start", json={
         "series_id": series.id,
@@ -371,7 +371,7 @@ def test_start_flow_blocks_script_generation_with_blocked_expert_gate(db, monkey
             db_session.flush()
             return SimpleNamespace(agency_trace={"visual_shots": {"stage_status": "blocked"}})
 
-    monkeypatch.setattr("app.services.production_run_service.PipelineManager", FakePipelineManager)
+    monkeypatch.setattr("app.domains.video_production.production_run_service.PipelineManager", FakePipelineManager)
 
     resp = client.post("/api/video-production/runs/start", json={
         "series_id": series.id,
@@ -408,7 +408,7 @@ def test_start_flow_blocks_existing_script_snapshot_with_blocked_expert_gate(db)
 
 
 def test_start_flow_blocks_approved_script_artifact_with_blocked_expert_gate(db):
-    from app.services.ai_text_artifact_service import AITextArtifactService
+    from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
 
     series, episode = _series_episode(db, storyboard=True)
     service = AITextArtifactService(db)
@@ -461,7 +461,7 @@ def test_start_flow_generates_missing_episode_script_even_when_storyboard_exists
             }
             db_session.flush()
 
-    monkeypatch.setattr("app.services.production_run_service.PipelineManager", FakePipelineManager)
+    monkeypatch.setattr("app.domains.video_production.production_run_service.PipelineManager", FakePipelineManager)
 
     resp = client.post("/api/video-production/runs/start", json={
         "series_id": series.id,
@@ -543,7 +543,7 @@ def test_start_flow_creates_plan_segments_linked_run_and_returns_route(db):
 
 
 def test_start_flow_blocks_when_episode_asset_scope_is_missing(db):
-    from app.services.ai_text_artifact_service import AITextArtifactService
+    from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
 
     series, episode = _series_episode(db)
     series.story_bible_json = {"style_lock": {"locked": True, "version": 1, "visual_style": {}}}
@@ -584,7 +584,7 @@ def test_start_flow_blocks_when_episode_asset_scope_is_missing(db):
 
 
 def test_start_flow_blocks_style_lock_fallback_when_episode_scope_is_missing(db):
-    from app.services.ai_text_artifact_service import AITextArtifactService
+    from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
 
     series, episode = _series_episode(db, storyboard=False)
     service = AITextArtifactService(db)
@@ -614,7 +614,7 @@ def test_start_flow_blocks_style_lock_fallback_when_episode_scope_is_missing(db)
 
 
 def test_start_flow_blocks_unlinked_episode_asset_ids(db):
-    from app.services.ai_text_artifact_service import AITextArtifactService
+    from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
 
     series, episode = _series_episode(db)
     series.story_bible_json = {"style_lock": {"locked": True, "version": 1, "visual_style": {}}}
@@ -665,7 +665,7 @@ def test_start_flow_blocks_unlinked_episode_asset_ids(db):
 
 
 def test_start_flow_applies_episode_asset_scope_to_storyboard_frames(db):
-    from app.services.ai_text_artifact_service import AITextArtifactService
+    from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
 
     series, episode = _series_episode(db)
     series.story_bible_json = {"style_lock": {"locked": True, "version": 1, "visual_style": {}}}
@@ -727,7 +727,7 @@ def test_start_flow_applies_episode_asset_scope_to_storyboard_frames(db):
 
 
 def test_start_flow_replaces_stale_storyboard_frame_asset_ids_with_episode_scope(db):
-    from app.services.ai_text_artifact_service import AITextArtifactService
+    from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
 
     series, episode = _series_episode(db)
     series.story_bible_json = {"style_lock": {"locked": True, "version": 1, "visual_style": {}}}
@@ -785,7 +785,7 @@ def test_start_flow_replaces_stale_storyboard_frame_asset_ids_with_episode_scope
 
 
 def test_start_flow_retimes_existing_storyboard_to_target_duration(db):
-    from app.services.ai_text_artifact_service import AITextArtifactService
+    from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
 
     series, episode = _series_episode(db)
     character = Character(name="Timing Lead", role_type="protagonist", gender="female")
@@ -849,7 +849,7 @@ def test_start_flow_retimes_existing_storyboard_to_target_duration(db):
 
 
 def test_start_flow_blocks_ambiguous_multi_scene_scope_without_frame_scene_ids(db):
-    from app.services.ai_text_artifact_service import AITextArtifactService
+    from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
 
     series = Series(
         title="Ambiguous Scope",
@@ -945,7 +945,7 @@ def test_start_flow_imports_existing_text_inputs_as_consumed_artifacts(db):
 
 
 def test_start_flow_blocks_when_latest_text_artifact_revision_is_unapproved(db):
-    from app.services.ai_text_artifact_service import AITextArtifactService
+    from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
 
     series, episode = _series_episode(db)
     service = AITextArtifactService(db)
@@ -976,7 +976,7 @@ def test_start_flow_blocks_when_latest_text_artifact_revision_is_unapproved(db):
 
 
 def test_start_flow_binds_latest_approved_text_artifacts_to_run(db):
-    from app.services.ai_text_artifact_service import AITextArtifactService
+    from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
 
     series, episode = _series_episode(db)
     service = AITextArtifactService(db)
@@ -1045,7 +1045,7 @@ def test_start_flow_binds_latest_approved_text_artifacts_to_run(db):
 
 
 def test_start_flow_uses_approved_storyboard_artifact_as_production_input(db):
-    from app.services.ai_text_artifact_service import AITextArtifactService
+    from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
 
     series, episode = _series_episode(db)
     episode.storyboard_json = {
@@ -1163,7 +1163,7 @@ def test_real_short_start_flow_autostart_images_enqueues_without_synchronous_age
     async def fail_if_called(*args, **kwargs):
         raise AssertionError("start flow must not synchronously run agency review")
 
-    monkeypatch.setattr("app.services.video_production_service._guard_provider_stage", fail_if_called)
+    monkeypatch.setattr("app.domains.video_production.video_production_service._guard_provider_stage", fail_if_called)
 
     resp = client.post("/api/video-production/runs/start", json={
         "series_id": series.id,

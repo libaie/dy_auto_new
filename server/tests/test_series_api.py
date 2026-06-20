@@ -3,7 +3,7 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app
-from app.db_models import AITextArtifact, Character, Episode, ProductionJob, Scene, Series, VideoProductionRun
+from app.db.models import AITextArtifact, Character, Episode, ProductionJob, Scene, Series, VideoProductionRun
 
 
 @pytest.fixture
@@ -380,7 +380,7 @@ class TestSeriesAPI:
             return {"script": target.script_json, "storyboard": target.storyboard_json, "artifact_count": 2}
 
         monkeypatch.setattr(
-            "app.routers.series.generate_episode_script_storyboard",
+            "app.domains.ai_video_series.router.generate_episode_script_storyboard",
             fake_generate_episode_script_storyboard,
             raising=False,
         )
@@ -581,7 +581,7 @@ class TestSeriesAPI:
         assert artifact.content_json == {"scenes": []}
 
     def test_update_episode_rolls_back_when_text_artifact_approval_fails(self, client, db, monkeypatch):
-        from app.services.ai_text_artifact_service import AITextArtifactService
+        from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
 
         series_id = self._create_series(client).json()["series"]["id"]
         detail = client.get(f"/api/series/{series_id}")

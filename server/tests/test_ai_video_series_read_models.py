@@ -1,4 +1,4 @@
-from app.db_models import Episode, Series, VideoProductionRun
+from app.db.models import Episode, Series, VideoProductionRun
 from app.domains.ai_video_series.read_models import (
     active_video_runs_by_episode,
     episode_dict_with_video_run,

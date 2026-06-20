@@ -2,7 +2,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app
-from app.db_models import Account, AccountGroup, AccountGroupMember
+from app.db.models import Account, AccountGroup, AccountGroupMember
 
 
 @pytest.fixture

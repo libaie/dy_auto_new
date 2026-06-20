@@ -1,5 +1,5 @@
 import pytest
-from app.db_models import (
+from app.db.models import (
     Episode,
     ProductionAuditEvent,
     ProductionEpisode,
@@ -12,8 +12,8 @@ from app.db_models import (
     VideoProductionRun,
     VideoReviewRecord,
 )
-from app.services.video_production_service import VideoProductionError, start_asset_regeneration, sync_regenerated_asset
-from app.services.video_production_run_types import REAL_SHORT_E2E
+from app.domains.video_production.video_production_service import VideoProductionError, start_asset_regeneration, sync_regenerated_asset
+from app.domains.video_production.video_production_run_types import REAL_SHORT_E2E
 
 
 def _asset_run(db, asset_type="image", frame_id="frame-001"):
@@ -138,8 +138,8 @@ async def test_start_video_segment_regeneration_uses_selected_frame(db, monkeypa
         calls.append(frames)
         return {"ok": True, "stage_task_id": "regen-video-task"}
 
-    monkeypatch.setattr("app.services.video_production_service.resolve_runtime_model_config", lambda db, scene: {"provider": "mock", "scene_key": scene})
-    monkeypatch.setattr("app.services.video_production_service.submit_video_batch", fake_submit_video_batch)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.resolve_runtime_model_config", lambda db, scene: {"provider": "mock", "scene_key": scene})
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_video_batch", fake_submit_video_batch)
 
     updated = await start_asset_regeneration(db, asset.id)
     assert updated.status == "regenerating"
@@ -155,8 +155,8 @@ async def test_start_image_regeneration_marks_old_asset_regenerating(db, monkeyp
     async def fake_submit_image_batch(db, run_id, episode_id, frames, model_config, template_config=None):
         return {"ok": True, "stage_task_id": "regen-image-task"}
 
-    monkeypatch.setattr("app.services.video_production_service.resolve_runtime_model_config", lambda db, scene: {"provider": "mock", "scene_key": scene})
-    monkeypatch.setattr("app.services.video_production_service.submit_image_batch", fake_submit_image_batch)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.resolve_runtime_model_config", lambda db, scene: {"provider": "mock", "scene_key": scene})
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_image_batch", fake_submit_image_batch)
 
     updated = await start_asset_regeneration(db, asset.id)
     assert updated.status == "regenerating"
@@ -173,7 +173,7 @@ async def test_real_short_regeneration_blocks_direct_provider_submit(db, monkeyp
     async def fail_submit_image_batch(*args, **kwargs):
         raise AssertionError("real_short_e2e regeneration must not direct-submit provider work")
 
-    monkeypatch.setattr("app.services.video_production_service.submit_image_batch", fail_submit_image_batch)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_image_batch", fail_submit_image_batch)
 
     with pytest.raises(VideoProductionError, match="worker/executor"):
         await start_asset_regeneration(db, asset.id)
@@ -200,9 +200,9 @@ async def test_linked_image_regeneration_uses_segment_frame_and_preserves_target
             "metadata": {},
         }]}
 
-    monkeypatch.setattr("app.services.video_production_service.resolve_runtime_model_config", lambda db, scene: {"provider": "mock", "scene_key": scene})
-    monkeypatch.setattr("app.services.video_production_service.submit_image_batch", fake_submit_image_batch)
-    monkeypatch.setattr("app.services.video_production_service.get_stage_task", fake_get_stage_task)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.resolve_runtime_model_config", lambda db, scene: {"provider": "mock", "scene_key": scene})
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_image_batch", fake_submit_image_batch)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.get_stage_task", fake_get_stage_task)
 
     updated = await start_asset_regeneration(db, asset.id)
     assert updated.pixelle_task_id == "regen-linked-image-task"
@@ -244,9 +244,9 @@ async def test_linked_video_regeneration_uses_segment_frame_and_preserves_target
             "metadata": {"duration": 7},
         }]}
 
-    monkeypatch.setattr("app.services.video_production_service.resolve_runtime_model_config", lambda db, scene: {"provider": "mock", "scene_key": scene})
-    monkeypatch.setattr("app.services.video_production_service.submit_video_batch", fake_submit_video_batch)
-    monkeypatch.setattr("app.services.video_production_service.get_stage_task", fake_get_stage_task)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.resolve_runtime_model_config", lambda db, scene: {"provider": "mock", "scene_key": scene})
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_video_batch", fake_submit_video_batch)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.get_stage_task", fake_get_stage_task)
 
     updated = await start_asset_regeneration(db, asset.id)
     assert updated.pixelle_task_id == "regen-linked-video-task"
@@ -277,7 +277,7 @@ async def test_start_image_regeneration_blocks_when_provider_model_config_missin
     async def fail_submit_image_batch(*args, **kwargs):
         raise AssertionError("image provider should not submit without runtime config")
 
-    monkeypatch.setattr("app.services.video_production_service.submit_image_batch", fail_submit_image_batch)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_image_batch", fail_submit_image_batch)
 
     with pytest.raises(VideoProductionError, match="image_generation"):
         await start_asset_regeneration(db, asset.id)
@@ -310,7 +310,7 @@ async def test_start_video_regeneration_blocks_when_provider_model_config_missin
     async def fail_submit_video_batch(*args, **kwargs):
         raise AssertionError("video provider should not submit without runtime config")
 
-    monkeypatch.setattr("app.services.video_production_service.submit_video_batch", fail_submit_video_batch)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_video_batch", fail_submit_video_batch)
 
     with pytest.raises(VideoProductionError, match="video_rendering"):
         await start_asset_regeneration(db, asset.id)
@@ -350,8 +350,8 @@ async def test_sync_regenerated_asset_creates_next_version(db, monkeypatch):
             "metadata": {},
         }]}
 
-    monkeypatch.setattr("app.services.video_production_service.get_stage_task", fake_get_stage_task)
-    monkeypatch.setattr("app.services.video_production_service.resolve_runtime_model_config", lambda db, scene: {})
+    monkeypatch.setattr("app.domains.video_production.video_production_service.get_stage_task", fake_get_stage_task)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.resolve_runtime_model_config", lambda db, scene: {})
 
     new_asset = await sync_regenerated_asset(db, asset.id)
     assert new_asset.version == 2
@@ -376,8 +376,8 @@ async def test_sync_regenerated_video_segment_creates_ai_review(db, monkeypatch)
             "metadata": {"duration": 6},
         }]}
 
-    monkeypatch.setattr("app.services.video_production_service.get_stage_task", fake_get_stage_task)
-    monkeypatch.setattr("app.services.video_production_service.resolve_runtime_model_config", lambda db, scene: {})
+    monkeypatch.setattr("app.domains.video_production.video_production_service.get_stage_task", fake_get_stage_task)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.resolve_runtime_model_config", lambda db, scene: {})
 
     new_asset = await sync_regenerated_asset(db, asset.id)
     assert new_asset.asset_type == "video_segment"

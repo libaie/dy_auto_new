@@ -4,7 +4,7 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app
-from app.db_models import DMSequence
+from app.db.models import DMSequence
 from app.database import get_db
 
 
@@ -198,7 +198,7 @@ def test_delete_not_found(client):
 
 def test_device_poll_includes_dm_sequences(db):
     """Poll response should include dm_sequences for sequence templates."""
-    from app.db_models import DMSequence as DS, Device as DBDevice
+    from app.db.models import DMSequence as DS, Device as DBDevice
     from app.config import bj_now
 
     _clean(db)
@@ -228,7 +228,7 @@ def test_device_poll_includes_dm_sequences(db):
 
 def test_device_sync_keeps_variant_delay_ms_between_1500_and_3000(db, monkeypatch):
     from app.config import DEVICE_SECRET
-    from app.db_models import DMSequence as DS
+    from app.db.models import DMSequence as DS
 
     _clean(db)
     db.add(DS(
@@ -240,7 +240,7 @@ def test_device_sync_keeps_variant_delay_ms_between_1500_and_3000(db, monkeypatc
     ))
     db.commit()
     monkeypatch.setattr(
-        "app.routers.dm_sequences.random.randint",
+        "app.domains.content_collection.dm_sequences_router.random.randint",
         lambda low, _high: low,
     )
 
@@ -260,7 +260,7 @@ def test_device_sync_keeps_variant_delay_ms_between_1500_and_3000(db, monkeypatc
 
 def test_device_sync_randomizes_each_variant_group_delay_ms(db, monkeypatch):
     from app.config import DEVICE_SECRET
-    from app.db_models import DMSequence as DS
+    from app.db.models import DMSequence as DS
 
     _clean(db)
     db.add(DS(
@@ -282,7 +282,7 @@ def test_device_sync_randomizes_each_variant_group_delay_ms(db, monkeypatch):
     db.commit()
     delays = iter([1500, 1600, 1700, 1800])
     monkeypatch.setattr(
-        "app.routers.dm_sequences._variant_delay_ms",
+        "app.domains.content_collection.dm_sequences_router._variant_delay_ms",
         lambda: next(delays),
     )
 
@@ -327,7 +327,7 @@ def test_generate_normalizes_common_ai_message_fields(client, monkeypatch):
         ], ensure_ascii=False)
 
     monkeypatch.setattr(
-        "app.services.ai_generator.ai_generator.generate_custom_stream",
+        "app.domains.model_configuration.ai_generator.ai_generator.generate_custom_stream",
         fake_stream,
     )
 
@@ -362,7 +362,7 @@ def test_generate_variants_randomizes_delay_ms_between_1500_and_3000(client, db,
         }, ensure_ascii=False)
 
     monkeypatch.setattr(
-        "app.services.ai_generator.ai_generator.generate_custom",
+        "app.domains.model_configuration.ai_generator.ai_generator.generate_custom",
         fake_generate_custom,
     )
 
@@ -391,7 +391,7 @@ def test_generate_variants_accepts_count_20(client, db, monkeypatch):
         }, ensure_ascii=False)
 
     monkeypatch.setattr(
-        "app.services.ai_generator.ai_generator.generate_custom",
+        "app.domains.model_configuration.ai_generator.ai_generator.generate_custom",
         fake_generate_custom,
     )
 

@@ -106,7 +106,7 @@ def test_list_accounts_excludes_deleted():
 
 def test_delete_account_cancels_pending_tasks():
     """Soft-deleting an account cancels its pending/running tasks."""
-    from app.db_models import Task as DBTask
+    from app.db.models import Task as DBTask
 
     # Create account
     create_resp = client.post("/api/accounts", json={
@@ -115,7 +115,7 @@ def test_delete_account_cancels_pending_tasks():
     account_id = create_resp.json()["id"]
 
     # Create some tasks for this account via the service
-    from app.services.task_service import task_service
+    from app.domains.task_operations.task_service import task_service
     from app.models import TaskType
     from app.database import get_db as _get_db
     db_gen = app.dependency_overrides[_get_db]()
@@ -145,7 +145,7 @@ def test_delete_account_cancels_pending_tasks():
 
 def test_delete_account_unbinds_devices():
     """Soft-deleting an account unbinds associated devices."""
-    from app.db_models import Device as DBDevice
+    from app.db.models import Device as DBDevice
     from app.database import get_db as _get_db
 
     # Create account

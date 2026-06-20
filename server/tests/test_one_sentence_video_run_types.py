@@ -1,12 +1,12 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from app.db_models import Character, Episode, Scene, Series, VideoProductionRun
+from app.db.models import Character, Episode, Scene, Series, VideoProductionRun
 from app.main import app
-from app.services.production_errors import ProductionRepairableError
-from app.services.production_run_service import start_episode_production
-from app.services.video_production_run_types import MOCK_SERIES_SCALE, REAL_SHORT_E2E
-from app.services.video_production_service import start_image_stage
+from app.domains.video_production.production_errors import ProductionRepairableError
+from app.domains.video_production.production_run_service import start_episode_production
+from app.domains.video_production.video_production_run_types import MOCK_SERIES_SCALE, REAL_SHORT_E2E
+from app.domains.video_production.video_production_service import start_image_stage
 
 
 client = TestClient(app)
@@ -48,11 +48,11 @@ async def _fake_scene_references(db, scene_id, slot="all"):
 
 def _mock_reference_generation(monkeypatch):
     monkeypatch.setattr(
-        "app.services.reference_asset_service.generate_character_reference_images",
+        "app.domains.creative_library.reference_asset_service.generate_character_reference_images",
         _fake_character_references,
     )
     monkeypatch.setattr(
-        "app.services.reference_asset_service.generate_scene_reference_images",
+        "app.domains.creative_library.reference_asset_service.generate_scene_reference_images",
         _fake_scene_references,
     )
 
@@ -166,7 +166,7 @@ async def test_mock_series_scale_cannot_enter_real_provider_image_stage(db, monk
     async def fail_if_called(*args, **kwargs):
         raise AssertionError("mock_series_scale entered provider stage")
 
-    monkeypatch.setattr("app.services.video_production_service._guard_provider_stage", fail_if_called)
+    monkeypatch.setattr("app.domains.video_production.video_production_service._guard_provider_stage", fail_if_called)
 
     with pytest.raises(Exception) as exc_info:
         await start_image_stage(db, run.id)
@@ -207,7 +207,7 @@ async def test_real_short_image_stage_blocks_empty_reference_payload_before_prov
     async def fail_if_called(*args, **kwargs):
         raise AssertionError("provider guard should not run before local reference validation")
 
-    monkeypatch.setattr("app.services.video_production_service._guard_provider_stage", fail_if_called)
+    monkeypatch.setattr("app.domains.video_production.video_production_service._guard_provider_stage", fail_if_called)
 
     run = await start_episode_production(
         db,

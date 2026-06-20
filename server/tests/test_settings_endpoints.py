@@ -2,7 +2,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app
-from app.db_models import SystemSetting
+from app.db.models import SystemSetting
 from app.database import get_db
 
 

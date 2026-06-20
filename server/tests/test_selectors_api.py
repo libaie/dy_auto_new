@@ -93,8 +93,7 @@ def test_toggle_selector_enabled(client):
 
 
 def test_upload_template_uses_form_action_and_query_resolution(client, tmp_path, monkeypatch):
-    from app.services import template_service as template_module
-
+    from app.domains.selector_management import template_service as template_module
     monkeypatch.setattr(template_module, "TEMPLATE_DIR", tmp_path)
     template_module.template_service._md5_cache.clear()
 

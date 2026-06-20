@@ -2,9 +2,9 @@ from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
-from app.db_models import AIModel, ImageCreationAsset, ImageCreationTask
+from app.db.models import AIModel, ImageCreationAsset, ImageCreationTask
 from app.main import app
-from app.services.crypto import encrypt
+from app.domains.system_configuration.crypto import encrypt
 
 
 client = TestClient(app)
@@ -62,9 +62,9 @@ def test_mocked_text_to_image_flow_approves_downstream_asset(db, monkeypatch):
             "mime_type": "image/png",
         }
 
-    monkeypatch.setattr("app.services.image_creation_service.submit_image_create", fake_submit)
-    monkeypatch.setattr("app.services.image_creation_service.get_stage_task", fake_stage_task)
-    monkeypatch.setattr("app.services.image_creation_service._copy_external_image", fake_copy_external)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.submit_image_create", fake_submit)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.get_stage_task", fake_stage_task)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service._copy_external_image", fake_copy_external)
 
     created = client.post("/api/image-creation/tasks", json={
         "mode": "text_to_image",

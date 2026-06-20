@@ -112,7 +112,7 @@ def test_scene_key_unknown_raises(client):
 
 
 def test_provider_preset_fallback(client):
-    from app.services.model_schema import get_provider_preset
+    from app.domains.model_configuration.model_schema import get_provider_preset
     preset = get_provider_preset("unknown_provider_xyz")
     assert preset["label"] == "unknown_provider_xyz"
     assert preset["test_strategy"] == "health_check"

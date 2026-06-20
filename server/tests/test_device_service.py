@@ -1,6 +1,6 @@
 """Device service tests."""
 import pytest
-from app.services.device_service import device_service
+from app.domains.device_operations.device_service import device_service
 
 
 def test_register_new_device(db):
@@ -48,7 +48,7 @@ def test_get_device_status_unknown(db):
 def test_set_offline_devices(db):
     """Devices without recent heartbeat get marked offline."""
     device_service.register(db, "dev-offline-test", "Offline Device")
-    from app.db_models import Device
+    from app.db.models import Device
     from datetime import datetime, timezone, timedelta
     device = db.query(Device).filter(Device.id == "dev-offline-test").first()
     device.last_seen_at = datetime.now(timezone.utc) - timedelta(minutes=10)

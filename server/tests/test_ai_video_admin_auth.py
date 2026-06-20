@@ -16,7 +16,7 @@ def test_non_admin_cannot_start_one_sentence_production(real_auth, monkeypatch):
     async def fail_if_called(*args, **kwargs):
         raise AssertionError("non-admin request reached one-sentence production")
 
-    monkeypatch.setattr("app.routers.video_production.create_one_sentence_video", fail_if_called)
+    monkeypatch.setattr("app.domains.video_production.video_production_router.create_one_sentence_video", fail_if_called)
 
     response = client.post(
         "/api/video-production/one-sentence",
@@ -36,7 +36,7 @@ def test_non_admin_cannot_start_episode_production(real_auth, monkeypatch):
     async def fail_if_called(*args, **kwargs):
         raise AssertionError("non-admin request reached episode production")
 
-    monkeypatch.setattr("app.services.production_run_service.start_episode_production", fail_if_called)
+    monkeypatch.setattr("app.domains.video_production.production_run_service.start_episode_production", fail_if_called)
 
     response = client.post(
         "/api/video-production/runs/start",

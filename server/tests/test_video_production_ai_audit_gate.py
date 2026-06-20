@@ -1,4 +1,4 @@
-from app.db_models import (
+from app.db.models import (
     Episode,
     ProductionAuditEvent,
     ProductionEpisode,
@@ -12,8 +12,8 @@ from app.db_models import (
     VideoProductionRun,
     VideoReviewRecord,
 )
-from app.services.video_production_run_types import REAL_SHORT_E2E
-from app.services.video_production_service import run_ai_audit_for_assets
+from app.domains.video_production.video_production_run_types import REAL_SHORT_E2E
+from app.domains.video_production.video_production_service import run_ai_audit_for_assets
 
 
 def test_ai_audit_pass_does_not_human_approve_image_gate(db, monkeypatch):
@@ -52,11 +52,11 @@ def test_ai_audit_pass_does_not_human_approve_image_gate(db, monkeypatch):
     db.commit()
 
     monkeypatch.setattr(
-        "app.services.video_production_service.resolve_runtime_model_config",
+        "app.domains.video_production.video_production_service.resolve_runtime_model_config",
         lambda db, scene: {"provider": "mock", "api_key": "x", "model_name": "audit"},
     )
     monkeypatch.setattr(
-        "app.routers.audit._do_audit",
+        "app.domains.quality_audit.audit_router._do_audit",
         lambda model, url, text: {"score": 0.99, "pass_fail": True, "issues": []},
     )
 
@@ -112,7 +112,7 @@ def test_autopilot_run_auto_approves_image_when_audit_model_is_unavailable(db, m
     db.commit()
 
     monkeypatch.setattr(
-        "app.services.video_production_service.resolve_runtime_model_config",
+        "app.domains.video_production.video_production_service.resolve_runtime_model_config",
         lambda db, scene: (_ for _ in ()).throw(RuntimeError("audit unavailable")),
     )
 
@@ -214,11 +214,11 @@ def test_ai_audit_fallback_third_failure_triggers_image_backtrack(db, monkeypatc
     db.commit()
 
     monkeypatch.setattr(
-        "app.services.model_registry.get_model_for_scene",
+        "app.domains.model_configuration.model_registry.get_model_for_scene",
         lambda db, scene: (_ for _ in ()).throw(RuntimeError("registry unavailable")),
     )
     monkeypatch.setattr(
-        "app.services.video_production_service.resolve_runtime_model_config",
+        "app.domains.video_production.video_production_service.resolve_runtime_model_config",
         lambda db, scene: (_ for _ in ()).throw(RuntimeError("audit unavailable")),
     )
 
@@ -340,11 +340,11 @@ def test_backtrack_state_survives_later_auto_approval_in_same_audit_batch(db, mo
     db.commit()
 
     monkeypatch.setattr(
-        "app.services.video_production_service.resolve_runtime_model_config",
+        "app.domains.video_production.video_production_service.resolve_runtime_model_config",
         lambda db, scene: {"provider": "mock", "api_key": "x", "model_name": "audit"},
     )
     monkeypatch.setattr(
-        "app.routers.audit._do_audit",
+        "app.domains.quality_audit.audit_router._do_audit",
         lambda model, url, text: (
             {"score": 0.1, "pass_fail": False, "issues": ["bad"]}
             if "fail-current" in url

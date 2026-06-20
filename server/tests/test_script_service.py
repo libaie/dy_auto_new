@@ -2,7 +2,7 @@
 import pytest
 import io
 from pathlib import Path
-from app.services.script_service import script_service
+from app.domains.device_operations.script_service import script_service
 
 
 def test_get_version_returns_string():

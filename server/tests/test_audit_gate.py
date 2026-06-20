@@ -1,4 +1,4 @@
-from app.services.audit_gate import classify_audit_gate
+from app.domains.quality_audit.audit_gate import classify_audit_gate
 
 
 def test_missing_audit_config_needs_human():

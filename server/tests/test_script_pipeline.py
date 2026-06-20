@@ -1,4 +1,4 @@
-from app.db_models import (
+from app.db.models import (
     Episode,
     EpisodeScript as DbEpisodeScript,
     AITextArtifact,
@@ -11,8 +11,8 @@ from app.db_models import (
 import pytest
 
 from app.models.script import DramaticBeatType, EpisodeScript, PipelineStage
-from app.services import script_pipeline as script_pipeline_module
-from app.services.script_pipeline import (
+from app.domains.script_pipeline import script_pipeline_service as script_pipeline_module
+from app.domains.script_pipeline.script_pipeline_service import (
     DynamicPromptBuilder,
     PipelineManager,
     ScriptGenerationError,

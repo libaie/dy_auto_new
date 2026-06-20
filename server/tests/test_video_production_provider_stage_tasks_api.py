@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from app.db_models import ProviderCostReservation, ProviderStageTask
+from app.db.models import ProviderCostReservation, ProviderStageTask
 from app.main import app
 from tests.video_production_control_plane_helpers import linked_segment_context
 

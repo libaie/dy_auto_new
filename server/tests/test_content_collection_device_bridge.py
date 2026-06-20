@@ -50,7 +50,7 @@ def test_device_bridge_handoff_use_case_modules_exist():
 
 
 def test_device_generate_content_bridge_response_shape(db):
-    from app.services.content_service import content_service
+    from app.domains.content_collection.content_service import content_service
 
     template = content_service.create_template(
         db,
@@ -61,7 +61,7 @@ def test_device_generate_content_bridge_response_shape(db):
     )
 
     with patch(
-        "app.services.content_service.ContentService.generate_from_template",
+        "app.domains.content_collection.content_service.ContentService.generate_from_template",
         new_callable=AsyncMock,
         return_value="Generated bridge reply",
     ):

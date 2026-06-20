@@ -2,7 +2,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from app.db_models import AIModel as LegacyAIModel, Base
+from app.db.models import AIModel as LegacyAIModel, Base
 
 
 SERVER_ROOT = Path(__file__).resolve().parents[1]
@@ -18,7 +18,7 @@ def test_model_configuration_model_boundary_reexports_ai_model():
 
 def test_model_configuration_model_boundary_imports_in_clean_process():
     code = (
-        "import app.db_models as legacy; "
+        "import app.db.models as legacy; "
         "from app.db.models.model_configuration import AIModel; "
         "assert legacy.AIModel is AIModel; "
         "assert 'ai_models' in legacy.Base.metadata.tables"

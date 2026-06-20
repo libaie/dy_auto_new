@@ -3,11 +3,11 @@ from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
-from app.db_models import AIModel, ImageCreationAsset, ImageCreationReviewRecord, ImageCreationTask
+from app.db.models import AIModel, ImageCreationAsset, ImageCreationReviewRecord, ImageCreationTask
 from app.main import app
-from app.routers.image_creation import CreateImageTaskRequest
-from app.services.crypto import encrypt
-from app.services.image_creation_service import normalized_request_hash
+from app.domains.image_generation.image_creation_router import CreateImageTaskRequest
+from app.domains.system_configuration.crypto import encrypt
+from app.domains.image_generation.image_creation_service import normalized_request_hash
 
 
 client = TestClient(app)
@@ -44,7 +44,7 @@ def _error_code(resp):
 
 
 def test_upload_image_saves_to_static_storage(tmp_path, monkeypatch):
-    monkeypatch.setattr("app.services.image_creation_storage.IMAGE_CREATION_ROOT", tmp_path / "image-creation")
+    monkeypatch.setattr("app.domains.image_generation.image_creation_storage.IMAGE_CREATION_ROOT", tmp_path / "image-creation")
 
     resp = client.post(
         "/api/image-creation/uploads",
@@ -68,7 +68,7 @@ def test_create_text_to_image_task_submits_pixelle(db, monkeypatch):
         calls.append(kwargs)
         return {"ok": True, "stage_task_id": "stage-1"}
 
-    monkeypatch.setattr("app.services.image_creation_service.submit_image_create", fake_submit)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.submit_image_create", fake_submit)
 
     resp = client.post("/api/image-creation/tasks", json={
         "mode": "text_to_image",
@@ -95,7 +95,7 @@ def test_reusing_idempotency_key_with_different_request_returns_conflict(db, mon
     async def fake_submit(**kwargs):
         return {"ok": True, "stage_task_id": "stage-1"}
 
-    monkeypatch.setattr("app.services.image_creation_service.submit_image_create", fake_submit)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.submit_image_create", fake_submit)
 
     first = client.post("/api/image-creation/tasks", json={
         "mode": "text_to_image",
@@ -123,7 +123,7 @@ def test_image_to_image_requires_source_image_and_does_not_submit(db, monkeypatc
     async def fake_submit(**kwargs):
         raise AssertionError("submit_image_create should not run when the source image is missing")
 
-    monkeypatch.setattr("app.services.image_creation_service.submit_image_create", fake_submit)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.submit_image_create", fake_submit)
 
     resp = client.post("/api/image-creation/tasks", json={
         "mode": "image_to_image",
@@ -142,7 +142,7 @@ def test_create_rejects_private_source_url_before_submit(db, monkeypatch):
     async def fake_submit(**kwargs):
         raise AssertionError("submit_image_create should not run for unsafe source URLs")
 
-    monkeypatch.setattr("app.services.image_creation_service.submit_image_create", fake_submit)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.submit_image_create", fake_submit)
 
     resp = client.post("/api/image-creation/tasks", json={
         "mode": "image_to_image",
@@ -166,8 +166,8 @@ def test_create_rejects_source_url_that_resolves_to_private_ip(db, monkeypatch):
     async def fake_submit(**kwargs):
         raise AssertionError("submit_image_create should not run for DNS-private source URLs")
 
-    monkeypatch.setattr("app.services.image_creation_service.socket.getaddrinfo", fake_getaddrinfo)
-    monkeypatch.setattr("app.services.image_creation_service.submit_image_create", fake_submit)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.socket.getaddrinfo", fake_getaddrinfo)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.submit_image_create", fake_submit)
 
     resp = client.post("/api/image-creation/tasks", json={
         "mode": "image_to_image",
@@ -190,7 +190,7 @@ def test_create_rejects_provider_options_that_override_core_payload(db, monkeypa
     async def fake_submit(**kwargs):
         raise AssertionError("submit_image_create should not run for protected provider options")
 
-    monkeypatch.setattr("app.services.image_creation_service.submit_image_create", fake_submit)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.submit_image_create", fake_submit)
 
     resp = client.post("/api/image-creation/tasks", json={
         "mode": "text_to_image",
@@ -213,7 +213,7 @@ def test_create_rejects_schema_declared_secret_provider_option(db, monkeypatch):
     async def fake_submit(**kwargs):
         raise AssertionError("submit_image_create should not run for secret provider options")
 
-    monkeypatch.setattr("app.services.image_creation_service.submit_image_create", fake_submit)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.submit_image_create", fake_submit)
 
     resp = client.post("/api/image-creation/tasks", json={
         "mode": "text_to_image",
@@ -236,7 +236,7 @@ def test_create_rejects_nested_secret_provider_option(db, monkeypatch):
     async def fake_submit(**kwargs):
         raise AssertionError("submit_image_create should not run for nested secret provider options")
 
-    monkeypatch.setattr("app.services.image_creation_service.submit_image_create", fake_submit)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.submit_image_create", fake_submit)
 
     resp = client.post("/api/image-creation/tasks", json={
         "mode": "text_to_image",
@@ -281,7 +281,7 @@ def test_image_to_image_resolves_source_asset_url_for_pixelle(db, monkeypatch):
         calls.append(kwargs)
         return {"ok": True, "stage_task_id": "stage-source"}
 
-    monkeypatch.setattr("app.services.image_creation_service.submit_image_create", fake_submit)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.submit_image_create", fake_submit)
 
     resp = client.post("/api/image-creation/tasks", json={
         "mode": "image_to_image",
@@ -304,7 +304,7 @@ def test_image_to_image_missing_source_asset_returns_404(db, monkeypatch):
     async def fake_submit(**kwargs):
         raise AssertionError("submit_image_create should not run when source asset is missing")
 
-    monkeypatch.setattr("app.services.image_creation_service.submit_image_create", fake_submit)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.submit_image_create", fake_submit)
 
     resp = client.post("/api/image-creation/tasks", json={
         "mode": "image_to_image",
@@ -348,7 +348,7 @@ def test_image_to_image_source_asset_without_public_url_returns_400(db, monkeypa
     async def fake_submit(**kwargs):
         raise AssertionError("submit_image_create should not run when source asset has no public URL")
 
-    monkeypatch.setattr("app.services.image_creation_service.submit_image_create", fake_submit)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.submit_image_create", fake_submit)
 
     resp = client.post("/api/image-creation/tasks", json={
         "mode": "image_to_image",
@@ -388,7 +388,7 @@ def test_existing_reserved_idempotency_task_returns_without_submit(db, monkeypat
     async def fake_submit(**kwargs):
         raise AssertionError("submit_image_create should not run for an existing reserved task")
 
-    monkeypatch.setattr("app.services.image_creation_service.submit_image_create", fake_submit)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.submit_image_create", fake_submit)
 
     resp = client.post("/api/image-creation/tasks", json=payload)
 
@@ -403,7 +403,7 @@ def test_multi_reference_requires_two_references_and_does_not_submit(db, monkeyp
     async def fake_submit(**kwargs):
         raise AssertionError("submit_image_create should not run when references are insufficient")
 
-    monkeypatch.setattr("app.services.image_creation_service.submit_image_create", fake_submit)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.submit_image_create", fake_submit)
 
     resp = client.post("/api/image-creation/tasks", json={
         "mode": "multi_reference_to_image",
@@ -448,7 +448,7 @@ def test_multi_reference_resolves_reference_asset_ids(db, monkeypatch):
         calls.append(kwargs)
         return {"ok": True, "stage_task_id": "stage-reference"}
 
-    monkeypatch.setattr("app.services.image_creation_service.submit_image_create", fake_submit)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.submit_image_create", fake_submit)
 
     resp = client.post("/api/image-creation/tasks", json={
         "mode": "multi_reference_to_image",
@@ -535,9 +535,9 @@ def test_sync_persists_completed_assets_without_duplicates(db, monkeypatch):
             "mime_type": "image/png",
         }
 
-    monkeypatch.setattr("app.services.image_creation_service.submit_image_create", fake_submit)
-    monkeypatch.setattr("app.services.image_creation_service.get_stage_task", fake_status)
-    monkeypatch.setattr("app.services.image_creation_service._copy_external_image", fake_copy_external)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.submit_image_create", fake_submit)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.get_stage_task", fake_status)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service._copy_external_image", fake_copy_external)
 
     created = client.post("/api/image-creation/tasks", json={
         "mode": "text_to_image",
@@ -575,8 +575,8 @@ def test_sync_running_task_accepts_pixelle_progress_object(db, monkeypatch):
             "progress": {"current": 2, "total": 5, "message": "Generating"},
         }
 
-    monkeypatch.setattr("app.services.image_creation_service.submit_image_create", fake_submit)
-    monkeypatch.setattr("app.services.image_creation_service.get_stage_task", fake_status)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.submit_image_create", fake_submit)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.get_stage_task", fake_status)
 
     created = client.post("/api/image-creation/tasks", json={
         "mode": "text_to_image",
@@ -612,8 +612,8 @@ def test_sync_normalizes_pixelle_file_url_for_preview_and_reuse(db, monkeypatch)
             }],
         }
 
-    monkeypatch.setattr("app.services.image_creation_service.submit_image_create", fake_submit)
-    monkeypatch.setattr("app.services.image_creation_service.get_stage_task", fake_status)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.submit_image_create", fake_submit)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.get_stage_task", fake_status)
 
     created = client.post("/api/image-creation/tasks", json={
         "mode": "text_to_image",
@@ -789,7 +789,7 @@ def test_repaint_asset_creates_image_to_image_task_from_source_asset(db, monkeyp
         calls.append(kwargs)
         return {"ok": True, "stage_task_id": "stage-edit"}
 
-    monkeypatch.setattr("app.services.image_creation_service.submit_image_create", fake_submit)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.submit_image_create", fake_submit)
 
     resp = client.post(f"/api/image-creation/assets/{source_asset.id}/edit", json={
         "prompt": "make the lighting cinematic",
@@ -846,7 +846,7 @@ def test_copy_asset_creates_image_to_image_task_without_mutating_source_asset(db
         calls.append(kwargs)
         return {"ok": True, "stage_task_id": "stage-copy"}
 
-    monkeypatch.setattr("app.services.image_creation_service.submit_image_create", fake_submit)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.submit_image_create", fake_submit)
 
     resp = client.post(f"/api/image-creation/assets/{source_asset.id}/edit", json={
         "prompt": "copy as a fresh task",
@@ -896,7 +896,7 @@ def test_repaint_asset_rejects_action_not_allowed_for_approved_asset(db, monkeyp
         calls.append(kwargs)
         return {"ok": True, "stage_task_id": "stage-should-not-run"}
 
-    monkeypatch.setattr("app.services.image_creation_service.submit_image_create", fake_submit)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.submit_image_create", fake_submit)
 
     resp = client.post(f"/api/image-creation/assets/{source_asset.id}/edit", json={
         "prompt": "should not repaint approved",
@@ -945,7 +945,7 @@ def test_edit_asset_validates_source_before_idempotency_return(db, monkeypatch):
         calls.append(kwargs)
         return {"ok": True, "stage_task_id": "stage-edit-idempotent"}
 
-    monkeypatch.setattr("app.services.image_creation_service.submit_image_create", fake_submit)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.submit_image_create", fake_submit)
     body = {
         "prompt": "make the lighting cinematic",
         "count": 1,

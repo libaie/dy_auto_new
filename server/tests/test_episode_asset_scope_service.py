@@ -1,7 +1,7 @@
 import pytest
 
-from app.db_models import Character, Episode, Scene, Series
-from app.services.episode_asset_scope_service import (
+from app.db.models import Character, Episode, Scene, Series
+from app.domains.ai_video_series.episode_asset_scope_service import (
     EpisodeAssetScopeError,
     normalize_episode_asset_scope,
 )

@@ -9,8 +9,8 @@ if str(SERVER_DIR) not in sys.path:
     sys.path.insert(0, str(SERVER_DIR))
 
 from app.database import SessionLocal
-from app.services.one_sentence_video_service import create_one_sentence_video
-from app.services.video_production_run_types import REAL_SHORT_E2E
+from app.domains.video_production.one_sentence_video_service import create_one_sentence_video
+from app.domains.video_production.video_production_run_types import REAL_SHORT_E2E
 
 ALLOW_ENV = "DY_AUTO_ALLOW_REAL_PROVIDER_E2E"
 

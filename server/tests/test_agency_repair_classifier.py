@@ -1,4 +1,4 @@
-from app.services.agency_repair_classifier import classify_repair_tasks
+from app.domains.agency_operations.agency_repair_classifier import classify_repair_tasks
 
 
 def test_structured_storyboard_repair_is_auto_executable():

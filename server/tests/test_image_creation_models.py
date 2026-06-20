@@ -2,7 +2,7 @@ import pytest
 from sqlalchemy import inspect
 from sqlalchemy.exc import IntegrityError
 
-from app.db_models import (
+from app.db.models import (
     Episode,
     ImageCreationAsset,
     ImageCreationReviewRecord,

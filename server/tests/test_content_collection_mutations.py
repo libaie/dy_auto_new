@@ -144,7 +144,7 @@ def test_content_template_and_sensitive_word_response_shapes():
 
 
 def test_content_generation_response_shapes(db):
-    from app.services.content_service import content_service
+    from app.domains.content_collection.content_service import content_service
 
     template = content_service.create_template(
         db,
@@ -155,7 +155,7 @@ def test_content_generation_response_shapes(db):
     )
 
     with patch(
-        "app.services.content_service.ContentService.generate_from_template",
+        "app.domains.content_collection.content_service.ContentService.generate_from_template",
         new_callable=AsyncMock,
         return_value="Generated content",
     ):

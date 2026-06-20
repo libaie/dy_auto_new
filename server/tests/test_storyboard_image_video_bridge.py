@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from app.db_models import Episode, ImageCreationAsset, ImageCreationTask, Series, VideoProductionAsset, VideoProductionRun
-from app.services.video_production_service import image_stage_frames
+from app.db.models import Episode, ImageCreationAsset, ImageCreationTask, Series, VideoProductionAsset, VideoProductionRun
+from app.domains.video_production.video_production_service import image_stage_frames
 
 
 def _series_episode_run(db):

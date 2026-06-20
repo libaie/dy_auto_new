@@ -3,7 +3,7 @@ from datetime import timedelta
 import pytest
 
 from app.config import bj_now
-from app.db_models import (
+from app.db.models import (
     Episode,
     ProductionJob,
     ProductionPlan,
@@ -12,9 +12,9 @@ from app.db_models import (
     Series,
     VideoProductionRun,
 )
-from app.services.production_errors import ProductionErrorCode, ProductionRepairableError
-from app.services.production_queue_service import enqueue_job
-from app.services.production_state_contract import (
+from app.domains.video_production.production_errors import ProductionErrorCode, ProductionRepairableError
+from app.domains.video_production.production_queue_service import enqueue_job
+from app.domains.video_production.production_state_contract import (
     PROVIDER_TASK_CANCELLED,
     PROVIDER_TASK_FAILED,
     PROVIDER_TASK_MANUAL_REPAIR_REQUIRED,
@@ -23,11 +23,11 @@ from app.services.production_state_contract import (
     PROVIDER_TASK_SUCCEEDED,
     PROVIDER_TASK_SYNC_REQUIRED,
 )
-from app.services.provider_stage_executor import (
+from app.domains.video_production.provider_stage_executor import (
     PROVIDER_THROTTLE_DEPLOYMENT_CONTRACT,
     ProviderStageExecutor,
 )
-from app.services.provider_stage_task_service import request_hash
+from app.domains.video_production.provider_stage_task_service import request_hash
 
 
 class FakeProviderClient:

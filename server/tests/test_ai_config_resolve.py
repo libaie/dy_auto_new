@@ -1,6 +1,6 @@
 """AI config resolution tests — dual llm_* / ai_* key compatibility."""
 import pytest
-from app.db_models import SystemSetting
+from app.db.models import SystemSetting
 from app.database import get_db
 from app.main import app
 

@@ -1,10 +1,10 @@
 import pytest
-from app.db_models import Character, CharacterAnchor, ImageCreationAsset, ImageCreationTask, Scene, SceneAnchor, Series
+from app.db.models import Character, CharacterAnchor, ImageCreationAsset, ImageCreationTask, Scene, SceneAnchor, Series
 
 
 @pytest.mark.asyncio
 async def test_invalid_character_slot_raises_reference_slot_invalid(db):
-    from app.services.reference_asset_service import (
+    from app.domains.creative_library.reference_asset_service import (
         ReferenceAssetError,
         generate_character_reference_images,
     )
@@ -21,8 +21,7 @@ async def test_invalid_character_slot_raises_reference_slot_invalid(db):
 
 @pytest.mark.asyncio
 async def test_character_single_slot_generation_updates_only_requested_url_and_meta(db, monkeypatch):
-    from app.services import reference_asset_service
-
+    from app.domains.creative_library import reference_asset_service
     character = Character(
         name="Lin",
         role_type="protagonist",
@@ -70,8 +69,7 @@ async def test_character_single_slot_generation_updates_only_requested_url_and_m
 
 @pytest.mark.asyncio
 async def test_scene_all_slots_generation_updates_all_reference_urls(db, monkeypatch):
-    from app.services import reference_asset_service
-
+    from app.domains.creative_library import reference_asset_service
     scene = Scene(
         name="Rain Clinic",
         scene_type="indoor",
@@ -128,8 +126,7 @@ async def test_scene_all_slots_generation_updates_all_reference_urls(db, monkeyp
 
 @pytest.mark.asyncio
 async def test_reality_series_context_forces_character_and_scene_reference_prompts_to_live_action(db, monkeypatch):
-    from app.services import reference_asset_service
-
+    from app.domains.creative_library import reference_asset_service
     series = Series(
         title="控糖日记",
         logline="一位现实生活的普通中老年人老刘用现实真实生活方式管理血糖，每集解决一个日常控糖问题。",
@@ -178,7 +175,7 @@ async def test_reality_series_context_forces_character_and_scene_reference_promp
 
 def test_reference_url_is_usable_rejects_expired_tos_signed_url():
     from datetime import datetime, timezone
-    from app.services.reference_asset_service import reference_url_is_usable
+    from app.domains.creative_library.reference_asset_service import reference_url_is_usable
 
     expired = (
         "https://ark-acg-cn-beijing.tos-cn-beijing.volces.com/ref.jpeg"
@@ -196,8 +193,7 @@ def test_reference_url_is_usable_rejects_expired_tos_signed_url():
 
 @pytest.mark.asyncio
 async def test_character_all_slots_regenerates_expired_signed_reference_url(db, monkeypatch):
-    from app.services import reference_asset_service
-
+    from app.domains.creative_library import reference_asset_service
     expired = (
         "https://ark-acg-cn-beijing.tos-cn-beijing.volces.com/ref.jpeg"
         "?X-Tos-Date=20000101T000000Z&X-Tos-Expires=86400"
@@ -231,7 +227,7 @@ async def test_character_all_slots_regenerates_expired_signed_reference_url(db, 
 
 @pytest.mark.asyncio
 async def test_missing_model_capability_maps_to_model_scene_not_configured(db, monkeypatch):
-    from app.services import reference_asset_service
+    from app.domains.creative_library import reference_asset_service
     from fastapi import HTTPException
 
     async def fake_create_image_task(db_session, payload):
@@ -240,7 +236,7 @@ async def test_missing_model_capability_maps_to_model_scene_not_configured(db, m
             "message": "missing model",
         })
 
-    monkeypatch.setattr("app.services.image_creation_service.create_image_task", fake_create_image_task)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.create_image_task", fake_create_image_task)
 
     with pytest.raises(reference_asset_service.ReferenceAssetError) as exc_info:
         await reference_asset_service.generate_reference_url(db, "prompt")
@@ -250,8 +246,7 @@ async def test_missing_model_capability_maps_to_model_scene_not_configured(db, m
 
 @pytest.mark.asyncio
 async def test_generate_reference_url_uses_image_creation_task_pipeline(db, monkeypatch):
-    from app.services import reference_asset_service
-
+    from app.domains.creative_library import reference_asset_service
     captured_payload = {}
 
     async def fake_create_image_task(db_session, payload):
@@ -283,8 +278,8 @@ async def test_generate_reference_url_uses_image_creation_task_pipeline(db, monk
         db_session.refresh(task)
         return task
 
-    monkeypatch.setattr("app.services.image_creation_service.create_image_task", fake_create_image_task)
-    monkeypatch.setattr("app.services.image_creation_service.sync_image_task", fake_sync_image_task)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.create_image_task", fake_create_image_task)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.sync_image_task", fake_sync_image_task)
 
     url = await reference_asset_service.generate_reference_url(
         db,
@@ -304,8 +299,7 @@ async def test_generate_reference_url_uses_image_creation_task_pipeline(db, monk
 
 @pytest.mark.asyncio
 async def test_generate_reference_url_polls_running_provider_task_until_asset_ready(db, monkeypatch):
-    from app.services import reference_asset_service
-
+    from app.domains.creative_library import reference_asset_service
     async def fake_create_image_task(db_session, payload):
         task = ImageCreationTask(
             mode="text_to_image",
@@ -343,8 +337,8 @@ async def test_generate_reference_url_polls_running_provider_task_until_asset_re
         db_session.refresh(task)
         return task
 
-    monkeypatch.setattr("app.services.image_creation_service.create_image_task", fake_create_image_task)
-    monkeypatch.setattr("app.services.image_creation_service.sync_image_task", fake_sync_image_task)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.create_image_task", fake_create_image_task)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.sync_image_task", fake_sync_image_task)
     monkeypatch.setattr(reference_asset_service, "REFERENCE_SYNC_POLL_ATTEMPTS", 3)
     monkeypatch.setattr(reference_asset_service, "REFERENCE_SYNC_POLL_DELAY_SECONDS", 0)
 
@@ -356,8 +350,7 @@ async def test_generate_reference_url_polls_running_provider_task_until_asset_re
 
 @pytest.mark.asyncio
 async def test_generate_reference_url_reports_provider_still_running_after_poll_budget(db, monkeypatch):
-    from app.services import reference_asset_service
-
+    from app.domains.creative_library import reference_asset_service
     async def fake_create_image_task(db_session, payload):
         task = ImageCreationTask(
             mode="text_to_image",
@@ -380,8 +373,8 @@ async def test_generate_reference_url_reports_provider_still_running_after_poll_
         db_session.refresh(task)
         return task
 
-    monkeypatch.setattr("app.services.image_creation_service.create_image_task", fake_create_image_task)
-    monkeypatch.setattr("app.services.image_creation_service.sync_image_task", fake_sync_image_task)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.create_image_task", fake_create_image_task)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.sync_image_task", fake_sync_image_task)
     monkeypatch.setattr(reference_asset_service, "REFERENCE_SYNC_POLL_ATTEMPTS", 1)
     monkeypatch.setattr(reference_asset_service, "REFERENCE_SYNC_POLL_DELAY_SECONDS", 0)
 
@@ -394,8 +387,7 @@ async def test_generate_reference_url_reports_provider_still_running_after_poll_
 
 @pytest.mark.asyncio
 async def test_generate_reference_url_reuses_running_task_for_same_reference_slot(db, monkeypatch):
-    from app.services import reference_asset_service
-
+    from app.domains.creative_library import reference_asset_service
     existing = ImageCreationTask(
         mode="text_to_image",
         output_mode="single",
@@ -435,8 +427,8 @@ async def test_generate_reference_url_reuses_running_task_for_same_reference_slo
         db_session.refresh(task)
         return task
 
-    monkeypatch.setattr("app.services.image_creation_service.create_image_task", fake_create_image_task)
-    monkeypatch.setattr("app.services.image_creation_service.sync_image_task", fake_sync_image_task)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.create_image_task", fake_create_image_task)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.sync_image_task", fake_sync_image_task)
     monkeypatch.setattr(reference_asset_service, "REFERENCE_SYNC_POLL_ATTEMPTS", 1)
     monkeypatch.setattr(reference_asset_service, "REFERENCE_SYNC_POLL_DELAY_SECONDS", 0)
 
@@ -458,8 +450,7 @@ async def test_generate_reference_url_reuses_running_task_for_same_reference_slo
 
 @pytest.mark.asyncio
 async def test_generate_reference_url_downloads_external_provider_asset_into_project(db, monkeypatch):
-    from app.services import reference_asset_service
-
+    from app.domains.creative_library import reference_asset_service
     async def fake_create_image_task(db_session, payload):
         task = ImageCreationTask(
             mode="text_to_image",
@@ -499,9 +490,9 @@ async def test_generate_reference_url_downloads_external_provider_asset_into_pro
             "mime_type": "image/png",
         }
 
-    monkeypatch.setattr("app.services.image_creation_service.create_image_task", fake_create_image_task)
-    monkeypatch.setattr("app.services.image_creation_service.sync_image_task", fake_sync_image_task)
-    monkeypatch.setattr("app.services.image_creation_service._copy_external_image", fake_copy_external_image)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.create_image_task", fake_create_image_task)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.sync_image_task", fake_sync_image_task)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service._copy_external_image", fake_copy_external_image)
 
     url = await reference_asset_service.generate_reference_url(
         db,
@@ -524,8 +515,7 @@ async def test_generate_reference_url_downloads_external_provider_asset_into_pro
 
 @pytest.mark.asyncio
 async def test_generate_reference_url_copies_provider_url_that_looks_like_static_path(db, monkeypatch):
-    from app.services import reference_asset_service
-
+    from app.domains.creative_library import reference_asset_service
     source_url = "https://provider.test/static/image-creation/outputs/reference.png"
 
     async def fake_create_image_task(db_session, payload):
@@ -569,9 +559,9 @@ async def test_generate_reference_url_copies_provider_url_that_looks_like_static
             "mime_type": "image/png",
         }
 
-    monkeypatch.setattr("app.services.image_creation_service.create_image_task", fake_create_image_task)
-    monkeypatch.setattr("app.services.image_creation_service.sync_image_task", fake_sync_image_task)
-    monkeypatch.setattr("app.services.image_creation_service._copy_external_image", fake_copy_external_image)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.create_image_task", fake_create_image_task)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.sync_image_task", fake_sync_image_task)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service._copy_external_image", fake_copy_external_image)
 
     url = await reference_asset_service.generate_reference_url(db, "reference prompt")
 
@@ -581,8 +571,7 @@ async def test_generate_reference_url_copies_provider_url_that_looks_like_static
 
 @pytest.mark.asyncio
 async def test_generate_reference_url_wraps_project_copy_filesystem_error(db, monkeypatch):
-    from app.services import reference_asset_service
-
+    from app.domains.creative_library import reference_asset_service
     async def fake_create_image_task(db_session, payload):
         task = ImageCreationTask(
             mode="text_to_image",
@@ -614,9 +603,9 @@ async def test_generate_reference_url_wraps_project_copy_filesystem_error(db, mo
     async def fake_copy_external_image(url):
         raise OSError("disk full")
 
-    monkeypatch.setattr("app.services.image_creation_service.create_image_task", fake_create_image_task)
-    monkeypatch.setattr("app.services.image_creation_service.sync_image_task", fake_sync_image_task)
-    monkeypatch.setattr("app.services.image_creation_service._copy_external_image", fake_copy_external_image)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.create_image_task", fake_create_image_task)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.sync_image_task", fake_sync_image_task)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service._copy_external_image", fake_copy_external_image)
 
     with pytest.raises(reference_asset_service.ReferenceAssetError) as exc_info:
         await reference_asset_service.generate_reference_url(db, "reference prompt")
@@ -627,7 +616,7 @@ async def test_generate_reference_url_wraps_project_copy_filesystem_error(db, mo
 
 @pytest.mark.asyncio
 async def test_image_creation_http_error_wraps_as_reference_provider_request_failed(db, monkeypatch):
-    from app.services import reference_asset_service
+    from app.domains.creative_library import reference_asset_service
     from fastapi import HTTPException
 
     async def fake_create_image_task(db_session, payload):
@@ -636,7 +625,7 @@ async def test_image_creation_http_error_wraps_as_reference_provider_request_fai
             "message": "provider rejected prompt",
         })
 
-    monkeypatch.setattr("app.services.image_creation_service.create_image_task", fake_create_image_task)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.create_image_task", fake_create_image_task)
 
     with pytest.raises(reference_asset_service.ReferenceAssetError) as exc_info:
         await reference_asset_service.generate_reference_url(db, "prompt")

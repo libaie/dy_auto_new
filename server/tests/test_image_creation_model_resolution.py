@@ -2,9 +2,9 @@ import uuid
 
 import pytest
 
-from app.db_models import AIModel
-from app.services.crypto import encrypt
-from app.services.runtime_model_config import (
+from app.db.models import AIModel
+from app.domains.system_configuration.crypto import encrypt
+from app.domains.model_configuration.runtime_model_config import (
     RuntimeModelConfigError,
     resolve_image_model_for_capability,
 )
@@ -112,7 +112,7 @@ def test_single_seedream_model_supports_generation_and_editing_capabilities(db):
 
 
 def test_seed_ai_models_union_merges_seedream_scene_keys(db):
-    from app.routers.ai_config import SEEDANCE_ARK_BASE_URL, SEEDREAM_IMAGE_MODEL, seed_ai_models
+    from app.domains.model_configuration.ai_models_router import SEEDANCE_ARK_BASE_URL, SEEDREAM_IMAGE_MODEL, seed_ai_models
 
     model = _seed_image_model(
         db,

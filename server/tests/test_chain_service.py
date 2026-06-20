@@ -1,10 +1,10 @@
 """Chain service unit tests."""
 import pytest
-from app.db_models import (
+from app.db.models import (
     Account, ChainTemplate, ChainInstance, Task as DBTask,
     AccountGroup, AccountGroupMember,
 )
-from app.services.chain_service import chain_service
+from app.domains.account_operations.chain_service import chain_service
 
 
 # ---------------------------------------------------------------------------

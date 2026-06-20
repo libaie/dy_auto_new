@@ -1,8 +1,8 @@
 import pytest
 
-from app.db_models import AIModel
-from app.services.crypto import encrypt
-from app.services.runtime_model_config import (
+from app.db.models import AIModel
+from app.domains.system_configuration.crypto import encrypt
+from app.domains.model_configuration.runtime_model_config import (
     RuntimeModelConfigError,
     resolve_runtime_model_config,
     redact_runtime_model_config,

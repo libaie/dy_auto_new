@@ -1,6 +1,6 @@
 import pytest
 
-from app.db_models import (
+from app.db.models import (
     Character,
     CharacterAnchor,
     Episode,
@@ -161,7 +161,7 @@ def test_compose_shot_prompt_requires_input_image_url_for_wan_i2v(db):
 
 
 def test_linked_image_and_video_stage_frames_include_anchor_payload(db):
-    from app.services.video_production_service import (
+    from app.domains.video_production.video_production_service import (
         build_image_stage_frames_for_segments,
         build_video_stage_frames_for_segments,
     )

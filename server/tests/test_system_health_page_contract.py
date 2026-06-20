@@ -7,7 +7,7 @@ from types import SimpleNamespace
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.db_models import AIModel
+from app.db.models import AIModel
 from app.main import app
 
 
@@ -59,7 +59,7 @@ def test_system_health_exposes_migration_provider_and_smoke_status():
 
 
 def test_system_health_ok_means_health_check_succeeded_when_status_blocked(monkeypatch):
-    import app.routers.system_health as system_health
+    import app.domains.system_operations.system_health_router as system_health
 
     monkeypatch.setattr(system_health, "_migration_health", lambda db: {
         "status": "blocked",
@@ -81,7 +81,7 @@ def test_system_health_ok_means_health_check_succeeded_when_status_blocked(monke
 
 
 def test_provider_capability_health_blocks_without_single_worker_env(db, monkeypatch):
-    import app.routers.system_health as system_health
+    import app.domains.system_operations.system_health_router as system_health
 
     monkeypatch.delenv("DY_AUTO_PROVIDER_SUBMIT_WORKER_COUNT", raising=False)
 
@@ -94,7 +94,7 @@ def test_provider_capability_health_blocks_without_single_worker_env(db, monkeyp
 
 
 def test_provider_capability_health_requires_paid_ready_model_per_runtime_scene(db, monkeypatch):
-    import app.routers.system_health as system_health
+    import app.domains.system_operations.system_health_router as system_health
 
     monkeypatch.setenv("DY_AUTO_PROVIDER_SUBMIT_WORKER_COUNT", "1")
     for scene_key in ("image_generation", "video_rendering"):
@@ -130,7 +130,7 @@ def test_provider_capability_health_requires_paid_ready_model_per_runtime_scene(
 
 
 def test_system_health_reports_missing_required_boundary_column(monkeypatch):
-    import app.routers.system_health as system_health
+    import app.domains.system_operations.system_health_router as system_health
 
     monkeypatch.setattr(
         system_health,
@@ -151,7 +151,7 @@ def test_system_health_reports_missing_required_boundary_column(monkeypatch):
 
 
 def test_provider_capability_health_handles_ai_model_query_failure():
-    import app.routers.system_health as system_health
+    import app.domains.system_operations.system_health_router as system_health
 
     class BrokenDB:
         def query(self, *_args, **_kwargs):
@@ -171,7 +171,7 @@ def test_provider_capability_health_handles_ai_model_query_failure():
 
 
 def test_provider_capability_ignores_malformed_config_json():
-    import app.routers.system_health as system_health
+    import app.domains.system_operations.system_health_router as system_health
 
     capability = system_health._capability_for_model(
         SimpleNamespace(config_json="not-a-dict")

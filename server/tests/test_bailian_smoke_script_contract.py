@@ -3,8 +3,8 @@ import sys
 
 import pytest
 
-from app.db_models import AIModel, Episode, Series, VideoProductionRun
-from app.services.crypto import encrypt
+from app.db.models import AIModel, Episode, Series, VideoProductionRun
+from app.domains.system_configuration.crypto import encrypt
 from scripts import smoke_bailian_one_sentence_e2e as smoke
 
 
@@ -41,10 +41,9 @@ def test_parse_args_supports_explicit_expert_gate_bypass(monkeypatch):
 
 
 def test_paid_smoke_uses_extended_expert_timeout_defaults():
-    from app.services.one_sentence_video_service import ONE_SENTENCE_AGENCY_REVIEW_TIMEOUT_SECONDS
-    from app.services.production_worker_service import _deferred_stage_gate_timeout_seconds
-    from app.services import reference_asset_service
-
+    from app.domains.video_production.one_sentence_video_service import ONE_SENTENCE_AGENCY_REVIEW_TIMEOUT_SECONDS
+    from app.domains.video_production.production_worker_service import _deferred_stage_gate_timeout_seconds
+    from app.domains.creative_library import reference_asset_service
     assert ONE_SENTENCE_AGENCY_REVIEW_TIMEOUT_SECONDS >= 180
     assert _deferred_stage_gate_timeout_seconds() >= 180
     assert reference_asset_service.REFERENCE_SYNC_POLL_ATTEMPTS >= 180

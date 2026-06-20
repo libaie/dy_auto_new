@@ -1,9 +1,9 @@
 """Stats service tests — daily operation counting and quota checks."""
 import pytest
-from app.services.stats_service import stats_service
+from app.domains.reporting.stats_service import stats_service
 from app.models import TaskType
 from app.database import get_db
-from app.db_models import Account
+from app.db.models import Account
 from app.main import app
 
 

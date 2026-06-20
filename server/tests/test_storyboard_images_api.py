@@ -4,7 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.config import bj_now
-from app.db_models import Episode, ImageCreationAsset, ImageCreationTask, Series, VideoProductionAsset, VideoProductionRun
+from app.db.models import Episode, ImageCreationAsset, ImageCreationTask, Series, VideoProductionAsset, VideoProductionRun
 from app.main import app
 
 
@@ -73,7 +73,7 @@ def fake_storyboard_image_creation(monkeypatch):
         calls.append(payload)
         return _task_from_payload(payload)
 
-    monkeypatch.setattr("app.services.storyboard_image_service.create_image_task", fake_create_image_task)
+    monkeypatch.setattr("app.domains.storyboard_images.storyboard_image_service.create_image_task", fake_create_image_task)
     return calls
 
 

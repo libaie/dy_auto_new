@@ -1,5 +1,5 @@
-from app import db_models as models
-from app.db_models import (
+from app.db import models as models
+from app.db.models import (
     Episode,
     ProductionEpisode,
     ProductionJob,

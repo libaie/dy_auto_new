@@ -2,7 +2,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from app.db_models import (
+from app.db.models import (
     Base,
     Character as LegacyCharacter,
     ReferenceCategory as LegacyReferenceCategory,
@@ -33,7 +33,7 @@ def test_creative_library_model_boundary_reexports_reference_models():
 
 def test_creative_library_model_boundary_imports_in_clean_process():
     code = (
-        "import app.db_models as legacy; "
+        "import app.db.models as legacy; "
         "from app.db.models.creative_library import Character, ReferenceCategory, ReferenceData, Scene; "
         "assert legacy.Character is Character; "
         "assert legacy.ReferenceData is ReferenceData; "

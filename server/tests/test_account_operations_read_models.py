@@ -215,7 +215,7 @@ def _uid(prefix):
 
 
 def _seed_account(db, account_id, nickname=None):
-    from app.db_models import Account
+    from app.db.models import Account
 
     db.add(
         Account(
@@ -236,7 +236,7 @@ def _seed_account(db, account_id, nickname=None):
 
 
 def _seed_group(db, group_id, account_ids):
-    from app.db_models import AccountGroup, AccountGroupMember
+    from app.db.models import AccountGroup, AccountGroupMember
 
     db.add(AccountGroup(id=group_id, name=group_id, description="read model group"))
     for account_id in account_ids:

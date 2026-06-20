@@ -1,11 +1,11 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from app.db_models import Episode, ProductionPlan, Series, VideoProductionRun
+from app.db.models import Episode, ProductionPlan, Series, VideoProductionRun
 from app.main import app
-from app.services.production_errors import ProductionErrorCode, ProductionRepairableError
-from app.services.production_run_service import start_episode_production
-from app.services.video_production_run_types import MOCK_SERIES_SCALE, REAL_SHORT_E2E
+from app.domains.video_production.production_errors import ProductionErrorCode, ProductionRepairableError
+from app.domains.video_production.production_run_service import start_episode_production
+from app.domains.video_production.video_production_run_types import MOCK_SERIES_SCALE, REAL_SHORT_E2E
 
 
 client = TestClient(app)

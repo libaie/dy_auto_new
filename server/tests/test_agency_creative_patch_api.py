@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from app.db_models import AgencyCreativePatch, Episode, Series
+from app.db.models import AgencyCreativePatch, Episode, Series
 from app.main import app
 
 client = TestClient(app)

@@ -1,12 +1,12 @@
 import pytest
 
-from app.db_models import ProductionCostEvent, ProductionJob, ProductionPlan, Series
-from app.services.production_cost_service import (
+from app.db.models import ProductionCostEvent, ProductionJob, ProductionPlan, Series
+from app.domains.video_production.production_cost_service import (
     assert_budget_available,
     pause_plan_for_budget,
     record_cost_event,
 )
-from app.services.production_queue_service import claim_next_job, enqueue_job
+from app.domains.video_production.production_queue_service import claim_next_job, enqueue_job
 
 
 def _plan(db, budget_limit=10.0, current_cost=0.0):

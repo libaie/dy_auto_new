@@ -1,7 +1,7 @@
 import pytest
 
-from app.db_models import Episode, ProductionAuditEvent, Series, VideoProductionAsset, VideoProductionRun
-from app.services.video_production_service import VideoProductionError, start_image_stage, start_video_stage
+from app.db.models import Episode, ProductionAuditEvent, Series, VideoProductionAsset, VideoProductionRun
+from app.domains.video_production.video_production_service import VideoProductionError, start_image_stage, start_video_stage
 
 
 def _storyboard_run(db):
@@ -34,8 +34,8 @@ async def test_image_stage_blocks_when_provider_model_config_missing_after_agenc
     async def fail_submit(*args, **kwargs):
         raise AssertionError("image provider should not submit without runtime config")
 
-    monkeypatch.setattr("app.services.video_production_service._guard_provider_stage", _agency_pass)
-    monkeypatch.setattr("app.services.video_production_service.submit_image_batch", fail_submit)
+    monkeypatch.setattr("app.domains.video_production.video_production_service._guard_provider_stage", _agency_pass)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_image_batch", fail_submit)
 
     with pytest.raises(VideoProductionError, match="image_generation"):
         await start_image_stage(db, run.id)
@@ -77,8 +77,8 @@ async def test_video_stage_blocks_when_provider_model_config_missing_after_agenc
     async def fail_submit(*args, **kwargs):
         raise AssertionError("video provider should not submit without runtime config")
 
-    monkeypatch.setattr("app.services.video_production_service._guard_provider_stage", _agency_pass)
-    monkeypatch.setattr("app.services.video_production_service.submit_video_batch", fail_submit)
+    monkeypatch.setattr("app.domains.video_production.video_production_service._guard_provider_stage", _agency_pass)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_video_batch", fail_submit)
 
     with pytest.raises(VideoProductionError, match="video_rendering"):
         await start_video_stage(db, run.id)

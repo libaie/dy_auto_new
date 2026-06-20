@@ -3,9 +3,9 @@ import uuid
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app
-from app.db_models import AIModel
-from app.services.crypto import encrypt
-from app.services.model_registry import get_model_for_scene, ModelResolutionError
+from app.db.models import AIModel
+from app.domains.system_configuration.crypto import encrypt
+from app.domains.model_configuration.model_registry import get_model_for_scene, ModelResolutionError
 
 
 @pytest.fixture

@@ -2,11 +2,11 @@ import subprocess
 import sys
 from pathlib import Path
 
-from app.db_models import Base
-from app.db_models import EpisodeScript as LegacyEpisodeScript
-from app.db_models import ScriptDramaticBeat as LegacyScriptDramaticBeat
-from app.db_models import ScriptSceneOutline as LegacyScriptSceneOutline
-from app.db_models import ScriptVisualShot as LegacyScriptVisualShot
+from app.db.models import Base
+from app.db.models import EpisodeScript as LegacyEpisodeScript
+from app.db.models import ScriptDramaticBeat as LegacyScriptDramaticBeat
+from app.db.models import ScriptSceneOutline as LegacyScriptSceneOutline
+from app.db.models import ScriptVisualShot as LegacyScriptVisualShot
 
 
 SERVER_ROOT = Path(__file__).resolve().parents[1]
@@ -36,7 +36,7 @@ def test_script_pipeline_model_boundary_reexports_script_output_models():
 
 def test_script_pipeline_model_boundary_imports_in_clean_process():
     code = (
-        "import app.db_models as legacy; "
+        "import app.db.models as legacy; "
         "from app.db.models.script_pipeline import EpisodeScript, ScriptDramaticBeat, ScriptSceneOutline, ScriptVisualShot; "
         "assert legacy.EpisodeScript is EpisodeScript; "
         "assert legacy.ScriptDramaticBeat is ScriptDramaticBeat; "

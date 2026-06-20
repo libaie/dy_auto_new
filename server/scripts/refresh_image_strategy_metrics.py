@@ -1,5 +1,5 @@
 from app.database import SessionLocal
-from app.services.image_production_metrics_service import refresh_all_image_strategy_metrics
+from app.domains.image_generation.image_production_metrics_service import refresh_all_image_strategy_metrics
 
 
 def main() -> None:

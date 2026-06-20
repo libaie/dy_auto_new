@@ -2,9 +2,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-from app.db_models import AITextArtifact as LegacyAITextArtifact
-from app.db_models import AITextArtifactConsumer as LegacyAITextArtifactConsumer
-from app.db_models import Base
+from app.db.models import AITextArtifact as LegacyAITextArtifact
+from app.db.models import AITextArtifactConsumer as LegacyAITextArtifactConsumer
+from app.db.models import Base
 
 
 SERVER_ROOT = Path(__file__).resolve().parents[1]
@@ -23,7 +23,7 @@ def test_ai_text_artifact_model_boundary_reexports_models():
 
 def test_ai_text_artifact_model_boundary_imports_in_clean_process():
     code = (
-        "import app.db_models as legacy; "
+        "import app.db.models as legacy; "
         "from app.db.models.ai_text_artifacts import AITextArtifact, AITextArtifactConsumer; "
         "assert legacy.AITextArtifact is AITextArtifact; "
         "assert legacy.AITextArtifactConsumer is AITextArtifactConsumer; "

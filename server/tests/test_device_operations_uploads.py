@@ -25,7 +25,7 @@ SCRIPT_ASSET_ENDPOINTS = {
 
 @pytest.fixture(autouse=True)
 def isolate_script_service(tmp_path, monkeypatch):
-    from app.services.script_service import script_service
+    from app.domains.device_operations.script_service import script_service
 
     script_dir = tmp_path / "scripts"
     monkeypatch.setattr(script_service, "_script_dir", script_dir)

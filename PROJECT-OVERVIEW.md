@@ -115,12 +115,12 @@ dy_auto/
 │   │   ├── main.py                  #   入口：FastAPI 应用 + CORS + 后台离线检测 + AI 预热
 │   │   ├── config.py                #   配置（北京时区、AI提供商、OSS等）
 │   │   ├── database.py              #   数据库连接管理
-│   │   ├── db_models.py             #   SQLAlchemy ORM 模型（30+ 张表）
+│   │   ├── db/                      #   SQLAlchemy Base 与分域 ORM 模型
 │   │   ├── deps.py                  #   依赖注入（auth/role/device 验证）
 │   │   ├── models.py                #   Pydantic 请求/响应模型
 │   │   ├── seed.py                  #   种子数据
 │   │   ├── ws_manager.py            #   WebSocket 连接管理 + 心跳
-│   │   ├── routers/                 #   🌐 API 路由（25 个模块）
+│   │   ├── domains/                 #   🌐 分域 API 路由与业务服务
 │   │   │   ├── accounts.py          #     账号 CRUD + 统计
 │   │   │   ├── account_groups.py    #     账号分组管理
 │   │   │   ├── ai_config.py         #     AI 配置

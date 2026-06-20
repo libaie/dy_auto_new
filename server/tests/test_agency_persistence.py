@@ -1,8 +1,8 @@
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from app.db_models import AgencyCreativePatch, AgencyExpertInvocation, Episode, ProductionAuditEvent, Series
-from app.services.agency_persistence import (
+from app.db.models import AgencyCreativePatch, AgencyExpertInvocation, Episode, ProductionAuditEvent, Series
+from app.domains.agency_operations.agency_persistence import (
     create_or_resume_invocation,
     finalize_invocation_and_audit,
 )

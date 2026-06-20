@@ -2,8 +2,8 @@
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app
-from app.db_models import AIModel
-from app.services.crypto import encrypt, decrypt
+from app.db.models import AIModel
+from app.domains.system_configuration.crypto import encrypt, decrypt
 
 
 @pytest.fixture

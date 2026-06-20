@@ -1,9 +1,9 @@
 from uuid import uuid4
 
-from app.db_models import AIModel
-from app.services.crypto import encrypt
-from app.services.image_model_selection_service import resolve_image_model_selection
-from app.services.image_production_strategy_service import create_strategy
+from app.db.models import AIModel
+from app.domains.system_configuration.crypto import encrypt
+from app.domains.image_generation.image_model_selection_service import resolve_image_model_selection
+from app.domains.image_generation.image_production_strategy_service import create_strategy
 
 
 def _seed_image_model(

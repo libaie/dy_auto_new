@@ -47,7 +47,7 @@ def test_risk_report_marks_account(client):
     from app.main import app as _app
     gen = _app.dependency_overrides[get_db]()
     db = next(gen)
-    from app.db_models import Account
+    from app.db.models import Account
     account = db.query(Account).filter(Account.status == "active").first()
     db.close()
     gen.close()

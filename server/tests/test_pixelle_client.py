@@ -3,7 +3,7 @@ import json
 import pytest
 import httpx
 from unittest.mock import AsyncMock, MagicMock, patch
-from app.services.pixelle_client import _pixelle_request, _get_base_url, DEFAULT_BASE_URL
+from app.domains.pixelle_integration.pixelle_client import _pixelle_request, _get_base_url, DEFAULT_BASE_URL
 
 
 class TestPixelleRequest:
@@ -18,7 +18,7 @@ class TestPixelleRequest:
         mock_client = AsyncMock()
         mock_client.request = AsyncMock(return_value=resp)
 
-        with patch("app.services.pixelle_client._get_client", return_value=mock_client):
+        with patch("app.domains.pixelle_integration.pixelle_client._get_client", return_value=mock_client):
             result = await _pixelle_request("POST", "/test", json={"x": 1})
 
         assert result == {"ok": True, "result": "done"}
@@ -26,8 +26,7 @@ class TestPixelleRequest:
 
     @pytest.mark.asyncio
     async def test_sends_pixelle_api_key_from_system_settings_when_env_empty(self, monkeypatch):
-        from app.services import pixelle_client
-
+        from app.domains.pixelle_integration import pixelle_client
         monkeypatch.setattr("app.config.PIXELLE_API_KEY", "")
         pixelle_client._base_url = ""
 
@@ -58,7 +57,7 @@ class TestPixelleRequest:
             def query(self, *_args, **_kwargs):
                 return FakeQuery()
 
-        with patch("app.services.pixelle_client._get_client", return_value=mock_client):
+        with patch("app.domains.pixelle_integration.pixelle_client._get_client", return_value=mock_client):
             await _pixelle_request("POST", "/api/stages/images/create", FakeDB(), json={})
 
         headers = mock_client.request.call_args.kwargs["headers"]
@@ -66,15 +65,14 @@ class TestPixelleRequest:
         pixelle_client._base_url = ""
 
     def test_client_disables_environment_proxy(self, monkeypatch):
-        from app.services import pixelle_client
-
+        from app.domains.pixelle_integration import pixelle_client
         created = {}
 
         class FakeAsyncClient:
             def __init__(self, **kwargs):
                 created.update(kwargs)
 
-        monkeypatch.setattr("app.services.pixelle_client.httpx.AsyncClient", FakeAsyncClient)
+        monkeypatch.setattr("app.domains.pixelle_integration.pixelle_client.httpx.AsyncClient", FakeAsyncClient)
         pixelle_client._client = None
 
         pixelle_client._get_client()
@@ -95,7 +93,7 @@ class TestPixelleRequest:
         mock_client = AsyncMock()
         mock_client.request = AsyncMock(side_effect=[fail_resp, fail_resp, ok_resp])
 
-        with patch("app.services.pixelle_client._get_client", return_value=mock_client):
+        with patch("app.domains.pixelle_integration.pixelle_client._get_client", return_value=mock_client):
             result = await _pixelle_request("GET", "/test")
 
         assert result == {"ok": True}
@@ -110,7 +108,7 @@ class TestPixelleRequest:
         mock_client = AsyncMock()
         mock_client.request = AsyncMock(return_value=resp)
 
-        with patch("app.services.pixelle_client._get_client", return_value=mock_client):
+        with patch("app.domains.pixelle_integration.pixelle_client._get_client", return_value=mock_client):
             with pytest.raises(httpx.HTTPStatusError):
                 await _pixelle_request("POST", "/test", json={})
 
@@ -125,7 +123,7 @@ class TestPixelleRequest:
             httpx.ConnectError("refused"),
         ])
 
-        with patch("app.services.pixelle_client._get_client", return_value=mock_client):
+        with patch("app.domains.pixelle_integration.pixelle_client._get_client", return_value=mock_client):
             with pytest.raises(httpx.ConnectError):
                 await _pixelle_request("GET", "/test")
 
@@ -142,7 +140,7 @@ class TestPixelleRequest:
         mock_client = AsyncMock()
         mock_client.request = AsyncMock(return_value=resp)
 
-        with patch("app.services.pixelle_client._get_client", return_value=mock_client):
+        with patch("app.domains.pixelle_integration.pixelle_client._get_client", return_value=mock_client):
             with pytest.raises(RuntimeError, match="invalid JSON"):
                 await _pixelle_request("POST", "/test")
 
@@ -157,7 +155,7 @@ class TestPixelleRequest:
             httpx.TimeoutException("timeout"),
         ])
 
-        with patch("app.services.pixelle_client._get_client", return_value=mock_client):
+        with patch("app.domains.pixelle_integration.pixelle_client._get_client", return_value=mock_client):
             with pytest.raises(httpx.TimeoutException):
                 await _pixelle_request("GET", "/test")
 
@@ -168,20 +166,20 @@ class TestGetBaseUrl:
     """_get_base_url — SystemSetting fallback."""
 
     def test_returns_default_when_no_db(self):
-        from app.services import pixelle_client
+        from app.domains.pixelle_integration import pixelle_client
         pixelle_client._base_url = ""
         url = _get_base_url(db=None)
         assert url == DEFAULT_BASE_URL
 
     def test_returns_cached_url(self):
-        from app.services import pixelle_client
+        from app.domains.pixelle_integration import pixelle_client
         pixelle_client._base_url = "http://custom:9999/api"
         url = _get_base_url(db=None)
         assert url == "http://custom:9999"
         pixelle_client._base_url = ""  # reset
 
     def test_strips_api_suffix_from_configured_url(self):
-        from app.services import pixelle_client
+        from app.domains.pixelle_integration import pixelle_client
         pixelle_client._base_url = ""
 
         class FakeQuery:

@@ -1,4 +1,4 @@
-from app.db_models import (
+from app.db.models import (
     Episode,
     ProductionAuditEvent,
     ProductionEpisode,
@@ -12,9 +12,9 @@ from app.db_models import (
     VideoProductionRun,
     VideoReviewRecord,
 )
-from app.services.agency_backtrack_policy import trigger_backtrack_if_needed
-from app.services.production_queue_service import claim_next_job, mark_job_completed
-from app.services.production_status import JOB_COMPLETED
+from app.domains.agency_operations.agency_backtrack_policy import trigger_backtrack_if_needed
+from app.domains.video_production.production_queue_service import claim_next_job, mark_job_completed
+from app.domains.video_production.production_status import JOB_COMPLETED
 
 
 def test_auto_repair_stage_names_fit_production_job_stage_column():

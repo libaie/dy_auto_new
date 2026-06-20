@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from app.db_models import (
+from app.db.models import (
     Episode,
     ProductionEpisode,
     ProductionPlan,
@@ -13,7 +13,7 @@ from app.db_models import (
     VideoReviewRecord,
 )
 from app.main import app
-from app.services.review_asset_edit_service import ReviewAssetEditError
+from app.domains.video_production.review_asset_edit_service import ReviewAssetEditError
 
 
 client = TestClient(app)
@@ -99,7 +99,7 @@ def test_create_video_production_run(db):
 
 
 def test_regenerate_creates_new_version(db):
-    from app.services.video_production_service import create_run_from_episode, mark_image_stage_assets
+    from app.domains.video_production.video_production_service import create_run_from_episode, mark_image_stage_assets
 
     series, episode = _episode(db)
     run = create_run_from_episode(db, series.id, episode.id)
@@ -128,7 +128,7 @@ def test_regenerate_creates_new_version(db):
 
 
 def test_regenerate_without_persistence_fields_returns_storage_failed_asset(db):
-    from app.services.video_production_service import create_run_from_episode, mark_image_stage_assets
+    from app.domains.video_production.video_production_service import create_run_from_episode, mark_image_stage_assets
 
     series, episode = _episode(db)
     run = create_run_from_episode(db, series.id, episode.id)
@@ -154,7 +154,7 @@ def test_regenerate_without_persistence_fields_returns_storage_failed_asset(db):
 
 
 def test_review_items_defaults_to_actionable_statuses(db):
-    from app.services.video_production_service import create_run_from_episode
+    from app.domains.video_production.video_production_service import create_run_from_episode
 
     series, episode = _episode(db)
     run = create_run_from_episode(db, series.id, episode.id)
@@ -179,7 +179,7 @@ def test_review_items_defaults_to_actionable_statuses(db):
 
 
 def test_review_items_keeps_single_status_filter_compatible(db):
-    from app.services.video_production_service import create_run_from_episode
+    from app.domains.video_production.video_production_service import create_run_from_episode
 
     series, episode = _episode(db)
     run = create_run_from_episode(db, series.id, episode.id)
@@ -205,7 +205,7 @@ def test_review_items_keeps_single_status_filter_compatible(db):
 
 
 def test_review_items_supports_multiple_statuses(db):
-    from app.services.video_production_service import create_run_from_episode
+    from app.domains.video_production.video_production_service import create_run_from_episode
 
     series, episode = _episode(db)
     run = create_run_from_episode(db, series.id, episode.id)
@@ -279,7 +279,7 @@ def test_review_items_exposes_production_segment_id_for_real_short_retry(db):
 
 
 def test_review_items_excludes_superseded_asset_versions(db):
-    from app.services.video_production_service import create_run_from_episode
+    from app.domains.video_production.video_production_service import create_run_from_episode
 
     series, episode = _episode(db)
     run = create_run_from_episode(db, series.id, episode.id)
@@ -318,7 +318,7 @@ def test_review_items_excludes_superseded_asset_versions(db):
 
 
 def test_review_items_exposes_approval_permission_from_persistence_state(db):
-    from app.services.video_production_service import create_run_from_episode
+    from app.domains.video_production.video_production_service import create_run_from_episode
 
     series, episode = _episode(db)
     run = create_run_from_episode(db, series.id, episode.id)
@@ -375,7 +375,7 @@ def test_review_items_exposes_approval_permission_from_persistence_state(db):
 
 
 def test_persist_retry_runs_ai_audit_before_returning_reviewable_asset(db, monkeypatch):
-    from app.services.video_production_service import create_run_from_episode
+    from app.domains.video_production.video_production_service import create_run_from_episode
 
     series, episode = _episode(db)
     run = create_run_from_episode(db, series.id, episode.id)
@@ -419,8 +419,8 @@ def test_persist_retry_runs_ai_audit_before_returning_reviewable_asset(db, monke
         db.commit()
         return assets
 
-    monkeypatch.setattr("app.services.asset_storage_guard.persist_provider_asset", fake_persist_provider_asset)
-    monkeypatch.setattr("app.services.video_production_service.run_ai_audit_for_assets", fake_audit)
+    monkeypatch.setattr("app.domains.video_production.asset_storage_guard.persist_provider_asset", fake_persist_provider_asset)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.run_ai_audit_for_assets", fake_audit)
 
     resp = client.post(f"/api/video-production/assets/{asset.id}/persist-retry")
 
@@ -432,7 +432,7 @@ def test_persist_retry_runs_ai_audit_before_returning_reviewable_asset(db, monke
 
 
 def test_persist_retry_rejects_already_persisted_assets(db):
-    from app.services.video_production_service import create_run_from_episode
+    from app.domains.video_production.video_production_service import create_run_from_episode
 
     series, episode = _episode(db)
     run = create_run_from_episode(db, series.id, episode.id)
@@ -468,7 +468,7 @@ def test_image_edit_pending_response_has_sync_payload(db, monkeypatch):
             {"image_task_id": "task-1", "status": "queued"},
         )
 
-    monkeypatch.setattr("app.routers.video_production.edit_image_asset", fake_edit)
+    monkeypatch.setattr("app.domains.video_production.video_production_router.edit_image_asset", fake_edit)
 
     resp = client.post(f"/api/video-production/assets/{asset.id}/image-edit", json={
         "instruction": "保持角色脸型一致",

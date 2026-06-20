@@ -1,4 +1,4 @@
-from app.db_models import AITextArtifact, AITextArtifactConsumer, Episode, Series, VideoProductionRun
+from app.db.models import AITextArtifact, AITextArtifactConsumer, Episode, Series, VideoProductionRun
 
 
 def _create_series_episode(db):
@@ -12,7 +12,7 @@ def _create_series_episode(db):
 
 
 def test_manual_edit_creates_new_artifact_version_and_approval_supersedes_old(db):
-    from app.services.ai_text_artifact_service import AITextArtifactService
+    from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
 
     series, episode = _create_series_episode(db)
     service = AITextArtifactService(db)
@@ -64,7 +64,7 @@ def test_manual_edit_creates_new_artifact_version_and_approval_supersedes_old(db
 
 
 def test_approve_artifact_rejects_stale_version_when_newer_version_exists(db):
-    from app.services.ai_text_artifact_service import AITextArtifactService
+    from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
 
     series, episode = _create_series_episode(db)
     service = AITextArtifactService(db)
@@ -103,7 +103,7 @@ def test_approve_artifact_rejects_stale_version_when_newer_version_exists(db):
 
 
 def test_bind_consumer_records_exact_artifact_version(db):
-    from app.services.ai_text_artifact_service import AITextArtifactService
+    from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
 
     series, episode = _create_series_episode(db)
     service = AITextArtifactService(db)
@@ -135,7 +135,7 @@ def test_bind_consumer_records_exact_artifact_version(db):
 
 
 def test_backfill_run_text_artifacts_imports_legacy_run_outputs_and_binds_run(db):
-    from app.services.ai_text_artifact_service import AITextArtifactService
+    from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
 
     series, episode = _create_series_episode(db)
     series.story_bible_json = {"style_lock": {"locked": True, "characters": [{"id": "char-1"}]}}

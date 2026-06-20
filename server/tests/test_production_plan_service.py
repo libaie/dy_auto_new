@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from app.db_models import (
+from app.db.models import (
     Episode,
     ProductionEpisode,
     ProductionPlan,
@@ -11,7 +11,7 @@ from app.db_models import (
     Series,
 )
 from app.main import app
-from app.services.production_status import (
+from app.domains.video_production.production_status import (
     PLAN_READY,
     REFERENCE_CHARACTER_ANCHOR,
     REFERENCE_STYLE_ANCHOR,
@@ -60,7 +60,7 @@ def _create_locked_series_with_episode(db, *, locked=True, frames=None):
 
 
 def test_create_episode_production_plan_splits_long_frame_into_segments(db):
-    from app.services.production_plan_service import create_episode_production_plan
+    from app.domains.video_production.production_plan_service import create_episode_production_plan
 
     series, episode = _create_locked_series_with_episode(db)
 
@@ -95,7 +95,7 @@ def test_create_episode_production_plan_splits_long_frame_into_segments(db):
 
 
 def test_create_episode_production_plan_requires_locked_style(db):
-    from app.services.production_plan_service import create_episode_production_plan
+    from app.domains.video_production.production_plan_service import create_episode_production_plan
 
     series, episode = _create_locked_series_with_episode(db, locked=False)
 
@@ -104,7 +104,7 @@ def test_create_episode_production_plan_requires_locked_style(db):
 
 
 def test_create_episode_production_plan_rejects_empty_storyboard(db):
-    from app.services.production_plan_service import create_episode_production_plan
+    from app.domains.video_production.production_plan_service import create_episode_production_plan
 
     series, episode = _create_locked_series_with_episode(db, frames=[])
 
@@ -113,7 +113,7 @@ def test_create_episode_production_plan_rejects_empty_storyboard(db):
 
 
 def test_create_episode_production_plan_rejects_non_object_frames(db):
-    from app.services.production_plan_service import create_episode_production_plan
+    from app.domains.video_production.production_plan_service import create_episode_production_plan
 
     series, episode = _create_locked_series_with_episode(db, frames=[None])
 

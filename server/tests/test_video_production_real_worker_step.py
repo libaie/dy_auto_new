@@ -4,7 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.config import bj_now
-from app.db_models import (
+from app.db.models import (
     Episode,
     ProductionEpisode,
     ProductionJob,
@@ -17,9 +17,9 @@ from app.db_models import (
     VideoProductionRun,
 )
 from app.main import app
-from app.services.production_action_result import ProductionActionResult
-from app.services.production_errors import ProductionErrorCode, ProductionRepairableError
-from app.services.video_production_run_types import MOCK_SERIES_SCALE, REAL_SHORT_E2E
+from app.domains.video_production.production_action_result import ProductionActionResult
+from app.domains.video_production.production_errors import ProductionErrorCode, ProductionRepairableError
+from app.domains.video_production.video_production_run_types import MOCK_SERIES_SCALE, REAL_SHORT_E2E
 
 client = TestClient(app)
 
@@ -123,7 +123,7 @@ def _linked_run_with_image_job_refs(db, *, reference_roles_json):
 
 
 def test_real_worker_step_claims_limited_batch_and_returns_visible_summary(db, monkeypatch):
-    from app.services.production_worker_service import run_real_worker_step
+    from app.domains.video_production.production_worker_service import run_real_worker_step
 
     run = _run_with_jobs(db, job_count=3)
 
@@ -132,7 +132,7 @@ def test_real_worker_step_claims_limited_batch_and_returns_visible_summary(db, m
         db.commit()
         return {"job_id": job.id, "status": job.status}
 
-    monkeypatch.setattr("app.services.production_worker_service.execute_real_job", fake_execute_job)
+    monkeypatch.setattr("app.domains.video_production.production_worker_service.execute_real_job", fake_execute_job)
 
     result = run_real_worker_step(db, run.id, lease_id="worker-a", batch_size=2)
 
@@ -153,7 +153,7 @@ def test_real_worker_step_route_accepts_background_mode(db, monkeypatch):
         calls.append({"run_id": run_id, "lease_id": lease_id, "batch_size": batch_size})
         return {"ok": True, "processed": batch_size}
 
-    monkeypatch.setattr("app.services.production_worker_service.run_real_worker_step", fake_run_real_worker_step)
+    monkeypatch.setattr("app.domains.video_production.production_worker_service.run_real_worker_step", fake_run_real_worker_step)
 
     resp = client.post(f"/api/video-production/runs/{run.id}/worker-step", json={
         "lease_id": "background-test",
@@ -169,7 +169,7 @@ def test_real_worker_step_route_accepts_background_mode(db, monkeypatch):
 
 
 def test_real_worker_step_does_not_process_more_than_batch_size_and_reports_remaining(db, monkeypatch):
-    from app.services.production_worker_service import run_real_worker_step
+    from app.domains.video_production.production_worker_service import run_real_worker_step
 
     run = _run_with_jobs(db, job_count=5)
     processed = []
@@ -180,7 +180,7 @@ def test_real_worker_step_does_not_process_more_than_batch_size_and_reports_rema
         db.commit()
         return {"job_id": job.id, "status": job.status}
 
-    monkeypatch.setattr("app.services.production_worker_service.execute_real_job", fake_execute_job)
+    monkeypatch.setattr("app.domains.video_production.production_worker_service.execute_real_job", fake_execute_job)
 
     result = run_real_worker_step(db, run.id, lease_id="worker-a", batch_size=2)
 
@@ -198,7 +198,7 @@ def test_real_worker_step_does_not_process_more_than_batch_size_and_reports_rema
     ],
 )
 def test_worker_status_sync_does_not_downgrade_autopilot_approved_gate(db, stage, approved_status, approved_stage):
-    from app.services.production_worker_service import _update_run_status_after_stage_job
+    from app.domains.video_production.production_worker_service import _update_run_status_after_stage_job
 
     run = _run_with_jobs(db, job_count=0)
     run.status = approved_status
@@ -214,7 +214,7 @@ def test_worker_status_sync_does_not_downgrade_autopilot_approved_gate(db, stage
 
 
 def test_real_worker_step_records_repairable_failure_and_continues(db, monkeypatch):
-    from app.services.production_worker_service import run_real_worker_step
+    from app.domains.video_production.production_worker_service import run_real_worker_step
 
     run = _run_with_jobs(db, job_count=2)
     calls = {"count": 0}
@@ -235,7 +235,7 @@ def test_real_worker_step_records_repairable_failure_and_continues(db, monkeypat
         db.commit()
         return {"job_id": job.id, "status": job.status}
 
-    monkeypatch.setattr("app.services.production_worker_service.execute_real_job", fake_execute_job)
+    monkeypatch.setattr("app.domains.video_production.production_worker_service.execute_real_job", fake_execute_job)
 
     result = run_real_worker_step(db, run.id, lease_id="worker-a", batch_size=2)
 
@@ -253,7 +253,7 @@ def test_real_worker_step_records_repairable_failure_and_continues(db, monkeypat
 
 
 def test_real_worker_step_sync_required_does_not_consume_attempt(db, monkeypatch):
-    from app.services.production_worker_service import run_real_worker_step
+    from app.domains.video_production.production_worker_service import run_real_worker_step
 
     run = _run_with_jobs(db, job_count=1)
 
@@ -267,7 +267,7 @@ def test_real_worker_step_sync_required_does_not_consume_attempt(db, monkeypatch
             retryable=True,
         )
 
-    monkeypatch.setattr("app.services.production_worker_service.execute_real_job", fake_execute_job)
+    monkeypatch.setattr("app.domains.video_production.production_worker_service.execute_real_job", fake_execute_job)
 
     result = run_real_worker_step(db, run.id, lease_id="worker-a", batch_size=1)
 
@@ -283,7 +283,7 @@ def test_real_worker_step_sync_required_does_not_consume_attempt(db, monkeypatch
 
 
 def test_real_worker_step_terminal_provider_failure_is_not_resynced(db, monkeypatch):
-    from app.services.production_worker_service import run_real_worker_step
+    from app.domains.video_production.production_worker_service import run_real_worker_step
 
     run, segment = _linked_run_with_image_job(db)
     calls = {"sync": 0}
@@ -312,9 +312,9 @@ def test_real_worker_step_terminal_provider_failure_is_not_resynced(db, monkeypa
         return {"ok": False, "status": "failed", "error": "provider stopped"}
 
     monkeypatch.setenv("DY_AUTO_PROVIDER_SUBMIT_WORKER_COUNT", "1")
-    monkeypatch.setattr("app.services.production_worker_service.resolve_runtime_model_config", fake_config)
-    monkeypatch.setattr("app.services.video_production_service.submit_image_batch", fake_submit_image_batch)
-    monkeypatch.setattr("app.services.video_production_service.get_stage_task", fake_get_stage_task)
+    monkeypatch.setattr("app.domains.video_production.production_worker_service.resolve_runtime_model_config", fake_config)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_image_batch", fake_submit_image_batch)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.get_stage_task", fake_get_stage_task)
 
     first = run_real_worker_step(db, run.id, lease_id="worker-a", batch_size=1)
 
@@ -340,14 +340,14 @@ def test_real_worker_step_terminal_provider_failure_is_not_resynced(db, monkeypa
 
 @pytest.mark.parametrize("raised", [ValueError("bad worker payload"), RuntimeError("provider exploded")])
 def test_real_worker_step_captures_job_exceptions_and_clears_lease(db, monkeypatch, raised):
-    from app.services.production_worker_service import run_real_worker_step
+    from app.domains.video_production.production_worker_service import run_real_worker_step
 
     run = _run_with_jobs(db, job_count=1)
 
     async def fake_execute_job(db, run, job):
         raise raised
 
-    monkeypatch.setattr("app.services.production_worker_service.execute_real_job", fake_execute_job)
+    monkeypatch.setattr("app.domains.video_production.production_worker_service.execute_real_job", fake_execute_job)
 
     result = run_real_worker_step(db, run.id, lease_id="worker-a", batch_size=1)
 
@@ -361,7 +361,7 @@ def test_real_worker_step_captures_job_exceptions_and_clears_lease(db, monkeypat
 
 
 def test_real_worker_step_executes_image_job_and_persists_asset(db, monkeypatch):
-    from app.services.production_worker_service import run_real_worker_step
+    from app.domains.video_production.production_worker_service import run_real_worker_step
 
     run, segment = _linked_run_with_image_job(db)
     submitted = {}
@@ -406,10 +406,10 @@ def test_real_worker_step_executes_image_job_and_persists_asset(db, monkeypatch)
         }
 
     monkeypatch.setenv("DY_AUTO_PROVIDER_SUBMIT_WORKER_COUNT", "1")
-    monkeypatch.setattr("app.services.production_worker_service.resolve_runtime_model_config", fake_config)
-    monkeypatch.setattr("app.services.video_production_service.submit_image_batch", fake_submit_image_batch)
-    monkeypatch.setattr("app.services.video_production_service.get_stage_task", fake_get_stage_task)
-    monkeypatch.setattr("app.services.production_worker_service.run_ai_audit_for_assets", lambda db, run, assets: assets)
+    monkeypatch.setattr("app.domains.video_production.production_worker_service.resolve_runtime_model_config", fake_config)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_image_batch", fake_submit_image_batch)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.get_stage_task", fake_get_stage_task)
+    monkeypatch.setattr("app.domains.video_production.production_worker_service.run_ai_audit_for_assets", lambda db, run, assets: assets)
 
     result = run_real_worker_step(db, run.id, lease_id="worker-a", batch_size=1)
 
@@ -429,7 +429,7 @@ def test_real_worker_step_executes_image_job_and_persists_asset(db, monkeypatch)
 
 
 def test_real_worker_step_blocks_image_job_without_reference_urls_before_provider(db, monkeypatch):
-    from app.services.production_worker_service import run_real_worker_step
+    from app.domains.video_production.production_worker_service import run_real_worker_step
 
     run, segment = _linked_run_with_image_job_refs(db, reference_roles_json=[])
 
@@ -452,8 +452,8 @@ def test_real_worker_step_blocks_image_job_without_reference_urls_before_provide
         raise AssertionError("worker submitted a paid image task without reference URLs")
 
     monkeypatch.setenv("DY_AUTO_PROVIDER_SUBMIT_WORKER_COUNT", "1")
-    monkeypatch.setattr("app.services.production_worker_service.resolve_runtime_model_config", fake_config)
-    monkeypatch.setattr("app.services.video_production_service.submit_image_batch", fail_submit_image_batch)
+    monkeypatch.setattr("app.domains.video_production.production_worker_service.resolve_runtime_model_config", fake_config)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_image_batch", fail_submit_image_batch)
 
     result = run_real_worker_step(db, run.id, lease_id="worker-a", batch_size=1)
 
@@ -466,7 +466,7 @@ def test_real_worker_step_blocks_image_job_without_reference_urls_before_provide
 
 
 def test_real_worker_step_persists_registered_provider_asset_before_audit(db, monkeypatch):
-    from app.services.production_worker_service import run_real_worker_step
+    from app.domains.video_production.production_worker_service import run_real_worker_step
 
     run, segment = _linked_run_with_image_job(db)
     submitted = {}
@@ -526,11 +526,11 @@ def test_real_worker_step_persists_registered_provider_asset_before_audit(db, mo
         return assets
 
     monkeypatch.setenv("DY_AUTO_PROVIDER_SUBMIT_WORKER_COUNT", "1")
-    monkeypatch.setattr("app.services.production_worker_service.resolve_runtime_model_config", fake_config)
-    monkeypatch.setattr("app.services.video_production_service.submit_image_batch", fake_submit_image_batch)
-    monkeypatch.setattr("app.services.video_production_service.get_stage_task", fake_get_stage_task)
-    monkeypatch.setattr("app.services.asset_storage_guard.persist_provider_asset", fake_persist_provider_asset)
-    monkeypatch.setattr("app.services.production_worker_service.run_ai_audit_for_assets", fake_audit)
+    monkeypatch.setattr("app.domains.video_production.production_worker_service.resolve_runtime_model_config", fake_config)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_image_batch", fake_submit_image_batch)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.get_stage_task", fake_get_stage_task)
+    monkeypatch.setattr("app.domains.video_production.asset_storage_guard.persist_provider_asset", fake_persist_provider_asset)
+    monkeypatch.setattr("app.domains.video_production.production_worker_service.run_ai_audit_for_assets", fake_audit)
 
     result = run_real_worker_step(db, run.id, lease_id="worker-a", batch_size=1)
 
@@ -544,7 +544,7 @@ def test_real_worker_step_persists_registered_provider_asset_before_audit(db, mo
 
 
 def test_real_worker_keeps_run_running_until_stage_jobs_are_finished(db, monkeypatch):
-    from app.services.production_worker_service import run_real_worker_step
+    from app.domains.video_production.production_worker_service import run_real_worker_step
 
     run, first_segment = _linked_run_with_image_job(db)
     shot = db.query(ProductionShot).one()
@@ -615,10 +615,10 @@ def test_real_worker_keeps_run_running_until_stage_jobs_are_finished(db, monkeyp
         }
 
     monkeypatch.setenv("DY_AUTO_PROVIDER_SUBMIT_WORKER_COUNT", "1")
-    monkeypatch.setattr("app.services.production_worker_service.resolve_runtime_model_config", fake_config)
-    monkeypatch.setattr("app.services.video_production_service.submit_image_batch", fake_submit_image_batch)
-    monkeypatch.setattr("app.services.video_production_service.get_stage_task", fake_get_stage_task)
-    monkeypatch.setattr("app.services.production_worker_service.run_ai_audit_for_assets", lambda db, run, assets: assets)
+    monkeypatch.setattr("app.domains.video_production.production_worker_service.resolve_runtime_model_config", fake_config)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_image_batch", fake_submit_image_batch)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.get_stage_task", fake_get_stage_task)
+    monkeypatch.setattr("app.domains.video_production.production_worker_service.run_ai_audit_for_assets", lambda db, run, assets: assets)
 
     first = run_real_worker_step(db, run.id, lease_id="worker-a", batch_size=1)
     db.refresh(run)
@@ -636,8 +636,7 @@ def test_real_worker_keeps_run_running_until_stage_jobs_are_finished(db, monkeyp
 
 
 def test_compose_worker_persists_final_asset_before_final_audit(db, monkeypatch, tmp_path):
-    from app.services import production_worker_service
-
+    from app.domains.video_production import production_worker_service
     pixelle_config = tmp_path / "Pixelle-Video" / "config.yaml"
     monkeypatch.setattr(production_worker_service, "PIXELLE_CONFIG_PATH", str(pixelle_config))
     run = _run_with_jobs(db, job_count=0)
@@ -675,8 +674,8 @@ def test_compose_worker_persists_final_asset_before_final_audit(db, monkeypatch,
         audited.append(asset.id)
         return asset
 
-    monkeypatch.setattr("app.services.asset_storage_guard.persist_provider_asset", fake_persist_provider_asset)
-    monkeypatch.setattr("app.services.video_production_service.run_final_audit_for_asset", fake_final_audit)
+    monkeypatch.setattr("app.domains.video_production.asset_storage_guard.persist_provider_asset", fake_persist_provider_asset)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.run_final_audit_for_asset", fake_final_audit)
 
     result = ProductionActionResult.success(data={
         "provider_result": {
@@ -698,7 +697,7 @@ def test_compose_worker_persists_final_asset_before_final_audit(db, monkeypatch,
 
 
 def test_real_worker_marks_completed_provider_result_without_assets_failed(db, monkeypatch):
-    from app.services.production_worker_service import run_real_worker_step
+    from app.domains.video_production.production_worker_service import run_real_worker_step
 
     run, _segment = _linked_run_with_image_job(db)
 
@@ -729,9 +728,9 @@ def test_real_worker_marks_completed_provider_result_without_assets_failed(db, m
         }
 
     monkeypatch.setenv("DY_AUTO_PROVIDER_SUBMIT_WORKER_COUNT", "1")
-    monkeypatch.setattr("app.services.production_worker_service.resolve_runtime_model_config", fake_config)
-    monkeypatch.setattr("app.services.video_production_service.submit_image_batch", fake_submit_image_batch)
-    monkeypatch.setattr("app.services.video_production_service.get_stage_task", fake_get_stage_task)
+    monkeypatch.setattr("app.domains.video_production.production_worker_service.resolve_runtime_model_config", fake_config)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_image_batch", fake_submit_image_batch)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.get_stage_task", fake_get_stage_task)
 
     result = run_real_worker_step(db, run.id, lease_id="worker-a", batch_size=1)
 
@@ -747,14 +746,14 @@ def test_real_worker_marks_completed_provider_result_without_assets_failed(db, m
 
 
 def test_real_worker_step_does_not_process_mock_series_scale_runs(db, monkeypatch):
-    from app.services.production_worker_service import run_real_worker_step
+    from app.domains.video_production.production_worker_service import run_real_worker_step
 
     run = _run_with_jobs(db, job_count=1, run_type=MOCK_SERIES_SCALE)
 
     async def fail_execute_job(*args, **kwargs):
         raise AssertionError("mock_series_scale jobs must not be processed by real worker step")
 
-    monkeypatch.setattr("app.services.production_worker_service.execute_real_job", fail_execute_job)
+    monkeypatch.setattr("app.domains.video_production.production_worker_service.execute_real_job", fail_execute_job)
 
     with pytest.raises(ProductionRepairableError) as exc:
         run_real_worker_step(db, run.id, lease_id="worker-a", batch_size=1)

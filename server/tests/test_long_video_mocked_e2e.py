@@ -1,6 +1,6 @@
-from app.db_models import Episode, GeneratedVideo, ProductionPlan, ProductionSegment, Series
-from app.services.production_collection_service import create_collection_from_approved_episodes
-from app.services.production_plan_service import create_episode_production_plan
+from app.db.models import Episode, GeneratedVideo, ProductionPlan, ProductionSegment, Series
+from app.domains.video_production.production_collection_service import create_collection_from_approved_episodes
+from app.domains.video_production.production_plan_service import create_episode_production_plan
 
 
 def test_multi_episode_plan_retry_and_collection_mocked_e2e(db):

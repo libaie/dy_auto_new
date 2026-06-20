@@ -1,9 +1,9 @@
 from fastapi.testclient import TestClient
 
-from app.db_models import Episode, ProductionJob, ProductionPlan, Series, VideoProductionAsset, VideoProductionRun
+from app.db.models import Episode, ProductionJob, ProductionPlan, Series, VideoProductionAsset, VideoProductionRun
 from app.main import app
-from app.services.production_status import JOB_BLOCKED
-from app.services.video_production_run_types import REAL_SHORT_E2E
+from app.domains.video_production.production_status import JOB_BLOCKED
+from app.domains.video_production.video_production_run_types import REAL_SHORT_E2E
 
 
 client = TestClient(app)

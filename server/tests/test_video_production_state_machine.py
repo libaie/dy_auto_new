@@ -1,5 +1,5 @@
-from app.db_models import Episode, Series, VideoProductionAsset, VideoProductionRun, VideoReviewRecord
-from app.services.video_production_state import (
+from app.db.models import Episode, Series, VideoProductionAsset, VideoProductionRun, VideoReviewRecord
+from app.domains.video_production.video_production_state import (
     assert_can_start_images,
     assert_can_start_videos,
     assert_can_compose,
@@ -7,7 +7,7 @@ from app.services.video_production_state import (
     record_stage_task,
     recompute_run_gate,
 )
-from app.services.video_production_service import mark_image_stage_assets, run_ai_audit_for_assets
+from app.domains.video_production.video_production_service import mark_image_stage_assets, run_ai_audit_for_assets
 
 
 def _run(db, frame_count=2):

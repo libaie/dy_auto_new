@@ -1,14 +1,13 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from app.db_models import Character, Scene
+from app.db.models import Character, Scene
 from app.main import app
 
 
 @pytest.mark.asyncio
 async def test_character_rewrite_returns_candidate_without_mutating_row(db, monkeypatch):
-    from app.services import asset_ai_rewrite_service
-
+    from app.domains.creative_library import asset_ai_rewrite_service
     character = Character(
         name="Lin",
         role_type="protagonist",
@@ -56,8 +55,7 @@ async def test_character_rewrite_returns_candidate_without_mutating_row(db, monk
 
 @pytest.mark.asyncio
 async def test_scene_rewrite_returns_candidate_without_mutating_row(db, monkeypatch):
-    from app.services import asset_ai_rewrite_service
-
+    from app.domains.creative_library import asset_ai_rewrite_service
     scene = Scene(
         name="Rain Clinic",
         scene_type="indoor",
@@ -95,8 +93,7 @@ async def test_scene_rewrite_returns_candidate_without_mutating_row(db, monkeypa
 
 @pytest.mark.asyncio
 async def test_invalid_ai_json_raises_ai_rewrite_invalid_output(db, monkeypatch):
-    from app.services import asset_ai_rewrite_service
-
+    from app.domains.creative_library import asset_ai_rewrite_service
     character = Character(name="Lin")
     db.add(character)
     db.commit()
@@ -115,7 +112,7 @@ async def test_invalid_ai_json_raises_ai_rewrite_invalid_output(db, monkeypatch)
 
 @pytest.mark.asyncio
 async def test_not_found_raises_correct_code(db):
-    from app.services.asset_ai_rewrite_service import (
+    from app.domains.creative_library.asset_ai_rewrite_service import (
         AssetAiRewriteError,
         generate_character_rewrite_candidate,
         generate_scene_rewrite_candidate,
@@ -131,8 +128,7 @@ async def test_not_found_raises_correct_code(db):
 
 
 def test_character_ai_rewrite_candidate_endpoint_returns_candidate(db, monkeypatch):
-    from app.services import asset_ai_rewrite_service
-
+    from app.domains.creative_library import asset_ai_rewrite_service
     character = Character(name="Lin", role_type="protagonist", gender="female")
     db.add(character)
     db.commit()
@@ -157,8 +153,7 @@ def test_character_ai_rewrite_candidate_endpoint_returns_candidate(db, monkeypat
 
 
 def test_scene_ai_rewrite_candidate_endpoint_returns_candidate(db, monkeypatch):
-    from app.services import asset_ai_rewrite_service
-
+    from app.domains.creative_library import asset_ai_rewrite_service
     scene = Scene(name="Clinic", scene_type="indoor", lighting="night")
     db.add(scene)
     db.commit()

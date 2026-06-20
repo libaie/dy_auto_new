@@ -1,7 +1,7 @@
 """Channel and ChannelItem ORM model tests."""
 import pytest
 from tests.conftest import setup_group
-from app.db_models import Channel, ChannelItem
+from app.db.models import Channel, ChannelItem
 
 
 def test_create_channel(db):

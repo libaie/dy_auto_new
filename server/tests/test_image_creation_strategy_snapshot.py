@@ -5,13 +5,13 @@ from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import IntegrityError
 
-from app.db_models import AIModel, ImageCreationTask, ImageCreationAsset, ImageProductionCostEvent, ImageProductionPolicyVersion
+from app.db.models import AIModel, ImageCreationTask, ImageCreationAsset, ImageProductionCostEvent, ImageProductionPolicyVersion
 from app.deps import verify_admin_token
 from app.main import app
-from app.services.crypto import encrypt
-from app.services.image_creation_service import create_image_task, sync_image_task, _redact_provider_error
-from app.services.image_production_strategy_service import create_strategy
-from app.services.image_selection_preview_service import create_selection_preview
+from app.domains.system_configuration.crypto import encrypt
+from app.domains.image_generation.image_creation_service import create_image_task, sync_image_task, _redact_provider_error
+from app.domains.image_generation.image_production_strategy_service import create_strategy
+from app.domains.image_generation.image_selection_preview_service import create_selection_preview
 
 
 client = TestClient(app)
@@ -77,7 +77,7 @@ def test_create_image_task_with_strategy_persists_snapshot(db, monkeypatch):
     async def fake_submit(**kwargs):
         return {"ok": True, "stage_task_id": "snapshot-stage"}
 
-    monkeypatch.setattr("app.services.image_creation_service.submit_image_create", fake_submit)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.submit_image_create", fake_submit)
 
     resp = client.post("/api/image-creation/tasks", json={
         "mode": "text_to_image",
@@ -113,7 +113,7 @@ def test_create_image_task_without_strategy_still_works(db, monkeypatch):
     async def fake_submit(**kwargs):
         return {"ok": True, "stage_task_id": "no-strategy-stage"}
 
-    monkeypatch.setattr("app.services.image_creation_service.submit_image_create", fake_submit)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.submit_image_create", fake_submit)
 
     resp = client.post("/api/image-creation/tasks", json={
         "mode": "text_to_image",
@@ -142,7 +142,7 @@ def test_create_image_task_requires_explicit_high_cost_confirmation(db, monkeypa
     async def fake_submit(**kwargs):
         raise AssertionError("submit_image_create should not run without cost confirmation")
 
-    monkeypatch.setattr("app.services.image_creation_service.submit_image_create", fake_submit)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.submit_image_create", fake_submit)
 
     resp = client.post("/api/image-creation/tasks", json={
         "mode": "text_to_image",
@@ -175,7 +175,7 @@ def test_create_image_task_requires_fresh_preview_for_high_cost_confirmation(db,
     async def fake_submit(**kwargs):
         raise AssertionError("submit_image_create should not run without a matching cost preview")
 
-    monkeypatch.setattr("app.services.image_creation_service.submit_image_create", fake_submit)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.submit_image_create", fake_submit)
 
     resp = client.post("/api/image-creation/tasks", json={
         "mode": "text_to_image",
@@ -219,7 +219,7 @@ def test_create_image_task_accepts_high_cost_confirmation_with_matching_preview(
     async def fake_submit(**kwargs):
         return {"ok": True, "stage_task_id": "high-cost-preview-stage"}
 
-    monkeypatch.setattr("app.services.image_creation_service.submit_image_create", fake_submit)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.submit_image_create", fake_submit)
 
     resp = client.post("/api/image-creation/tasks", json={
         **payload,
@@ -270,7 +270,7 @@ def test_create_image_task_rejects_high_cost_confirmation_when_preview_request_c
     async def fake_submit(**kwargs):
         raise AssertionError("submit_image_create should not run for stale high-cost preview")
 
-    monkeypatch.setattr("app.services.image_creation_service.submit_image_create", fake_submit)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.submit_image_create", fake_submit)
 
     create_payload = {**preview_payload, field: changed_value}
     resp = client.post("/api/image-creation/tasks", json={
@@ -312,7 +312,7 @@ def test_create_image_task_queues_when_capacity_full(db, monkeypatch):
     async def fake_submit(**kwargs):
         raise AssertionError("queued task should not be submitted to Pixelle")
 
-    monkeypatch.setattr("app.services.image_creation_service.submit_image_create", fake_submit)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.submit_image_create", fake_submit)
 
     resp = client.post("/api/image-creation/tasks", json={
         "mode": "text_to_image",
@@ -367,7 +367,7 @@ def test_create_image_task_blocks_when_capacity_full_without_queue(db, monkeypat
     async def fake_submit(**kwargs):
         raise AssertionError("blocked task should not be submitted to Pixelle")
 
-    monkeypatch.setattr("app.services.image_creation_service.submit_image_create", fake_submit)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.submit_image_create", fake_submit)
 
     resp = client.post("/api/image-creation/tasks", json={
         "mode": "text_to_image",
@@ -416,7 +416,7 @@ def test_dispatch_queued_image_task_submits_to_pixelle(db, monkeypatch):
     async def fail_submit(**kwargs):
         raise AssertionError("create should queue without Pixelle")
 
-    monkeypatch.setattr("app.services.image_creation_service.submit_image_create", fail_submit)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.submit_image_create", fail_submit)
     create_resp = client.post("/api/image-creation/tasks", json={
         "mode": "text_to_image",
         "prompt": "dispatch later",
@@ -438,7 +438,7 @@ def test_dispatch_queued_image_task_submits_to_pixelle(db, monkeypatch):
         captured.update(kwargs)
         return {"ok": True, "stage_task_id": "dispatch-stage"}
 
-    monkeypatch.setattr("app.services.image_creation_service.submit_image_create", fake_submit)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.submit_image_create", fake_submit)
 
     resp = client.post(f"/api/image-creation/tasks/{task_id}/dispatch")
     task = db.query(ImageCreationTask).filter(ImageCreationTask.id == task_id).first()
@@ -525,7 +525,7 @@ def test_dispatch_queued_image_task_marks_failed_when_pixelle_submit_fails(db, m
     async def fake_submit(**kwargs):
         raise RuntimeError("dispatch unavailable")
 
-    monkeypatch.setattr("app.services.image_creation_service.submit_image_create", fake_submit)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.submit_image_create", fake_submit)
 
     resp = client.post(f"/api/image-creation/tasks/{task.id}/dispatch")
     detail = resp.json()["detail"]
@@ -569,8 +569,8 @@ def test_create_image_task_rechecks_capacity_before_lease(db, monkeypatch):
     async def fake_submit(**kwargs):
         raise AssertionError("second capacity block should happen before Pixelle")
 
-    monkeypatch.setattr("app.services.image_creation_service.preview_image_capacity", fake_capacity, raising=False)
-    monkeypatch.setattr("app.services.image_creation_service.submit_image_create", fake_submit)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.preview_image_capacity", fake_capacity, raising=False)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.submit_image_create", fake_submit)
 
     resp = client.post("/api/image-creation/tasks", json={
         "mode": "text_to_image",
@@ -626,7 +626,7 @@ def test_create_image_task_records_fallback_trace_when_pixelle_submit_fails(db, 
         assert kwargs["model_config"]["model_id"] == model.id
         raise RuntimeError("Authorization: Bearer ark-123 api_key=secret pixelle unavailable")
 
-    monkeypatch.setattr("app.services.image_creation_service.submit_image_create", fake_submit)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.submit_image_create", fake_submit)
     idempotency_key = f"pixelle-fail-{uuid4().hex}"
 
     resp = client.post("/api/image-creation/tasks", json={
@@ -677,8 +677,8 @@ def test_sync_image_task_redacts_failed_status_and_records_fallback_trace(db, mo
             "nested": {"client_secret": "nested-secret-value"},
         }
 
-    monkeypatch.setattr("app.services.image_creation_service.submit_image_create", fake_submit)
-    monkeypatch.setattr("app.services.image_creation_service.get_stage_task", fake_get_stage_task)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.submit_image_create", fake_submit)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.get_stage_task", fake_get_stage_task)
 
     create_resp = client.post("/api/image-creation/tasks", json={
         "mode": "text_to_image",
@@ -748,7 +748,7 @@ async def test_sync_image_task_reuses_existing_canonical_asset(db, monkeypatch):
             }],
         }
 
-    monkeypatch.setattr("app.services.image_creation_service.get_stage_task", fake_get_stage_task)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.get_stage_task", fake_get_stage_task)
 
     synced = await sync_image_task(db, task.id)
 
@@ -805,7 +805,7 @@ async def test_sync_image_task_recovers_duplicate_asset_commit_race(db, monkeypa
             )
         return original_commit()
 
-    monkeypatch.setattr("app.services.image_creation_service.get_stage_task", fake_get_stage_task)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.get_stage_task", fake_get_stage_task)
     monkeypatch.setattr(db, "commit", race_commit)
 
     synced = await sync_image_task(db, task.id)
@@ -822,7 +822,7 @@ def test_task_payload_includes_production_timeline(db, monkeypatch):
     async def fake_submit(**kwargs):
         return {"ok": True, "stage_task_id": "timeline-stage"}
 
-    monkeypatch.setattr("app.services.image_creation_service.submit_image_create", fake_submit)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.submit_image_create", fake_submit)
 
     resp = client.post("/api/image-creation/tasks", json={
         "mode": "text_to_image",
@@ -904,7 +904,7 @@ def test_create_image_task_rejects_selection_preview_when_request_changes(db, mo
     async def fake_submit(**kwargs):
         raise AssertionError("submit_image_create should not run for drifted preview")
 
-    monkeypatch.setattr("app.services.image_creation_service.submit_image_create", fake_submit)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.submit_image_create", fake_submit)
 
     resp = client.post("/api/image-creation/tasks", json={
         "mode": "text_to_image",
@@ -943,7 +943,7 @@ def test_create_image_task_accepts_preview_with_strategy_default_model(db, monke
     async def fake_submit(**kwargs):
         return {"ok": True, "stage_task_id": "preview-default-stage"}
 
-    monkeypatch.setattr("app.services.image_creation_service.submit_image_create", fake_submit)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.submit_image_create", fake_submit)
 
     resp = client.post("/api/image-creation/tasks", json={
         "mode": "text_to_image",
@@ -981,7 +981,7 @@ def test_create_image_task_accepts_preview_with_strategy_default_destination_rol
     async def fake_submit(**kwargs):
         return {"ok": True, "stage_task_id": "preview-default-destination-stage"}
 
-    monkeypatch.setattr("app.services.image_creation_service.submit_image_create", fake_submit)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.submit_image_create", fake_submit)
 
     resp = client.post("/api/image-creation/tasks", json={
         "mode": "text_to_image",
@@ -1074,7 +1074,7 @@ def test_create_image_task_accepts_preview_with_same_source_and_reference(db, mo
     async def fake_submit(**kwargs):
         return {"ok": True, "stage_task_id": "preview-source-reference-stage"}
 
-    monkeypatch.setattr("app.services.image_creation_service.submit_image_create", fake_submit)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.submit_image_create", fake_submit)
 
     resp = client.post("/api/image-creation/tasks", json={
         "mode": "text_to_image",
@@ -1111,7 +1111,7 @@ def test_http_selection_preview_keeps_source_and_reference_fields_for_create(db,
     async def fake_submit(**kwargs):
         return {"ok": True, "stage_task_id": "http-preview-source-reference-stage"}
 
-    monkeypatch.setattr("app.services.image_creation_service.submit_image_create", fake_submit)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.submit_image_create", fake_submit)
 
     resp = client.post("/api/image-creation/tasks", json={
         "mode": "text_to_image",
@@ -1180,7 +1180,7 @@ def test_create_image_task_accepts_preview_with_asset_source_and_reference(db, m
     async def fake_submit(**kwargs):
         return {"ok": True, "stage_task_id": "preview-asset-stage"}
 
-    monkeypatch.setattr("app.services.image_creation_service.submit_image_create", fake_submit)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.submit_image_create", fake_submit)
 
     resp = client.post("/api/image-creation/tasks", json={
         "mode": "text_to_image",
@@ -1214,7 +1214,7 @@ def test_create_image_task_rejects_preview_when_reference_changes(db, monkeypatc
     async def fake_submit(**kwargs):
         raise AssertionError("submit_image_create should not run for reference drift")
 
-    monkeypatch.setattr("app.services.image_creation_service.submit_image_create", fake_submit)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.submit_image_create", fake_submit)
 
     resp = client.post("/api/image-creation/tasks", json={
         "mode": "text_to_image",
@@ -1250,7 +1250,7 @@ async def test_create_image_task_rejects_selection_preview_user_scope(db, monkey
     async def fake_submit(**kwargs):
         raise AssertionError("submit_image_create should not run for forbidden preview")
 
-    monkeypatch.setattr("app.services.image_creation_service.submit_image_create", fake_submit)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.submit_image_create", fake_submit)
     payload = {
         "mode": "text_to_image",
         "prompt": "preview scope",

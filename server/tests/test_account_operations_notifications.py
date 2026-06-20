@@ -156,7 +156,7 @@ def _uid(prefix):
 
 
 def _seed_account(db, account_id):
-    from app.db_models import Account
+    from app.db.models import Account
 
     db.add(
         Account(
@@ -177,7 +177,7 @@ def _seed_account(db, account_id):
 
 
 def _seed_group(db, group_id, account_ids):
-    from app.db_models import AccountGroup, AccountGroupMember
+    from app.db.models import AccountGroup, AccountGroupMember
 
     db.add(AccountGroup(id=group_id, name=group_id, description="notify group"))
     for account_id in account_ids:
@@ -187,7 +187,7 @@ def _seed_group(db, group_id, account_ids):
 
 
 def _latest_instance_id(db, account_id):
-    from app.db_models import ChainInstance
+    from app.db.models import ChainInstance
 
     db.rollback()
     instance = (

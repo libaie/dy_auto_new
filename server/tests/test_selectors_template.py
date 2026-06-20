@@ -3,9 +3,9 @@ from pathlib import Path
 
 import yaml
 
-from app.db_models import UISelector
+from app.db.models import UISelector
 from app.seed import seed_selectors
-from app.services.selector_service import selector_service
+from app.domains.selector_management.selector_service import selector_service
 
 
 REQUIRED_RUNTIME_SELECTORS = {
@@ -106,7 +106,7 @@ def test_seed_selectors_bumps_revision_when_template_adds_selector(db):
 
 
 def test_seed_selectors_restores_douyin_38_7_profile(db):
-    from app.db_models import Device
+    from app.db.models import Device
 
     seed_selectors(db)
 

@@ -1,4 +1,4 @@
-from app.db_models import (
+from app.db.models import (
     Episode,
     ProductionCostEvent,
     ProductionEpisode,

@@ -2,9 +2,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.db_models import AgencyExpertInvocation, AIModel, Episode, PipelineRun, Series
-from app.services.agency_runtime import AgencyRuntimeResult
-from app.services.crypto import encrypt
+from app.db.models import AgencyExpertInvocation, AIModel, Episode, PipelineRun, Series
+from app.domains.agency_operations.agency_runtime import AgencyRuntimeResult
+from app.domains.system_configuration.crypto import encrypt
 
 
 client = TestClient(app)
@@ -83,8 +83,7 @@ async def _agency_pass(self, **kwargs):
 
 @pytest.mark.asyncio
 async def test_pipeline_start_blocks_when_expert_review_model_missing(db, monkeypatch):
-    from app.routers import pipeline
-
+    from app.domains.script_pipeline import pipeline_router as pipeline
     series, episode = _series_with_storyboard(db)
     captured = {}
 
@@ -113,8 +112,7 @@ async def test_pipeline_start_blocks_when_expert_review_model_missing(db, monkey
 
 @pytest.mark.asyncio
 async def test_pipeline_start_loads_saved_storyboard_when_director_plan_missing(db, monkeypatch):
-    from app.routers import pipeline
-
+    from app.domains.script_pipeline import pipeline_router as pipeline
     series, episode = _series_with_storyboard(db)
     _expert_review_model(db)
     captured = {}
@@ -128,7 +126,7 @@ async def test_pipeline_start_loads_saved_storyboard_when_director_plan_missing(
         }
 
     monkeypatch.setattr(pipeline, "_submit_and_poll", fake_submit_and_poll)
-    monkeypatch.setattr("app.services.agency_runtime.AgencySkillRuntime.invoke", _agency_pass)
+    monkeypatch.setattr("app.domains.agency_operations.agency_runtime.AgencySkillRuntime.invoke", _agency_pass)
 
     resp = client.post("/api/pipeline/start", json={
         "series_id": series.id,

@@ -9,9 +9,9 @@ from sqlalchemy.orm import sessionmaker
 
 from app.domains.ai_video_series import story_planning, style_lock
 from app.main import app
-from app.db_models import AIModel, AITextArtifact, Character, Episode, GeneratedVideo, PipelineRun, ProductionJob, Scene, Series
-from app.services.agency_runtime import AgencyRuntimeResult
-from app.services.crypto import encrypt
+from app.db.models import AIModel, AITextArtifact, Character, Episode, GeneratedVideo, PipelineRun, ProductionJob, Scene, Series
+from app.domains.agency_operations.agency_runtime import AgencyRuntimeResult
+from app.domains.system_configuration.crypto import encrypt
 
 
 def _expert_review_model(db):
@@ -57,7 +57,7 @@ async def _agency_pass(self, **kwargs):
 
 
 def test_auto_plan_splits_long_video_into_seedance_shots_with_anchors():
-    from app.routers.director import _normalize_auto_frames
+    from app.domains.director_planning.director_router import _normalize_auto_frames
 
     character_refs = [f"https://cdn.test/lin-angle-{index}.png" for index in range(1, 11)]
     scene_refs = [f"https://cdn.test/clinic-style-{index}.png" for index in range(1, 5)]
@@ -116,8 +116,7 @@ def _create_series(db, *, with_episode=True):
 
 @pytest.mark.asyncio
 async def test_style_lock_fills_multi_angle_character_and_scene_references(db, monkeypatch):
-    from app.routers import series as series_router
-
+    from app.domains.ai_video_series import router as series_router
     parent = Series(title="Anchors", logline="Test", genre="drama")
     character = Character(
         name="Lin",
@@ -171,8 +170,7 @@ async def test_style_lock_fills_multi_angle_character_and_scene_references(db, m
 
 @pytest.mark.asyncio
 async def test_style_lock_infers_live_action_style_from_reality_health_logline(db, monkeypatch):
-    from app.routers import series as series_router
-
+    from app.domains.ai_video_series import router as series_router
     parent = Series(
         title="控糖日记",
         logline="一位现实生活的普通中老年人老刘用现实真实生活方式管理血糖，每集解决一个日常控糖问题。",
@@ -217,8 +215,7 @@ async def test_style_lock_infers_live_action_style_from_reality_health_logline(d
 
 @pytest.mark.asyncio
 async def test_style_lock_regenerates_usable_references_when_inferred_medium_changes(db, monkeypatch):
-    from app.routers import series as series_router
-
+    from app.domains.ai_video_series import router as series_router
     parent = Series(
         title="控糖日记",
         logline="一位现实生活的普通中老年人老刘用现实真实生活方式管理血糖。",
@@ -278,8 +275,7 @@ async def test_style_lock_regenerates_usable_references_when_inferred_medium_cha
 
 @pytest.mark.asyncio
 async def test_style_lock_regenerates_expired_reference_urls(db, monkeypatch):
-    from app.routers import series as series_router
-
+    from app.domains.ai_video_series import router as series_router
     expired = (
         "https://ark-acg-cn-beijing.tos-cn-beijing.volces.com/ref.jpeg"
         "?X-Tos-Date=20000101T000000Z&X-Tos-Expires=86400"
@@ -329,8 +325,7 @@ async def test_style_lock_regenerates_expired_reference_urls(db, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_style_lock_generates_missing_assets_and_records_missing_references(client, db, monkeypatch):
-    from app.routers import series as series_router
-
+    from app.domains.ai_video_series import router as series_router
     series, _ = _create_series(db, with_episode=False)
     generated = [
         json.dumps({
@@ -496,8 +491,7 @@ def test_style_lock_post_clears_stale_missing_assets_and_progress(client, db):
 
 
 def test_style_lock_post_schedules_background_job_without_running_inline(client, db, monkeypatch):
-    from app.routers import series as series_router
-
+    from app.domains.ai_video_series import router as series_router
     series, _ = _create_series(db, with_episode=False)
     resp = client.post(f"/api/series/{series.id}/style-lock")
 
@@ -529,8 +523,7 @@ def test_style_lock_active_job_blocks_duplicate_even_if_story_bible_is_stale(cli
 
 @pytest.mark.asyncio
 async def test_style_lock_worker_step_processes_persisted_job(db, monkeypatch):
-    from app.routers import series as series_router
-
+    from app.domains.ai_video_series import router as series_router
     series, _ = _create_series(db, with_episode=False)
     character = Character(name="Lin", role_type="protagonist", avatar_front_url="https://cdn.test/front.png")
     scene = Scene(name="Clinic", reference_wideshot_url="https://cdn.test/wide.png")
@@ -559,8 +552,7 @@ async def test_style_lock_worker_step_processes_persisted_job(db, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_style_lock_worker_claims_jobs_with_long_lease(db, monkeypatch):
-    from app.routers import series as series_router
-
+    from app.domains.ai_video_series import router as series_router
     claim_kwargs = {}
 
     def fake_claim_next_job(db_session, **kwargs):
@@ -578,8 +570,7 @@ async def test_style_lock_worker_claims_jobs_with_long_lease(db, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_story_plan_worker_step_processes_persisted_job(db, monkeypatch):
-    from app.routers import series as series_router
-
+    from app.domains.ai_video_series import router as series_router
     series, _ = _create_series(db, with_episode=False)
     client = TestClient(app)
     resp = client.post(f"/api/series/{series.id}/story-plan")
@@ -604,8 +595,7 @@ async def test_story_plan_worker_step_processes_persisted_job(db, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_story_plan_worker_claims_jobs_with_long_lease(db, monkeypatch):
-    from app.routers import series as series_router
-
+    from app.domains.ai_video_series import router as series_router
     claim_kwargs = {}
 
     def fake_claim_next_job(db_session, **kwargs):
@@ -623,8 +613,7 @@ async def test_story_plan_worker_claims_jobs_with_long_lease(db, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_style_lock_worker_records_reference_slot_progress(db, monkeypatch):
-    from app.routers import series as series_router
-
+    from app.domains.ai_video_series import router as series_router
     series, _ = _create_series(db, with_episode=False)
     character = Character(
         name="Lin",
@@ -674,8 +663,7 @@ async def test_style_lock_worker_records_reference_slot_progress(db, monkeypatch
 
 @pytest.mark.asyncio
 async def test_style_lock_reference_generation_uses_slot_scoped_idempotency_context(db, monkeypatch):
-    from app.routers import series as series_router
-
+    from app.domains.ai_video_series import router as series_router
     series, _ = _create_series(db, with_episode=False)
     character = Character(name="Lin", role_type="protagonist")
     scene = Scene(name="Clinic", scene_type="indoor")
@@ -717,8 +705,7 @@ async def test_style_lock_reference_generation_uses_slot_scoped_idempotency_cont
 
 @pytest.mark.asyncio
 async def test_style_lock_reference_generation_runs_slots_in_parallel(db, monkeypatch):
-    from app.routers import series as series_router
-
+    from app.domains.ai_video_series import router as series_router
     series, _ = _create_series(db, with_episode=False)
     character = Character(name="Lin", role_type="protagonist")
     scene = Scene(name="Clinic", scene_type="indoor")
@@ -750,8 +737,7 @@ async def test_style_lock_reference_generation_runs_slots_in_parallel(db, monkey
 
 @pytest.mark.asyncio
 async def test_style_lock_blocked_agency_trace_does_not_mark_series_locked(client, db, monkeypatch):
-    from app.routers import series as series_router
-
+    from app.domains.ai_video_series import router as series_router
     series, _ = _create_series(db, with_episode=False)
     character = Character(
         name="Lin",
@@ -811,8 +797,7 @@ async def test_style_lock_blocked_agency_trace_does_not_mark_series_locked(clien
 @pytest.mark.asyncio
 async def test_style_lock_review_timeout_completes_with_partial_trace(client, db, monkeypatch):
     import asyncio
-    from app.routers import series as series_router
-
+    from app.domains.ai_video_series import router as series_router
     series, _ = _create_series(db, with_episode=False)
     character = Character(
         name="Lin",
@@ -921,7 +906,7 @@ def test_style_lock_get_replaces_stored_legacy_agency_team(client, db):
 
 
 def test_director_auto_plan_persists_storyboard_with_references(client, db, monkeypatch):
-    from app.services.video_agency_team import build_video_agency_team
+    from app.domains.agency_operations.video_agency_team import build_video_agency_team
 
     series, episode = _create_series(db)
     character = Character(
@@ -961,7 +946,7 @@ def test_director_auto_plan_persists_storyboard_with_references(client, db, monk
             "audio_mode": "tts",
         }]
         }))
-    monkeypatch.setattr("app.routers.director.ai_generator.generate_custom", generate)
+    monkeypatch.setattr("app.domains.director_planning.director_router.ai_generator.generate_custom", generate)
 
     resp = client.post("/api/director/auto-plan", json={
         "series_id": series.id,
@@ -990,7 +975,7 @@ def test_director_auto_plan_persists_storyboard_with_references(client, db, monk
 
 
 def test_auto_plan_blocked_agency_trace_does_not_persist_storyboard(client, db, monkeypatch):
-    from app.services.video_agency_team import build_video_agency_team
+    from app.domains.agency_operations.video_agency_team import build_video_agency_team
 
     series, episode = _create_series(db)
     _expert_review_model(db)
@@ -1022,7 +1007,7 @@ def test_auto_plan_blocked_agency_trace_does_not_persist_storyboard(client, db, 
     db.commit()
 
     monkeypatch.setattr(
-        "app.routers.director.ai_generator.generate_custom",
+        "app.domains.director_planning.director_router.ai_generator.generate_custom",
         AsyncMock(return_value=json.dumps({
             "frames": [{
                 "narration": "Lin enters the clinic.",
@@ -1042,7 +1027,7 @@ def test_auto_plan_blocked_agency_trace_does_not_persist_storyboard(client, db, 
         }
 
     monkeypatch.setattr(
-        "app.routers.director.AgencyOrchestrator.run_storyboard_review",
+        "app.domains.director_planning.director_router.AgencyOrchestrator.run_storyboard_review",
         blocked_storyboard_review,
     )
 
@@ -1060,7 +1045,7 @@ def test_auto_plan_blocked_agency_trace_does_not_persist_storyboard(client, db, 
 
 
 def test_director_auto_plan_generation_timeout_persists_fallback_storyboard(client, db, monkeypatch):
-    from app.services.video_agency_team import build_video_agency_team
+    from app.domains.agency_operations.video_agency_team import build_video_agency_team
 
     series, episode = _create_series(db)
     character = Character(
@@ -1096,8 +1081,8 @@ def test_director_auto_plan_generation_timeout_persists_fallback_storyboard(clie
         await asyncio.sleep(1)
         return json.dumps({"frames": []})
 
-    monkeypatch.setattr("app.routers.director.DIRECTOR_GENERATION_TIMEOUT_SECONDS", 0.01)
-    monkeypatch.setattr("app.routers.director.ai_generator.generate_custom", slow_generate)
+    monkeypatch.setattr("app.domains.director_planning.director_router.DIRECTOR_GENERATION_TIMEOUT_SECONDS", 0.01)
+    monkeypatch.setattr("app.domains.director_planning.director_router.ai_generator.generate_custom", slow_generate)
 
     resp = client.post("/api/director/auto-plan", json={
         "series_id": series.id,
@@ -1117,7 +1102,7 @@ def test_director_auto_plan_generation_timeout_persists_fallback_storyboard(clie
 
 
 def test_director_auto_plan_review_timeout_persists_partial_trace(client, db, monkeypatch):
-    from app.services.video_agency_team import build_video_agency_team
+    from app.domains.agency_operations.video_agency_team import build_video_agency_team
 
     series, episode = _create_series(db)
     _expert_review_model(db)
@@ -1149,7 +1134,7 @@ def test_director_auto_plan_review_timeout_persists_partial_trace(client, db, mo
     db.commit()
 
     monkeypatch.setattr(
-        "app.routers.director.ai_generator.generate_custom",
+        "app.domains.director_planning.director_router.ai_generator.generate_custom",
         AsyncMock(return_value=json.dumps({"frames": [{
             "narration": "Lin enters the clinic.",
             "image_prompt": "Lin walks through the clinic.",
@@ -1163,9 +1148,9 @@ def test_director_auto_plan_review_timeout_persists_partial_trace(client, db, mo
         await asyncio.sleep(1)
         return {"stage": "storyboard", "stage_status": "passed"}
 
-    monkeypatch.setattr("app.routers.director.DIRECTOR_AGENCY_REVIEW_TIMEOUT_SECONDS", 0.01)
+    monkeypatch.setattr("app.domains.director_planning.director_router.DIRECTOR_AGENCY_REVIEW_TIMEOUT_SECONDS", 0.01)
     monkeypatch.setattr(
-        "app.routers.director.AgencyOrchestrator.run_storyboard_review",
+        "app.domains.director_planning.director_router.AgencyOrchestrator.run_storyboard_review",
         slow_storyboard_review,
     )
 
@@ -1187,12 +1172,12 @@ def test_director_auto_plan_review_timeout_persists_partial_trace(client, db, mo
 
 @pytest.mark.asyncio
 async def test_pipeline_uses_saved_storyboard_and_persists_episode_and_video(db, test_db, monkeypatch):
-    from app.routers import pipeline
-    from app.services.video_agency_team import build_video_agency_team
+    from app.domains.script_pipeline import pipeline_router as pipeline
+    from app.domains.agency_operations.video_agency_team import build_video_agency_team
 
     TestSession = sessionmaker(bind=test_db, autocommit=False, autoflush=False)
     monkeypatch.setattr(pipeline, "SessionLocal", TestSession)
-    monkeypatch.setattr("app.services.agency_runtime.AgencySkillRuntime.invoke", _agency_pass)
+    monkeypatch.setattr("app.domains.agency_operations.agency_runtime.AgencySkillRuntime.invoke", _agency_pass)
 
     series, episode = _create_series(db)
     _expert_review_model(db)

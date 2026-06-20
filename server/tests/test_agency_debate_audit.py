@@ -1,8 +1,8 @@
 import pytest
 
-from app.db_models import AgencyExpertInvocation, ProductionAuditEvent, ProductionJob, ProductionPlan, Series
-from app.services.production_queue_service import mark_job_completed
-from app.services.agency_debate_audit import run_debate_audit
+from app.db.models import AgencyExpertInvocation, ProductionAuditEvent, ProductionJob, ProductionPlan, Series
+from app.domains.video_production.production_queue_service import mark_job_completed
+from app.domains.agency_operations.agency_debate_audit import run_debate_audit
 
 
 class DebateRuntimeResult:

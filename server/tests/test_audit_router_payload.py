@@ -1,6 +1,6 @@
 import json
 
-from app.routers.audit import _audit_openai_compatible
+from app.domains.quality_audit.audit_router import _audit_openai_compatible
 
 
 class _AuditResponse:
@@ -29,7 +29,7 @@ def test_bailian_qwen_runtime_model_uses_text_only_audit_payload(monkeypatch):
         captured["timeout"] = timeout
         return _AuditResponse()
 
-    monkeypatch.setattr("app.routers.audit.httpx.post", fake_post)
+    monkeypatch.setattr("app.domains.quality_audit.audit_router.httpx.post", fake_post)
 
     result = _audit_openai_compatible(
         {
@@ -64,7 +64,7 @@ def test_vision_enabled_openai_model_keeps_image_url_payload(monkeypatch):
         captured["payload"] = json
         return _AuditResponse()
 
-    monkeypatch.setattr("app.routers.audit.httpx.post", fake_post)
+    monkeypatch.setattr("app.domains.quality_audit.audit_router.httpx.post", fake_post)
 
     _audit_openai_compatible(
         {

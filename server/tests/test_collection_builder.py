@@ -1,8 +1,8 @@
 from fastapi.testclient import TestClient
 
-from app.db_models import Episode, Series, VideoCollection
+from app.db.models import Episode, Series, VideoCollection
 from app.main import app
-from app.services.production_collection_service import create_collection_from_approved_episodes
+from app.domains.video_production.production_collection_service import create_collection_from_approved_episodes
 
 
 client = TestClient(app)

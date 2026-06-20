@@ -1,8 +1,8 @@
 import uuid
 
-from app.db_models import AIModel
-from app.routers.pixelle import _serialize_ai_models
-from app.services.crypto import encrypt
+from app.db.models import AIModel
+from app.domains.pixelle_integration.pixelle_router import _serialize_ai_models
+from app.domains.system_configuration.crypto import encrypt
 
 
 def _seed_model(db, **kwargs):

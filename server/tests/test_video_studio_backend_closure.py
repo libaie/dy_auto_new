@@ -3,7 +3,7 @@ import importlib
 import httpx
 from fastapi.testclient import TestClient
 
-from app.db_models import SystemSetting
+from app.db.models import SystemSetting
 from app.deps import create_access_token
 from app.main import app
 
@@ -17,7 +17,7 @@ def _auth_headers(role: str) -> dict:
 
 def _install_fake_seedance_client(monkeypatch, captured: dict):
     try:
-        seedance = importlib.import_module("app.routers.seedance")
+        seedance = importlib.import_module("app.domains.seedance_integration.seedance_router")
     except ModuleNotFoundError:
         return
 
@@ -73,7 +73,7 @@ def test_pixelle_proxy_forwards_api_key_from_system_settings(db, monkeypatch):
             captured["headers"] = headers or {}
             return httpx.Response(200, json={"ok": True}, headers={"content-type": "application/json"})
 
-    monkeypatch.setattr("app.routers.pixelle._get_proxy_client", lambda db=None: FakePixelleClient())
+    monkeypatch.setattr("app.domains.pixelle_integration.pixelle_router._get_proxy_client", lambda db=None: FakePixelleClient())
 
     response = client.get("/api/pixelle-proxy/openapi.json")
 
@@ -86,7 +86,7 @@ def test_pixelle_proxy_rejects_non_admin_role(real_auth, monkeypatch):
         async def request(self, *args, **kwargs):
             return httpx.Response(200, json={"ok": True})
 
-    monkeypatch.setattr("app.routers.pixelle._get_proxy_client", lambda db=None: FakePixelleClient())
+    monkeypatch.setattr("app.domains.pixelle_integration.pixelle_router._get_proxy_client", lambda db=None: FakePixelleClient())
 
     response = client.get(
         "/api/pixelle-proxy/openapi.json",

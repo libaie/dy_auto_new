@@ -1,5 +1,5 @@
-from app.db_models import ImageCreationTask, ImageProductionCostEvent
-from app.services.image_production_cost_service import record_actual_cost_event, record_estimated_cost_event
+from app.db.models import ImageCreationTask, ImageProductionCostEvent
+from app.domains.image_generation.image_production_cost_service import record_actual_cost_event, record_estimated_cost_event
 
 
 def _task(db):

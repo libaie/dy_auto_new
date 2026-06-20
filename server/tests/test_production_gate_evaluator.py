@@ -1,6 +1,6 @@
 import pytest
 
-from app.db_models import (
+from app.db.models import (
     Episode,
     GeneratedVideo,
     ProductionAuditEvent,
@@ -13,9 +13,9 @@ from app.db_models import (
     VideoProductionAsset,
     VideoProductionRun,
 )
-from app.services.production_errors import ProductionErrorCode, ProductionRepairableError
-from app.services.video_production_service import approve_asset
-from app.services.video_production_service import start_compose_stage, start_video_stage
+from app.domains.video_production.production_errors import ProductionErrorCode, ProductionRepairableError
+from app.domains.video_production.video_production_service import approve_asset
+from app.domains.video_production.video_production_service import start_compose_stage, start_video_stage
 
 
 def _linked_run_with_segments(db, statuses, *, asset_type="image"):
@@ -197,7 +197,7 @@ def _final_asset(db, run, episode, *, status="review_pending", copy_status="pers
 
 
 def test_gate_blocks_partial_image_approval(db):
-    from app.services.production_gate_evaluator import evaluate_stage_gate
+    from app.domains.video_production.production_gate_evaluator import evaluate_stage_gate
 
     run, _episode, segments = _linked_run_with_segments(db, ["approved", "storage_failed"])
 
@@ -215,7 +215,7 @@ def test_gate_blocks_partial_image_approval(db):
 
 
 def test_gate_allows_next_stage_only_when_all_required_assets_approved(db):
-    from app.services.production_gate_evaluator import evaluate_stage_gate
+    from app.domains.video_production.production_gate_evaluator import evaluate_stage_gate
 
     run, _episode, _segments = _linked_run_with_segments(db, ["approved", "approved"])
 
@@ -230,7 +230,7 @@ def test_gate_allows_next_stage_only_when_all_required_assets_approved(db):
 
 
 def test_video_gate_requires_persisted_approved_latest_assets(db):
-    from app.services.production_gate_evaluator import evaluate_stage_gate
+    from app.domains.video_production.production_gate_evaluator import evaluate_stage_gate
 
     run, episode, segments = _linked_run_with_segments(db, ["approved"], asset_type="video_segment")
     latest = (
@@ -286,7 +286,7 @@ def test_final_writeback_blocked_until_final_asset_is_approved_persisted_and_lat
 
 
 def test_final_gate_ready_after_human_approval(db):
-    from app.services.production_gate_evaluator import evaluate_stage_gate
+    from app.domains.video_production.production_gate_evaluator import evaluate_stage_gate
 
     run, episode = _storyboard_run(db)
     asset = _final_asset(db, run, episode)
@@ -302,7 +302,7 @@ def test_final_gate_ready_after_human_approval(db):
 
 
 def test_approval_does_not_leave_run_advanced_when_sibling_latest_asset_is_not_persisted(db):
-    from app.services.production_gate_evaluator import evaluate_stage_gate
+    from app.domains.video_production.production_gate_evaluator import evaluate_stage_gate
 
     run, _episode, segments = _linked_run_with_segments(db, ["review_pending", "approved"])
     non_persisted = (
@@ -343,9 +343,9 @@ async def test_start_video_stage_blocks_non_persisted_approved_image_without_sub
         calls.append(kwargs)
         raise AssertionError("video provider submit should not be called")
 
-    monkeypatch.setattr("app.services.video_production_service._guard_provider_stage", agency_pass)
-    monkeypatch.setattr("app.services.video_production_service.resolve_runtime_model_config", lambda db, scene: {"provider": "mock", "scene_key": scene})
-    monkeypatch.setattr("app.services.video_production_service.submit_video_batch", fake_submit_video_batch)
+    monkeypatch.setattr("app.domains.video_production.video_production_service._guard_provider_stage", agency_pass)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.resolve_runtime_model_config", lambda db, scene: {"provider": "mock", "scene_key": scene})
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_video_batch", fake_submit_video_batch)
 
     with pytest.raises(ProductionRepairableError) as exc_info:
         await start_video_stage(db, run.id)
@@ -366,9 +366,9 @@ async def test_start_compose_stage_blocks_non_persisted_approved_video_without_s
         calls.append(kwargs)
         raise AssertionError("compose provider submit should not be called")
 
-    monkeypatch.setattr("app.services.video_production_service._guard_provider_stage", agency_pass)
-    monkeypatch.setattr("app.services.video_production_service.compose_model_config", lambda db: {"provider": "mock", "scene_key": "video_composition"})
-    monkeypatch.setattr("app.services.video_production_service.submit_compose", fake_submit_compose)
+    monkeypatch.setattr("app.domains.video_production.video_production_service._guard_provider_stage", agency_pass)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.compose_model_config", lambda db: {"provider": "mock", "scene_key": "video_composition"})
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_compose", fake_submit_compose)
 
     with pytest.raises(ProductionRepairableError) as exc_info:
         await start_compose_stage(db, run.id)

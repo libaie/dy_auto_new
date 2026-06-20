@@ -1,6 +1,6 @@
 """Selector service tests — DB-backed."""
 import pytest
-from app.services.selector_service import selector_service
+from app.domains.selector_management.selector_service import selector_service
 from app.database import get_db
 from app.main import app
 
@@ -38,7 +38,7 @@ def test_selectors_version(db):
 
 
 def test_device_selectors_keep_platform_candidates(db):
-    from app.db_models import Device, UISelector
+    from app.db.models import Device, UISelector
 
     db.add(Device(
         id="dev-selector-candidates",
@@ -70,7 +70,7 @@ def test_device_selectors_keep_platform_candidates(db):
 
 def test_revision_bumps_on_create(db):
     """Creating a selector must increment the global revision."""
-    from app.db_models import UISelector
+    from app.db.models import UISelector
     v1 = selector_service.get_version(db)
     db.add(UISelector(
         action_name="rev_test_create",
@@ -78,7 +78,7 @@ def test_revision_bumps_on_create(db):
         resolution_profile="default",
         strategies=[{"type": "text", "value": "test", "priority": 1}],
     ))
-    from app.services.selector_service import _bump_revision
+    from app.domains.selector_management.selector_service import _bump_revision
     _bump_revision(db)
     db.commit()
     v2 = selector_service.get_version(db)
@@ -87,7 +87,7 @@ def test_revision_bumps_on_create(db):
 
 def test_revision_bumps_on_update(db):
     """Updating a selector must increment the global revision."""
-    from app.db_models import UISelector
+    from app.db.models import UISelector
     sel = UISelector(
         action_name="rev_test_update",
         platform_version="default",
@@ -106,7 +106,7 @@ def test_revision_bumps_on_update(db):
 
 def test_revision_bumps_on_delete(db):
     """Deleting a selector must increment the global revision."""
-    from app.db_models import UISelector
+    from app.db.models import UISelector
     sel = UISelector(
         action_name="rev_test_delete",
         platform_version="default",
@@ -124,7 +124,7 @@ def test_revision_bumps_on_delete(db):
 
 def test_revision_bumps_on_toggle(db):
     """Toggling a selector must increment the global revision."""
-    from app.db_models import UISelector
+    from app.db.models import UISelector
     sel = UISelector(
         action_name="rev_test_toggle",
         platform_version="default",
@@ -142,7 +142,7 @@ def test_revision_bumps_on_toggle(db):
 
 def test_resolution_filtering_1080x2400_device(db):
     """1080x2400 device gets default + 1080x2400 + same-AR, not 1080x2340."""
-    from app.db_models import Device, UISelector
+    from app.db.models import Device, UISelector
 
     db.add(Device(
         id="dev-1080x2400", name="test device 1080x2400",
@@ -175,7 +175,7 @@ def test_resolution_filtering_1080x2400_device(db):
 
 def test_composite_key_edit_precision(db):
     """Editing same action_name with different resolutions must not touch wrong row."""
-    from app.db_models import UISelector
+    from app.db.models import UISelector
 
     sel_default = UISelector(
         action_name="ckey_test", platform_version="default",
@@ -207,7 +207,7 @@ def test_composite_key_edit_precision(db):
 
 def test_disabled_selector_not_served(db):
     """Disabled selectors must not appear in get_all_selectors for device."""
-    from app.db_models import UISelector
+    from app.db.models import UISelector
 
     db.add(UISelector(
         action_name="dis_test_active", platform_version="default",

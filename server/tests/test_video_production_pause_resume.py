@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from app.db_models import ProductionJob, ProductionPlan, ProductionScene, ProductionShot, ProductionEpisode
+from app.db.models import ProductionJob, ProductionPlan, ProductionScene, ProductionShot, ProductionEpisode
 from app.main import app
 from tests.video_production_control_plane_helpers import linked_segment_context
 
@@ -63,7 +63,7 @@ def test_pause_and_resume_linked_run_preserves_job_resume_status(db):
 
 
 def test_recompute_from_segment_updates_parent_status(db):
-    from app.services.production_status_aggregation import recompute_from_segment
+    from app.domains.video_production.production_status_aggregation import recompute_from_segment
 
     ctx = linked_segment_context(db, segment_status="completed")
     segment = ctx["segment"]

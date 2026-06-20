@@ -2,9 +2,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-from app.db_models import Base
-from app.db_models import CharacterAnchor as LegacyCharacterAnchor
-from app.db_models import SceneAnchor as LegacySceneAnchor
+from app.db.models import Base
+from app.db.models import CharacterAnchor as LegacyCharacterAnchor
+from app.db.models import SceneAnchor as LegacySceneAnchor
 
 
 SERVER_ROOT = Path(__file__).resolve().parents[1]
@@ -23,7 +23,7 @@ def test_creative_library_model_boundary_reexports_anchor_models():
 
 def test_creative_library_model_boundary_imports_in_clean_process():
     code = (
-        "import app.db_models as legacy; "
+        "import app.db.models as legacy; "
         "from app.db.models.creative_library import CharacterAnchor, SceneAnchor; "
         "assert legacy.CharacterAnchor is CharacterAnchor; "
         "assert legacy.SceneAnchor is SceneAnchor; "

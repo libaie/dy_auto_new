@@ -1,6 +1,6 @@
 import pytest
 
-from app.db_models import (
+from app.db.models import (
     Episode,
     ImageCreationAsset,
     ImageCreationTask,
@@ -9,7 +9,7 @@ from app.db_models import (
     VideoProductionRun,
     VideoReviewRecord,
 )
-from app.services.review_asset_edit_service import (
+from app.domains.video_production.review_asset_edit_service import (
     ReviewAssetEditError,
     _generate_edited_image,
     edit_image_asset,
@@ -54,7 +54,7 @@ def create_run_with_image_asset(db):
 
 
 def test_review_edit_destination_role_is_registered_for_image_creation():
-    from app.services.image_creation_service import DESTINATION_ROLES
+    from app.domains.image_generation.image_creation_service import DESTINATION_ROLES
 
     assert "video_production_review_edit" in DESTINATION_ROLES
 
@@ -92,7 +92,7 @@ async def test_edit_image_asset_creates_new_version_and_demotes_old(db, monkeypa
             "storage_path": "assets/new.png",
         }
 
-    monkeypatch.setattr("app.services.review_asset_edit_service._generate_edited_image", fake_generate)
+    monkeypatch.setattr("app.domains.video_production.review_asset_edit_service._generate_edited_image", fake_generate)
 
     result = await edit_image_asset(db, asset.id, instruction="make hair consistent", expected_version=1)
 
@@ -128,7 +128,7 @@ async def test_edit_image_asset_reserves_asset_before_provider_call(db, monkeypa
             "storage_path": "assets/new.png",
         }
 
-    monkeypatch.setattr("app.services.review_asset_edit_service._generate_edited_image", fake_generate)
+    monkeypatch.setattr("app.domains.video_production.review_asset_edit_service._generate_edited_image", fake_generate)
 
     await edit_image_asset(db, asset.id, instruction="make hair consistent", expected_version=1)
 
@@ -146,7 +146,7 @@ async def test_edit_image_asset_surfaces_queued_task_without_demoting_or_creatin
             {"image_task_id": "task-1", "status": "queued"},
         )
 
-    monkeypatch.setattr("app.services.review_asset_edit_service._generate_edited_image", fake_generate)
+    monkeypatch.setattr("app.domains.video_production.review_asset_edit_service._generate_edited_image", fake_generate)
 
     with pytest.raises(ReviewAssetEditError) as exc:
         await edit_image_asset(db, asset.id, instruction="make hair consistent")
@@ -168,7 +168,7 @@ async def test_edit_image_asset_surfaces_pending_task_without_demoting_or_creati
             {"image_task_id": "task-1", "status": "running"},
         )
 
-    monkeypatch.setattr("app.services.review_asset_edit_service._generate_edited_image", fake_generate)
+    monkeypatch.setattr("app.domains.video_production.review_asset_edit_service._generate_edited_image", fake_generate)
 
     with pytest.raises(ReviewAssetEditError) as exc:
         await edit_image_asset(db, asset.id, instruction="make hair consistent")
@@ -217,8 +217,8 @@ async def test_generate_edited_image_uses_existing_image_creation_path_payload(d
         db.refresh(task)
         return task
 
-    monkeypatch.setattr("app.services.image_creation_service.create_image_task", fake_create_image_task)
-    monkeypatch.setattr("app.services.image_creation_service.sync_image_task", fake_sync_image_task)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.create_image_task", fake_create_image_task)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.sync_image_task", fake_sync_image_task)
 
     result = await _generate_edited_image(db, asset, "fix face")
 
@@ -253,7 +253,7 @@ async def test_generate_edited_image_uses_bounded_idempotency_key_for_long_instr
         db.refresh(task)
         return task
 
-    monkeypatch.setattr("app.services.image_creation_service.create_image_task", fake_create_image_task)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.create_image_task", fake_create_image_task)
 
     with pytest.raises(ReviewAssetEditError) as exc:
         await _generate_edited_image(db, asset, long_instruction)
@@ -284,7 +284,7 @@ async def test_generate_edited_image_maps_returned_failed_task_to_provider_failu
         db.refresh(task)
         return task
 
-    monkeypatch.setattr("app.services.image_creation_service.create_image_task", fake_create_image_task)
+    monkeypatch.setattr("app.domains.image_generation.image_creation_service.create_image_task", fake_create_image_task)
 
     with pytest.raises(ReviewAssetEditError) as exc:
         await _generate_edited_image(db, asset, "fix face")
@@ -317,7 +317,7 @@ async def test_edit_stale_asset_version_raises_before_provider_call(db, monkeypa
         called = True
         return {"url": "https://cdn.test/new.png"}
 
-    monkeypatch.setattr("app.services.review_asset_edit_service._generate_edited_image", fake_generate)
+    monkeypatch.setattr("app.domains.video_production.review_asset_edit_service._generate_edited_image", fake_generate)
 
     with pytest.raises(ReviewAssetEditError) as exc:
         await edit_image_asset(db, asset.id, instruction="make hair consistent", expected_version=2)
@@ -338,7 +338,7 @@ async def test_edit_reserved_asset_version_raises_before_provider_call(db, monke
         called = True
         return {"url": "https://cdn.test/new.png"}
 
-    monkeypatch.setattr("app.services.review_asset_edit_service._generate_edited_image", fake_generate)
+    monkeypatch.setattr("app.domains.video_production.review_asset_edit_service._generate_edited_image", fake_generate)
 
     with pytest.raises(ReviewAssetEditError) as exc:
         await edit_image_asset(db, asset.id, instruction="make hair consistent", expected_version=1)

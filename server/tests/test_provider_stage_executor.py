@@ -3,8 +3,8 @@ import json
 
 import pytest
 
-from app.services import provider_stage_executor as executor_module
-from app.db_models import (
+from app.domains.video_production import provider_stage_executor as executor_module
+from app.db.models import (
     Episode,
     ProductionAuditEvent,
     ProductionJob,
@@ -14,9 +14,9 @@ from app.db_models import (
     Series,
     VideoProductionRun,
 )
-from app.services.production_errors import ProductionErrorCode, ProductionRepairableError
-from app.services.production_queue_service import enqueue_job
-from app.services.production_state_contract import (
+from app.domains.video_production.production_errors import ProductionErrorCode, ProductionRepairableError
+from app.domains.video_production.production_queue_service import enqueue_job
+from app.domains.video_production.production_state_contract import (
     COST_ACTIVE_UNSUBMITTED,
     COST_STALE_NEEDS_REPAIR,
     COST_SETTLED,
@@ -28,12 +28,12 @@ from app.services.production_state_contract import (
     PROVIDER_TASK_SYNC_REQUIRED,
     PROVIDER_TASK_SUCCEEDED,
 )
-from app.services.provider_capability_service import (
+from app.domains.video_production.provider_capability_service import (
     assert_real_paid_allowed,
     capability_from_model_config,
 )
-from app.services.provider_stage_executor import ProviderStageExecutor
-from app.services.provider_stage_task_service import (
+from app.domains.video_production.provider_stage_executor import ProviderStageExecutor
+from app.domains.video_production.provider_stage_task_service import (
     get_or_create_stage_task,
     request_hash,
     set_task_status,

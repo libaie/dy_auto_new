@@ -20,10 +20,9 @@ if str(SERVER_DIR) not in sys.path:
     sys.path.insert(0, str(SERVER_DIR))
 
 from app.database import SessionLocal
-from app.db_models import Episode, GeneratedVideo, VideoProductionAsset, VideoProductionRun
-from app.services import one_sentence_video_service as one_sentence_service
-from app.services import reference_asset_service
-
+from app.db.models import Episode, GeneratedVideo, VideoProductionAsset, VideoProductionRun
+from app.domains.video_production import one_sentence_video_service as one_sentence_service
+from app.domains.creative_library import reference_asset_service
 one_sentence_service.ONE_SENTENCE_AGENCY_REVIEW_TIMEOUT_SECONDS = float(
     os.getenv("DY_AUTO_ONE_SENTENCE_AGENCY_REVIEW_TIMEOUT_SECONDS", SMOKE_EXPERT_TIMEOUT_DEFAULT_SECONDS)
 )
@@ -31,15 +30,15 @@ reference_asset_service.REFERENCE_SYNC_POLL_ATTEMPTS = int(
     os.getenv("DY_AUTO_REFERENCE_SYNC_POLL_ATTEMPTS", SMOKE_REFERENCE_SYNC_POLL_ATTEMPTS_DEFAULT)
 )
 
-from app.services.one_sentence_video_service import (
+from app.domains.video_production.one_sentence_video_service import (
     ONE_SENTENCE_REFERENCE_RUNNING_STATUS,
     complete_one_sentence_reference_generation,
     create_one_sentence_video,
 )
-from app.services.production_worker_service import run_real_worker_step
-from app.services.runtime_model_config import redact_runtime_model_config, resolve_runtime_model_config
-from app.services.video_production_run_types import REAL_SHORT_E2E
-from app.services.video_production_service import approve_asset, start_compose_stage, start_video_stage
+from app.domains.video_production.production_worker_service import run_real_worker_step
+from app.domains.model_configuration.runtime_model_config import redact_runtime_model_config, resolve_runtime_model_config
+from app.domains.video_production.video_production_run_types import REAL_SHORT_E2E
+from app.domains.video_production.video_production_service import approve_asset, start_compose_stage, start_video_stage
 
 
 ALLOW_ENV = "DY_AUTO_ALLOW_REAL_PROVIDER_E2E"
@@ -81,8 +80,8 @@ async def _smoke_pass_provider_stage(*args, **kwargs):
 
 
 def _install_smoke_gate_overrides() -> None:
-    import app.services.one_sentence_video_service as one_sentence_service
-    import app.services.video_production_service as video_service
+    import app.domains.video_production.one_sentence_video_service as one_sentence_service
+    import app.domains.video_production.video_production_service as video_service
 
     one_sentence_service.AgencyOrchestrator = _SmokePassAgencyOrchestrator
     video_service._guard_provider_stage = _smoke_pass_provider_stage

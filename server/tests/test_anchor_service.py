@@ -1,15 +1,15 @@
 import pytest
 
-from app.db_models import Character, Scene
-from app.db_models import CharacterAnchor as CharacterAnchorRow
-from app.db_models import SceneAnchor as SceneAnchorRow
+from app.db.models import Character, Scene
+from app.db.models import CharacterAnchor as CharacterAnchorRow
+from app.db.models import SceneAnchor as SceneAnchorRow
 from app.models.asset_anchor import AnchorReferenceMode
 
 
 @pytest.mark.asyncio
 async def test_ensure_character_anchor_reuses_existing_reference_slot(db, monkeypatch):
-    from app.services import anchor_service
-    from app.services.anchor_service import AssetAnchorManager
+    from app.domains.creative_library import anchor_service
+    from app.domains.creative_library.anchor_service import AssetAnchorManager
 
     async def unexpected_generate(*args, **kwargs):
         raise AssertionError("existing usable character reference should be reused")
@@ -44,8 +44,8 @@ async def test_ensure_character_anchor_reuses_existing_reference_slot(db, monkey
 
 @pytest.mark.asyncio
 async def test_ensure_scene_anchor_generates_missing_reference(db, monkeypatch):
-    from app.services import anchor_service
-    from app.services.anchor_service import AssetAnchorManager
+    from app.domains.creative_library import anchor_service
+    from app.domains.creative_library.anchor_service import AssetAnchorManager
 
     captured = {}
 
@@ -90,7 +90,7 @@ async def test_ensure_scene_anchor_generates_missing_reference(db, monkeypatch):
 
 
 def test_adapt_provider_parameters_maps_anchor_refs_and_filters_seed(db):
-    from app.services.anchor_service import AssetAnchorManager
+    from app.domains.creative_library.anchor_service import AssetAnchorManager
 
     character_anchor = CharacterAnchorRow(
         id="char-anchor-001",

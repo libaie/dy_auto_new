@@ -2,8 +2,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-from app.db_models import Base
-from app.db_models import PipelineRun as LegacyPipelineRun
+from app.db.models import Base
+from app.db.models import PipelineRun as LegacyPipelineRun
 
 
 SERVER_ROOT = Path(__file__).resolve().parents[1]
@@ -19,7 +19,7 @@ def test_script_pipeline_model_boundary_reexports_pipeline_run():
 
 def test_script_pipeline_model_boundary_imports_in_clean_process():
     code = (
-        "import app.db_models as legacy; "
+        "import app.db.models as legacy; "
         "from app.db.models.script_pipeline import PipelineRun; "
         "assert legacy.PipelineRun is PipelineRun; "
         "assert 'pipeline_runs' in legacy.Base.metadata.tables"

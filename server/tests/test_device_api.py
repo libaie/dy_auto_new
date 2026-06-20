@@ -59,12 +59,12 @@ class TestGenerateContent:
     def test_generate_content_success(self, db):
         """Happy path: returns generated content with correct shape."""
         from unittest.mock import patch, AsyncMock
-        from app.services.content_service import content_service
+        from app.domains.content_collection.content_service import content_service
         tpl = content_service.create_template(
             db, name="happy-test", body="关于{keyword}的评论",
             category="comment", variables=["keyword"],
         )
-        with patch("app.services.content_service.ContentService.generate_from_template",
+        with patch("app.domains.content_collection.content_service.ContentService.generate_from_template",
                     new_callable=AsyncMock, return_value="AI生成的好内容"):
             resp = client.post("/api/device/generate-content", json={
                 "template_id": tpl.id,
@@ -86,7 +86,7 @@ class TestGenerateContent:
     def test_generate_content_no_api_key(self, db, monkeypatch):
         """Returns 503 when AI_API_KEY is not set."""
         monkeypatch.delenv("AI_API_KEY", raising=False)
-        from app.services.content_service import content_service
+        from app.domains.content_collection.content_service import content_service
         tpl = content_service.create_template(
             db, name="gen-test", body="关于{keyword}的评论",
             category="comment", variables=["keyword"],

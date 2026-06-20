@@ -1,7 +1,7 @@
 import pytest
-from app.db_models import AIModel, Episode, GeneratedVideo, ProductionAuditEvent, Series, VideoProductionAsset, VideoProductionRun
-from app.services.crypto import encrypt
-from app.services.video_production_service import (
+from app.db.models import AIModel, Episode, GeneratedVideo, ProductionAuditEvent, Series, VideoProductionAsset, VideoProductionRun
+from app.domains.system_configuration.crypto import encrypt
+from app.domains.video_production.video_production_service import (
     COMPOSE_SCENE_KEY,
     VideoProductionError,
     approve_asset,
@@ -9,7 +9,7 @@ from app.services.video_production_service import (
     start_compose_stage,
     sync_compose_stage_results,
 )
-from app.services.pixelle_stage_client import submit_compose
+from app.domains.pixelle_integration.pixelle_stage_client import submit_compose
 
 
 def _run_with_segments(db):
@@ -66,7 +66,7 @@ async def test_submit_compose_requires_explicit_model_config(monkeypatch):
         called = True
         raise AssertionError("compose request should not be sent without model_config")
 
-    monkeypatch.setattr("app.services.pixelle_stage_client._pixelle_request", fail_pixelle_request)
+    monkeypatch.setattr("app.domains.pixelle_integration.pixelle_stage_client._pixelle_request", fail_pixelle_request)
 
     with pytest.raises(ValueError, match="model_config"):
         await submit_compose(
@@ -95,8 +95,8 @@ async def test_start_compose_stage_submits_approved_segments(db, monkeypatch):
         })
         return {"ok": True, "stage_task_id": "compose-task-1"}
 
-    monkeypatch.setattr("app.services.video_production_service._guard_provider_stage", _agency_pass)
-    monkeypatch.setattr("app.services.video_production_service.submit_compose", fake_submit_compose)
+    monkeypatch.setattr("app.domains.video_production.video_production_service._guard_provider_stage", _agency_pass)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_compose", fake_submit_compose)
     updated = await start_compose_stage(db, run.id)
     assert updated.status == "composing"
     assert updated.pixelle_stage_task_id == "compose-task-1"
@@ -121,8 +121,8 @@ async def test_start_compose_stage_runs_video_review_before_compose_preflight(db
     async def fake_submit_compose(db, run_id, segments, edit_manifest, model_config=None):
         return {"ok": True, "stage_task_id": "compose-task-1"}
 
-    monkeypatch.setattr("app.services.video_production_service._guard_provider_stage", fake_guard)
-    monkeypatch.setattr("app.services.video_production_service.submit_compose", fake_submit_compose)
+    monkeypatch.setattr("app.domains.video_production.video_production_service._guard_provider_stage", fake_guard)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_compose", fake_submit_compose)
 
     await start_compose_stage(db, run.id)
 
@@ -136,8 +136,8 @@ async def test_start_compose_stage_blocks_when_compose_config_missing(db, monkey
     async def fail_submit_compose(*args, **kwargs):
         raise AssertionError("compose should not submit without runtime config")
 
-    monkeypatch.setattr("app.services.video_production_service._guard_provider_stage", _agency_pass)
-    monkeypatch.setattr("app.services.video_production_service.submit_compose", fail_submit_compose)
+    monkeypatch.setattr("app.domains.video_production.video_production_service._guard_provider_stage", _agency_pass)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_compose", fail_submit_compose)
 
     with pytest.raises(VideoProductionError, match="video_composition"):
         await start_compose_stage(db, run.id)
@@ -173,9 +173,9 @@ async def test_sync_compose_results_registers_final_review_without_writeback(db,
             "metadata": {"duration": 5},
         }]}
 
-    monkeypatch.setattr("app.services.video_production_service.get_stage_task", fake_get_stage_task)
-    monkeypatch.setattr("app.services.video_production_service.resolve_runtime_model_config", lambda db, scene: {"provider": "mock", "api_key": "x", "model_name": "audit"})
-    monkeypatch.setattr("app.routers.audit._do_audit", lambda model, url, text: {"score": 0.96, "pass_fail": True, "issues": []})
+    monkeypatch.setattr("app.domains.video_production.video_production_service.get_stage_task", fake_get_stage_task)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.resolve_runtime_model_config", lambda db, scene: {"provider": "mock", "api_key": "x", "model_name": "audit"})
+    monkeypatch.setattr("app.domains.quality_audit.audit_router._do_audit", lambda model, url, text: {"score": 0.96, "pass_fail": True, "issues": []})
 
     asset = await sync_compose_stage_results(db, run.id)
     assert asset.asset_type == "final_video"; assert asset.status == "review_pending"
@@ -204,9 +204,9 @@ async def test_sync_compose_results_enters_final_review_when_audit_fails(db, mon
             "metadata": {"duration": 5},
         }]}
 
-    monkeypatch.setattr("app.services.video_production_service.get_stage_task", fake_get_stage_task)
-    monkeypatch.setattr("app.services.video_production_service.resolve_runtime_model_config", lambda db, scene: {"provider": "mock", "api_key": "x", "model_name": "audit"})
-    monkeypatch.setattr("app.routers.audit._do_audit", lambda model, url, text: {"score": 0.4, "pass_fail": False, "issues": ["bad cut"]})
+    monkeypatch.setattr("app.domains.video_production.video_production_service.get_stage_task", fake_get_stage_task)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.resolve_runtime_model_config", lambda db, scene: {"provider": "mock", "api_key": "x", "model_name": "audit"})
+    monkeypatch.setattr("app.domains.quality_audit.audit_router._do_audit", lambda model, url, text: {"score": 0.4, "pass_fail": False, "issues": ["bad cut"]})
 
     asset = await sync_compose_stage_results(db, run.id)
     assert asset.asset_type == "final_video"; assert asset.status == "review_pending"

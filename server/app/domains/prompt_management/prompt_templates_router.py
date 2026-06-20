@@ -15,7 +15,7 @@ from app.deps import verify_admin_token, require_role
 from app.domains.model_configuration.ai_generator import ai_generator as gen
 from app.domains.prompt_management.prompt_template_service import prompt_template_service
 
-logger = logging.getLogger("app.routers.prompt_templates")
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/prompt-templates", tags=["prompt-templates"])
 

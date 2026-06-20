@@ -2,7 +2,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from app.db_models import Base, DailyStats as LegacyDailyStats, StatsEvent as LegacyStatsEvent
+from app.db.models import Base, DailyStats as LegacyDailyStats, StatsEvent as LegacyStatsEvent
 
 
 SERVER_ROOT = Path(__file__).resolve().parents[1]
@@ -21,7 +21,7 @@ def test_reporting_model_boundary_reexports_stats_models():
 
 def test_reporting_model_boundary_imports_in_clean_process():
     code = (
-        "import app.db_models as legacy; "
+        "import app.db.models as legacy; "
         "from app.db.models.reporting import DailyStats, StatsEvent; "
         "assert legacy.DailyStats is DailyStats; "
         "assert legacy.StatsEvent is StatsEvent"

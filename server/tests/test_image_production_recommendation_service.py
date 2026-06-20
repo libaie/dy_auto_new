@@ -1,4 +1,4 @@
-from app.db_models import (
+from app.db.models import (
     ImageCreationAsset,
     ImageCreationTask,
     ImageProductionAbAttempt,
@@ -6,7 +6,7 @@ from app.db_models import (
     ImageProductionMetric,
     ImageProductionStrategy,
 )
-from app.services.image_production_recommendation_service import (
+from app.domains.image_generation.image_production_recommendation_service import (
     ab_winner_recommendation_payload,
     strategy_recommendation_payload,
 )

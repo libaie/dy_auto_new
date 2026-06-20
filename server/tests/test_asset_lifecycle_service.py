@@ -1,6 +1,6 @@
 import pytest
 
-from app.db_models import (
+from app.db.models import (
     Character,
     Episode,
     PipelineRun,
@@ -13,7 +13,7 @@ from app.db_models import (
     series_characters,
     series_scenes,
 )
-from app.services.asset_lifecycle_service import (
+from app.domains.creative_library.asset_lifecycle_service import (
     AssetLifecycleError,
     archive_character_or_scene,
     delete_or_archive_series,

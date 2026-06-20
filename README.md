@@ -64,9 +64,8 @@ dy_auto/
 │   │   ├── main.py          # FastAPI 入口、路由挂载、启动生命周期
 │   │   ├── config.py        # 环境变量、AI 配置、Pixelle-Video 配置
 │   │   ├── database.py      # DB engine/session/init_db
-│   │   ├── db_models.py     # SQLAlchemy ORM 模型
-│   │   ├── routers/         # REST API 路由
-│   │   ├── services/        # 调度、AI、生产、审核、provider 等业务服务
+│   │   ├── db/              # SQLAlchemy Base 与分域 ORM 模型
+│   │   ├── domains/         # REST API 路由与业务服务，按业务域组织
 │   │   └── data/            # SQLite DB、内置数据、agent 定义等
 │   ├── alembic/             # 数据库迁移
 │   ├── requirements.txt     # Python 依赖

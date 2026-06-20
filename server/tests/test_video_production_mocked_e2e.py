@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from app.db_models import AIModel, Episode, Series
+from app.db.models import AIModel, Episode, Series
 from app.main import app
 
 
@@ -52,9 +52,9 @@ def test_mocked_image_stage_to_human_approval(db, monkeypatch):
             }],
         }
 
-    monkeypatch.setattr("app.services.video_production_service.submit_image_batch", fake_submit_image_batch)
-    monkeypatch.setattr("app.services.video_production_service._guard_provider_stage", _agency_pass)
-    monkeypatch.setattr("app.services.video_production_service.get_stage_task", fake_get_stage_task)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_image_batch", fake_submit_image_batch)
+    monkeypatch.setattr("app.domains.video_production.video_production_service._guard_provider_stage", _agency_pass)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.get_stage_task", fake_get_stage_task)
 
     run_resp = client.post("/api/video-production/runs", json={"series_id": series.id, "episode_id": episode.id})
     run_id = run_resp.json()["run"]["id"]

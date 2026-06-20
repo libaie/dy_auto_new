@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from app.db_models import (
+from app.db.models import (
     Episode,
     ProductionEpisode,
     ProductionPlan,
@@ -95,7 +95,7 @@ def _linked_asset(
 
 
 def test_human_review_snapshots_asset_target_fields(db):
-    from app.services.video_production_service import approve_asset
+    from app.domains.video_production.video_production_service import approve_asset
 
     asset = _linked_asset(db, version=2, is_latest=True)
 

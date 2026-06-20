@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from app.db_models import Episode, Series, VideoProductionAsset, VideoProductionRun
+from app.db.models import Episode, Series, VideoProductionAsset, VideoProductionRun
 from app.main import app
 
 

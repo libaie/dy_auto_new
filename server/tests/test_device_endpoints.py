@@ -12,7 +12,7 @@ HEADERS = {"X-Device-Secret": SECRET}
 @pytest.fixture(autouse=True)
 def isolate_script_service(tmp_path, monkeypatch):
     """Keep script upload/download endpoint tests out of the real server/scripts dir."""
-    from app.services.script_service import script_service
+    from app.domains.device_operations.script_service import script_service
 
     script_dir = tmp_path / "scripts"
     monkeypatch.setattr(script_service, "_script_dir", script_dir)
@@ -70,9 +70,8 @@ def test_script_upload_rejects_oversized():
 
 def test_device_template_download_with_per_device_secret(db, tmp_path, monkeypatch):
     """Per-device auth should resolve device resolution and still fall back to default templates."""
-    from app.db_models import Device
-    from app.services import template_service as template_module
-
+    from app.db.models import Device
+    from app.domains.selector_management import template_service as template_module
     monkeypatch.setattr(template_module, "TEMPLATE_DIR", tmp_path)
     template_module.template_service._md5_cache.clear()
     default_dir = tmp_path / "default"
@@ -129,7 +128,7 @@ def test_heartbeat_updates_device():
 
 
 def test_collect_report_saves_entry_comment_on_user(db):
-    from app.db_models import CollectedComment, CollectedUser
+    from app.db.models import CollectedComment, CollectedUser
 
     db.query(CollectedComment).delete()
     db.query(CollectedUser).delete()
@@ -175,7 +174,7 @@ def test_collect_report_saves_entry_comment_on_user(db):
 
 
 def test_collect_report_skips_user_when_douyin_id_missing(db):
-    from app.db_models import CollectedComment, CollectedUser
+    from app.db.models import CollectedComment, CollectedUser
 
     db.query(CollectedComment).delete()
     db.query(CollectedUser).delete()
@@ -224,7 +223,7 @@ def test_collect_report_skips_user_when_douyin_id_missing(db):
 
 def test_poll_returns_proxy_config(db):
     """Poll response includes proxy config for registered device."""
-    from app.db_models import Device
+    from app.db.models import Device
     device = Device(id="dev-proxy-test", name="Proxy Device", status="online")
     device.proxy_config = {"type": "http", "host": "proxy.test", "port": 8080}
     db.add(device)
@@ -240,7 +239,7 @@ def test_poll_returns_proxy_config(db):
 
 def test_device_task_dm_sequence_is_included_even_when_not_device_scoped(db):
     """A device must receive the full DM sequence referenced by its assigned task."""
-    from app.db_models import Device, DMSequence, Task
+    from app.db.models import Device, DMSequence, Task
 
     seq_id = "seq-owned-by-web-user"
     device_headers = {"X-Device-Secret": "dev-dm-seq-secret"}

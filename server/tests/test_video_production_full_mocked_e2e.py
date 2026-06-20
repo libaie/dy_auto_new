@@ -1,5 +1,5 @@
 from fastapi.testclient import TestClient
-from app.db_models import Episode, GeneratedVideo, ProductionAuditEvent, Series, VideoProductionAsset, VideoProductionRun
+from app.db.models import Episode, GeneratedVideo, ProductionAuditEvent, Series, VideoProductionAsset, VideoProductionRun
 from app.main import app
 
 client = TestClient(app)
@@ -59,13 +59,13 @@ def test_storyboard_to_final_video_mocked_e2e(db, monkeypatch):
             "metadata": {"duration": 5},
         }]}
 
-    monkeypatch.setattr("app.services.video_production_service.resolve_runtime_model_config", lambda db, scene: {"provider": "mock", "api_key": "x", "scene_key": scene})
-    monkeypatch.setattr("app.services.video_production_service._guard_provider_stage", _agency_pass)
-    monkeypatch.setattr("app.services.video_production_service.submit_image_batch", fake_submit_image_batch)
-    monkeypatch.setattr("app.services.video_production_service.submit_video_batch", fake_submit_video_batch)
-    monkeypatch.setattr("app.services.video_production_service.submit_compose", fake_submit_compose)
-    monkeypatch.setattr("app.services.video_production_service.get_stage_task", fake_get_stage_task)
-    monkeypatch.setattr("app.routers.audit._do_audit", lambda model, url, text: {"score": 0.99, "pass_fail": True, "issues": []})
+    monkeypatch.setattr("app.domains.video_production.video_production_service.resolve_runtime_model_config", lambda db, scene: {"provider": "mock", "api_key": "x", "scene_key": scene})
+    monkeypatch.setattr("app.domains.video_production.video_production_service._guard_provider_stage", _agency_pass)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_image_batch", fake_submit_image_batch)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_video_batch", fake_submit_video_batch)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_compose", fake_submit_compose)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.get_stage_task", fake_get_stage_task)
+    monkeypatch.setattr("app.domains.quality_audit.audit_router._do_audit", lambda model, url, text: {"score": 0.99, "pass_fail": True, "issues": []})
 
     created = client.post("/api/video-production/runs", json={"series_id": series.id, "episode_id": episode.id}).json()
     run_id = created["run"]["id"]
@@ -202,13 +202,13 @@ def test_linked_start_to_final_video_mocked_e2e(db, monkeypatch):
             }],
         }
 
-    monkeypatch.setattr("app.services.video_production_service.resolve_runtime_model_config", lambda db, scene: {"provider": "mock", "api_key": "x", "scene_key": scene})
-    monkeypatch.setattr("app.services.video_production_service._guard_provider_stage", _agency_pass)
-    monkeypatch.setattr("app.services.video_production_service.submit_image_batch", fake_submit_image_batch)
-    monkeypatch.setattr("app.services.video_production_service.submit_video_batch", fake_submit_video_batch)
-    monkeypatch.setattr("app.services.video_production_service.submit_compose", fake_submit_compose)
-    monkeypatch.setattr("app.services.video_production_service.get_stage_task", fake_get_stage_task)
-    monkeypatch.setattr("app.routers.audit._do_audit", lambda model, url, text: {"score": 0.99, "pass_fail": True, "issues": []})
+    monkeypatch.setattr("app.domains.video_production.video_production_service.resolve_runtime_model_config", lambda db, scene: {"provider": "mock", "api_key": "x", "scene_key": scene})
+    monkeypatch.setattr("app.domains.video_production.video_production_service._guard_provider_stage", _agency_pass)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_image_batch", fake_submit_image_batch)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_video_batch", fake_submit_video_batch)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_compose", fake_submit_compose)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.get_stage_task", fake_get_stage_task)
+    monkeypatch.setattr("app.domains.quality_audit.audit_router._do_audit", lambda model, url, text: {"score": 0.99, "pass_fail": True, "issues": []})
 
     created = client.post("/api/video-production/runs/start", json={
         "series_id": series.id,

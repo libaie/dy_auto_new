@@ -1,10 +1,10 @@
 from fastapi.testclient import TestClient
 import pytest
 
-from app.db_models import AgencyExpertInvocation, AIModel, AITextArtifact, AITextArtifactConsumer, Character, Episode, ProductionSegment, Scene, Series, VideoProductionRun
+from app.db.models import AgencyExpertInvocation, AIModel, AITextArtifact, AITextArtifactConsumer, Character, Episode, ProductionSegment, Scene, Series, VideoProductionRun
 from app.main import app
-from app.services.agency_runtime import AgencyRuntimeResult
-from app.services.crypto import encrypt
+from app.domains.agency_operations.agency_runtime import AgencyRuntimeResult
+from app.domains.system_configuration.crypto import encrypt
 
 
 def _expert_review_model(db):
@@ -106,11 +106,11 @@ async def _fake_scene_references(db, scene_id, slot="all"):
 
 def _mock_reference_generation(monkeypatch):
     monkeypatch.setattr(
-        "app.services.reference_asset_service.generate_character_reference_images",
+        "app.domains.creative_library.reference_asset_service.generate_character_reference_images",
         _fake_character_references,
     )
     monkeypatch.setattr(
-        "app.services.reference_asset_service.generate_scene_reference_images",
+        "app.domains.creative_library.reference_asset_service.generate_scene_reference_images",
         _fake_scene_references,
     )
 
@@ -326,7 +326,7 @@ def test_one_sentence_video_splits_15_second_smoke_into_multiple_shots(db, monke
 def test_one_sentence_video_injects_reference_assets_into_style_storyboard_and_segments(db, monkeypatch):
     _expert_review_model(db)
     _mock_reference_generation(monkeypatch)
-    monkeypatch.setattr("app.services.agency_runtime.AgencySkillRuntime.invoke", _agency_pass)
+    monkeypatch.setattr("app.domains.agency_operations.agency_runtime.AgencySkillRuntime.invoke", _agency_pass)
     client = TestClient(app)
 
     resp = client.post("/api/video-production/one-sentence", json={
@@ -361,7 +361,7 @@ def test_one_sentence_video_injects_reference_assets_into_style_storyboard_and_s
 def test_one_sentence_video_infers_live_action_style_from_reality_health_prompt(db, monkeypatch):
     _expert_review_model(db)
     _mock_reference_generation(monkeypatch)
-    monkeypatch.setattr("app.services.agency_runtime.AgencySkillRuntime.invoke", _agency_pass)
+    monkeypatch.setattr("app.domains.agency_operations.agency_runtime.AgencySkillRuntime.invoke", _agency_pass)
     client = TestClient(app)
 
     resp = client.post("/api/video-production/one-sentence", json={
@@ -387,9 +387,9 @@ def test_one_sentence_video_infers_live_action_style_from_reality_health_prompt(
 def test_one_sentence_video_blocks_when_style_or_storyboard_expert_blocks(db, monkeypatch):
     _expert_review_model(db)
     _mock_reference_generation(monkeypatch)
-    monkeypatch.setattr("app.services.agency_runtime.AgencySkillRuntime.invoke", _agency_block)
+    monkeypatch.setattr("app.domains.agency_operations.agency_runtime.AgencySkillRuntime.invoke", _agency_block)
     monkeypatch.setattr(
-        "app.services.production_run_service.start_image_stage",
+        "app.domains.video_production.production_run_service.start_image_stage",
         lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("image stage must not start")),
     )
     client = TestClient(app)
@@ -412,7 +412,7 @@ def test_one_sentence_video_blocks_when_style_or_storyboard_expert_blocks(db, mo
 def test_one_sentence_real_provider_accepts_long_duration_after_shot_segmentation(db, monkeypatch):
     _expert_review_model(db)
     _mock_reference_generation(monkeypatch)
-    monkeypatch.setattr("app.services.agency_runtime.AgencySkillRuntime.invoke", _agency_pass)
+    monkeypatch.setattr("app.domains.agency_operations.agency_runtime.AgencySkillRuntime.invoke", _agency_pass)
     client = TestClient(app)
 
     resp = client.post("/api/video-production/one-sentence", json={
@@ -433,7 +433,7 @@ def test_one_sentence_real_provider_accepts_long_duration_after_shot_segmentatio
 def test_one_sentence_real_provider_rejects_duration_beyond_real_short_limit(db, monkeypatch):
     _expert_review_model(db)
     _mock_reference_generation(monkeypatch)
-    monkeypatch.setattr("app.services.agency_runtime.AgencySkillRuntime.invoke", _agency_pass)
+    monkeypatch.setattr("app.domains.agency_operations.agency_runtime.AgencySkillRuntime.invoke", _agency_pass)
     client = TestClient(app)
 
     before_series_count = db.query(Series).count()
@@ -468,7 +468,7 @@ def test_one_sentence_video_autostarts_image_stage(db, monkeypatch):
         db.refresh(run)
         return run
 
-    monkeypatch.setattr("app.services.production_run_service.start_image_stage", fake_start_image_stage)
+    monkeypatch.setattr("app.domains.video_production.production_run_service.start_image_stage", fake_start_image_stage)
     client = TestClient(app)
 
     resp = client.post("/api/video-production/one-sentence", json={
@@ -490,7 +490,7 @@ def test_one_sentence_video_autostarts_image_stage(db, monkeypatch):
 def test_one_sentence_video_links_style_and_storyboard_invocations_to_run(db, monkeypatch):
     _expert_review_model(db)
     _mock_reference_generation(monkeypatch)
-    monkeypatch.setattr("app.services.agency_runtime.AgencySkillRuntime.invoke", _agency_pass)
+    monkeypatch.setattr("app.domains.agency_operations.agency_runtime.AgencySkillRuntime.invoke", _agency_pass)
     client = TestClient(app)
 
     resp = client.post("/api/video-production/one-sentence", json={
@@ -515,7 +515,7 @@ def test_one_sentence_video_links_style_and_storyboard_invocations_to_run(db, mo
 
 @pytest.mark.asyncio
 async def test_one_sentence_reference_generation_timeout_returns_pending_run(db, monkeypatch):
-    from app.services.one_sentence_video_service import create_one_sentence_video
+    from app.domains.video_production.one_sentence_video_service import create_one_sentence_video
 
     async def slow_character_references(db, character_id, slot="all"):
         import asyncio
@@ -529,13 +529,13 @@ async def test_one_sentence_reference_generation_timeout_returns_pending_run(db,
         await asyncio.sleep(1)
         return {"ok": True}
 
-    monkeypatch.setattr("app.services.one_sentence_video_service.ONE_SENTENCE_REFERENCE_TIMEOUT_SECONDS", 0.01)
+    monkeypatch.setattr("app.domains.video_production.one_sentence_video_service.ONE_SENTENCE_REFERENCE_TIMEOUT_SECONDS", 0.01)
     monkeypatch.setattr(
-        "app.services.reference_asset_service.generate_character_reference_images",
+        "app.domains.creative_library.reference_asset_service.generate_character_reference_images",
         slow_character_references,
     )
     monkeypatch.setattr(
-        "app.services.reference_asset_service.generate_scene_reference_images",
+        "app.domains.creative_library.reference_asset_service.generate_scene_reference_images",
         slow_scene_references,
     )
     result = await create_one_sentence_video(
@@ -555,8 +555,8 @@ async def test_one_sentence_reference_generation_timeout_returns_pending_run(db,
 
 @pytest.mark.asyncio
 async def test_one_sentence_reference_provider_still_running_returns_pending_run(db, monkeypatch):
-    from app.services.one_sentence_video_service import create_one_sentence_video
-    from app.services.reference_asset_service import ReferenceAssetError
+    from app.domains.video_production.one_sentence_video_service import create_one_sentence_video
+    from app.domains.creative_library.reference_asset_service import ReferenceAssetError
 
     async def queued_character_references(db, character_id, slot="all"):
         raise ReferenceAssetError(
@@ -574,11 +574,11 @@ async def test_one_sentence_reference_provider_still_running_returns_pending_run
         raise AssertionError("scene references should wait for the queued character reference first")
 
     monkeypatch.setattr(
-        "app.services.reference_asset_service.generate_character_reference_images",
+        "app.domains.creative_library.reference_asset_service.generate_character_reference_images",
         queued_character_references,
     )
     monkeypatch.setattr(
-        "app.services.reference_asset_service.generate_scene_reference_images",
+        "app.domains.creative_library.reference_asset_service.generate_scene_reference_images",
         fail_if_scene_called,
     )
 
@@ -605,7 +605,7 @@ async def test_one_sentence_reference_provider_still_running_returns_pending_run
 
 @pytest.mark.asyncio
 async def test_one_sentence_background_reference_completion_refreshes_storyboard_and_segments(db, monkeypatch):
-    from app.services.one_sentence_video_service import (
+    from app.domains.video_production.one_sentence_video_service import (
         complete_one_sentence_reference_generation,
         create_one_sentence_video,
     )
@@ -622,13 +622,13 @@ async def test_one_sentence_background_reference_completion_refreshes_storyboard
         await asyncio.sleep(1)
         return {"ok": True}
 
-    monkeypatch.setattr("app.services.one_sentence_video_service.ONE_SENTENCE_REFERENCE_TIMEOUT_SECONDS", 0.01)
+    monkeypatch.setattr("app.domains.video_production.one_sentence_video_service.ONE_SENTENCE_REFERENCE_TIMEOUT_SECONDS", 0.01)
     monkeypatch.setattr(
-        "app.services.reference_asset_service.generate_character_reference_images",
+        "app.domains.creative_library.reference_asset_service.generate_character_reference_images",
         slow_character_references,
     )
     monkeypatch.setattr(
-        "app.services.reference_asset_service.generate_scene_reference_images",
+        "app.domains.creative_library.reference_asset_service.generate_scene_reference_images",
         slow_scene_references,
     )
     result = await create_one_sentence_video(
@@ -696,11 +696,11 @@ async def test_one_sentence_background_reference_completion_refreshes_storyboard
 
 @pytest.mark.asyncio
 async def test_one_sentence_background_reference_completion_keeps_running_provider_pending(db, monkeypatch):
-    from app.services.one_sentence_video_service import (
+    from app.domains.video_production.one_sentence_video_service import (
         complete_one_sentence_reference_generation,
         create_one_sentence_video,
     )
-    from app.services.reference_asset_service import ReferenceAssetError
+    from app.domains.creative_library.reference_asset_service import ReferenceAssetError
 
     async def slow_character_references(db, character_id, slot="all"):
         import asyncio
@@ -714,13 +714,13 @@ async def test_one_sentence_background_reference_completion_keeps_running_provid
         await asyncio.sleep(1)
         return {"ok": True}
 
-    monkeypatch.setattr("app.services.one_sentence_video_service.ONE_SENTENCE_REFERENCE_TIMEOUT_SECONDS", 0.01)
+    monkeypatch.setattr("app.domains.video_production.one_sentence_video_service.ONE_SENTENCE_REFERENCE_TIMEOUT_SECONDS", 0.01)
     monkeypatch.setattr(
-        "app.services.reference_asset_service.generate_character_reference_images",
+        "app.domains.creative_library.reference_asset_service.generate_character_reference_images",
         slow_character_references,
     )
     monkeypatch.setattr(
-        "app.services.reference_asset_service.generate_scene_reference_images",
+        "app.domains.creative_library.reference_asset_service.generate_scene_reference_images",
         slow_scene_references,
     )
     result = await create_one_sentence_video(
@@ -743,7 +743,7 @@ async def test_one_sentence_background_reference_completion_keeps_running_provid
         )
 
     monkeypatch.setattr(
-        "app.services.reference_asset_service.generate_character_reference_images",
+        "app.domains.creative_library.reference_asset_service.generate_character_reference_images",
         queued_character_references,
     )
 
@@ -757,7 +757,7 @@ async def test_one_sentence_background_reference_completion_keeps_running_provid
 
 
 def test_one_sentence_reference_generation_running_readiness_has_no_review_blocks(db):
-    from app.services.video_production_readiness import build_run_readiness
+    from app.domains.video_production.video_production_readiness import build_run_readiness
 
     series = Series(
         title="Reference readiness",
@@ -796,15 +796,15 @@ def test_one_sentence_reference_generation_running_readiness_has_no_review_block
 
 @pytest.mark.asyncio
 async def test_one_sentence_reference_provider_error_points_to_ai_config(db, monkeypatch):
-    from app.services.one_sentence_video_service import create_one_sentence_video
-    from app.services.production_errors import ProductionRepairableError
-    from app.services.reference_asset_service import ReferenceAssetError
+    from app.domains.video_production.one_sentence_video_service import create_one_sentence_video
+    from app.domains.video_production.production_errors import ProductionRepairableError
+    from app.domains.creative_library.reference_asset_service import ReferenceAssetError
 
     async def missing_reference_model(db, character_id, slot="all"):
         raise ReferenceAssetError("REFERENCE_MODEL_NOT_CONFIGURED", "No image model configured", {})
 
     monkeypatch.setattr(
-        "app.services.reference_asset_service.generate_character_reference_images",
+        "app.domains.creative_library.reference_asset_service.generate_character_reference_images",
         missing_reference_model,
     )
 
@@ -822,18 +822,18 @@ async def test_one_sentence_reference_provider_error_points_to_ai_config(db, mon
 
 @pytest.mark.asyncio
 async def test_one_sentence_empty_reference_assets_point_to_asset_library(db, monkeypatch):
-    from app.services.one_sentence_video_service import create_one_sentence_video
-    from app.services.production_errors import ProductionRepairableError
+    from app.domains.video_production.one_sentence_video_service import create_one_sentence_video
+    from app.domains.video_production.production_errors import ProductionRepairableError
 
     async def no_reference_urls(*args, **kwargs):
         return {"ok": True, "generated": [], "missing_assets": []}
 
     monkeypatch.setattr(
-        "app.services.reference_asset_service.generate_character_reference_images",
+        "app.domains.creative_library.reference_asset_service.generate_character_reference_images",
         no_reference_urls,
     )
     monkeypatch.setattr(
-        "app.services.reference_asset_service.generate_scene_reference_images",
+        "app.domains.creative_library.reference_asset_service.generate_scene_reference_images",
         no_reference_urls,
     )
 
@@ -878,7 +878,7 @@ def test_one_sentence_reference_worker_skips_until_next_check_at():
 
 @pytest.mark.asyncio
 async def test_reference_generation_error_does_not_overwrite_progressed_image_stage(db, monkeypatch):
-    from app.services.one_sentence_video_service import (
+    from app.domains.video_production.one_sentence_video_service import (
         complete_one_sentence_reference_generation,
         create_one_sentence_video,
     )
@@ -902,7 +902,7 @@ async def test_reference_generation_error_does_not_overwrite_progressed_image_st
         raise RuntimeError("late duplicate reference task failed")
 
     monkeypatch.setattr(
-        "app.services.reference_asset_service.generate_character_reference_images",
+        "app.domains.creative_library.reference_asset_service.generate_character_reference_images",
         failing_character_references,
     )
 
@@ -914,7 +914,7 @@ async def test_reference_generation_error_does_not_overwrite_progressed_image_st
 
 
 def test_one_sentence_storyboard_ready_readiness_can_start_images_without_review_blocks(db):
-    from app.services.video_production_readiness import build_run_readiness
+    from app.domains.video_production.video_production_readiness import build_run_readiness
 
     series = Series(
         title="Storyboard readiness",
@@ -968,13 +968,13 @@ def test_one_sentence_expert_review_timeout_returns_partial_trace(db, monkeypatc
         await asyncio.sleep(1)
         return {"stage": "storyboard", "stage_status": "passed"}
 
-    monkeypatch.setattr("app.services.one_sentence_video_service.ONE_SENTENCE_AGENCY_REVIEW_TIMEOUT_SECONDS", 0.01)
+    monkeypatch.setattr("app.domains.video_production.one_sentence_video_service.ONE_SENTENCE_AGENCY_REVIEW_TIMEOUT_SECONDS", 0.01)
     monkeypatch.setattr(
-        "app.services.one_sentence_video_service.AgencyOrchestrator.run_style_lock_review",
+        "app.domains.video_production.one_sentence_video_service.AgencyOrchestrator.run_style_lock_review",
         slow_style_lock_review,
     )
     monkeypatch.setattr(
-        "app.services.one_sentence_video_service.AgencyOrchestrator.run_storyboard_review",
+        "app.domains.video_production.one_sentence_video_service.AgencyOrchestrator.run_storyboard_review",
         slow_storyboard_review,
     )
     client = TestClient(app)

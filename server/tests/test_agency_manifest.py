@@ -1,7 +1,7 @@
 import pytest
 
-from app.services import agency_manifest
-from app.services.agency_manifest import (
+from app.domains.agency_operations import agency_manifest
+from app.domains.agency_operations.agency_manifest import (
     AgencyManifest,
     EXPERT_IDS,
     AgencyManifestError,

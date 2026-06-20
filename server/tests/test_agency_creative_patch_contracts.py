@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from app.services.agency_creative_patch_contracts import (
+from app.domains.agency_operations.agency_creative_patch_contracts import (
     CreativePatchProposal,
     CreativePatchStatus,
     normalize_patch_payload,

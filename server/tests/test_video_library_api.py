@@ -2,7 +2,7 @@ from fastapi.testclient import TestClient
 import pytest
 
 from app.database import get_db
-from app.db_models import GeneratedVideo
+from app.db.models import GeneratedVideo
 from app.main import app
 
 

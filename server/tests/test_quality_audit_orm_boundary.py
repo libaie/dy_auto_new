@@ -2,7 +2,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from app.db_models import AuditReport as LegacyAuditReport, Base
+from app.db.models import AuditReport as LegacyAuditReport, Base
 
 
 SERVER_ROOT = Path(__file__).resolve().parents[1]
@@ -18,7 +18,7 @@ def test_quality_audit_model_boundary_reexports_audit_report():
 
 def test_quality_audit_model_boundary_imports_in_clean_process():
     code = (
-        "import app.db_models as legacy; "
+        "import app.db.models as legacy; "
         "from app.db.models.quality_audit import AuditReport; "
         "assert legacy.AuditReport is AuditReport; "
         "assert 'audit_reports' in legacy.Base.metadata.tables"

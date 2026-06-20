@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 from fastapi.testclient import TestClient
 from app.main import app
-from app.db_models import Account, ChainInstance, Task as DBTask
+from app.db.models import Account, ChainInstance, Task as DBTask
 
 client = TestClient(app)
 
@@ -485,7 +485,7 @@ class TestChainInstanceLifecycle:
 
     def test_instance_state_transitions(self, db):
         """Full lifecycle: create -> running -> task complete -> chain completed."""
-        from app.services.task_service import task_service
+        from app.domains.task_operations.task_service import task_service
         from app.models import TaskStatus
 
         uid = uuid.uuid4().hex[:8]

@@ -4,7 +4,7 @@ import pytest
 from fastapi import HTTPException
 
 from app.config import bj_now
-from app.db_models import Episode, ImageCreationAsset, ImageCreationTask, Series, VideoProductionAsset, VideoProductionRun
+from app.db.models import Episode, ImageCreationAsset, ImageCreationTask, Series, VideoProductionAsset, VideoProductionRun
 
 
 def _series_episode(db, *, storyboard: dict | None = None):
@@ -71,8 +71,7 @@ def _task_from_payload(payload: dict) -> ImageCreationTask:
 
 @pytest.mark.asyncio
 async def test_create_storyboard_frame_image_task_builds_image_creation_payload(db, monkeypatch):
-    from app.services import storyboard_image_service
-
+    from app.domains.storyboard_images import storyboard_image_service
     series, episode = _series_episode(db)
     captured = {}
 
@@ -113,7 +112,7 @@ async def test_create_storyboard_frame_image_task_builds_image_creation_payload(
 
 
 def test_force_storyboard_frame_image_payload_uses_fresh_idempotency_key(db):
-    from app.services.storyboard_image_service import _frame_payload
+    from app.domains.storyboard_images.storyboard_image_service import _frame_payload
 
     series, episode = _series_episode(db)
     frame = episode.storyboard_json["frames"][0]
@@ -144,8 +143,7 @@ def test_force_storyboard_frame_image_payload_uses_fresh_idempotency_key(db):
 
 @pytest.mark.asyncio
 async def test_force_storyboard_frame_image_task_creates_fresh_task(db, monkeypatch):
-    from app.services import storyboard_image_service
-
+    from app.domains.storyboard_images import storyboard_image_service
     series, episode = _series_episode(db)
     run = VideoProductionRun(
         series_id=series.id,
@@ -211,8 +209,7 @@ async def test_force_storyboard_frame_image_task_creates_fresh_task(db, monkeypa
 
 @pytest.mark.asyncio
 async def test_create_missing_storyboard_image_tasks_returns_per_frame_results(db, monkeypatch):
-    from app.services import storyboard_image_service
-
+    from app.domains.storyboard_images import storyboard_image_service
     series, episode = _series_episode(db)
 
     async def fake_create_image_task(db_session, payload):
@@ -232,7 +229,7 @@ async def test_create_missing_storyboard_image_tasks_returns_per_frame_results(d
 
 
 def test_list_storyboard_image_state_returns_frames_in_storyboard_order(db):
-    from app.services.storyboard_image_service import list_storyboard_image_state
+    from app.domains.storyboard_images.storyboard_image_service import list_storyboard_image_state
 
     series, episode = _series_episode(db)
     task = ImageCreationTask(
@@ -284,7 +281,7 @@ def test_list_storyboard_image_state_returns_frames_in_storyboard_order(db):
 
 
 def test_storyboard_image_state_is_scoped_by_run_id(db):
-    from app.services.storyboard_image_service import list_storyboard_image_state
+    from app.domains.storyboard_images.storyboard_image_service import list_storyboard_image_state
 
     series, episode = _series_episode(db)
     old_run = VideoProductionRun(
@@ -364,7 +361,7 @@ def test_storyboard_image_state_is_scoped_by_run_id(db):
 
 
 def test_promote_storyboard_image_asset_blocks_unapproved_assets(db):
-    from app.services.storyboard_image_service import promote_storyboard_image_asset
+    from app.domains.storyboard_images.storyboard_image_service import promote_storyboard_image_asset
 
     series, episode = _series_episode(db)
     run = VideoProductionRun(
@@ -420,7 +417,7 @@ def test_promote_storyboard_image_asset_blocks_unapproved_assets(db):
 
 
 def test_promote_storyboard_image_asset_promotes_same_run_asset(db):
-    from app.services.storyboard_image_service import promote_storyboard_image_asset
+    from app.domains.storyboard_images.storyboard_image_service import promote_storyboard_image_asset
 
     series, episode = _series_episode(db)
     run = VideoProductionRun(
@@ -479,7 +476,7 @@ def test_promote_storyboard_image_asset_promotes_same_run_asset(db):
 
 
 def test_promote_storyboard_image_asset_rejects_cross_run_assets(db):
-    from app.services.storyboard_image_service import promote_storyboard_image_asset
+    from app.domains.storyboard_images.storyboard_image_service import promote_storyboard_image_asset
 
     series, episode = _series_episode(db)
     old_run = VideoProductionRun(
@@ -545,7 +542,7 @@ def test_promote_storyboard_image_asset_rejects_cross_run_assets(db):
 
 @pytest.mark.parametrize("stale_side", ["asset", "task"])
 def test_promote_storyboard_image_asset_rejects_split_context_mismatch(db, stale_side):
-    from app.services.storyboard_image_service import promote_storyboard_image_asset
+    from app.domains.storyboard_images.storyboard_image_service import promote_storyboard_image_asset
 
     series, episode = _series_episode(db)
     old_run = VideoProductionRun(

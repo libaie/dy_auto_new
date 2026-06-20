@@ -7,10 +7,10 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from app.db_models import PromptTemplate, SystemSetting
+from app.db.models import PromptTemplate, SystemSetting
 from app.deps import verify_admin_token
 from app.main import app
-from app.services.prompt_template_service import prompt_template_service
+from app.domains.prompt_management.prompt_template_service import prompt_template_service
 
 
 @pytest.fixture(autouse=True)
@@ -114,9 +114,9 @@ def test_rewrite_valid_ai_json_emits_done_without_persistence(db):
 
     client = TestClient(app)
     with (
-        patch("app.routers.prompt_templates.get_ai_config_with_key", return_value={"api_key": "test-key"}) as cfg,
-        patch("app.routers.prompt_templates.SessionLocal", return_value=nullcontext(db)),
-        patch("app.routers.prompt_templates.gen.generate_custom_stream_with_config", fake_stream),
+        patch("app.domains.prompt_management.prompt_templates_router.get_ai_config_with_key", return_value={"api_key": "test-key"}) as cfg,
+        patch("app.domains.prompt_management.prompt_templates_router.SessionLocal", return_value=nullcontext(db)),
+        patch("app.domains.prompt_management.prompt_templates_router.gen.generate_custom_stream_with_config", fake_stream),
         patch("app.ws_manager.pair_ws_manager.broadcast_to_devices", new=AsyncMock()) as broadcast_devices,
         patch("app.ws_manager.pair_ws_manager.broadcast_to_admins", new=AsyncMock()) as broadcast_admins,
     ):
@@ -148,7 +148,7 @@ def test_rewrite_invalid_current_content_returns_error_before_ai():
     del content["analysis"]["replyRules"]
 
     client = TestClient(app)
-    with patch("app.routers.prompt_templates.gen.generate_custom_stream_with_config") as stream:
+    with patch("app.domains.prompt_management.prompt_templates_router.gen.generate_custom_stream_with_config") as stream:
         response = client.post(
             "/api/prompt-templates/rewrite-stream",
             json={"industry": "health", "content": content, "instruction": "make warmer"},
@@ -167,13 +167,13 @@ def test_rewrite_preflight_validation_does_not_log_content_sentinel(caplog):
     content["analysis"]["replyExample"]["good"] = f"comment -> reply {sentinel}"
 
     client = TestClient(app)
-    caplog.set_level(logging.WARNING, logger="app.routers.prompt_templates")
+    caplog.set_level(logging.WARNING, logger="app.domains.prompt_management.prompt_templates_router")
     with (
         patch(
-            "app.routers.prompt_templates.prompt_template_service.validate_rewrite_request",
+            "app.domains.prompt_management.prompt_templates_router.prompt_template_service.validate_rewrite_request",
             side_effect=ValueError(f"invalid template text {sentinel}"),
         ),
-        patch("app.routers.prompt_templates.gen.generate_custom_stream_with_config") as stream,
+        patch("app.domains.prompt_management.prompt_templates_router.gen.generate_custom_stream_with_config") as stream,
     ):
         response = client.post(
             "/api/prompt-templates/rewrite-stream",
@@ -191,7 +191,7 @@ def test_rewrite_preflight_validation_does_not_log_content_sentinel(caplog):
 
 def test_rewrite_long_instruction_returns_error_before_ai():
     client = TestClient(app)
-    with patch("app.routers.prompt_templates.gen.generate_custom_stream_with_config") as stream:
+    with patch("app.domains.prompt_management.prompt_templates_router.gen.generate_custom_stream_with_config") as stream:
         response = client.post(
             "/api/prompt-templates/rewrite-stream",
             json={
@@ -210,7 +210,7 @@ def test_rewrite_long_instruction_returns_error_before_ai():
 
 def test_rewrite_missing_content_returns_error_before_ai():
     client = TestClient(app)
-    with patch("app.routers.prompt_templates.gen.generate_custom_stream_with_config") as stream:
+    with patch("app.domains.prompt_management.prompt_templates_router.gen.generate_custom_stream_with_config") as stream:
         response = client.post(
             "/api/prompt-templates/rewrite-stream",
             json={"industry": "health", "instruction": "make warmer"},
@@ -225,7 +225,7 @@ def test_rewrite_missing_content_returns_error_before_ai():
 
 def test_rewrite_missing_instruction_returns_error_before_ai():
     client = TestClient(app)
-    with patch("app.routers.prompt_templates.gen.generate_custom_stream_with_config") as stream:
+    with patch("app.domains.prompt_management.prompt_templates_router.gen.generate_custom_stream_with_config") as stream:
         response = client.post(
             "/api/prompt-templates/rewrite-stream",
             json={"industry": "health", "content": valid_template_content()},
@@ -244,9 +244,9 @@ def test_rewrite_ai_invalid_json_emits_error(db):
 
     client = TestClient(app)
     with (
-        patch("app.routers.prompt_templates.get_ai_config_with_key", return_value={"api_key": "test-key"}),
-        patch("app.routers.prompt_templates.SessionLocal", return_value=nullcontext(db)),
-        patch("app.routers.prompt_templates.gen.generate_custom_stream_with_config", fake_stream),
+        patch("app.domains.prompt_management.prompt_templates_router.get_ai_config_with_key", return_value={"api_key": "test-key"}),
+        patch("app.domains.prompt_management.prompt_templates_router.SessionLocal", return_value=nullcontext(db)),
+        patch("app.domains.prompt_management.prompt_templates_router.gen.generate_custom_stream_with_config", fake_stream),
     ):
         response = client.post(
             "/api/prompt-templates/rewrite-stream",
@@ -272,11 +272,11 @@ def test_rewrite_generic_stream_failure_does_not_log_sentinel(db, caplog):
         raise RuntimeError(f"provider failed {sentinel}")
 
     client = TestClient(app)
-    caplog.set_level(logging.ERROR, logger="app.routers.prompt_templates")
+    caplog.set_level(logging.ERROR, logger="app.domains.prompt_management.prompt_templates_router")
     with (
-        patch("app.routers.prompt_templates.get_ai_config_with_key", return_value={"api_key": "test-key"}),
-        patch("app.routers.prompt_templates.SessionLocal", return_value=nullcontext(db)),
-        patch("app.routers.prompt_templates.gen.generate_custom_stream_with_config", fake_stream),
+        patch("app.domains.prompt_management.prompt_templates_router.get_ai_config_with_key", return_value={"api_key": "test-key"}),
+        patch("app.domains.prompt_management.prompt_templates_router.SessionLocal", return_value=nullcontext(db)),
+        patch("app.domains.prompt_management.prompt_templates_router.gen.generate_custom_stream_with_config", fake_stream),
     ):
         response = client.post(
             "/api/prompt-templates/rewrite-stream",
@@ -304,9 +304,9 @@ def test_rewrite_ai_invalid_template_emits_error_not_warning(db):
 
     client = TestClient(app)
     with (
-        patch("app.routers.prompt_templates.get_ai_config_with_key", return_value={"api_key": "test-key"}),
-        patch("app.routers.prompt_templates.SessionLocal", return_value=nullcontext(db)),
-        patch("app.routers.prompt_templates.gen.generate_custom_stream_with_config", fake_stream),
+        patch("app.domains.prompt_management.prompt_templates_router.get_ai_config_with_key", return_value={"api_key": "test-key"}),
+        patch("app.domains.prompt_management.prompt_templates_router.SessionLocal", return_value=nullcontext(db)),
+        patch("app.domains.prompt_management.prompt_templates_router.gen.generate_custom_stream_with_config", fake_stream),
     ):
         response = client.post(
             "/api/prompt-templates/rewrite-stream",
@@ -330,9 +330,9 @@ def test_rewrite_ai_unchanged_template_emits_error_not_done(db):
 
     client = TestClient(app)
     with (
-        patch("app.routers.prompt_templates.get_ai_config_with_key", return_value={"api_key": "test-key"}),
-        patch("app.routers.prompt_templates.SessionLocal", return_value=nullcontext(db)),
-        patch("app.routers.prompt_templates.gen.generate_custom_stream_with_config", fake_stream),
+        patch("app.domains.prompt_management.prompt_templates_router.get_ai_config_with_key", return_value={"api_key": "test-key"}),
+        patch("app.domains.prompt_management.prompt_templates_router.SessionLocal", return_value=nullcontext(db)),
+        patch("app.domains.prompt_management.prompt_templates_router.gen.generate_custom_stream_with_config", fake_stream),
     ):
         response = client.post(
             "/api/prompt-templates/rewrite-stream",
@@ -360,9 +360,9 @@ def test_rewrite_ai_incomplete_scenario_template_emits_error_not_done(db):
 
     client = TestClient(app)
     with (
-        patch("app.routers.prompt_templates.get_ai_config_with_key", return_value={"api_key": "test-key"}),
-        patch("app.routers.prompt_templates.SessionLocal", return_value=nullcontext(db)),
-        patch("app.routers.prompt_templates.gen.generate_custom_stream_with_config", fake_stream),
+        patch("app.domains.prompt_management.prompt_templates_router.get_ai_config_with_key", return_value={"api_key": "test-key"}),
+        patch("app.domains.prompt_management.prompt_templates_router.SessionLocal", return_value=nullcontext(db)),
+        patch("app.domains.prompt_management.prompt_templates_router.gen.generate_custom_stream_with_config", fake_stream),
     ):
         response = client.post(
             "/api/prompt-templates/rewrite-stream",
@@ -390,13 +390,13 @@ def test_rewrite_output_validation_does_not_log_content_sentinel(db, caplog):
         yield json.dumps(invalid)
 
     client = TestClient(app)
-    caplog.set_level(logging.WARNING, logger="app.routers.prompt_templates")
+    caplog.set_level(logging.WARNING, logger="app.domains.prompt_management.prompt_templates_router")
     with (
-        patch("app.routers.prompt_templates.get_ai_config_with_key", return_value={"api_key": "test-key"}),
-        patch("app.routers.prompt_templates.SessionLocal", return_value=nullcontext(db)),
-        patch("app.routers.prompt_templates.gen.generate_custom_stream_with_config", fake_stream),
+        patch("app.domains.prompt_management.prompt_templates_router.get_ai_config_with_key", return_value={"api_key": "test-key"}),
+        patch("app.domains.prompt_management.prompt_templates_router.SessionLocal", return_value=nullcontext(db)),
+        patch("app.domains.prompt_management.prompt_templates_router.gen.generate_custom_stream_with_config", fake_stream),
         patch(
-            "app.routers.prompt_templates.prompt_template_service.validate_rewrite_output",
+            "app.domains.prompt_management.prompt_templates_router.prompt_template_service.validate_rewrite_output",
             side_effect=ValueError(f"invalid rewritten text {sentinel}"),
         ),
     ):

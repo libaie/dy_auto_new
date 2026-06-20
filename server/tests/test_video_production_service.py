@@ -1,7 +1,7 @@
 import pytest
 
-from app.db_models import Episode, Series, VideoProductionAsset, VideoProductionRun, VideoReviewRecord
-from app.services.video_production_service import (
+from app.db.models import Episode, Series, VideoProductionAsset, VideoProductionRun, VideoReviewRecord
+from app.domains.video_production.video_production_service import (
     approve_asset,
     create_regenerated_image_asset,
     create_run_from_episode,

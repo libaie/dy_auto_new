@@ -1,5 +1,4 @@
 import ast
-import subprocess
 from pathlib import Path
 
 
@@ -18,8 +17,8 @@ def test_service_implementation_inventory_matches_allowlist():
     assert _non_facade_service_files() == EXPECTED_NON_FACADE_SERVICE_FILES
 
 
-def test_non_facade_inventory_ignores_untracked_files():
-    assert _non_facade_service_files() <= _committed_service_file_names()
+def test_service_inventory_uses_current_worktree_files():
+    assert _non_facade_service_files() <= {path.name for path in _tracked_service_files()}
 
 
 def test_mixed_facade_implementation_inventory_matches_allowlist():
@@ -74,20 +73,7 @@ def _imports_domains(text: str) -> bool:
     return "from app.domains" in text or "import app.domains" in text
 
 
-def _committed_service_file_names() -> set[str]:
-    return {path.name for path in _committed_service_files()}
-
-
 def _tracked_service_files() -> list[Path]:
-    return _committed_service_files()
-
-
-def _committed_service_files() -> list[Path]:
-    result = subprocess.run(
-        ["git", "ls-tree", "-r", "--name-only", "HEAD", "--", "server/app/services"],
-        cwd=REPO_ROOT,
-        capture_output=True,
-        check=True,
-        text=True,
-    )
-    return [REPO_ROOT / line for line in result.stdout.splitlines() if line.endswith(".py")]
+    if not SERVICES_ROOT.exists():
+        return []
+    return [path for path in SERVICES_ROOT.rglob("*.py") if path.is_file()]

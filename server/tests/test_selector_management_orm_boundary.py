@@ -2,7 +2,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from app.db_models import Base, UISelector as LegacyUISelector
+from app.db.models import Base, UISelector as LegacyUISelector
 
 
 SERVER_ROOT = Path(__file__).resolve().parents[1]
@@ -18,7 +18,7 @@ def test_selector_management_model_boundary_reexports_ui_selector():
 
 def test_selector_management_model_boundary_imports_in_clean_process():
     code = (
-        "import app.db_models as legacy; "
+        "import app.db.models as legacy; "
         "from app.db.models.selector_management import UISelector; "
         "assert legacy.UISelector is UISelector; "
         "assert 'ui_selectors' in legacy.Base.metadata.tables"

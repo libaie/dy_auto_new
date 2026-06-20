@@ -4,8 +4,8 @@ from alembic.config import Config
 from alembic.script import ScriptDirectory
 from sqlalchemy import inspect
 
-from app.db_models import AgencyExpertInvocation
-from app.services.agency_contracts import (
+from app.db.models import AgencyExpertInvocation
+from app.domains.agency_operations.agency_contracts import (
     AgencyConsoleResponse,
     AgencyDecisionLogItem,
     AgencyExecutionStatus,

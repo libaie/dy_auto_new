@@ -1,6 +1,6 @@
 import pytest
 
-from app.db_models import (
+from app.db.models import (
     Episode,
     ProductionEpisode,
     ProductionPlan,
@@ -12,10 +12,10 @@ from app.db_models import (
     VideoProductionRun,
     VideoReviewRecord,
 )
-from app.services.production_review_service import apply_bulk_review_action
-from app.services.production_segment_service import retry_segment
-from app.services.production_status import SEGMENT_RETRY_QUEUED, SEGMENT_SUPERSEDED
-from app.services.video_production_run_types import MOCK_SERIES_SCALE, REAL_SHORT_E2E
+from app.domains.video_production.production_review_service import apply_bulk_review_action
+from app.domains.video_production.production_segment_service import retry_segment
+from app.domains.video_production.production_status import SEGMENT_RETRY_QUEUED, SEGMENT_SUPERSEDED
+from app.domains.video_production.video_production_run_types import MOCK_SERIES_SCALE, REAL_SHORT_E2E
 
 
 def _production_context(db, frame_ids=("seg-1",), run_type=MOCK_SERIES_SCALE):

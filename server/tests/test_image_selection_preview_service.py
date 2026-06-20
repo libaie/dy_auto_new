@@ -4,11 +4,11 @@ import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
-from app.db_models import AIModel, ImageProductionPolicyVersion, ImageSelectionPreview
+from app.db.models import AIModel, ImageProductionPolicyVersion, ImageSelectionPreview
 from app.main import app
-from app.services.crypto import encrypt
-from app.services.image_production_strategy_service import create_strategy
-from app.services.image_selection_preview_service import create_selection_preview
+from app.domains.system_configuration.crypto import encrypt
+from app.domains.image_generation.image_production_strategy_service import create_strategy
+from app.domains.image_generation.image_selection_preview_service import create_selection_preview
 
 
 client = TestClient(app)

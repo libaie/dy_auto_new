@@ -1,4 +1,4 @@
-from app.db_models import (
+from app.db.models import (
     AgencyCreativePatch,
     AgencyExpertInvocation,
     AITextArtifact,
@@ -11,7 +11,7 @@ from app.db_models import (
     Series,
     VideoProductionRun,
 )
-from app.services.agency_creative_patch_service import (
+from app.domains.agency_operations.agency_creative_patch_service import (
     apply_approved_patches,
     apply_patch,
     create_patches_for_invocation,

@@ -3,8 +3,8 @@ import json
 import httpx
 import pytest
 
-from app.services.agency_prompting import build_expert_prompt
-from app.services.agency_runtime import AgencyRuntimeError, AgencySkillRuntime
+from app.domains.agency_operations.agency_prompting import build_expert_prompt
+from app.domains.agency_operations.agency_runtime import AgencyRuntimeError, AgencySkillRuntime
 
 
 def _runtime_config():

@@ -1,11 +1,9 @@
 from fastapi.testclient import TestClient
 
 from app.config import bj_now
-from app.db_models import ImageCreationTask, ImageProductionMetric
+from app.db.models import ImageCreationTask, ImageProductionMetric
 from app.main import app
-from app.routers import image_production as router_module
-
-
+from app.domains.image_generation import image_production_router as router_module
 client = TestClient(app)
 
 

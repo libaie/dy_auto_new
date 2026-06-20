@@ -39,7 +39,7 @@ def test_read_model_module_owns_payload_functions():
 
 
 def test_comment_user_and_conversation_read_model_response_shapes(db):
-    from app.db_models import CollectedComment, CollectedUser, Conversation, ConversationMessage
+    from app.db.models import CollectedComment, CollectedUser, Conversation, ConversationMessage
 
     db.add(CollectedComment(
         task_id="read-model-task",
@@ -88,7 +88,7 @@ def test_comment_user_and_conversation_read_model_response_shapes(db):
 
 
 def test_conversation_detail_returns_message_ledger(db):
-    from app.db_models import Conversation, ConversationMessage
+    from app.db.models import Conversation, ConversationMessage
     db.add(Conversation(
         id="detail-conversation",
         account_id="acc-001",
@@ -133,7 +133,7 @@ def test_conversation_detail_returns_message_ledger(db):
 
 
 def test_conversation_detail_hides_other_users_task(db):
-    from app.db_models import Conversation, Task
+    from app.db.models import Conversation, Task
     from app.deps import verify_admin_token
 
     db.add(Task(

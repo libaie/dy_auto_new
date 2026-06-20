@@ -3,8 +3,8 @@ import uuid
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app
-from app.db_models import AIModel
-from app.services.crypto import encrypt, decrypt
+from app.db.models import AIModel
+from app.domains.system_configuration.crypto import encrypt, decrypt
 
 
 @pytest.fixture
@@ -146,7 +146,7 @@ def test_connection_test_allows_public_hostname(client, db, monkeypatch):
         calls.append((url, kwargs))
         return Response()
 
-    monkeypatch.setattr("app.routers.ai_config.httpx.get", fake_get)
+    monkeypatch.setattr("app.domains.model_configuration.ai_models_router.httpx.get", fake_get)
     m = _seed_one(
         db,
         name="PublicHostTest",
@@ -173,7 +173,7 @@ def test_connection_test_noop_strategy(client, db):
     assert data["ok"] is False
     assert "不支持" in data["error"]
 def test_default_seedance_models_use_ark_plan_v3():
-    from app.routers.ai_config import DEFAULT_MODELS
+    from app.domains.model_configuration.ai_models_router import DEFAULT_MODELS
 
     seedance_models = [m for m in DEFAULT_MODELS if m["provider"] == "seedance"]
     by_type = {m["model_type"]: m for m in seedance_models}
@@ -189,7 +189,7 @@ def test_default_seedance_models_use_ark_plan_v3():
 
 
 def test_default_wan_model_uses_bailian_video_task_endpoint():
-    from app.routers.ai_config import DEFAULT_MODELS
+    from app.domains.model_configuration.ai_models_router import DEFAULT_MODELS
 
     wan = next(m for m in DEFAULT_MODELS if m["name"] == "Wan 2.7")
 
@@ -208,7 +208,7 @@ def test_default_wan_model_uses_bailian_video_task_endpoint():
 
 
 def test_default_qwen_image_model_uses_bailian_multimodal_generation_endpoint():
-    from app.routers.ai_config import DEFAULT_MODELS
+    from app.domains.model_configuration.ai_models_router import DEFAULT_MODELS
 
     qwen_image = next(m for m in DEFAULT_MODELS if m["name"] == "Qwen Image 2.0 Pro")
 
@@ -230,7 +230,7 @@ def test_default_qwen_image_model_uses_bailian_multimodal_generation_endpoint():
 
 
 def test_default_bailian_qwen_37_plus_model_covers_script_and_expert_review():
-    from app.routers.ai_config import DEFAULT_MODELS
+    from app.domains.model_configuration.ai_models_router import DEFAULT_MODELS
 
     expert = next(m for m in DEFAULT_MODELS if m["name"] == "Bailian Qwen 3.7 Plus")
 
@@ -249,7 +249,7 @@ def test_default_bailian_qwen_37_plus_model_covers_script_and_expert_review():
 
 
 def test_default_bailian_qwen_37_quality_audit_model_uses_chat_completions_endpoint():
-    from app.routers.ai_config import DEFAULT_MODELS
+    from app.domains.model_configuration.ai_models_router import DEFAULT_MODELS
 
     audit = next(m for m in DEFAULT_MODELS if m["name"] == "Bailian Qwen 3.7 Quality Audit")
 
@@ -265,7 +265,7 @@ def test_default_bailian_qwen_37_quality_audit_model_uses_chat_completions_endpo
 
 
 def test_default_pixelle_compose_model_covers_video_composition():
-    from app.routers.ai_config import DEFAULT_MODELS
+    from app.domains.model_configuration.ai_models_router import DEFAULT_MODELS
 
     compose = next(m for m in DEFAULT_MODELS if m["name"] == "Pixelle Compose")
 
@@ -285,8 +285,8 @@ def test_default_pixelle_compose_model_covers_video_composition():
 
 
 def test_seed_ai_models_adds_pixelle_compose_model(db):
-    from app.routers.ai_config import seed_ai_models
-    from app.services.runtime_model_config import resolve_runtime_model_config
+    from app.domains.model_configuration.ai_models_router import seed_ai_models
+    from app.domains.model_configuration.runtime_model_config import resolve_runtime_model_config
 
     seed_ai_models(db)
 
@@ -298,7 +298,7 @@ def test_seed_ai_models_adds_pixelle_compose_model(db):
 
 
 def test_seed_ai_models_updates_existing_pixelle_compose_capabilities(db):
-    from app.routers.ai_config import seed_ai_models
+    from app.domains.model_configuration.ai_models_router import seed_ai_models
 
     model = _seed_one(
         db,
@@ -322,8 +322,8 @@ def test_seed_ai_models_updates_existing_pixelle_compose_capabilities(db):
 
 
 def test_seed_ai_models_upgrades_unconfigured_legacy_expert_review_default(db):
-    from app.db_models import AIModel
-    from app.routers.ai_config import seed_ai_models
+    from app.db.models import AIModel
+    from app.domains.model_configuration.ai_models_router import seed_ai_models
 
     legacy = AIModel(
         name="OpenAI Compatible Expert Review",
@@ -356,7 +356,7 @@ def test_seed_ai_models_upgrades_unconfigured_legacy_expert_review_default(db):
 
 
 def test_seed_ai_models_updates_existing_legacy_seedance_base_url(db):
-    from app.routers.ai_config import seed_ai_models
+    from app.domains.model_configuration.ai_models_router import seed_ai_models
 
     legacy_base_url = "https://ark.cn-beijing.volces.com" + "/api/v3"
     model = _seed_one(
@@ -378,7 +378,7 @@ def test_seed_ai_models_updates_existing_legacy_seedance_base_url(db):
 
 
 def test_seed_ai_models_updates_existing_legacy_seedance_image_model(db):
-    from app.routers.ai_config import seed_ai_models
+    from app.domains.model_configuration.ai_models_router import seed_ai_models
 
     model = _seed_one(
         db,

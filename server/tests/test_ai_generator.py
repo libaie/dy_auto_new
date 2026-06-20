@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from app.services.ai_generator import AiGeneratorService
+from app.domains.model_configuration.ai_generator import AiGeneratorService
 
 pytestmark = pytest.mark.anyio
 
@@ -142,7 +142,7 @@ class TestGenerate:
         cfg = _openai_cfg()
 
         with patch("app.config.get_ai_config_with_key", return_value=cfg), \
-             patch("app.services.ai_generator.AI_MAX_RETRIES", 3), \
+             patch("app.domains.model_configuration.ai_generator.AI_MAX_RETRIES", 3), \
              patch.object(gen, "_call_api", new_callable=AsyncMock, return_value="good content") as mock_call:
             result = await gen.generate(db, "body", {"keyword": "test"})
 
@@ -155,9 +155,9 @@ class TestGenerate:
         cfg = _openai_cfg()
 
         with patch("app.config.get_ai_config_with_key", return_value=cfg), \
-             patch("app.services.ai_generator.AI_MAX_RETRIES", 3), \
+             patch("app.domains.model_configuration.ai_generator.AI_MAX_RETRIES", 3), \
              patch.object(gen, "_call_api", new_callable=AsyncMock, return_value="normal content"), \
-             patch("app.services.ai_generator.content_service") as mock_cs:
+             patch("app.domains.model_configuration.ai_generator.content_service") as mock_cs:
             mock_cs.contains_sensitive.side_effect = [True, False]
             result = await gen.generate(db, "body", {})
 
@@ -169,9 +169,9 @@ class TestGenerate:
         cfg = _openai_cfg()
 
         with patch("app.config.get_ai_config_with_key", return_value=cfg), \
-             patch("app.services.ai_generator.AI_MAX_RETRIES", 3), \
+             patch("app.domains.model_configuration.ai_generator.AI_MAX_RETRIES", 3), \
              patch.object(gen, "_call_api", new_callable=AsyncMock, return_value="blocked content"), \
-             patch("app.services.ai_generator.content_service") as mock_cs:
+             patch("app.domains.model_configuration.ai_generator.content_service") as mock_cs:
             mock_cs.contains_sensitive.return_value = True
             with pytest.raises(ValueError, match="All generated content contained sensitive words"):
                 await gen.generate(db, "body", {})
@@ -181,7 +181,7 @@ class TestGenerate:
         cfg = _openai_cfg()
 
         with patch("app.config.get_ai_config_with_key", return_value=cfg), \
-             patch("app.services.ai_generator.AI_MAX_RETRIES", 3), \
+             patch("app.domains.model_configuration.ai_generator.AI_MAX_RETRIES", 3), \
              patch.object(gen, "_call_api", new_callable=AsyncMock) as mock_call:
             mock_call.side_effect = [
                 httpx.ConnectError("connection refused"),
@@ -196,7 +196,7 @@ class TestGenerate:
         cfg = _openai_cfg()
 
         with patch("app.config.get_ai_config_with_key", return_value=cfg), \
-             patch("app.services.ai_generator.AI_MAX_RETRIES", 2), \
+             patch("app.domains.model_configuration.ai_generator.AI_MAX_RETRIES", 2), \
              patch.object(gen, "_call_api", new_callable=AsyncMock) as mock_call:
             mock_call.side_effect = httpx.ConnectError("connection refused")
             with pytest.raises(RuntimeError, match="AI API failed after 2 attempts"):
@@ -290,7 +290,7 @@ class TestGenerateCustom:
         gen._client = mock_client
 
         with patch("app.config.get_ai_config_with_key", return_value=_openai_cfg()), \
-             patch("app.services.ai_generator.AI_MAX_RETRIES", 1):
+             patch("app.domains.model_configuration.ai_generator.AI_MAX_RETRIES", 1):
             result = await gen.generate_custom(
                 db,
                 "system",
@@ -380,7 +380,7 @@ class TestGenerateCustomStreamWithConfig:
         client = _FailingStreamClient([])
         gen._client = client
 
-        with patch("app.services.ai_generator.AI_MAX_RETRIES", 0), \
+        with patch("app.domains.model_configuration.ai_generator.AI_MAX_RETRIES", 0), \
              pytest.raises(RuntimeError, match="generate_custom_stream_with_config failed after 1 attempts"):
             async for _chunk in gen.generate_custom_stream_with_config(
                 _openai_cfg(),
@@ -399,7 +399,7 @@ class TestGenerateCustomStreamWithConfig:
         gen._client = client
 
         chunks = []
-        with patch("app.services.ai_generator.AI_MAX_RETRIES", 2), \
+        with patch("app.domains.model_configuration.ai_generator.AI_MAX_RETRIES", 2), \
              pytest.raises(RuntimeError, match="streaming started"):
             async for chunk in gen.generate_custom_stream_with_config(
                 _openai_cfg(),

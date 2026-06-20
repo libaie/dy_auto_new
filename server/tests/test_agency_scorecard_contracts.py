@@ -1,4 +1,4 @@
-from app.services.agency_scorecard_contracts import normalize_scorecard, scorecard_blocks_stage
+from app.domains.agency_operations.agency_scorecard_contracts import normalize_scorecard, scorecard_blocks_stage
 
 
 def test_normalize_scorecard_derives_weighted_overall_and_verdict():

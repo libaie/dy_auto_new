@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy.orm import Query, sessionmaker
 
 from app.config import bj_now
-from app.db_models import (
+from app.db.models import (
     Episode,
     ProductionPlan,
     ProviderCostReservation,
@@ -12,10 +12,10 @@ from app.db_models import (
     Series,
     VideoProductionRun,
 )
-from app.services import provider_cost_reservation_service as reservations
-from app.services.production_cost_summary_service import get_run_costs
-from app.services.production_errors import ProductionErrorCode, ProductionRepairableError
-from app.services.production_state_contract import (
+from app.domains.video_production import provider_cost_reservation_service as reservations
+from app.domains.video_production.production_cost_summary_service import get_run_costs
+from app.domains.video_production.production_errors import ProductionErrorCode, ProductionRepairableError
+from app.domains.video_production.production_state_contract import (
     COST_ACTIVE_UNSUBMITTED,
     COST_RELEASED,
     COST_SETTLED,

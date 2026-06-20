@@ -1,5 +1,5 @@
 from app.models.script import DramaticBeatType, PipelineStage
-from app.services.script_pipeline import DynamicPromptBuilder
+from app.domains.script_pipeline.script_pipeline_service import DynamicPromptBuilder
 
 
 def test_prompt_builder_injects_hook_and_tag_constraints():

@@ -1,8 +1,8 @@
 import pytest
 
-from app.db_models import Episode, ProductionAuditEvent, Series, VideoProductionAsset, VideoProductionRun
-from app.services.production_observability import record_production_event
-from app.services.video_production_run_types import LEGACY_EPISODE_RUN, MOCK_SERIES_SCALE, REAL_SHORT_E2E
+from app.db.models import Episode, ProductionAuditEvent, Series, VideoProductionAsset, VideoProductionRun
+from app.domains.production_observability.production_observability_service import record_production_event
+from app.domains.video_production.video_production_run_types import LEGACY_EPISODE_RUN, MOCK_SERIES_SCALE, REAL_SHORT_E2E
 
 
 def test_record_production_event_redacts_secret_like_fields(db):
@@ -70,7 +70,7 @@ def test_record_production_event_uses_caller_transaction(db):
 
 @pytest.mark.asyncio
 async def test_image_stage_blocks_when_agency_model_config_missing(db, monkeypatch):
-    from app.services.video_production_service import start_image_stage
+    from app.domains.video_production.video_production_service import start_image_stage
 
     series = Series(title="Agency Block", logline="Test", genre="drama")
     db.add(series)
@@ -91,7 +91,7 @@ async def test_image_stage_blocks_when_agency_model_config_missing(db, monkeypat
     async def fail_submit(*args, **kwargs):
         raise AssertionError("provider stage should not submit without agency config")
 
-    monkeypatch.setattr("app.services.video_production_service.submit_image_batch", fail_submit)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_image_batch", fail_submit)
 
     updated = await start_image_stage(db, run.id)
 
@@ -142,7 +142,7 @@ def _event_payloads(db, run_id):
 
 
 def test_core_run_events_include_run_type(db):
-    from app.services.video_production_service import (
+    from app.domains.video_production.video_production_service import (
         mark_image_stage_assets,
         mark_image_stage_submitted,
         mark_video_stage_assets,
@@ -174,7 +174,7 @@ def test_core_run_events_include_run_type(db):
 
 
 def test_run_type_assigned_event_includes_run_type(db):
-    from app.services.video_production_service import create_run_from_episode
+    from app.domains.video_production.video_production_service import create_run_from_episode
 
     series = Series(title="Assigned", logline="Test", genre="drama")
     db.add(series)
@@ -202,8 +202,8 @@ def test_run_type_assigned_event_includes_run_type(db):
     ],
 )
 def test_provider_config_blocked_events_include_run_type(db, stage, scene_key, event_type):
-    from app.services.runtime_model_config import RuntimeModelConfigError
-    from app.services.video_production_service import _block_missing_provider_model_config
+    from app.domains.model_configuration.runtime_model_config import RuntimeModelConfigError
+    from app.domains.video_production.video_production_service import _block_missing_provider_model_config
 
     run = _run(db)
 
@@ -222,7 +222,7 @@ def test_provider_config_blocked_events_include_run_type(db, stage, scene_key, e
 
 @pytest.mark.asyncio
 async def test_video_and_compose_submitted_events_include_run_type(db, monkeypatch):
-    from app.services.video_production_service import start_compose_stage, start_video_stage
+    from app.domains.video_production.video_production_service import start_compose_stage, start_video_stage
 
     run = _run(db, run_type=LEGACY_EPISODE_RUN)
     image = VideoProductionAsset(
@@ -266,10 +266,10 @@ async def test_video_and_compose_submitted_events_include_run_type(db, monkeypat
     def model_config(*args, **kwargs):
         return {"provider": "test", "model": "mock", "api_key": "secret"}
 
-    monkeypatch.setattr("app.services.video_production_service._guard_provider_stage", pass_guard)
-    monkeypatch.setattr("app.services.video_production_service.submit_video_batch", submit_video)
-    monkeypatch.setattr("app.services.video_production_service.submit_compose", submit_compose)
-    monkeypatch.setattr("app.services.video_production_service.resolve_runtime_model_config", model_config)
+    monkeypatch.setattr("app.domains.video_production.video_production_service._guard_provider_stage", pass_guard)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_video_batch", submit_video)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_compose", submit_compose)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.resolve_runtime_model_config", model_config)
 
     run.status = "image_approved"
     db.commit()
@@ -287,7 +287,7 @@ async def test_video_and_compose_submitted_events_include_run_type(db, monkeypat
 
 
 def test_final_approval_records_final_video_completed_with_run_type(db):
-    from app.services.video_production_service import approve_asset
+    from app.domains.video_production.video_production_service import approve_asset
 
     run = _run(db)
     run.status = "final_review_pending"
@@ -318,7 +318,7 @@ def test_final_approval_records_final_video_completed_with_run_type(db):
 
 
 def test_persist_final_video_records_compose_asset_registered_with_run_type(db):
-    from app.services.video_production_service import persist_final_video
+    from app.domains.video_production.video_production_service import persist_final_video
 
     run = _run(db)
     run.pixelle_stage_task_id = "compose-task-1"
@@ -349,7 +349,7 @@ def test_persist_final_video_records_compose_asset_registered_with_run_type(db):
 
 
 def test_agency_invocation_completed_event_includes_run_type_when_run_exists(db):
-    from app.services.agency_persistence import create_or_resume_invocation, finalize_invocation_and_audit
+    from app.domains.agency_operations.agency_persistence import create_or_resume_invocation, finalize_invocation_and_audit
 
     run = _run(db)
     invocation = create_or_resume_invocation(
@@ -388,7 +388,7 @@ def test_agency_invocation_completed_event_includes_run_type_when_run_exists(db)
 
 
 def test_mock_scheduler_step_completed_records_provider_free_evidence(db):
-    from app.services.mock_scale_scheduler_service import advance_mock_scheduler, create_mock_scale_run
+    from app.domains.video_production.mock_scale_scheduler_service import advance_mock_scheduler, create_mock_scale_run
 
     result = create_mock_scale_run(
         db,
@@ -414,7 +414,7 @@ def test_mock_scheduler_step_completed_records_provider_free_evidence(db):
 
 
 def test_mock_scale_run_records_run_type_assigned_event(db):
-    from app.services.mock_scale_scheduler_service import create_mock_scale_run
+    from app.domains.video_production.mock_scale_scheduler_service import create_mock_scale_run
 
     result = create_mock_scale_run(
         db,

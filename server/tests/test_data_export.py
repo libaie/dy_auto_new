@@ -5,7 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 from openpyxl import load_workbook
 
-from app.db_models import CollectedComment, CollectedUser, Conversation
+from app.db.models import CollectedComment, CollectedUser, Conversation
 from app.main import app
 
 client = TestClient(app)

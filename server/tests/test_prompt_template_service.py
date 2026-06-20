@@ -2,7 +2,7 @@ import copy
 
 import pytest
 
-from app.services.prompt_template_service import (
+from app.domains.prompt_management.prompt_template_service import (
     PROMPT_TEMPLATE_REWRITE_MAX_CONTENT_BYTES,
     prompt_template_service,
 )

@@ -2,14 +2,14 @@ import subprocess
 import sys
 from pathlib import Path
 
-from app.db_models import Account as LegacyAccount
-from app.db_models import AccountGroup as LegacyAccountGroup
-from app.db_models import AccountGroupMember as LegacyAccountGroupMember
-from app.db_models import Base
-from app.db_models import ChainInstance as LegacyChainInstance
-from app.db_models import ChainTemplate as LegacyChainTemplate
-from app.db_models import Channel as LegacyChannel
-from app.db_models import ChannelItem as LegacyChannelItem
+from app.db.models import Account as LegacyAccount
+from app.db.models import AccountGroup as LegacyAccountGroup
+from app.db.models import AccountGroupMember as LegacyAccountGroupMember
+from app.db.models import Base
+from app.db.models import ChainInstance as LegacyChainInstance
+from app.db.models import ChainTemplate as LegacyChainTemplate
+from app.db.models import Channel as LegacyChannel
+from app.db.models import ChannelItem as LegacyChannelItem
 
 
 SERVER_ROOT = Path(__file__).resolve().parents[1]
@@ -51,7 +51,7 @@ def test_account_operations_model_boundary_reexports_account_models():
 
 def test_account_operations_model_boundary_imports_in_clean_process():
     code = (
-        "import app.db_models as legacy; "
+        "import app.db.models as legacy; "
         "from app.db.models.account_operations import Account, AccountGroup, AccountGroupMember, ChainInstance, ChainTemplate, Channel, ChannelItem; "
         "assert legacy.Account is Account; "
         "assert legacy.AccountGroup is AccountGroup; "

@@ -1,6 +1,6 @@
 import pytest
 
-from app.services.pixelle_stage_client import submit_image_batch, get_stage_task, submit_image_create
+from app.domains.pixelle_integration.pixelle_stage_client import submit_image_batch, get_stage_task, submit_image_create
 
 
 @pytest.mark.asyncio
@@ -11,7 +11,7 @@ async def test_submit_image_batch_calls_pixelle_stage_api(monkeypatch):
         calls.append((method, path, kwargs["json"]))
         return {"ok": True, "stage_task_id": "stage-1", "assets": []}
 
-    monkeypatch.setattr("app.services.pixelle_stage_client._pixelle_request", fake_request)
+    monkeypatch.setattr("app.domains.pixelle_integration.pixelle_stage_client._pixelle_request", fake_request)
 
     result = await submit_image_batch(
         db=None,
@@ -36,7 +36,7 @@ async def test_submit_image_create_calls_pixelle_stage_api(monkeypatch):
         calls.append((method, path, kwargs["json"]))
         return {"ok": True, "stage_task_id": "stage-create-1", "assets": []}
 
-    monkeypatch.setattr("app.services.pixelle_stage_client._pixelle_request", fake_request)
+    monkeypatch.setattr("app.domains.pixelle_integration.pixelle_stage_client._pixelle_request", fake_request)
 
     result = await submit_image_create(
         db=None,
@@ -85,7 +85,7 @@ async def test_get_stage_task_calls_pixelle_status(monkeypatch):
     async def fake_request(method, path, db=None, **kwargs):
         return {"ok": True, "stage_task_id": "stage-1", "status": "completed", "assets": []}
 
-    monkeypatch.setattr("app.services.pixelle_stage_client._pixelle_request", fake_request)
+    monkeypatch.setattr("app.domains.pixelle_integration.pixelle_stage_client._pixelle_request", fake_request)
 
     result = await get_stage_task(None, "stage-1")
 

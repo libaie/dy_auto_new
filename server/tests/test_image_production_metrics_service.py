@@ -1,14 +1,14 @@
 from datetime import timedelta
 
 from app.config import bj_now
-from app.db_models import (
+from app.db.models import (
     ImageCreationAsset,
     ImageCreationReviewRecord,
     ImageCreationTask,
     ImageProductionCostEvent,
     ImageProductionMetric,
 )
-from app.services.image_production_metrics_service import (
+from app.domains.image_generation.image_production_metrics_service import (
     aggregate_strategy_metrics_payload,
     refresh_all_image_strategy_metrics,
     refresh_image_strategy_metrics,

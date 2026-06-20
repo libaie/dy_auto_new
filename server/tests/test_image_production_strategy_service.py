@@ -2,10 +2,10 @@ from datetime import datetime
 
 from fastapi.testclient import TestClient
 
-from app.db_models import ImageProductionMetric, ImageProductionPolicyVersion, ImageProductionStrategy, ImageProductionStrategyVersion, ProductionAuditEvent
+from app.db.models import ImageProductionMetric, ImageProductionPolicyVersion, ImageProductionStrategy, ImageProductionStrategyVersion, ProductionAuditEvent
 from app.deps import verify_admin_token
 from app.main import app
-from app.services.image_production_strategy_service import seed_default_image_strategies
+from app.domains.image_generation.image_production_strategy_service import seed_default_image_strategies
 
 
 client = TestClient(app)

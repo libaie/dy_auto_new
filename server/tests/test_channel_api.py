@@ -3,7 +3,7 @@ import pytest
 from fastapi.testclient import TestClient
 from app.main import app
 from app.database import get_db
-from app.db_models import Account, AccountGroup, AccountGroupMember, Device, Channel, ChannelItem
+from app.db.models import Account, AccountGroup, AccountGroupMember, Device, Channel, ChannelItem
 from tests.conftest import setup_group
 
 client = TestClient(app)

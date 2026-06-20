@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from app.db_models import (
+from app.db.models import (
     Episode,
     ProductionEpisode,
     ProductionPlan,
@@ -13,7 +13,7 @@ from app.db_models import (
     VideoProductionRun,
 )
 from app.main import app
-from app.services.video_production_run_types import REAL_SHORT_E2E
+from app.domains.video_production.video_production_run_types import REAL_SHORT_E2E
 
 client = TestClient(app)
 
@@ -130,7 +130,7 @@ def _asset(db, run, segment, *, asset_type, url, status="approved", version=1, i
 
 
 def test_linked_run_image_frames_are_built_from_segments(db):
-    from app.services.video_production_service import image_stage_frames
+    from app.domains.video_production.video_production_service import image_stage_frames
 
     run, segments = _linked_run_with_segments(db)
     segment = segments[0]
@@ -151,7 +151,7 @@ def test_linked_run_image_frames_are_built_from_segments(db):
 
 
 def test_legacy_run_image_frames_still_use_storyboard(db):
-    from app.services.video_production_service import image_stage_frames
+    from app.domains.video_production.video_production_service import image_stage_frames
 
     run = _legacy_run(db)
 
@@ -164,12 +164,12 @@ def test_legacy_run_image_frames_still_use_storyboard(db):
 
 
 def test_worker_image_job_spec_includes_redacted_provider_parameters(db, monkeypatch):
-    from app.services.production_worker_service import _job_spec
+    from app.domains.video_production.production_worker_service import _job_spec
 
     run, segments = _linked_run_with_segments(db, count=1, run_type=REAL_SHORT_E2E, budget_limit=1.0)
     client.post(f"/api/video-production/runs/{run.id}/start-images")
     job = db.query(ProductionJob).filter_by(plan_id=run.production_plan_id, stage="image_generation").one()
-    monkeypatch.setattr("app.services.production_worker_service.resolve_runtime_model_config", lambda db, scene: {
+    monkeypatch.setattr("app.domains.video_production.production_worker_service.resolve_runtime_model_config", lambda db, scene: {
         "provider": "seedance",
         "model": "doubao-seedream-5.0-lite",
         "api_key": "secret-key",
@@ -187,7 +187,7 @@ def test_worker_image_job_spec_includes_redacted_provider_parameters(db, monkeyp
 
 
 def test_linked_video_frames_use_approved_segment_image_and_video_prompt(db):
-    from app.services.video_production_service import video_stage_frames
+    from app.domains.video_production.video_production_service import video_stage_frames
 
     run, segments = _linked_run_with_segments(db)
     segment = segments[0]
@@ -203,7 +203,7 @@ def test_linked_video_frames_use_approved_segment_image_and_video_prompt(db):
 
 
 def test_linked_compose_segments_use_ordered_production_segments(db):
-    from app.services.video_production_service import compose_segments
+    from app.domains.video_production.video_production_service import compose_segments
 
     run, segments = _linked_run_with_segments(db, count=2)
     _asset(db, run, segments[1], asset_type="video_segment", url="https://cdn.test/segment-2.mp4")
@@ -220,7 +220,7 @@ def test_linked_compose_segments_use_ordered_production_segments(db):
 
 
 def test_linked_image_asset_write_demotes_previous_latest_for_segment(db):
-    from app.services.video_production_service import mark_image_stage_assets
+    from app.domains.video_production.video_production_service import mark_image_stage_assets
 
     run, segments = _linked_run_with_segments(db)
     segment = segments[0]
@@ -255,8 +255,8 @@ def test_real_short_start_images_route_enqueues_jobs_without_legacy_submit(db, m
     async def fail_legacy_submit(*args, **kwargs):
         raise AssertionError("legacy image batch submit must not run for real_short_e2e")
 
-    monkeypatch.setattr("app.services.video_production_service._guard_provider_stage", _agency_pass)
-    monkeypatch.setattr("app.services.video_production_service.submit_image_batch", fail_legacy_submit)
+    monkeypatch.setattr("app.domains.video_production.video_production_service._guard_provider_stage", _agency_pass)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_image_batch", fail_legacy_submit)
 
     response = client.post(f"/api/video-production/runs/{run.id}/start-images")
 
@@ -281,7 +281,7 @@ def test_real_short_start_images_defers_image_stage_agency_gate_to_worker(db, mo
     async def fail_if_called(*args, **kwargs):
         raise AssertionError("real_short_e2e start-images must not synchronously run agency review")
 
-    monkeypatch.setattr("app.services.video_production_service._guard_provider_stage", fail_if_called)
+    monkeypatch.setattr("app.domains.video_production.video_production_service._guard_provider_stage", fail_if_called)
 
     response = client.post(f"/api/video-production/runs/{run.id}/start-images")
 
@@ -291,7 +291,7 @@ def test_real_short_start_images_defers_image_stage_agency_gate_to_worker(db, mo
 
 
 def test_real_worker_runs_deferred_image_stage_agency_gate_before_provider_submit(db, monkeypatch):
-    from app.services.production_worker_service import run_real_worker_step
+    from app.domains.video_production.production_worker_service import run_real_worker_step
 
     run, _segments = _linked_run_with_segments(db, count=1, run_type=REAL_SHORT_E2E, budget_limit=1.0)
     client.post(f"/api/video-production/runs/{run.id}/start-images")
@@ -312,10 +312,10 @@ def test_real_worker_runs_deferred_image_stage_agency_gate_before_provider_submi
         "config": {},
         }
 
-    monkeypatch.setattr("app.services.production_worker_service.resolve_runtime_model_config", fake_runtime_config)
-    monkeypatch.setattr("app.services.video_production_service.resolve_runtime_model_config", fake_runtime_config)
-    monkeypatch.setattr("app.services.video_production_service._guard_provider_stage", block_image_stage)
-    monkeypatch.setattr("app.services.video_production_service.submit_image_batch", fail_submit)
+    monkeypatch.setattr("app.domains.video_production.production_worker_service.resolve_runtime_model_config", fake_runtime_config)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.resolve_runtime_model_config", fake_runtime_config)
+    monkeypatch.setattr("app.domains.video_production.video_production_service._guard_provider_stage", block_image_stage)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_image_batch", fail_submit)
 
     result = run_real_worker_step(db, run.id, lease_id="test-worker", batch_size=1)
 
@@ -332,7 +332,7 @@ def test_real_worker_runs_deferred_image_stage_agency_gate_before_provider_submi
 
 def test_real_worker_continues_provider_submit_when_deferred_agency_gate_times_out(db, monkeypatch):
     import asyncio
-    from app.services.production_worker_service import run_real_worker_step
+    from app.domains.video_production.production_worker_service import run_real_worker_step
 
     run, segments = _linked_run_with_segments(db, count=1, run_type=REAL_SHORT_E2E, budget_limit=1.0)
     client.post(f"/api/video-production/runs/{run.id}/start-images")
@@ -379,11 +379,11 @@ def test_real_worker_continues_provider_submit_when_deferred_agency_gate_times_o
         }
 
     monkeypatch.setenv("DY_AUTO_PROVIDER_SUBMIT_WORKER_COUNT", "1")
-    monkeypatch.setattr("app.services.production_worker_service.resolve_runtime_model_config", fake_runtime_config)
-    monkeypatch.setattr("app.services.video_production_service.resolve_runtime_model_config", fake_runtime_config)
-    monkeypatch.setattr("app.services.video_production_service._guard_provider_stage", slow_gate)
-    monkeypatch.setattr("app.services.video_production_service.submit_image_batch", submit_image)
-    monkeypatch.setattr("app.services.video_production_service.get_stage_task", get_stage_task)
+    monkeypatch.setattr("app.domains.video_production.production_worker_service.resolve_runtime_model_config", fake_runtime_config)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.resolve_runtime_model_config", fake_runtime_config)
+    monkeypatch.setattr("app.domains.video_production.video_production_service._guard_provider_stage", slow_gate)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_image_batch", submit_image)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.get_stage_task", get_stage_task)
 
     result = run_real_worker_step(db, run.id, lease_id="test-worker", batch_size=1)
 
@@ -399,7 +399,7 @@ def test_real_worker_continues_provider_submit_when_deferred_agency_gate_times_o
 
 
 def test_image_job_spec_strips_references_for_text_only_image_model(db, monkeypatch):
-    from app.services.production_worker_service import _image_stage_context_for_model, _job_spec
+    from app.domains.video_production.production_worker_service import _image_stage_context_for_model, _job_spec
 
     run, segments = _linked_run_with_segments(db, count=1, run_type=REAL_SHORT_E2E, budget_limit=1.0)
     segments[0].image_prompt = (
@@ -420,7 +420,7 @@ def test_image_job_spec_strips_references_for_text_only_image_model(db, monkeypa
     db.commit()
 
     monkeypatch.setattr(
-        "app.services.production_worker_service.resolve_runtime_model_config",
+        "app.domains.video_production.production_worker_service.resolve_runtime_model_config",
         lambda db, scene: {
             "provider": "qwen-image",
             "model": "qwen-image-2.0-pro",
@@ -453,7 +453,7 @@ def test_image_job_spec_strips_references_for_text_only_image_model(db, monkeypa
 
 
 def test_deferred_stage_gate_timeout_can_be_extended_with_env(monkeypatch):
-    from app.services.production_worker_service import _deferred_stage_gate_timeout_seconds
+    from app.domains.video_production.production_worker_service import _deferred_stage_gate_timeout_seconds
 
     monkeypatch.setenv("DY_AUTO_DEFERRED_STAGE_GATE_TIMEOUT_SECONDS", "180")
 
@@ -466,9 +466,9 @@ def test_legacy_start_images_blocks_paid_model_direct_submit(db, monkeypatch):
     async def fail_legacy_submit(*args, **kwargs):
         raise AssertionError("legacy paid provider submit must be blocked before direct submit")
 
-    monkeypatch.setattr("app.services.video_production_service._guard_provider_stage", _agency_pass)
+    monkeypatch.setattr("app.domains.video_production.video_production_service._guard_provider_stage", _agency_pass)
     monkeypatch.setattr(
-        "app.services.video_production_service.resolve_runtime_model_config",
+        "app.domains.video_production.video_production_service.resolve_runtime_model_config",
         lambda db, scene: {
             "provider": "seedance",
             "model": scene,
@@ -483,7 +483,7 @@ def test_legacy_start_images_blocks_paid_model_direct_submit(db, monkeypatch):
             },
         },
     )
-    monkeypatch.setattr("app.services.video_production_service.submit_image_batch", fail_legacy_submit)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_image_batch", fail_legacy_submit)
 
     response = client.post(f"/api/video-production/runs/{run.id}/start-images")
 
@@ -501,8 +501,8 @@ def test_real_short_start_videos_route_enqueues_jobs_without_legacy_submit(db, m
     async def fail_legacy_submit(*args, **kwargs):
         raise AssertionError("legacy video batch submit must not run for real_short_e2e")
 
-    monkeypatch.setattr("app.services.video_production_service._guard_provider_stage", _agency_pass)
-    monkeypatch.setattr("app.services.video_production_service.submit_video_batch", fail_legacy_submit)
+    monkeypatch.setattr("app.domains.video_production.video_production_service._guard_provider_stage", _agency_pass)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_video_batch", fail_legacy_submit)
 
     response = client.post(f"/api/video-production/runs/{run.id}/start-videos")
 
@@ -521,7 +521,7 @@ def test_real_short_start_videos_defers_video_stage_agency_gate_to_worker(db, mo
     async def fail_if_called(*args, **kwargs):
         raise AssertionError("real_short_e2e start-videos must not synchronously run agency review")
 
-    monkeypatch.setattr("app.services.video_production_service._guard_provider_stage", fail_if_called)
+    monkeypatch.setattr("app.domains.video_production.video_production_service._guard_provider_stage", fail_if_called)
 
     response = client.post(f"/api/video-production/runs/{run.id}/start-videos")
 
@@ -531,7 +531,7 @@ def test_real_short_start_videos_defers_video_stage_agency_gate_to_worker(db, mo
 
 
 def test_video_stage_worker_context_declares_single_segment_review_scope(db, monkeypatch):
-    from app.services.production_worker_service import run_real_worker_step
+    from app.domains.video_production.production_worker_service import run_real_worker_step
 
     captured = {}
     run, segments = _linked_run_with_segments(db, count=3, run_type=REAL_SHORT_E2E, budget_limit=1.0)
@@ -581,11 +581,11 @@ def test_video_stage_worker_context_declares_single_segment_review_scope(db, mon
         }
 
     monkeypatch.setenv("DY_AUTO_PROVIDER_SUBMIT_WORKER_COUNT", "1")
-    monkeypatch.setattr("app.services.production_worker_service.resolve_runtime_model_config", fake_runtime_config)
-    monkeypatch.setattr("app.services.video_production_service.resolve_runtime_model_config", fake_runtime_config)
-    monkeypatch.setattr("app.services.video_production_service._guard_provider_stage", capture_gate)
-    monkeypatch.setattr("app.services.video_production_service.submit_video_batch", submit_video)
-    monkeypatch.setattr("app.services.video_production_service.get_stage_task", get_stage_task)
+    monkeypatch.setattr("app.domains.video_production.production_worker_service.resolve_runtime_model_config", fake_runtime_config)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.resolve_runtime_model_config", fake_runtime_config)
+    monkeypatch.setattr("app.domains.video_production.video_production_service._guard_provider_stage", capture_gate)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_video_batch", submit_video)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.get_stage_task", get_stage_task)
 
     result = run_real_worker_step(db, run.id, lease_id="video-worker", batch_size=1)
 
@@ -607,8 +607,8 @@ def test_real_short_compose_route_enqueues_job_without_legacy_submit(db, monkeyp
     async def fail_legacy_submit(*args, **kwargs):
         raise AssertionError("legacy compose submit must not run for real_short_e2e")
 
-    monkeypatch.setattr("app.services.video_production_service._guard_provider_stage", _agency_pass)
-    monkeypatch.setattr("app.services.video_production_service.submit_compose", fail_legacy_submit)
+    monkeypatch.setattr("app.domains.video_production.video_production_service._guard_provider_stage", _agency_pass)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_compose", fail_legacy_submit)
 
     response = client.post(f"/api/video-production/runs/{run.id}/compose")
 
@@ -628,7 +628,7 @@ def test_real_short_compose_defers_video_review_and_compose_preflight_agency_gat
     async def fail_if_called(*args, **kwargs):
         raise AssertionError("real_short_e2e compose start must not synchronously run agency review")
 
-    monkeypatch.setattr("app.services.video_production_service._guard_provider_stage", fail_if_called)
+    monkeypatch.setattr("app.domains.video_production.video_production_service._guard_provider_stage", fail_if_called)
 
     response = client.post(f"/api/video-production/runs/{run.id}/compose")
 

@@ -1,4 +1,4 @@
-from app.routers.pixelle import _redact_secrets
+from app.domains.pixelle_integration.pixelle_router import _redact_secrets
 
 
 def test_redact_secrets_recursively_redacts_nested_api_keys():

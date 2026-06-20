@@ -1,6 +1,6 @@
 # dy_auto 数据库表结构
 
-> 生成日期: 2026-05-14 | 数据库: SQLite (WAL mode) | 来源: server/app/db_models.py
+> 生成日期: 2026-05-14 | 数据库: SQLite (WAL mode) | 来源: server/app/db/models/
 
 ---
 

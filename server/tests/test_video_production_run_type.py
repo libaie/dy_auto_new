@@ -1,7 +1,7 @@
 import pytest
 
-from app.db_models import Episode, Series, VideoProductionRun
-from app.services.video_production_run_types import (
+from app.db.models import Episode, Series, VideoProductionRun
+from app.domains.video_production.video_production_run_types import (
     LEGACY_EPISODE_RUN,
     MOCK_SERIES_SCALE,
     REAL_SHORT_E2E,

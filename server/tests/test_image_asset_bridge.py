@@ -3,7 +3,7 @@ from uuid import uuid4
 import pytest
 from fastapi.testclient import TestClient
 
-from app.db_models import (
+from app.db.models import (
     Episode,
     ImageCreationAsset,
     ImageCreationTask,
@@ -13,8 +13,8 @@ from app.db_models import (
 )
 from app.deps import verify_admin_token
 from app.main import app
-from app.services.image_asset_bridge_service import promote_image_asset_to_video_asset
-from app.services.image_creation_service import asset_payload, review_image_asset
+from app.domains.image_generation.image_asset_bridge_service import promote_image_asset_to_video_asset
+from app.domains.image_generation.image_creation_service import asset_payload, review_image_asset
 
 
 client = TestClient(app)

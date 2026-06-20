@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from app.db_models import ProductionJob, ProductionSegment, VideoProductionAsset, VideoProductionRun
+from app.db.models import ProductionJob, ProductionSegment, VideoProductionAsset, VideoProductionRun
 from app.main import app
 from tests.video_production_control_plane_helpers import linked_segment_context
 
@@ -45,7 +45,7 @@ def test_retry_segment_endpoint_demotes_latest_asset_and_creates_new_version(db)
 
 
 def test_retry_superseded_segment_is_not_required_by_image_gate(db):
-    from app.services.production_gate_evaluator import evaluate_stage_gate
+    from app.domains.video_production.production_gate_evaluator import evaluate_stage_gate
 
     ctx = linked_segment_context(db)
     segment = ctx["segment"]
@@ -86,7 +86,7 @@ def test_retry_superseded_segment_is_not_required_by_image_gate(db):
 
 
 def test_retry_superseded_segment_is_not_used_for_video_payload(db):
-    from app.services.video_production_service import build_image_stage_frames_for_segments
+    from app.domains.video_production.video_production_service import build_image_stage_frames_for_segments
 
     ctx = linked_segment_context(db)
     segment = ctx["segment"]

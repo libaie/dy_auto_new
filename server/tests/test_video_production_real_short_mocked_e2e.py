@@ -1,10 +1,10 @@
 from fastapi.testclient import TestClient
 
-from app.db_models import Character, Episode, GeneratedVideo, Scene, VideoProductionAsset, VideoProductionRun
+from app.db.models import Character, Episode, GeneratedVideo, Scene, VideoProductionAsset, VideoProductionRun
 from app.main import app
-from app.services.video_production_state import production_segment_frame_ids
-from app.services.video_production_run_types import REAL_SHORT_E2E
-from app.services.runtime_model_config import RuntimeModelConfigError
+from app.domains.video_production.video_production_state import production_segment_frame_ids
+from app.domains.video_production.video_production_run_types import REAL_SHORT_E2E
+from app.domains.model_configuration.runtime_model_config import RuntimeModelConfigError
 
 client = TestClient(app)
 
@@ -133,26 +133,26 @@ def test_real_short_e2e_requires_human_image_video_and_final_gates(db, monkeypat
             "usage": {"actual_cost": 0.03, "units": {"videos": 1}},
         }
 
-    monkeypatch.setattr("app.services.one_sentence_video_service.AgencyOrchestrator", FakeAgencyOrchestrator)
+    monkeypatch.setattr("app.domains.video_production.one_sentence_video_service.AgencyOrchestrator", FakeAgencyOrchestrator)
     monkeypatch.setattr(
-        "app.services.reference_asset_service.generate_character_reference_images",
+        "app.domains.creative_library.reference_asset_service.generate_character_reference_images",
         _fake_character_references,
     )
     monkeypatch.setattr(
-        "app.services.reference_asset_service.generate_scene_reference_images",
+        "app.domains.creative_library.reference_asset_service.generate_scene_reference_images",
         _fake_scene_references,
     )
-    monkeypatch.setattr("app.services.one_sentence_video_service.resolve_runtime_model_config", fake_one_sentence_config)
-    monkeypatch.setattr("app.services.video_production_service.resolve_runtime_model_config", fake_stage_config)
-    monkeypatch.setattr("app.services.production_worker_service.resolve_runtime_model_config", fake_stage_config)
-    monkeypatch.setattr("app.services.video_production_service._guard_provider_stage", _agency_pass)
-    monkeypatch.setattr("app.services.video_production_service.submit_image_batch", fake_submit_image_batch)
-    monkeypatch.setattr("app.services.video_production_service.submit_video_batch", fake_submit_video_batch)
-    monkeypatch.setattr("app.services.video_production_service.submit_compose", fake_submit_compose)
-    monkeypatch.setattr("app.services.video_production_service.get_stage_task", fake_get_stage_task)
-    monkeypatch.setattr("app.services.production_worker_service.run_ai_audit_for_assets", lambda db, run, assets: assets)
+    monkeypatch.setattr("app.domains.video_production.one_sentence_video_service.resolve_runtime_model_config", fake_one_sentence_config)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.resolve_runtime_model_config", fake_stage_config)
+    monkeypatch.setattr("app.domains.video_production.production_worker_service.resolve_runtime_model_config", fake_stage_config)
+    monkeypatch.setattr("app.domains.video_production.video_production_service._guard_provider_stage", _agency_pass)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_image_batch", fake_submit_image_batch)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_video_batch", fake_submit_video_batch)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_compose", fake_submit_compose)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.get_stage_task", fake_get_stage_task)
+    monkeypatch.setattr("app.domains.video_production.production_worker_service.run_ai_audit_for_assets", lambda db, run, assets: assets)
     monkeypatch.setenv("DY_AUTO_PROVIDER_SUBMIT_WORKER_COUNT", "1")
-    monkeypatch.setattr("app.routers.audit._do_audit", lambda model, url, text: {"score": 0.2, "pass_fail": False, "issues": []})
+    monkeypatch.setattr("app.domains.quality_audit.audit_router._do_audit", lambda model, url, text: {"score": 0.2, "pass_fail": False, "issues": []})
 
     create_resp = client.post(
         "/api/video-production/one-sentence",
@@ -364,23 +364,23 @@ def test_real_short_e2e_autopilot_stops_for_final_human_review_when_audit_model_
             "usage": {"actual_cost": 0.03, "units": {"videos": 1}},
         }
 
-    monkeypatch.setattr("app.services.one_sentence_video_service.AgencyOrchestrator", FakeAgencyOrchestrator)
+    monkeypatch.setattr("app.domains.video_production.one_sentence_video_service.AgencyOrchestrator", FakeAgencyOrchestrator)
     monkeypatch.setattr(
-        "app.services.reference_asset_service.generate_character_reference_images",
+        "app.domains.creative_library.reference_asset_service.generate_character_reference_images",
         _fake_character_references,
     )
     monkeypatch.setattr(
-        "app.services.reference_asset_service.generate_scene_reference_images",
+        "app.domains.creative_library.reference_asset_service.generate_scene_reference_images",
         _fake_scene_references,
     )
-    monkeypatch.setattr("app.services.one_sentence_video_service.resolve_runtime_model_config", fake_one_sentence_config)
-    monkeypatch.setattr("app.services.video_production_service.resolve_runtime_model_config", fake_stage_config)
-    monkeypatch.setattr("app.services.production_worker_service.resolve_runtime_model_config", fake_stage_config)
-    monkeypatch.setattr("app.services.video_production_service._guard_provider_stage", _agency_pass)
-    monkeypatch.setattr("app.services.video_production_service.submit_image_batch", fake_submit_image_batch)
-    monkeypatch.setattr("app.services.video_production_service.submit_video_batch", fake_submit_video_batch)
-    monkeypatch.setattr("app.services.video_production_service.submit_compose", fake_submit_compose)
-    monkeypatch.setattr("app.services.video_production_service.get_stage_task", fake_get_stage_task)
+    monkeypatch.setattr("app.domains.video_production.one_sentence_video_service.resolve_runtime_model_config", fake_one_sentence_config)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.resolve_runtime_model_config", fake_stage_config)
+    monkeypatch.setattr("app.domains.video_production.production_worker_service.resolve_runtime_model_config", fake_stage_config)
+    monkeypatch.setattr("app.domains.video_production.video_production_service._guard_provider_stage", _agency_pass)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_image_batch", fake_submit_image_batch)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_video_batch", fake_submit_video_batch)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_compose", fake_submit_compose)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.get_stage_task", fake_get_stage_task)
     monkeypatch.setenv("DY_AUTO_PROVIDER_SUBMIT_WORKER_COUNT", "1")
 
     create_resp = client.post(

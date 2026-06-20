@@ -3,7 +3,7 @@ import pytest
 from unittest.mock import patch, AsyncMock
 from fastapi.testclient import TestClient
 from app.main import app
-from app.services.content_service import content_service
+from app.domains.content_collection.content_service import content_service
 from tests.conftest import setup_group
 
 client = TestClient(app)
@@ -19,7 +19,7 @@ class TestTaskCreationWithTemplate:
             category="comment", variables=["keyword"],
         )
 
-        with patch("app.services.content_service.ContentService.generate_from_template",
+        with patch("app.domains.content_collection.content_service.ContentService.generate_from_template",
                     new_callable=AsyncMock, return_value="AI生成的评论"):
             resp = client.post("/api/tasks", json={
                 "type": "search_comment",
@@ -67,7 +67,7 @@ class TestTaskCreationWithTemplate:
             category="comment",
         )
 
-        with patch("app.services.content_service.ContentService.generate_from_template",
+        with patch("app.domains.content_collection.content_service.ContentService.generate_from_template",
                     new_callable=AsyncMock, side_effect=RuntimeError("AI API failed")):
             resp = client.post("/api/tasks", json={
                 "type": "search_comment",
@@ -85,7 +85,7 @@ class TestTaskCreationWithTemplate:
             category="comment",
         )
 
-        with patch("app.services.content_service.ContentService.generate_from_template",
+        with patch("app.domains.content_collection.content_service.ContentService.generate_from_template",
                     new_callable=AsyncMock) as mock_gen:
             resp = client.post("/api/tasks", json={
                 "type": "nurture",
@@ -191,7 +191,7 @@ class TestNurtureV2Params:
         assert sub_task["content"] == "reply for seed-a"
 
     def test_nurture_v2_preserves_expand_count_for_keyword_expansion(self):
-        with patch("app.services.content_service.ContentService.generate_keyword_matrix",
+        with patch("app.domains.content_collection.content_service.ContentService.generate_keyword_matrix",
                    new_callable=AsyncMock, return_value=["expanded-a", "expanded-b"]) as mock_expand:
             resp = client.post("/api/tasks", json={
                 "type": "nurture",
@@ -236,8 +236,8 @@ class TestChainTaskAssociation:
     """Tasks created via chain should have chain_instance_id and step_order."""
 
     def test_chain_task_has_instance_fields(self, db):
-        from app.db_models import Account, ChainTemplate, Task as DBTask
-        from app.services.chain_service import chain_service
+        from app.db.models import Account, ChainTemplate, Task as DBTask
+        from app.domains.account_operations.chain_service import chain_service
 
         existing = db.query(Account).filter(Account.id == "chain-task-acc").first()
         if not existing:

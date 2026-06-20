@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from app.db_models import Character, Scene
+from app.db.models import Character, Scene
 from app.main import app
 
 

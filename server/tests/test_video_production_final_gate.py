@@ -1,8 +1,8 @@
 import pytest
 
-from app.db_models import Episode, GeneratedVideo, Series, VideoProductionAsset, VideoProductionRun, VideoReviewRecord
-from app.services.production_errors import ProductionErrorCode, ProductionRepairableError
-from app.services.video_production_service import (
+from app.db.models import Episode, GeneratedVideo, Series, VideoProductionAsset, VideoProductionRun, VideoReviewRecord
+from app.domains.video_production.production_errors import ProductionErrorCode, ProductionRepairableError
+from app.domains.video_production.video_production_service import (
     VideoProductionError,
     approve_asset,
     complete_final_video,
@@ -100,13 +100,13 @@ async def test_sync_compose_results_registers_final_asset_without_writeback(db, 
             }],
         }
 
-    monkeypatch.setattr("app.services.video_production_service.get_stage_task", fake_get_stage_task)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.get_stage_task", fake_get_stage_task)
     monkeypatch.setattr(
-        "app.services.video_production_service.resolve_runtime_model_config",
+        "app.domains.video_production.video_production_service.resolve_runtime_model_config",
         lambda db, scene: {"provider": "mock", "api_key": "x", "model_name": "audit"},
     )
     monkeypatch.setattr(
-        "app.routers.audit._do_audit",
+        "app.domains.quality_audit.audit_router._do_audit",
         lambda model, url, text: {"score": 0.99, "pass_fail": True, "issues": []},
     )
 
@@ -191,11 +191,11 @@ def test_ai_audit_approval_does_not_complete_final_writeback(db, monkeypatch):
     run.current_stage = "final_review"
     asset = _final_asset(db, run, episode)
     monkeypatch.setattr(
-        "app.services.video_production_service.resolve_runtime_model_config",
+        "app.domains.video_production.video_production_service.resolve_runtime_model_config",
         lambda db, scene: {"provider": "mock", "api_key": "x", "model_name": "audit"},
     )
     monkeypatch.setattr(
-        "app.routers.audit._do_audit",
+        "app.domains.quality_audit.audit_router._do_audit",
         lambda model, url, text: {"score": 0.99, "pass_fail": True, "issues": []},
     )
 
@@ -216,11 +216,11 @@ def test_final_audit_records_runtime_model_name(db, monkeypatch):
     run.current_stage = "final_review"
     asset = _final_asset(db, run, episode)
     monkeypatch.setattr(
-        "app.services.video_production_service.resolve_runtime_model_config",
+        "app.domains.video_production.video_production_service.resolve_runtime_model_config",
         lambda db, scene: {"provider": "bailian", "api_key": "x", "model": "qwen3.7-plus"},
     )
     monkeypatch.setattr(
-        "app.routers.audit._do_audit",
+        "app.domains.quality_audit.audit_router._do_audit",
         lambda model, url, text: {"score": 0.99, "pass_fail": True, "issues": []},
     )
 
@@ -238,7 +238,7 @@ def test_autopilot_final_audit_still_requires_human_approval(db, monkeypatch):
     run.model_trace_json = {"autopilot": {"enabled": True, "source": "test"}}
     asset = _final_asset(db, run, episode)
     monkeypatch.setattr(
-        "app.services.video_production_service.resolve_runtime_model_config",
+        "app.domains.video_production.video_production_service.resolve_runtime_model_config",
         lambda db, scene: (_ for _ in ()).throw(RuntimeError("audit unavailable")),
     )
 
@@ -275,7 +275,7 @@ def test_human_approve_old_final_asset_requires_latest_asset(db, monkeypatch):
     def fail_complete(*args, **kwargs):
         raise AssertionError("complete_final_video must not be called for stale final assets")
 
-    monkeypatch.setattr("app.services.video_production_service.complete_final_video", fail_complete)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.complete_final_video", fail_complete)
 
     with pytest.raises(ProductionRepairableError) as exc_info:
         approve_asset(db, old_asset.id, reviewer_user_id="reviewer-1", comment="old")
@@ -323,7 +323,7 @@ def test_human_approve_final_asset_requires_review_pending_status(db, monkeypatc
     def fail_complete(*args, **kwargs):
         raise AssertionError("complete_final_video must not be called for non-pending assets")
 
-    monkeypatch.setattr("app.services.video_production_service.complete_final_video", fail_complete)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.complete_final_video", fail_complete)
 
     with pytest.raises(VideoProductionError, match="review_pending"):
         approve_asset(db, asset.id, reviewer_user_id="reviewer-1", comment="approve again")

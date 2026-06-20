@@ -2,9 +2,9 @@ from pathlib import Path
 
 import pytest
 
-from app.db_models import Episode, Series, VideoProductionAsset, VideoProductionRun
-from app.services.asset_storage_guard import persist_provider_asset
-from app.services.production_errors import ProductionErrorCode, ProductionRepairableError
+from app.db.models import Episode, Series, VideoProductionAsset, VideoProductionRun
+from app.domains.video_production.asset_storage_guard import persist_provider_asset
+from app.domains.video_production.production_errors import ProductionErrorCode, ProductionRepairableError
 
 
 def _asset(db, url="https://cdn.test/image.png"):
@@ -99,7 +99,7 @@ def test_storage_guard_downloads_when_local_path_is_remote_url(db, tmp_path, mon
         captured["url"] = url
         return FakeResponse()
 
-    monkeypatch.setattr("app.services.asset_storage_guard.httpx.stream", fake_stream)
+    monkeypatch.setattr("app.domains.video_production.asset_storage_guard.httpx.stream", fake_stream)
     asset = _asset(db, url="https://cdn.test/provider-image.jpg")
     asset.local_path = "https://cdn.test/provider-image.jpg?X-Tos-Signature=test"
     db.commit()

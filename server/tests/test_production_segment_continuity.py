@@ -1,4 +1,4 @@
-from app.services.pixelle_execution_service import build_video_stage_frame
+from app.domains.pixelle_integration.pixelle_execution_service import build_video_stage_frame
 
 
 def test_build_video_stage_frame_adds_previous_end_frame_for_continuous_action():

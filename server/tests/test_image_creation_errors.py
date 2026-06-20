@@ -1,4 +1,4 @@
-from app.services.image_creation_errors import image_error
+from app.domains.image_generation.image_creation_errors import image_error
 
 
 def test_image_error_carries_details_and_rescue_actions():

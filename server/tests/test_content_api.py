@@ -127,7 +127,7 @@ class TestGenerateAPI:
         """Happy path: admin generates content from template."""
         from unittest.mock import patch, AsyncMock
         tpl = _create_template(name="gen-happy", body="关于{keyword}的评论", variables=["keyword"])
-        with patch("app.services.content_service.ContentService.generate_from_template",
+        with patch("app.domains.content_collection.content_service.ContentService.generate_from_template",
                     new_callable=AsyncMock, return_value="好吃的内容"):
             resp = client.post("/api/content/generate", json={
                 "template_id": tpl["id"],

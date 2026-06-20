@@ -2,13 +2,13 @@ import asyncio
 
 import pytest
 
-from app.db_models import AgencyExpertInvocation, Series
-from app.services import agency_orchestrator
-from app.services.agency_manifest import AgencyManifestError
-from app.services.agency_manifest import EXPERT_IDS, list_experts, load_manifest
-from app.services.agency_orchestrator import AgencyOrchestrator, STAGE_DAG
-from app.services.agency_runtime import AgencyRuntimeError
-from app.services.video_agency_team import build_video_agency_team
+from app.db.models import AgencyExpertInvocation, Series
+from app.domains.agency_operations import agency_orchestrator
+from app.domains.agency_operations.agency_manifest import AgencyManifestError
+from app.domains.agency_operations.agency_manifest import EXPERT_IDS, list_experts, load_manifest
+from app.domains.agency_operations.agency_orchestrator import AgencyOrchestrator, STAGE_DAG
+from app.domains.agency_operations.agency_runtime import AgencyRuntimeError
+from app.domains.agency_operations.video_agency_team import build_video_agency_team
 
 
 class RuntimeResult:
@@ -652,7 +652,7 @@ def test_video_agency_team_contains_current_quality_roles_without_legacy():
 
 
 def test_agency_context_includes_quality_role_briefs_for_stage_prompts():
-    from app.services.video_agency_team import build_agency_context
+    from app.domains.agency_operations.video_agency_team import build_agency_context
 
     context = build_agency_context({"style_lock": {"locked": True}})
     role_brief_ids = [item["id"] for item in context["role_brief"]]

@@ -1,6 +1,6 @@
 """Tests for content service -- template CRUD, sensitive word CRUD, variable substitution."""
 import pytest
-from app.services.content_service import content_service
+from app.domains.content_collection.content_service import content_service
 
 
 class TestTemplateCRUD:

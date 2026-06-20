@@ -1,8 +1,8 @@
 from fastapi.testclient import TestClient
 
-from app.db_models import AgencyExpertInvocation, ProductionJob
+from app.db.models import AgencyExpertInvocation, ProductionJob
 from app.main import app
-from app.services.agency_repair_orchestrator import enqueue_repair_tasks_for_invocation
+from app.domains.agency_operations.agency_repair_orchestrator import enqueue_repair_tasks_for_invocation
 from tests.test_agency_repair_loop import _series_plan_run
 
 client = TestClient(app)

@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 
 from app.deps import verify_admin_token
-from app.db_models import AgencyExpertInvocation, Episode, PipelineRun, Series, VideoProductionRun
+from app.db.models import AgencyExpertInvocation, Episode, PipelineRun, Series, VideoProductionRun
 from app.main import app
 
 

@@ -1,8 +1,8 @@
 from fastapi.testclient import TestClient
 
-from app.db_models import ProductionAuditEvent, ProductionJob
+from app.db.models import ProductionAuditEvent, ProductionJob
 from app.main import app
-from app.services.production_status import JOB_BLOCKED, JOB_FAILED
+from app.domains.video_production.production_status import JOB_BLOCKED, JOB_FAILED
 from tests.test_agency_repair_loop import _series_plan_run
 
 client = TestClient(app)

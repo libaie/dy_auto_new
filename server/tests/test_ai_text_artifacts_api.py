@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from app.db_models import Episode, Series
+from app.db.models import Episode, Series
 from app.main import app
 
 
@@ -18,7 +18,7 @@ def _create_series_episode(db):
 
 
 def test_ai_text_artifacts_api_lists_and_edits_versions(db):
-    from app.services.ai_text_artifact_service import AITextArtifactService
+    from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
 
     series, episode = _create_series_episode(db)
     artifact = AITextArtifactService(db).create_artifact(
@@ -75,7 +75,7 @@ def test_ai_text_artifact_read_routes_require_auth(real_auth):
 
 def test_ai_text_artifact_write_routes_require_admin_role(db, real_auth):
     from app.deps import create_access_token
-    from app.services.ai_text_artifact_service import AITextArtifactService
+    from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
 
     series, episode = _create_series_episode(db)
     artifact = AITextArtifactService(db).create_artifact(
@@ -108,7 +108,7 @@ def test_ai_text_artifact_write_routes_require_admin_role(db, real_auth):
 
 
 def test_ai_text_artifact_api_rejects_approving_stale_version(db):
-    from app.services.ai_text_artifact_service import AITextArtifactService
+    from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
 
     series, episode = _create_series_episode(db)
     service = AITextArtifactService(db)
@@ -135,7 +135,7 @@ def test_ai_text_artifact_api_rejects_approving_stale_version(db):
 
 
 def test_ai_text_artifacts_api_regenerate_calls_ai_and_creates_reviewable_child_version(db, monkeypatch):
-    from app.services.ai_text_artifact_service import AITextArtifactService
+    from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
 
     series, episode = _create_series_episode(db)
     artifact = AITextArtifactService(db).create_artifact(
@@ -157,7 +157,7 @@ def test_ai_text_artifacts_api_regenerate_calls_ai_and_creates_reviewable_child_
         seen["kwargs"] = kwargs
         return '{"frames":[{"narration":"new AI hook"}]}'
 
-    monkeypatch.setattr("app.services.ai_generator.ai_generator.generate_custom", fake_generate_custom)
+    monkeypatch.setattr("app.domains.model_configuration.ai_generator.ai_generator.generate_custom", fake_generate_custom)
 
     resp = client.post(f"/api/ai-text-artifacts/{artifact.id}/regenerate", json={
         "input_json": {"instruction": "make the hook clearer"},

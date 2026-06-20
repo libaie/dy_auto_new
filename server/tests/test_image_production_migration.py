@@ -9,7 +9,7 @@ from sqlalchemy import inspect
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
-from app.db_models import ImageProductionMetric
+from app.db.models import ImageProductionMetric
 
 
 SERVER_DIR = Path(__file__).resolve().parents[1]

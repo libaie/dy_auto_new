@@ -1,7 +1,7 @@
 import pytest
 from datetime import timedelta
 
-from app.db_models import (
+from app.db.models import (
     Character,
     Episode,
     ProductionAuditEvent,
@@ -15,8 +15,8 @@ from app.db_models import (
     VideoProductionRun,
 )
 from app.config import bj_now
-from app.services.agency_repair_executor import execute_repair_job
-from app.services.production_status import JOB_QUEUED, SEGMENT_IMAGE_QUEUED
+from app.domains.agency_operations.agency_repair_executor import execute_repair_job
+from app.domains.video_production.production_status import JOB_QUEUED, SEGMENT_IMAGE_QUEUED
 
 
 @pytest.mark.asyncio

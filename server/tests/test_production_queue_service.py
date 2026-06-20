@@ -6,8 +6,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Query
 
 from app.config import bj_now
-from app.db_models import ProductionJob, ProductionPlan, Series
-from app.services.production_queue_service import (
+from app.db.models import ProductionJob, ProductionPlan, Series
+from app.domains.video_production.production_queue_service import (
     claim_next_job,
     enqueue_job,
     fail_job,
@@ -17,7 +17,7 @@ from app.services.production_queue_service import (
     retry_job_without_attempt,
     resume_plan_jobs,
 )
-from app.services.production_status import (
+from app.domains.video_production.production_status import (
     JOB_BLOCKED,
     JOB_COMPLETED,
     JOB_FAILED,

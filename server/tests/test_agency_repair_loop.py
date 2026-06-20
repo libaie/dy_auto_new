@@ -1,11 +1,11 @@
 from fastapi.testclient import TestClient
 
-from app.db_models import AgencyExpertInvocation, Character, Episode, ProductionAuditEvent, ProductionJob, ProductionPlan, Series, VideoProductionRun
+from app.db.models import AgencyExpertInvocation, Character, Episode, ProductionAuditEvent, ProductionJob, ProductionPlan, Series, VideoProductionRun
 from app.main import app
-from app.services.agency_repair_classifier import classify_repair_tasks
-from app.services.agency_repair_orchestrator import enqueue_repair_tasks_for_invocation
-from app.services.production_status import JOB_BLOCKED, JOB_COMPLETED, JOB_FAILED, JOB_QUEUED
-from app.services.production_worker_service import run_real_worker_step
+from app.domains.agency_operations.agency_repair_classifier import classify_repair_tasks
+from app.domains.agency_operations.agency_repair_orchestrator import enqueue_repair_tasks_for_invocation
+from app.domains.video_production.production_status import JOB_BLOCKED, JOB_COMPLETED, JOB_FAILED, JOB_QUEUED
+from app.domains.video_production.production_worker_service import run_real_worker_step
 
 client = TestClient(app)
 

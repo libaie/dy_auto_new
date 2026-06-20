@@ -140,7 +140,7 @@ async def test_offline_checker_handles_stuck_online_device_tasks(
     expected_task_status,
     expected_channel_status,
 ):
-    from app.services.task_service import MAX_RETRIES
+    from app.domains.task_operations.task_service import MAX_RETRIES
 
     now = datetime(2026, 6, 19, 9, 0, 0)
     retry_count = MAX_RETRIES - 1 if initial_retry_count == "max_minus_one" else initial_retry_count
@@ -172,8 +172,7 @@ async def test_offline_checker_handles_stuck_online_device_tasks(
 @pytest.mark.asyncio
 async def test_lifespan_starts_and_cancels_offline_checker_task(monkeypatch):
     import app.main as main
-    from app.services import pixelle_client
-
+    from app.domains.pixelle_integration import pixelle_client
     created_task_names = []
     created_tasks = []
 

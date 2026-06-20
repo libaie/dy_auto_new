@@ -2,9 +2,9 @@ import pytest
 from pydantic import ValidationError
 from sqlalchemy import inspect
 
-from app.db_models import Character, Scene
-from app.db_models import CharacterAnchor as CharacterAnchorRow
-from app.db_models import SceneAnchor as SceneAnchorRow
+from app.db.models import Character, Scene
+from app.db.models import CharacterAnchor as CharacterAnchorRow
+from app.db.models import SceneAnchor as SceneAnchorRow
 from app.models.asset_anchor import AnchorReferenceMode, CharacterAnchor, SceneAnchor
 
 

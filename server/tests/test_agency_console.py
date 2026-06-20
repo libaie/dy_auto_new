@@ -8,11 +8,11 @@ from sqlalchemy.orm import sessionmaker
 from fastapi.testclient import TestClient
 from app.deps import verify_admin_token
 from app.main import app
-from app.db_models import AgencyCreativePatch, AgencyExpertInvocation, AIModel, Episode, Series, PipelineRun, VideoProductionRun
-from app.services.agency_runtime import AgencyRuntimeResult
-from app.services.agency_orchestrator import STAGE_DAG
-from app.services.crypto import encrypt
-from app.services.video_agency_team import build_video_agency_team
+from app.db.models import AgencyCreativePatch, AgencyExpertInvocation, AIModel, Episode, Series, PipelineRun, VideoProductionRun
+from app.domains.agency_operations.agency_runtime import AgencyRuntimeResult
+from app.domains.agency_operations.agency_orchestrator import STAGE_DAG
+from app.domains.system_configuration.crypto import encrypt
+from app.domains.agency_operations.video_agency_team import build_video_agency_team
 
 
 SOURCE = {
@@ -266,11 +266,10 @@ def test_agency_console_rejects_non_admin_role(db):
 
 @pytest.mark.asyncio
 async def test_pipeline_layers_store_transparency_summaries(db, test_db, monkeypatch):
-    from app.routers import pipeline
-
+    from app.domains.script_pipeline import pipeline_router as pipeline
     TestSession = sessionmaker(bind=test_db, autocommit=False, autoflush=False)
     monkeypatch.setattr(pipeline, "SessionLocal", TestSession)
-    monkeypatch.setattr("app.services.agency_runtime.AgencySkillRuntime.invoke", _agency_pass)
+    monkeypatch.setattr("app.domains.agency_operations.agency_runtime.AgencySkillRuntime.invoke", _agency_pass)
     _expert_review_model(db)
 
     series = Series(
@@ -343,7 +342,7 @@ async def test_pipeline_layers_store_transparency_summaries(db, test_db, monkeyp
 
 
 def test_agency_console_includes_latest_run_steps_and_video(db):
-    from app.db_models import GeneratedVideo
+    from app.db.models import GeneratedVideo
 
     series = Series(
         title="City Healer",
@@ -954,11 +953,10 @@ def test_agency_console_marks_layer_only_blocked_trace(db):
 
 @pytest.mark.asyncio
 async def test_pipeline_failed_layer_gets_user_facing_recovery_summary(db, test_db, monkeypatch):
-    from app.routers import pipeline
-
+    from app.domains.script_pipeline import pipeline_router as pipeline
     TestSession = sessionmaker(bind=test_db, autocommit=False, autoflush=False)
     monkeypatch.setattr(pipeline, "SessionLocal", TestSession)
-    monkeypatch.setattr("app.services.agency_runtime.AgencySkillRuntime.invoke", _agency_pass)
+    monkeypatch.setattr("app.domains.agency_operations.agency_runtime.AgencySkillRuntime.invoke", _agency_pass)
     _expert_review_model(db)
 
     series = Series(

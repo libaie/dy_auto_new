@@ -2,7 +2,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from app.db_models import (
+from app.db.models import (
     Base,
     CollectedComment as LegacyCollectedComment,
     CollectedUser as LegacyCollectedUser,
@@ -58,7 +58,7 @@ def test_content_collection_model_boundary_reexports_template_and_sensitive_word
 
 def test_content_collection_model_boundary_imports_in_clean_process():
     code = (
-        "import app.db_models as legacy; "
+        "import app.db.models as legacy; "
         "from app.db.models.content_collection import CollectedComment, CollectedUser, ContentTemplate, Conversation, ConversationMessage, DMSequence, RepliedComment, SensitiveWord; "
         "assert legacy.CollectedComment is CollectedComment; "
         "assert legacy.CollectedUser is CollectedUser; "

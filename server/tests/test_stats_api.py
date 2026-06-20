@@ -34,7 +34,7 @@ def test_daily_stats(client):
 def test_account_stats(client):
     """Get stats for a specific account."""
     from app.database import get_db
-    from app.db_models import Account
+    from app.db.models import Account
 
     gen = app.dependency_overrides[get_db]()
     db = next(gen)

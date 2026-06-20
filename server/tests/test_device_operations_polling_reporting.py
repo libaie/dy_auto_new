@@ -46,7 +46,7 @@ def test_poll_no_task_response_shape():
 
 
 def test_progress_stats_report_and_heartbeat_response_shapes(db):
-    from app.db_models import Device, Task
+    from app.db.models import Device, Task
 
     device_id = "device-reporting-shape"
     task_id = "task-reporting-shape"

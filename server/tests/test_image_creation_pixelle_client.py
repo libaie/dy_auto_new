@@ -1,6 +1,6 @@
 import pytest
 
-from app.services.pixelle_stage_client import submit_image_create
+from app.domains.pixelle_integration.pixelle_stage_client import submit_image_create
 
 
 @pytest.mark.asyncio
@@ -11,7 +11,7 @@ async def test_image_creation_pixelle_client_sends_external_task_and_mode(monkey
         calls.append((method, path, kwargs["json"]))
         return {"ok": True, "stage_task_id": "stage-task-1", "assets": []}
 
-    monkeypatch.setattr("app.services.pixelle_stage_client._pixelle_request", fake_request)
+    monkeypatch.setattr("app.domains.pixelle_integration.pixelle_stage_client._pixelle_request", fake_request)
 
     await submit_image_create(
         db=None,

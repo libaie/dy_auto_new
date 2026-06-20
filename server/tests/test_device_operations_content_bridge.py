@@ -57,7 +57,7 @@ def test_comment_claim_and_release_response_shapes():
 
 
 def test_generate_content_bridge_response_shape(db):
-    from app.services.content_service import content_service
+    from app.domains.content_collection.content_service import content_service
 
     template = content_service.create_template(
         db,
@@ -68,7 +68,7 @@ def test_generate_content_bridge_response_shape(db):
     )
 
     with patch(
-        "app.services.content_service.ContentService.generate_from_template",
+        "app.domains.content_collection.content_service.ContentService.generate_from_template",
         new_callable=AsyncMock,
         return_value="Generated reply",
     ):
@@ -160,7 +160,7 @@ def test_dm_bridge_claim_release_and_send_response_shapes():
 
 
 def test_dm_send_report_records_idempotent_message_ledger(db):
-    from app.db_models import Task
+    from app.db.models import Task
 
     db.add(Task(
         id="dm-ledger-task",
@@ -200,7 +200,7 @@ def test_dm_send_report_records_idempotent_message_ledger(db):
         late_failed_payload = {**payload, "status": "failed", "error_message": "late failure"}
         late_failed = client.post("/api/device/dm-send-report", json=late_failed_payload, headers=HEADERS)
 
-    from app.db_models import Conversation, ConversationMessage
+    from app.db.models import Conversation, ConversationMessage
 
     assert first.status_code == 200
     assert duplicate.status_code == 200
@@ -239,7 +239,7 @@ def test_dm_send_report_dedupes_legacy_payload_retries(db):
         first = client.post("/api/device/dm-send-report", json=payload, headers=HEADERS)
         retry = client.post("/api/device/dm-send-report", json=payload, headers=HEADERS)
 
-    from app.db_models import Conversation, ConversationMessage
+    from app.db.models import Conversation, ConversationMessage
 
     assert first.status_code == 200
     assert retry.status_code == 200
@@ -251,7 +251,7 @@ def test_dm_send_report_dedupes_legacy_payload_retries(db):
 
 
 def test_dm_send_report_rejects_task_from_other_account(db):
-    from app.db_models import Task
+    from app.db.models import Task
 
     db.add(Task(
         id="wrong-account-task",
@@ -291,7 +291,7 @@ def test_dm_send_report_rejects_task_from_other_account(db):
 
     assert response.status_code == 403
 def test_dm_claim_reuses_failed_only_conversation_for_retry(db):
-    from app.db_models import Task
+    from app.db.models import Task
 
     db.add(Task(
         id="retry-task",
@@ -356,7 +356,7 @@ def test_dm_claim_reuses_failed_only_conversation_for_retry(db):
             headers=HEADERS,
         )
 
-    from app.db_models import Conversation, ConversationMessage
+    from app.db.models import Conversation, ConversationMessage
 
     assert first_claim.status_code == 200
     assert first_claim.json()["claimed"] is True
@@ -374,7 +374,7 @@ def test_dm_claim_reuses_failed_only_conversation_for_retry(db):
 
 @pytest.mark.asyncio
 async def test_dm_send_report_retries_integrity_race(db, monkeypatch):
-    from app.db_models import Conversation, ConversationMessage
+    from app.db.models import Conversation, ConversationMessage
     from app.domains.content_collection import dm_claims
     from app.models import DMSendReportRequest
 

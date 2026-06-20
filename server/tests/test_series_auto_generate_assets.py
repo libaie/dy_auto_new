@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from app.db_models import Series
+from app.db.models import Series
 from app.main import app
 
 
@@ -8,8 +8,7 @@ client = TestClient(app)
 
 
 def test_auto_generate_assets_uses_long_model_timeout(db, monkeypatch):
-    from app.routers import series as series_router
-
+    from app.domains.ai_video_series import router as series_router
     series = Series(
         title="City Healer",
         logline="A young doctor solves urban mysteries with a consistent cyber-noir style.",

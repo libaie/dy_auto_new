@@ -2,8 +2,8 @@
 import pytest
 from datetime import datetime, timezone
 from tests.conftest import setup_group
-from app.db_models import Account, AccountGroup, AccountGroupMember, Channel, ChannelItem
-from app.services.channel_service import channel_service
+from app.db.models import Account, AccountGroup, AccountGroupMember, Channel, ChannelItem
+from app.domains.account_operations.channel_service import channel_service
 
 
 def test_create_channel_round_robin(db):
@@ -153,7 +153,7 @@ def test_claim_pending_item(db):
         account_mode="single_account", account_id="acc-cl-001",
         keywords=["美食"], params_template={"content": "hi", "count": 5},
     )
-    from app.db_models import Device
+    from app.db.models import Device
     db.add(Device(id="dev-cl-001", name="test-device", status="online"))
     db.flush()
 
@@ -185,7 +185,7 @@ def test_claim_respects_account_status_filter(db):
                        account_id="acc-cl-risk", status="pending", queue_position=0))
     db.flush()
 
-    from app.db_models import Device
+    from app.db.models import Device
     db.add(Device(id="dev-cl-risk", name="dev", status="online"))
     db.flush()
 
@@ -201,7 +201,7 @@ def test_claim_respects_per_account_concurrency(db):
         account_mode="single_account", account_id="acc-cl-003",
         keywords=["a", "b"], params_template={"content": "x", "count": 1},
     )
-    from app.db_models import Device
+    from app.db.models import Device
     db.add(Device(id="dev-cl-c1", name="c1", status="online"))
     db.add(Device(id="dev-cl-c2", name="c2", status="online"))
     db.flush()
@@ -215,7 +215,7 @@ def test_claim_respects_per_account_concurrency(db):
 
 def test_claim_returns_none_when_empty(db):
     """Should return None when no pending items."""
-    from app.db_models import Device
+    from app.db.models import Device
     db.add(Device(id="dev-cl-empty", name="empty", status="online"))
     db.flush()
     result = channel_service.claim_channel_item(db, "dev-cl-empty")
@@ -233,7 +233,7 @@ def test_claim_stale_recovery(db):
     )
     items = db.query(ChannelItem).filter(ChannelItem.channel_id == ch.id).all()
     item = items[0]
-    from app.db_models import Device
+    from app.db.models import Device
     db.add(Device(id="dev-cl-stale", name="stale", status="online"))
     db.flush()
     item.status = "assigned"
@@ -260,7 +260,7 @@ def test_claim_cooldown_filtering(db):
         keywords=["cd-a", "cd-b"], params_template={},
         cooldown_seconds=600,
     )
-    from app.db_models import Device
+    from app.db.models import Device
     db.add(Device(id="dev-cl-cd1", name="cd1", status="online"))
     db.add(Device(id="dev-cl-cd2", name="cd2", status="online"))
     db.flush()
@@ -296,7 +296,7 @@ def test_claim_respects_bound_account_routing(db):
                        account_id="acc-cl-b2", status="pending", queue_position=1))
     db.flush()
 
-    from app.db_models import Device
+    from app.db.models import Device
     db.add(Device(id="dev-cl-bound", name="bound", status="online", bound_account_id="acc-cl-b1"))
     db.flush()
 
@@ -314,7 +314,7 @@ def test_claim_concurrent_optimistic_lock(db):
         account_mode="single_account", account_id="acc-cl-007",
         keywords=["concurrent"], params_template={},
     )
-    from app.db_models import Device
+    from app.db.models import Device
     db.add(Device(id="dev-cl-oc1", name="c1", status="online"))
     db.add(Device(id="dev-cl-oc2", name="c2", status="online"))
     db.flush()
@@ -327,14 +327,14 @@ def test_claim_concurrent_optimistic_lock(db):
 
 def test_claim_respects_quota_limit(db):
     """Should not claim item if account has exceeded daily quota."""
-    from app.services.stats_service import stats_service
+    from app.domains.reporting.stats_service import stats_service
     setup_group(db, group_id="grp-cl-008", account_ids=["acc-cl-008"])
     ch = channel_service.create_channel(
         db, group_id="grp-cl-008", task_type="search_comment",
         account_mode="single_account", account_id="acc-cl-008",
         keywords=["quota-kw"], params_template={},
     )
-    from app.db_models import Device
+    from app.db.models import Device
     db.add(Device(id="dev-cl-quota", name="quota", status="online"))
     db.flush()
 
@@ -361,7 +361,7 @@ def test_claim_nurture_injects_item_keyword_matrix(db):
             "duration": 10,
         },
     )
-    from app.db_models import Device
+    from app.db.models import Device
     db.add(Device(id="dev-cl-nurture-matrix", name="dev", status="online"))
     db.flush()
 
@@ -374,7 +374,7 @@ def test_claim_nurture_injects_item_keyword_matrix(db):
 
 
 def test_claim_nurture_respects_comment_quota(db):
-    from app.services.stats_service import stats_service
+    from app.domains.reporting.stats_service import stats_service
     setup_group(db, group_id="grp-cl-nurture-quota", account_ids=["acc-cl-nurture-quota"])
     account = db.query(Account).filter(Account.id == "acc-cl-nurture-quota").first()
     account.daily_limits = {
@@ -397,7 +397,7 @@ def test_claim_nurture_respects_comment_quota(db):
             "duration": 10,
         },
     )
-    from app.db_models import Device
+    from app.db.models import Device
     db.add(Device(id="dev-cl-nurture-quota", name="dev", status="online"))
     db.flush()
 

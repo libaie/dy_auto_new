@@ -2,7 +2,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app
-from app.db_models import Device, Channel
+from app.db.models import Device, Channel
 from tests.conftest import setup_group
 
 client = TestClient(app)

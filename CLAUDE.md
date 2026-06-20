@@ -54,17 +54,17 @@ npx vitest            # 运行前端测试
 
 | 模块 | 职责 |
 |------|------|
-| `app/routers/device.py` | **设备端唯一 API 入口**：register / poll / report / selectors / templates / pairing。设备端所有 HTTP 调用都走这里 |
-| `app/routers/channels.py` | **频道管理**：关键词分组 → 账号轮转 → 任务队列生成 → 设备领任务 |
-| `app/services/channel_service.py` | **频道调度引擎**：claim item / complete item / stale recovery / 每日配额检查。最核心的业务逻辑 |
-| `app/services/task_service.py` | **任务调度引擎**：创建任务、重试计数、超时恢复、状态机 (pending→queued→running→completed/failed) |
-| `app/services/ai_generator.py` | **AI 生成服务**：多 Provider 支持 (DeepSeek/OpenAI/Anthropic)，含 thinking 级别控制和流式输出 |
-| `app/services/selector_service.py` | **UI 选择器分发**：按 platform_version + resolution_profile 择优下发，支持新分辨率自动标定 |
-| `app/services/template_service.py` | **模板图片管理**：多分辨率子目录，设备端以图找图所需的模板图片 |
-| `app/routers/ai_config.py` | AI 模型配置 (llm_* 新命名优先，ai_* 旧命名 fallback) |
-| `app/routers/pixelle.py` | Pixelle 图生视频集成 (含代理路由) |
-| `app/routers/dm_sequences.py` | DM 私信序列模板 + AI 生成 + 变体轮替 |
-| `app/routers/pipeline.py` | 视频 pipeline 编排 (角色→场景→系列→剧集→生成) |
+| `app/domains/device_operations/device_router.py` | **设备端唯一 API 入口**：register / poll / report / selectors / templates / pairing。设备端所有 HTTP 调用都走这里 |
+| `app/domains/account_operations/channels_router.py` | **频道管理**：关键词分组 → 账号轮转 → 任务队列生成 → 设备领任务 |
+| `app/domains/account_operations/channel_service.py` | **频道调度引擎**：claim item / complete item / stale recovery / 每日配额检查。最核心的业务逻辑 |
+| `app/domains/task_operations/task_service.py` | **任务调度引擎**：创建任务、重试计数、超时恢复、状态机 (pending→queued→running→completed/failed) |
+| `app/domains/model_configuration/ai_generator.py` | **AI 生成服务**：多 Provider 支持 (DeepSeek/OpenAI/Anthropic)，含 thinking 级别控制和流式输出 |
+| `app/domains/selector_management/selector_service.py` | **UI 选择器分发**：按 platform_version + resolution_profile 择优下发，支持新分辨率自动标定 |
+| `app/domains/selector_management/template_service.py` | **模板图片管理**：多分辨率子目录，设备端以图找图所需的模板图片 |
+| `app/domains/model_configuration/ai_models_router.py` | AI 模型配置 (llm_* 新命名优先，ai_* 旧命名 fallback) |
+| `app/domains/pixelle_integration/pixelle_router.py` | Pixelle 图生视频集成 (含代理路由) |
+| `app/domains/content_collection/dm_sequences_router.py` | DM 私信序列模板 + AI 生成 + 变体轮替 |
+| `app/domains/script_pipeline/pipeline_router.py` | 视频 pipeline 编排 (角色→场景→系列→剧集→生成) |
 | `app/ws_manager.py` | WebSocket 双通道：设备通道 (pair_ws) + 管理端通道 (admin_ws)，含心跳和离线检测 |
 | `app/main.py` | 应用入口 + CORS + 全局异常日志中间件 + 后台离线检测器 + 卡死任务回收 |
 
@@ -97,7 +97,7 @@ npx vitest            # 运行前端测试
 
 - **开发**：SQLite (`server/app/data/dy_auto.db`)，WAL 模式，外键启用
 - **生产**：MySQL（通过 `DATABASE_URL` 环境变量切换）
-- **ORM**：SQLAlchemy 2.x，模型定义在 `server/app/db_models.py` (30+ 张表)
+- **ORM**：SQLAlchemy 2.x，模型定义在 `server/app/db/models/`，统一从 `app.db.models` 导入 (72 张表)
 - **迁移**：Alembic (`server/alembic.ini`)，`server/scripts/version.txt` 为设备端脚本版本
 
 ## 关键设计决策

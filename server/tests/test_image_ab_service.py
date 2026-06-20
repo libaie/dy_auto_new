@@ -4,8 +4,8 @@ import pytest
 from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
 
-from app.services import image_creation_service
-from app.db_models import (
+from app.domains.image_generation import image_creation_service
+from app.db.models import (
     AIModel,
     ImageCreationAsset,
     ImageCreationTask,
@@ -16,8 +16,8 @@ from app.db_models import (
     ImageSelectionPreview,
     ProductionAuditEvent,
 )
-from app.services import image_ab_test_service as service
-from app.services.crypto import encrypt
+from app.domains.image_generation import image_ab_test_service as service
+from app.domains.system_configuration.crypto import encrypt
 
 
 def _model(db):

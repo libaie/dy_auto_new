@@ -24,7 +24,7 @@ from app.domains.ai_video_series.read_models import (
     series_scene_dict,
 )
 from app.services.ai_generator import ai_generator
-from app.services.agency_orchestrator import AgencyOrchestrator
+from app.domains.agency_operations.agency_orchestrator import AgencyOrchestrator
 from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
 from app.domains.creative_library.reference_asset_service import (
     ReferenceAssetError,

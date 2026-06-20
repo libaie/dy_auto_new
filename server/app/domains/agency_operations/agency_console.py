@@ -18,7 +18,7 @@ from app.db_models import (
 )
 from app.domains.agency_operations.agency_creative_patch_service import creative_patch_summary
 from app.domains.agency_operations.agency_manifest import list_experts, load_manifest
-from app.services.agency_orchestrator import STAGE_DAG
+from app.domains.agency_operations.agency_orchestrator import STAGE_DAG
 from app.services.video_agency_team import ensure_video_agency_team, summarize_video_agency_team
 
 

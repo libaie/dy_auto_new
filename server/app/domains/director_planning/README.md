@@ -13,7 +13,8 @@ This domain owns director workshop and episode production planning routes.
 - Database session helpers stay in `app.database`.
 - Auth dependencies stay in `app.deps`.
 - AI generation stays in `app.services.ai_generator`.
-- Agency review orchestration stays in `app.services.agency_orchestrator`.
+- Agency review orchestration lives in
+  `app.domains.agency_operations.agency_orchestrator`.
 - AI text artifact persistence internals stay in
   `app.services.ai_text_artifact_service`.
 - Production plan row construction stays in

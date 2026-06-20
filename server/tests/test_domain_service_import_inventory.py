@@ -6,15 +6,11 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DOMAIN_ROOT = REPO_ROOT / "server/app/domains"
 
 EXPECTED_DOMAIN_SERVICE_IMPORTS = {
-    ("server/app/domains/agency_operations/agency_console.py", "agency_orchestrator"),
     ("server/app/domains/agency_operations/agency_console.py", "video_agency_team"),
-    ("server/app/domains/agency_operations/agency_debate_audit.py", "agency_orchestrator"),
-    ("server/app/domains/agency_operations/agency_multimodal_review.py", "agency_orchestrator"),
     ("server/app/domains/ai_text_artifacts/ai_text_artifact_service.py", "ai_generator"),
     ("server/app/domains/ai_video_series/read_models.py", "agency_console"),
     ("server/app/domains/ai_video_series/router.py", "production_run_service"),
     ("server/app/domains/ai_video_series/story_generator_expert.py", "agency_runtime"),
-    ("server/app/domains/ai_video_series/style_lock.py", "agency_orchestrator"),
     ("server/app/domains/ai_video_series/style_lock.py", "ai_generator"),
     ("server/app/domains/ai_video_series/style_lock.py", "video_agency_team"),
     ("server/app/domains/content_collection/collection_reports.py", "ai_generator"),
@@ -24,7 +20,6 @@ EXPECTED_DOMAIN_SERVICE_IMPORTS = {
     ("server/app/domains/creative_library/characters_router.py", "ai_generator"),
     ("server/app/domains/creative_library/reference_asset_service.py", "image_creation_service"),
     ("server/app/domains/creative_library/scenes_router.py", "ai_generator"),
-    ("server/app/domains/director_planning/director_router.py", "agency_orchestrator"),
     ("server/app/domains/director_planning/director_router.py", "ai_generator"),
     ("server/app/domains/director_planning/director_router.py", "video_agency_team"),
     ("server/app/domains/image_generation/image_ab_test_service.py", "image_creation_service"),
@@ -32,7 +27,6 @@ EXPECTED_DOMAIN_SERVICE_IMPORTS = {
     ("server/app/domains/image_generation/image_creation_router.py", "image_creation_service"),
     ("server/app/domains/image_generation/image_selection_preview_service.py", "image_creation_service"),
     ("server/app/domains/prompt_management/prompt_templates_router.py", "ai_generator"),
-    ("server/app/domains/script_pipeline/pipeline_router.py", "agency_orchestrator"),
     ("server/app/domains/script_pipeline/pipeline_router.py", "video_agency_team"),
     ("server/app/domains/script_pipeline/script_pipeline_service.py", "agency_orchestrator"),
     ("server/app/domains/script_pipeline/script_pipeline_service.py", "agency_runtime"),

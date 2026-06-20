@@ -1,7 +1,7 @@
 """Resolve dy_auto AIModel rows into runtime Pixelle stage payloads."""
 from sqlalchemy.orm import Session
 
-from app.db_models import AIModel
+from app.db.models.model_configuration import AIModel
 from app.domains.system_configuration.crypto import decrypt
 
 

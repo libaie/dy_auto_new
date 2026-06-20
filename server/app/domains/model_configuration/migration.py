@@ -3,7 +3,7 @@ import logging
 import os
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
-from app.db_models import AIModel
+from app.db.models.model_configuration import AIModel
 from app.domains.system_configuration.crypto import encrypt
 
 logger = logging.getLogger(__name__)

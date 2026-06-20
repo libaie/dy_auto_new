@@ -1,7 +1,7 @@
 """Scene-based model registry for model configuration."""
 import logging
 from sqlalchemy.orm import Session
-from app.db_models import AIModel
+from app.db.models.model_configuration import AIModel
 from app.domains.system_configuration.crypto import decrypt
 from app.data.model_schema_data import scene_key_to_model_type, SCENES
 

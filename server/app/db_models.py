@@ -13,6 +13,7 @@ from sqlalchemy.orm import relationship
 
 from app.db.models.device_operations import DevicePairRequest
 from app.db.models.content_collection import ContentTemplate, SensitiveWord
+from app.db.models.model_configuration import AIModel
 from app.db.models.prompt_management import PromptTemplate
 from app.db.models.system_configuration import SystemSetting
 
@@ -1134,27 +1135,6 @@ class ReferenceCategory(Base):
     label = Column(String(100), nullable=False)
     sort_order = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
-
-
-class AIModel(Base):
-    """AI model config — independent management of API connection parameters per model type."""
-    __tablename__ = "ai_models"
-
-    id = Column(String(36), primary_key=True, default=_uuid)
-    name = Column(String(100), nullable=False)
-    model_type = Column(String(20), nullable=False, index=True)
-    provider = Column(String(30), nullable=False)
-    base_url = Column(String(300), nullable=True)
-    api_key = Column(String(500), nullable=True)   # encrypted
-    api_secret = Column(String(500), nullable=True) # encrypted
-    model_name = Column(String(100), nullable=True)
-    config_json = Column(JSON, nullable=True)
-    enabled = Column(Boolean, nullable=False, default=True)
-    sort_order = Column(Integer, nullable=False, default=0)
-    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
-
-    __table_args__ = (UniqueConstraint("model_type", "provider", "model_name",
-                                        name="uq_ai_models_type_provider_name"),)
 
 
 class VideoProductionRun(Base):

@@ -8,7 +8,7 @@ PLAN_PATH = REPO_ROOT / "docs/superpowers/plans/2026-06-20-model-registry-domain
 DOMAIN_REGISTRY_PATH = REPO_ROOT / "server/app/domains/model_configuration/model_registry.py"
 LEGACY_REGISTRY_PATH = REPO_ROOT / "server/app/services/model_registry.py"
 AUDIT_ROUTER_PATH = REPO_ROOT / "server/app/domains/quality_audit/audit_router.py"
-VIDEO_SERVICE_PATH = REPO_ROOT / "server/app/services/video_production_service.py"
+VIDEO_SERVICE_PATH = REPO_ROOT / "server/app/domains/video_production/video_production_service.py"
 README_PATH = REPO_ROOT / "server/app/domains/model_configuration/README.md"
 
 
@@ -59,10 +59,10 @@ def test_quality_audit_imports_domain_model_registry_only():
     assert "app.services.model_registry" not in text
 
 
-def test_video_production_stays_legacy_compatible_for_wip_slice():
+def test_video_production_imports_domain_model_registry_directly():
     text = VIDEO_SERVICE_PATH.read_text(encoding="utf-8")
-    assert "app.services.model_registry" in text
-    assert "app.domains.model_configuration.model_registry" not in text
+    assert "app.domains.model_configuration.model_registry" in text
+    assert "app.services.model_registry" not in text
 
 
 def test_model_configuration_docs_register_model_registry_facade():
@@ -71,7 +71,7 @@ def test_model_configuration_docs_register_model_registry_facade():
         "app.domains.model_configuration.model_registry",
         "app.services.model_registry",
         "get_model_for_scene",
-        "approved video production compatibility import",
+        "remove only after import inventory shows no production legacy imports",
     ]:
         assert term in readme
 

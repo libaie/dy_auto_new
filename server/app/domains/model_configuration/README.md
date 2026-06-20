@@ -9,7 +9,7 @@ seeding helpers.
 
 ## Not Owned
 
-- `AIModel` ORM model definitions stay in `app.db_models`.
+- `AIModel` ORM model definition lives in `app.db.models.model_configuration`.
 - Database session helpers stay in `app.database`.
 - Auth dependencies stay in `app.deps`.
 - Encryption helpers stay in `app.domains.system_configuration.crypto`.
@@ -36,6 +36,7 @@ seeding helpers.
   instance used by app shutdown and domain callers.
 - `migration.py` owns legacy Settings, Pixelle, and Seedance configuration
   migration into `AIModel` rows.
+- `app.db.models.model_configuration` owns the `AIModel` ORM class body.
 
 ## Facade Register
 
@@ -43,17 +44,18 @@ seeding helpers.
 |---|---|---|
 | `app.routers.ai_config` | `app.domains.model_configuration.ai_models_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
 | `app.services.model_schema` | `app.domains.model_configuration.model_schema` | Keep while legacy tests or callers import schema helpers from `app.services`; remove only after import inventory shows no production legacy imports. |
-| `app.services.model_registry` | `app.domains.model_configuration.model_registry` | Keep while `video_production_service` has an approved video production compatibility import; remove only after import inventory shows no production legacy imports. |
+| `app.services.model_registry` | `app.domains.model_configuration.model_registry` | Remove only after import inventory shows no production legacy imports. |
 | `app.services.runtime_model_config` | `app.domains.model_configuration.runtime_model_config` | Keep while dirty or not-yet-moved service modules have approved compatibility imports; remove only after import inventory shows no production legacy imports. |
 | `app.services.ai_generator` | `app.domains.model_configuration.ai_generator` | Keep while app startup/shutdown, domain callers, and legacy tests import or monkeypatch the shared generator through `app.services`; remove after import inventory is clean. |
 | `app.services.migration` | `app.domains.model_configuration.migration` | Keep while legacy tests or maintenance scripts import migration helpers from `app.services`; remove after import inventory is clean. |
+| `app.db_models.AIModel` | `app.db.models.model_configuration.AIModel` | Keep as a compatibility re-export until production imports use the domain model path. |
 
 ## Boundaries
 
 - Preserve route paths, route names, auth dependencies, and response shapes.
 - Preserve `DEFAULT_MODELS` and `seed_ai_models` compatibility.
 - Preserve monkeypatch compatibility for `app.routers.ai_config.httpx.get`.
-- Keep `AIModel` persistence and runtime resolution in shared layers.
+- Keep `AIModel` persistence and runtime resolution in this domain.
 - Keep model consumers, such as Pixelle, image generation, video production, and
   audit, outside this route domain.
 - Keep compatibility for `app.services.runtime_model_config` until all service

@@ -6,7 +6,8 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.config import bj_now
-from app.db_models import ProviderCostReservation, ProviderStageTask
+from app.db.models.video_production import ProviderStageTask
+from app.db_models import ProviderCostReservation
 from app.domains.video_production.production_action_result import ProductionActionResult
 from app.domains.video_production.production_errors import ProductionErrorCode, ProductionRepairableError
 from app.domains.production_observability.production_observability_service import record_production_event

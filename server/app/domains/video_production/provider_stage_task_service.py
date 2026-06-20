@@ -5,7 +5,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.config import bj_now
-from app.db_models import ProviderStageTask
+from app.db.models.video_production import ProviderStageTask
 from app.domains.video_production.production_state_contract import (
     PROVIDER_TASK_RESERVED,
     PROVIDER_TASK_SUBMITTED,

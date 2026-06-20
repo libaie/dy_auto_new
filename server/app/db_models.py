@@ -57,6 +57,7 @@ from app.db.models.system_configuration import SystemSetting
 from app.db.models.task_operations import Task
 from app.db.models.video_library import GeneratedVideo
 from app.db.models.video_production import (
+    ProviderStageTask,
     ProductionEpisode,
     ProductionJob,
     ProductionPlan,
@@ -68,39 +69,6 @@ from app.db.models.video_production import (
 )
 
 # ==== 多模型系列生成系统 ====
-
-
-class ProviderStageTask(Base):
-    __tablename__ = "provider_stage_tasks"
-    __table_args__ = (
-        UniqueConstraint("idempotency_key", name="uq_provider_stage_tasks_idempotency"),
-        Index("idx_provider_stage_tasks_run_stage_status", "run_id", "stage", "status"),
-        Index("idx_provider_stage_tasks_plan_stage_status", "plan_id", "stage", "status"),
-        Index("idx_provider_stage_tasks_target", "target_type", "target_id"),
-        Index("idx_provider_stage_tasks_provider_task_id", "provider_task_id"),
-    )
-
-    id = Column(String(36), primary_key=True, default=_uuid)
-    run_id = Column(String(36), ForeignKey("video_production_runs.id", ondelete="CASCADE"), nullable=False)
-    plan_id = Column(String(36), ForeignKey("production_plans.id", ondelete="CASCADE"), nullable=False)
-    job_id = Column(String(36), ForeignKey("production_jobs.id", ondelete="SET NULL"), nullable=True)
-    target_type = Column(String(30), nullable=False)
-    target_id = Column(String(36), nullable=False)
-    stage = Column(String(40), nullable=False)
-    provider = Column(String(80), nullable=False)
-    model_name = Column(String(120), nullable=False)
-    request_hash = Column(String(64), nullable=False)
-    idempotency_key = Column(String(220), nullable=False)
-    status = Column(String(40), nullable=False, default="reserved")
-    provider_task_id = Column(String(160), nullable=True)
-    external_task_id = Column(String(160), nullable=True)
-    error_code = Column(String(80), nullable=True)
-    error_message = Column(Text, nullable=True)
-    response_summary_json = Column(JSON, nullable=True, default=dict)
-    submitted_at = Column(DateTime, nullable=True)
-    completed_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
-    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
 
 
 class ProviderCostReservation(Base):

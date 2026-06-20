@@ -7,8 +7,8 @@ import re
 from fastapi import HTTPException
 
 from app.db_models import DMSequence
+from app.domains.content_collection.dm_sequence_visibility import get_device_visible_dm_sequences
 from app.services.content_service import content_service
-from app.services.dm_sequence_visibility import get_device_visible_dm_sequences
 
 
 logger = logging.getLogger(__name__)

@@ -104,6 +104,7 @@ this domain provides stable use cases and compatibility tests for that handoff.
 - `app.domains.content_collection.content_generation` owns content, keyword, regex, and clean-prompt generation calls.
 - `app.domains.content_collection.collection_reports` owns collected comment/user ingestion, comment AI reply, user profile, and avatar use cases.
 - `app.domains.content_collection.dm_claims` owns DM recipient claim, send report, and release use cases.
+- `app.domains.content_collection.dm_sequence_visibility` owns `get_device_visible_dm_sequences` and DM sequence visibility rules for device sync and polling payload inclusion.
 - `app.domains.content_collection.realtime_events` owns content collection websocket broadcast helpers.
 - `app.domains.device_operations.content_bridge` remains the device-authenticated route boundary for `/api/device/*` content, collection, DM, profile, and avatar paths until this domain provides handoff use cases.
 - `content_collection` must preserve `content_changed` and `data_changed` websocket payloads when logic moves.
@@ -117,6 +118,7 @@ this domain provides stable use cases and compatibility tests for that handoff.
 | `app.routers.data` | `app.domains.content_collection.data_router` | PR3 | Data read/export snapshots pass with the domain router and streaming export behavior is unchanged. |
 | `app.routers.dm_sequences` | `app.domains.content_collection.dm_sequences_router` | PR3 | DM sequence CRUD, generation, variant, and device-sync tests pass with the domain router. |
 | `app.domains.device_operations.content_bridge` | `app.domains.content_collection` use cases | Planned PR5 | Device bridge tests prove `/api/device/*` auth, response shape, and realtime events are unchanged. |
+| `app.services.dm_sequence_visibility` | `app.domains.content_collection.dm_sequence_visibility` | DM sequence visibility slice | `rg -n "app\.services\.dm_sequence_visibility" server/app -g "*.py"` returns only approved device bridge compatibility imports. |
 
 ## Migration Checklist
 
@@ -171,5 +173,6 @@ Do not remove `app.routers.content`, `app.routers.data`, or `app.routers.dm_sequ
 - `server/tests/test_content_collection_device_bridge.py` proves the device bridge handoff keeps `/api/device/*` auth and response shapes stable.
 - `app.main` imports content collection routers from `app.domains.content_collection`.
 - Release notes mention the import-path migration.
+- Do not remove `app.services.dm_sequence_visibility` until device bridge cleanup either imports the domain service directly or documents the legacy import as the approved compatibility path.
 
 Do not move ORM model ownership or persistence class bodies until a separate graph/import plan exists.

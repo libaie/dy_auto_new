@@ -10,7 +10,6 @@ DOMAINS_ROOT = REPO_ROOT / "server/app/domains"
 EXPECTED_NON_FACADE_SERVICE_FILES = {
     "agency_console.py",
     "agency_orchestrator.py",
-    "agency_runtime.py",
     "ai_generator.py",
     "image_creation_service.py",
     "one_sentence_video_service.py",
@@ -26,7 +25,6 @@ EXPECTED_MIXED_FACADE_SERVICE_FILES = {
 EXPECTED_SERVICE_DOMAIN_TARGETS = {
     "agency_console.py": "agency_operations",
     "agency_orchestrator.py": "agency_operations",
-    "agency_runtime.py": "agency_operations",
     "ai_generator.py": "model_configuration",
     "image_creation_service.py": "image_generation",
     "one_sentence_video_service.py": "video_production",

@@ -49,6 +49,9 @@ repair task routes.
   prompt micro-tuning handoff back to image generation.
 - `agency_prompting.py` owns `ExpertPrompt` and `build_expert_prompt` for
   agency expert prompt safety, schema, and multimodal user payload construction.
+- `agency_runtime.py` owns `AgencySkillRuntime`, default OpenAI-compatible
+  expert model calls, expert output parsing, scorecard normalization, and
+  runtime secret redaction.
 - `agency_persistence.py` owns agency expert invocation idempotency, retryable
   resume state, finalization, repair task classification, creative patch
   creation, and production audit event mirroring.
@@ -69,6 +72,7 @@ repair task routes.
 | `app.services.agency_backtrack_policy` | `app.domains.agency_operations.agency_backtrack_policy` | Keep while dirty video production service code imports backtrack policy from `app.services`; remove after import inventory is clean. |
 | `app.services.agency_repair_executor` | `app.domains.agency_operations.agency_repair_executor` | Keep while dirty production worker code imports repair execution from `app.services`; remove after import inventory is clean. |
 | `app.services.agency_prompting` | `app.domains.agency_operations.agency_prompting` | Keep while dirty agency runtime code imports prompt construction from `app.services`; remove after import inventory is clean. |
+| `app.services.agency_runtime` | `app.domains.agency_operations.agency_runtime` | Keep while dirty agency orchestrator, story generator, script pipeline, and legacy tests import runtime symbols from `app.services`; remove after import inventory is clean. |
 | `app.services.agency_persistence` | `app.domains.agency_operations.agency_persistence` | Keep while dirty agency orchestrator, story generator, and legacy tests import invocation persistence from `app.services`; remove after import inventory is clean. |
 
 ## Boundaries

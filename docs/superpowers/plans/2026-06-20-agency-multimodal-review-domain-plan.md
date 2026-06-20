@@ -153,3 +153,32 @@ Expected: both pytest commands pass and `git diff --check` exits 0.
 git add -f docs/superpowers/specs/2026-06-20-agency-multimodal-review-domain-design.md docs/superpowers/plans/2026-06-20-agency-multimodal-review-domain-plan.md server/tests/test_agency_multimodal_review_facade.py server/tests/test_agency_multimodal_review.py server/app/domains/agency_operations/agency_multimodal_review.py server/app/services/agency_multimodal_review.py server/app/domains/agency_operations/agency_router.py server/app/domains/agency_operations/README.md
 git commit --only docs/superpowers/specs/2026-06-20-agency-multimodal-review-domain-design.md docs/superpowers/plans/2026-06-20-agency-multimodal-review-domain-plan.md server/tests/test_agency_multimodal_review_facade.py server/tests/test_agency_multimodal_review.py server/app/domains/agency_operations/agency_multimodal_review.py server/app/services/agency_multimodal_review.py server/app/domains/agency_operations/agency_router.py server/app/domains/agency_operations/README.md -m "refactor: move agency multimodal review into domain"
 ```
+
+### Task 3: Use Domain Runtime Model Config Import
+
+**Files:**
+- Modify: `server/app/domains/agency_operations/agency_multimodal_review.py`
+- Test: `server/tests/test_agency_multimodal_review_facade.py`
+
+- [ ] **Step 1: Add the failing boundary test**
+
+```python
+def test_agency_multimodal_review_imports_runtime_config_from_domain():
+    text = DOMAIN_PATH.read_text(encoding="utf-8")
+    assert "app.domains.model_configuration.runtime_model_config" in text
+    assert "app.services.runtime_model_config" not in text
+```
+
+- [ ] **Step 2: Change only that import**
+
+```python
+from app.domains.model_configuration.runtime_model_config import resolve_runtime_model_config
+```
+
+- [ ] **Step 3: Run focused verification**
+
+```powershell
+.\server\.venv\Scripts\python.exe -m pytest server/tests/test_agency_multimodal_review_facade.py server/tests/test_model_configuration_runtime_config_facade.py -q
+```
+
+Expected: all selected tests pass.

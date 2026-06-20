@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.db_models import Episode, VideoProductionAsset, VideoProductionRun
 from app.services.agency_orchestrator import AgencyOrchestrator
-from app.services.runtime_model_config import resolve_runtime_model_config
+from app.domains.model_configuration.runtime_model_config import resolve_runtime_model_config
 
 
 def build_multimodal_asset_context(db: Session, asset_id: str) -> dict[str, Any]:

@@ -34,6 +34,12 @@ def test_agency_multimodal_review_domain_file_owns_helpers():
     assert "async def run_multimodal_asset_review" in text
 
 
+def test_agency_multimodal_review_imports_runtime_config_from_domain():
+    text = DOMAIN_PATH.read_text(encoding="utf-8")
+    assert "app.domains.model_configuration.runtime_model_config" in text
+    assert "app.services.runtime_model_config" not in text
+
+
 def test_legacy_agency_multimodal_review_is_thin_facade():
     text = LEGACY_PATH.read_text(encoding="utf-8")
     assert "app.domains.agency_operations import agency_multimodal_review" in text

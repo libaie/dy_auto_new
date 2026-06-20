@@ -17,13 +17,16 @@ are still dirty.
 
 - Preserve `build_multimodal_asset_context` and `run_multimodal_asset_review`.
 - Update the agency router to import the domain helper directly.
+- Import runtime model configuration from
+  `app.domains.model_configuration.runtime_model_config`, not the legacy
+  `app.services.runtime_model_config` facade.
 - Keep legacy module alias compatibility.
 - Document the module and facade in the agency README.
 
 ## Non-Goals
 
 - Do not migrate `agency_orchestrator.py` in this slice.
-- Do not change model config resolution or review behavior.
+- Do not change model config resolution behavior.
 
 ## Verification
 

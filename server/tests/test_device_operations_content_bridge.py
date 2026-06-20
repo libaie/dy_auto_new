@@ -1,7 +1,9 @@
 from unittest.mock import AsyncMock, patch
 
+import pytest
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import IntegrityError
 
 from app.main import app
 
@@ -368,6 +370,80 @@ def test_dm_claim_reuses_failed_only_conversation_for_retry(db):
     assert messages[0].content == "Retried successfully"
     conversation = db.query(Conversation).filter_by(id=first_claim.json()["conversation_id"]).one()
     assert conversation.total_dm_count == 1
+
+
+@pytest.mark.asyncio
+async def test_dm_send_report_retries_integrity_race(db, monkeypatch):
+    from app.db_models import Conversation, ConversationMessage
+    from app.domains.content_collection import dm_claims
+    from app.models import DMSendReportRequest
+
+    conversation = Conversation(
+        account_id="acc-001",
+        device_id="device-race",
+        recipient_nickname="Race Recipient",
+        recipient_douyin_id="dm-race-recipient",
+        claimed_at=None,
+    )
+    db.add(conversation)
+    db.commit()
+    db.refresh(conversation)
+
+    request = DMSendReportRequest(
+        conversation_id=conversation.id,
+        stage="qualifying",
+        intent="interested",
+        keyword="tea",
+        content="Recovered message",
+        message_order=1,
+        message_key="race-message-key",
+        status="sent",
+    )
+    real_flush = db.flush
+    real_rollback = db.rollback
+    state = {"raised": False}
+
+    def rollback_and_seed_duplicate():
+        real_rollback()
+        db.add(ConversationMessage(
+            conversation_id=conversation.id,
+            device_id="device-race",
+            message_order=1,
+            message_key="race-message-key",
+            content="Initial failed message",
+            status="failed",
+            error_message="duplicate insert won elsewhere",
+        ))
+        real_flush()
+
+    def flaky_flush():
+        if not state["raised"]:
+            state["raised"] = True
+            raise IntegrityError("duplicate message key", {}, Exception("duplicate"))
+        return real_flush()
+
+    monkeypatch.setattr(db, "flush", flaky_flush)
+    monkeypatch.setattr(db, "rollback", rollback_and_seed_duplicate)
+
+    with patch(
+        "app.domains.content_collection.dm_claims.realtime_events.broadcast_data_changed",
+        new_callable=AsyncMock,
+    ) as broadcast:
+        result = await dm_claims.send_report(db, request, "device-race")
+
+    message = db.query(ConversationMessage).filter_by(
+        conversation_id=conversation.id,
+        message_key="race-message-key",
+    ).one()
+    db.refresh(conversation)
+    assert result == {"ok": True}
+    assert state["raised"] is True
+    assert message.status == "sent"
+    assert message.content == "Recovered message"
+    assert conversation.total_dm_count == 1
+    broadcast.assert_awaited_once_with("conversation", conversation.id)
+
+
 def test_user_profile_and_avatar_bridge_response_shapes():
     with TestClient(app) as client:
         profile = client.post(

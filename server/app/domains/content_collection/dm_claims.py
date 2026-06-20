@@ -85,6 +85,17 @@ def _fallback_message_key(conversation: Conversation, request, message_order: in
 
 
 async def send_report(db, request, device_id: str):
+    try:
+        conversation_id = _persist_send_report(db, request, device_id)
+    except IntegrityError:
+        db.rollback()
+        conversation_id = _persist_send_report(db, request, device_id)
+
+    await realtime_events.broadcast_data_changed("conversation", conversation_id)
+    return {"ok": True}
+
+
+def _persist_send_report(db, request, device_id: str) -> str:
     now = bj_now()
     conversation = db.query(Conversation).filter(Conversation.id == request.conversation_id).first()
     if not conversation:
@@ -144,9 +155,9 @@ async def send_report(db, request, device_id: str):
         ConversationMessage.status == "sent",
     ).count()
     db.commit()
+    return conversation.id
 
-    await realtime_events.broadcast_data_changed("conversation", conversation.id)
-    return {"ok": True}
+
 def release_recipient(db, request, device_id: str):
     conversation = db.query(Conversation).filter(
         Conversation.id == request.conversation_id,

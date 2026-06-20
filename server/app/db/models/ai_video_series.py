@@ -2,13 +2,12 @@
 
 from app.db.models.ai_text_artifacts import AITextArtifact, AITextArtifactConsumer
 from app.db.models.production_observability import ProductionAuditEvent
-from app.db.models.script_pipeline import PipelineRun
+from app.db.models.script_pipeline import EpisodeScript, PipelineRun
 from app.db_models import (
     Base,
     series_characters,
     series_scenes,
     Episode,
-    EpisodeScript,
     ProductionEpisode,
     ProductionJob,
     ProductionPlan,

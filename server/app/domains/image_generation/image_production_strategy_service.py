@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.config import bj_now
 from app.db_models import ImageProductionPolicyVersion, ImageProductionStrategy, ImageProductionStrategyVersion
 from app.domains.image_generation.image_creation_errors import image_error
-from app.services.production_observability import record_production_event
+from app.domains.production_observability.production_observability_service import record_production_event
 
 
 VALID_DESTINATION_ROLES = {

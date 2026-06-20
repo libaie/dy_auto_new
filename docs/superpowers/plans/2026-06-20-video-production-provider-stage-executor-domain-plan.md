@@ -79,10 +79,16 @@ from app.domains.video_production.provider_cost_reservation_service import (...)
 from app.domains.video_production.provider_stage_task_service import (...)
 ```
 
-Keep these imports unchanged in this slice:
+Use the shared production observability domain path after the observability
+domain migration:
 
 ```python
-from app.services.production_observability import record_production_event
+from app.domains.production_observability.production_observability_service import record_production_event
+```
+
+Keep this import unchanged in this slice:
+
+```python
 from app.services.production_queue_service import retry_job_without_attempt
 ```
 

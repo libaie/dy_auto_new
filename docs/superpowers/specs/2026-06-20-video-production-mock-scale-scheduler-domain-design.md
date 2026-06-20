@@ -23,8 +23,11 @@ Inside the moved module, import already-migrated contracts from domain paths:
 - `app.domains.video_production.production_status`
 - `app.domains.video_production.video_production_run_types`
 
-Keep queue and observability dependencies on their current paths because those
-modules need separate migration decisions.
+Keep the queue dependency on its current path because it needs a separate
+migration decision. The later production observability domain migration
+supersedes the original legacy observability note:
+`record_production_event` now comes from
+`app.domains.production_observability.production_observability_service`.
 
 ## Boundaries
 

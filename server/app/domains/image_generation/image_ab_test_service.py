@@ -31,7 +31,7 @@ from app.services.image_creation_service import (
 from app.domains.image_generation.image_production_metrics_service import refresh_image_strategy_metrics, strategy_metrics_payload
 from app.domains.image_generation.image_production_recommendation_service import ab_winner_recommendation_payload
 from app.domains.image_generation.image_selection_preview_service import create_selection_preview
-from app.services.production_observability import record_production_event
+from app.domains.production_observability.production_observability_service import record_production_event
 
 
 TERMINAL_TASK_STATUSES = {"completed", "failed", "cancelled", "completed_with_warnings"}

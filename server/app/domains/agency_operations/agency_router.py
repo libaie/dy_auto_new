@@ -26,7 +26,7 @@ from app.services.agency_manifest import (
     read_expert_markdown,
     read_legacy_expert_markdown,
 )
-from app.services.production_observability import _redact as _redact_secret_fields
+from app.domains.production_observability.production_observability_service import _redact as _redact_secret_fields
 from app.services.production_status import JOB_BLOCKED, JOB_FAILED, JOB_QUEUED, JOB_RETRY_WAIT
 from app.services.provider_cost_reservation_service import active_reserved_cost
 

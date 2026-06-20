@@ -23,9 +23,9 @@ Do not touch `production_worker_service.py` in this slice because it has
 unrelated work in progress. Its legacy import remains supported by the facade.
 
 Inside the moved module, import already-migrated helpers from
-`app.domains.video_production`. Keep `production_observability` and
-`production_queue_service` on legacy service paths for now because they have
-not been migrated in this slice.
+`app.domains.video_production` and shared audit helpers from
+`app.domains.production_observability`. Keep `production_queue_service` on the
+legacy service path for now because it has not been migrated in this slice.
 
 ## Boundaries
 

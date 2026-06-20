@@ -69,7 +69,8 @@ def test_provider_stage_executor_imports_domain_helper_contracts():
         assert f"app.domains.video_production.{module_name}" in text
         assert f"app.services.{module_name}" not in text
 
-    assert "app.services.production_observability" in text
+    assert "app.domains.production_observability.production_observability_service" in text
+    assert "app.services.production_observability" not in text
     assert "app.services.production_queue_service" in text
 
 

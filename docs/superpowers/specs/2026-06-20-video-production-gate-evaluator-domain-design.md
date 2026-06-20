@@ -13,10 +13,10 @@ Move the implementation to
 `app.domains.video_production.production_gate_evaluator` and keep
 `app.services.production_gate_evaluator` as a temporary compatibility facade.
 Update the moved module to import `production_segment_frame_ids` from
-`app.domains.video_production.video_production_state`. Keep
-`record_production_event` imported from `app.services.production_observability`
-because observability is currently shared across multiple business domains and
-needs its own migration decision.
+`app.domains.video_production.video_production_state`. The later production
+observability domain migration supersedes the original legacy import note:
+`record_production_event` now comes from
+`app.domains.production_observability.production_observability_service`.
 
 ## Boundaries
 

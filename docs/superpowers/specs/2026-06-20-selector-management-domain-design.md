@@ -31,7 +31,9 @@ The migration keeps `app.routers.selectors` as a compatibility facade.
 - Selector CRUD, revision tracking, and device selector filtering now live in
   `app.domains.selector_management.selector_service`;
   `app.services.selector_service` remains as a temporary compatibility facade.
-- Do not split or move `template_service` in this slice.
+- Template image listing, caching, lookup, save, and delete operations now live
+  in `app.domains.selector_management.template_service`;
+  `app.services.template_service` remains as a temporary compatibility facade.
 - Do not move selector ORM model bodies.
 - Do not change route paths, route ordering, auth dependencies, response shapes,
   websocket payloads, or upload validation behavior.
@@ -44,12 +46,14 @@ server/app/domains/selector_management/
   README.md
   selector_service.py
   selectors_router.py
+  template_service.py
 ```
 
 This began as a route-boundary migration. Selector CRUD and device selector
 filtering now live in the selector management domain through `SelectorService`,
-while later work can still split template image handlers and realtime
-notification helpers after the domain import boundary is stable.
+and template image file operations now live there through `TemplateService`.
+Later work can still split realtime notification helpers after the domain import
+boundary is stable.
 
 ## Compatibility Strategy
 
@@ -72,6 +76,15 @@ The selector service follows the same compatibility rule:
   including `rg "app\.services\.selector_service" server/app server/tests`
   showing only compatibility tests, migration docs, seed helpers, or callers
   from domains that have not moved yet.
+
+The template service also follows the compatibility rule:
+
+- `app.services.template_service` ->
+  `app.domains.selector_management.template_service`.
+- Keep the facade until the selector management README cleanup gate passes,
+  including `rg "app\.services\.template_service" server/app server/tests`
+  showing only compatibility tests, migration docs, or callers from domains
+  that have not moved yet.
 
 ## Tests
 

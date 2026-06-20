@@ -44,10 +44,12 @@ selector service ownership behind compatibility-preserving domain modules.
   `app.domains.selector_management.selector_service`; keep
   `app.services.selector_service` as a compatibility facade until direct-domain
   coverage replaces legacy imports.
+- Template service logic now lives in
+  `app.domains.selector_management.template_service`; keep
+  `app.services.template_service` as a compatibility facade until direct-domain
+  coverage replaces legacy imports.
 - Split selector CRUD use cases further only if the selector service gains more
   behavior.
-- Keep `template_service` stable until a separate service-split plan is
-  approved.
 
 ## Verification
 

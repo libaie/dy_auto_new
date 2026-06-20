@@ -65,7 +65,7 @@ def test_selectors_router_imports_domain_selector_service_only():
 
     assert "app.domains.selector_management.selector_service" in text
     assert "app.services.selector_service" not in text
-    assert "app.services.template_service" in text
+    assert "app.domains.selector_management.template_service" in text
 
 
 def test_device_selectors_stay_device_owned_and_legacy_compatible():

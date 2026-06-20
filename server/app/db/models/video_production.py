@@ -252,6 +252,40 @@ class VideoProductionAsset(Base):
     )
 
 
+class VideoReviewRecord(Base):
+    """AI or human review decision for a production asset."""
+    __tablename__ = "video_review_records"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    asset_id = Column(String(36), ForeignKey("video_production_assets.id", ondelete="CASCADE"), nullable=False)
+    run_id = Column(String(36), ForeignKey("video_production_runs.id", ondelete="CASCADE"), nullable=False)
+    review_type = Column(String(20), nullable=False)
+    status = Column(String(30), nullable=False)
+    score = Column(Float, nullable=True)
+    criteria_json = Column(JSON, nullable=True, default=list)
+    issues_json = Column(JSON, nullable=True, default=list)
+    reviewer_user_id = Column(String(36), nullable=True)
+    reviewer_role = Column(String(40), nullable=True)
+    action = Column(String(40), nullable=True)
+    model_trace_json = Column(JSON, nullable=True, default=dict)
+    asset_snapshot_json = Column(JSON, nullable=True, default=dict)
+    model_trace_summary_json = Column(JSON, nullable=True, default=dict)
+    comment = Column(Text, nullable=True)
+    target_type = Column(String(30), nullable=True)
+    target_id = Column(String(36), nullable=True)
+    production_segment_id = Column(String(36), ForeignKey("production_segments.id", ondelete="SET NULL"), nullable=True)
+    asset_version = Column(Integer, nullable=True)
+    is_latest_asset_review = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
+
+    __table_args__ = (
+        Index("idx_video_review_asset", "asset_id"),
+        Index("idx_video_review_run", "run_id"),
+        Index("idx_video_review_status", "status"),
+        Index("idx_video_review_target_version", "target_type", "target_id", "asset_version"),
+    )
+
+
 class ProviderStageTask(Base):
     __tablename__ = "provider_stage_tasks"
     __table_args__ = (

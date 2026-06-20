@@ -6,8 +6,8 @@ from app.db.models.video_production import (
     ProductionSegment,
     ProductionShot,
     VideoProductionAsset,
+    VideoReviewRecord,
 )
-from app.db_models import VideoReviewRecord
 
 
 def _asset_payload(asset: VideoProductionAsset | None) -> dict | None:

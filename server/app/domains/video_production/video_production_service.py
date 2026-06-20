@@ -12,11 +12,9 @@ from app.db.models.video_production import (
     ProductionShot,
     VideoProductionAsset,
     VideoProductionRun,
-)
-from app.db_models import (
-    Episode,
     VideoReviewRecord,
 )
+from app.db_models import Episode
 from app.domains.agency_operations.agency_backtrack_policy import trigger_backtrack_if_needed
 from app.domains.agency_operations.agency_creative_patch_service import unresolved_patch_gate
 from app.domains.agency_operations.agency_orchestrator import AgencyOrchestrator

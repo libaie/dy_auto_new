@@ -11,8 +11,8 @@ This domain owns the video production control-plane HTTP routes.
 - Production ORM models stay in `app.db_models`.
 - Database session helpers stay in `app.database`.
 - Auth dependencies stay in `app.deps`.
-- Production orchestration, worker execution, queues, retries, reviews, costs,
-  and text artifacts stay in `app.services.*` until migrated.
+- Production orchestration and text artifacts stay in `app.services.*` until
+  migrated.
 - Video library routes stay in `app.domains.video_library`.
 
 ## Current Modules
@@ -51,6 +51,9 @@ This domain owns the video production control-plane HTTP routes.
   locked style and episode storyboards into production plans.
 - `production_queue_service.py` owns production job enqueue, claim, completion,
   retry-wait, pause, and resume helpers.
+- `production_worker_service.py` owns real provider worker-step execution,
+  claimed job processing, deferred agency stage gates, provider result
+  persistence, and run status updates after stage jobs.
 - `production_collection_service.py` owns `create_collection_from_approved_episodes`
   for packaging approved episode videos into draft collections.
 - `production_tree_service.py` owns `get_run_tree` and tree payload helpers for
@@ -108,6 +111,7 @@ This domain owns the video production control-plane HTTP routes.
 | `app.services.production_status_aggregation` | `app.domains.video_production.production_status_aggregation` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.production_plan_service` | `app.domains.video_production.production_plan_service` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.production_queue_service` | `app.domains.video_production.production_queue_service` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests or service modules whose domains have not moved yet. |
+| `app.services.production_worker_service` | `app.domains.video_production.production_worker_service` | Keep while video production router, legacy tests, and `video_production_service` compatibility calls import or monkeypatch worker symbols through `app.services`; remove after import inventory is clean. |
 | `app.services.production_collection_service` | `app.domains.video_production.production_collection_service` | Domain router imports the domain helper directly, and legacy imports remain only in compatibility tests or older callers not yet migrated. |
 | `app.services.production_tree_service` | `app.domains.video_production.production_tree_service` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.review_asset_edit_service` | `app.domains.video_production.review_asset_edit_service` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |

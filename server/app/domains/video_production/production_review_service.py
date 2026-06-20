@@ -4,7 +4,7 @@ from app.config import bj_now
 from app.db_models import VideoProductionAsset, VideoProductionRun, VideoReviewRecord
 from app.domains.video_production.production_state_contract import asset_is_reviewable
 from app.domains.video_production.video_production_run_types import MOCK_SERIES_SCALE, get_run_type
-from app.services.video_production_state import latest_assets_by_frame, recompute_run_gate
+from app.domains.video_production.video_production_state import latest_assets_by_frame, recompute_run_gate
 
 
 SUPPORTED_BULK_REVIEW_ACTIONS = {"approve", "reject"}

@@ -15,7 +15,7 @@ from app.db.models.ai_video_series import (
     ProductionShot,
     VideoProductionRun,
 )
-from app.services.video_production_state import IMAGE_READY_STATUS, VIDEO_READY_STATUS
+from app.domains.video_production.video_production_state import IMAGE_READY_STATUS, VIDEO_READY_STATUS
 
 
 ACTIVE_JOB_STATUSES = {"queued", "leased", "running", "retry_wait"}

@@ -25,6 +25,9 @@ reference dictionaries, plus character and scene reference asset generation.
 - `anchor_service.py` owns `AssetAnchorManager`, character/scene anchor prompt
   construction, provider reference payload adaptation, and latest locked anchor
   lookup.
+- `asset_lifecycle_service.py` owns `AssetLifecycleError`, series
+  delete/archive decisions, character/scene unlinking, and character/scene
+  archive-or-delete behavior.
 
 ## Facade Register
 
@@ -35,6 +38,7 @@ reference dictionaries, plus character and scene reference asset generation.
 | `app.routers.reference_data` | `app.domains.creative_library.reference_data_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
 | `app.services.reference_asset_service` | `app.domains.creative_library.reference_asset_service` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.anchor_service` | `app.domains.creative_library.anchor_service` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
+| `app.services.asset_lifecycle_service` | `app.domains.creative_library.asset_lifecycle_service` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 
 ## Boundaries
 
@@ -45,6 +49,8 @@ reference dictionaries, plus character and scene reference asset generation.
   `app.services.reference_asset_service` until their owning domains move.
 - Non-domain utility or service modules may keep importing
   `app.services.anchor_service` until their owning domains move.
+- Non-domain service modules may keep importing
+  `app.services.asset_lifecycle_service` until their owning domains move.
 - Keep ORM models in `app.db_models` during this route-boundary migration.
 - Keep startup reference data seeding behavior unchanged.
 
@@ -76,3 +82,13 @@ Do not remove the legacy anchor service facade until all of these are true:
   tests for direct domain imports.
 - Domain-owned production modules import
   `app.domains.creative_library.anchor_service` directly.
+
+Do not remove the legacy asset lifecycle service facade until all of these are
+true:
+
+- `rg "app\.services\.asset_lifecycle_service" server/app server/tests` returns
+  only compatibility tests and migration docs.
+- `test_creative_library_asset_lifecycle_service_facade.py` has been replaced
+  with tests for direct domain imports.
+- Domain-owned production modules import
+  `app.domains.creative_library.asset_lifecycle_service` directly.

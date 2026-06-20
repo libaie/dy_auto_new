@@ -8,7 +8,6 @@ SERVICES_ROOT = REPO_ROOT / "server/app/services"
 DOMAINS_ROOT = REPO_ROOT / "server/app/domains"
 
 EXPECTED_NON_FACADE_SERVICE_FILES = {
-    "one_sentence_video_service.py",
     "video_agency_team.py",
 }
 
@@ -17,7 +16,6 @@ EXPECTED_MIXED_FACADE_SERVICE_FILES = {
 }
 
 EXPECTED_SERVICE_DOMAIN_TARGETS = {
-    "one_sentence_video_service.py": "video_production",
     "video_agency_team.py": "agency_operations",
 }
 

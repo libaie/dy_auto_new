@@ -31,6 +31,8 @@ EXPECTED_DOMAIN_SERVICE_IMPORTS = {
     ("server/app/domains/script_pipeline/script_pipeline_service.py", "agency_orchestrator"),
     ("server/app/domains/script_pipeline/script_pipeline_service.py", "agency_runtime"),
     ("server/app/domains/storyboard_images/storyboard_image_service.py", "image_creation_service"),
+    ("server/app/domains/video_production/one_sentence_video_service.py", "video_agency_team"),
+    ("server/app/domains/video_production/one_sentence_video_service.py", "video_production_service"),
     ("server/app/domains/video_production/review_asset_edit_service.py", "image_creation_service"),
     ("server/app/domains/video_production/production_run_service.py", "video_production_service"),
     ("server/app/domains/video_production/production_worker_service.py", "video_production_service"),

@@ -13,8 +13,7 @@ seeding helpers.
 - Database session helpers stay in `app.database`.
 - Auth dependencies stay in `app.deps`.
 - Encryption helpers stay in `app.services.crypto`.
-- Model schema payloads stay in `app.services.model_schema` and
-  `app.data.model_schema_data`.
+- raw schema data stays in `app.data.model_schema_data`.
 - Runtime model resolution stays in `app.services.runtime_model_config`.
 - Pixelle, Seedance, and audit execution routes stay in their own domains or
   routers.
@@ -24,12 +23,16 @@ seeding helpers.
 - `ai_models_router.py` owns `ModelCreate`, `ModelUpdate`, `DEFAULT_MODELS`,
   `seed_ai_models`, model CRUD endpoints, the model schema endpoint, connection
   test helpers, blank-secret preservation, and SSRF protection.
+- `model_schema.py` owns `get_schema_payload`, `get_provider_preset`, scene
+  lookups, and provider lists; raw schema data stays in
+  `app.data.model_schema_data`.
 
 ## Facade Register
 
 | Facade | Target | Exit condition |
 |---|---|---|
 | `app.routers.ai_config` | `app.domains.model_configuration.ai_models_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
+| `app.services.model_schema` | `app.domains.model_configuration.model_schema` | Keep while legacy tests or callers import schema helpers from `app.services`; remove only after import inventory shows no production legacy imports. |
 
 ## Boundaries
 

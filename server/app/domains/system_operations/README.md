@@ -17,12 +17,15 @@ This domain owns server operational health routes.
 - `system_health_router.py` owns migration schema checks, provider capability
   checks, worker runtime checks, scene readiness checks, and
   `/api/system/health`.
+- `oss_service.py` owns `upload_to_oss` OSS/CDN upload helper behavior for
+  local, MinIO, and Aliyun OSS providers.
 
 ## Facade Register
 
 | Facade | Target | Exit condition |
 |---|---|---|
 | `app.routers.system_health` | `app.domains.system_operations.system_health_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
+| `app.services.oss_service` | `app.domains.system_operations.oss_service` | Import inventory proves no production or test imports use the legacy service path. |
 
 ## Boundaries
 

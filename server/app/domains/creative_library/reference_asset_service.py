@@ -384,7 +384,7 @@ def _to_dict(row) -> dict:
 
 
 async def generate_character_reference_images(db: Session, character_id: str, slot: str = "all") -> dict:
-    from app.services.anchor_service import AssetAnchorManager
+    from app.domains.creative_library.anchor_service import AssetAnchorManager
 
     character = db.query(Character).filter(Character.id == character_id).first()
     if not character:
@@ -427,7 +427,7 @@ async def generate_character_reference_images(db: Session, character_id: str, sl
 
 
 async def generate_scene_reference_images(db: Session, scene_id: str, slot: str = "all") -> dict:
-    from app.services.anchor_service import AssetAnchorManager
+    from app.domains.creative_library.anchor_service import AssetAnchorManager
 
     scene = db.query(Scene).filter(Scene.id == scene_id).first()
     if not scene:

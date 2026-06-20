@@ -30,7 +30,7 @@ from app.domains.video_production.review_asset_edit_service import (
 )
 from app.domains.video_production.mock_scale_scheduler_service import advance_mock_scheduler
 from app.services.one_sentence_video_service import complete_one_sentence_reference_generation, create_one_sentence_video
-from app.services.video_production_readiness import build_run_readiness
+from app.domains.video_production.video_production_readiness import build_run_readiness
 from app.domains.video_production.video_production_run_types import LEGACY_EPISODE_RUN, MOCK_SERIES_SCALE, REAL_SHORT_E2E, get_run_type
 from app.services.video_production_service import (
     VideoProductionError,

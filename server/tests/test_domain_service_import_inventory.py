@@ -47,7 +47,6 @@ EXPECTED_DOMAIN_SERVICE_IMPORTS = {
     ("server/app/domains/video_production/video_production_router.py", "production_queue_service"),
     ("server/app/domains/video_production/video_production_router.py", "production_run_service"),
     ("server/app/domains/video_production/video_production_router.py", "production_worker_service"),
-    ("server/app/domains/video_production/video_production_router.py", "video_production_readiness"),
     ("server/app/domains/video_production/video_production_router.py", "video_production_service"),
 }
 

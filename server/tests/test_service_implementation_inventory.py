@@ -19,7 +19,6 @@ EXPECTED_NON_FACADE_SERVICE_FILES = {
     "production_run_service.py",
     "production_worker_service.py",
     "video_agency_team.py",
-    "video_production_readiness.py",
 }
 
 EXPECTED_MIXED_FACADE_SERVICE_FILES = {
@@ -38,7 +37,6 @@ EXPECTED_SERVICE_DOMAIN_TARGETS = {
     "production_run_service.py": "video_production",
     "production_worker_service.py": "video_production",
     "video_agency_team.py": "agency_operations",
-    "video_production_readiness.py": "video_production",
 }
 
 

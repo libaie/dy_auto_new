@@ -12,7 +12,7 @@ This domain owns the video production control-plane HTTP routes.
 - Database session helpers stay in `app.database`.
 - Auth dependencies stay in `app.deps`.
 - Production orchestration, worker execution, queues, retries, reviews, costs,
-  readiness, and text artifacts stay in `app.services.*`.
+  and text artifacts stay in `app.services.*` until migrated.
 - Video library routes stay in `app.domains.video_library`.
 
 ## Current Modules
@@ -62,6 +62,8 @@ This domain owns the video production control-plane HTTP routes.
 - `video_production_state.py` owns `IMAGE_READY_STATUS`,
   `VIDEO_READY_STATUS`, `production_segment_frame_ids`, and
   `recompute_run_gate` for run stage gate state.
+- `video_production_readiness.py` owns `build_run_readiness` and readiness
+  block payload helpers for run control-plane routes.
 - `provider_cost_reservation_service.py` owns
   `_ACTIVE_RESERVATION_STATUSES`, `_PLAN_LOCKS`, `active_reserved_cost`,
   `create_cost_reservation`, `settle_reservation`, and reservation lifecycle
@@ -108,6 +110,7 @@ This domain owns the video production control-plane HTTP routes.
 | `app.services.review_asset_edit_service` | `app.domains.video_production.review_asset_edit_service` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
 | `app.services.video_production_state` | `app.domains.video_production.video_production_state` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, approved cross-domain consumers, or service modules whose domains have not moved yet. |
 | `app.services.video_production_run_types` | `app.domains.video_production.video_production_run_types` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
+| `app.services.video_production_readiness` | `app.domains.video_production.video_production_readiness` | Domain router imports the domain readiness helper directly, and legacy imports remain only in compatibility tests or older callers not yet migrated. |
 | `app.services.provider_capability_service` | `app.domains.video_production.provider_capability_service` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, approved cross-domain consumers, or service modules whose domains have not moved yet. |
 | `app.services.provider_cost_reservation_service` | `app.domains.video_production.provider_cost_reservation_service` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, approved cross-domain consumers, or service modules whose domains have not moved yet. |
 | `app.services.provider_stage_task_service` | `app.domains.video_production.provider_stage_task_service` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |

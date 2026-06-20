@@ -1,7 +1,7 @@
 """Adapter handles for external task-operations dependencies."""
 
-from app.services.channel_service import channel_service
-from app.services.content_service import content_service
+from app.domains.account_operations.channel_service import channel_service
+from app.domains.content_collection.content_service import content_service
 from app.services.task_service import task_service
 from app.ws_manager import pair_ws_manager
 

@@ -5,8 +5,8 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from app.database import get_db
+from app.db.models.creative_library import ReferenceCategory, ReferenceData
 from app.deps import verify_admin_token
-from app.db_models import ReferenceData, ReferenceCategory
 
 router = APIRouter(prefix="/api", tags=["reference-data"])
 

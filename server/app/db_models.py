@@ -13,6 +13,7 @@ from sqlalchemy.orm import relationship
 
 from app.db.models.device_operations import DevicePairRequest
 from app.db.models.content_collection import ContentTemplate, SensitiveWord
+from app.db.models.creative_library import ReferenceCategory, ReferenceData
 from app.db.models.model_configuration import AIModel
 from app.db.models.prompt_management import PromptTemplate
 from app.db.models.quality_audit import AuditReport
@@ -1073,33 +1074,6 @@ class ScriptVisualShot(Base):
     visual_prompt = Column(Text, nullable=False)
     video_prompt = Column(Text, nullable=False)
     duration = Column(Float, nullable=False)
-
-
-class ReferenceData(Base):
-    """系统字典 — 管理所有下拉选项 (系列类型/角色类型/场景属性/模型配置)."""
-    __tablename__ = "reference_data"
-
-    id = Column(String(36), primary_key=True, default=_uuid)
-    category = Column(String(50), nullable=False, index=True)
-    value = Column(String(100), nullable=False)
-    label = Column(String(100), nullable=False)
-    description = Column(String(200), nullable=True)
-    sort_order = Column(Integer, nullable=False, default=0)
-    enabled = Column(Boolean, nullable=False, default=True)
-    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
-
-    __table_args__ = (UniqueConstraint("category", "value"),)
-
-
-class ReferenceCategory(Base):
-    """字典分类 — category 不再硬编码，可通过前端 CRUD 管理."""
-    __tablename__ = "reference_categories"
-
-    id = Column(String(36), primary_key=True, default=_uuid)
-    key = Column(String(50), nullable=False, unique=True, index=True)
-    label = Column(String(100), nullable=False)
-    sort_order = Column(Integer, nullable=False, default=0)
-    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
 
 
 class VideoProductionRun(Base):

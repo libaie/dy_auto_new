@@ -31,7 +31,7 @@ def register_device(
     # Per-device secret: reject mismatch
     if authed_device_id and authed_device_id != request.device_id:
         raise HTTPException(status_code=403, detail="Device ID mismatch")
-    from app.services.device_service import device_service
+    from app.domains.device_operations.device_service import device_service
     from app.config import get_ai_config
 
     # Capture client IP
@@ -76,4 +76,3 @@ router.include_router(reporting.risk_router)
 router.include_router(content_bridge.pre_template_router)
 router.include_router(script_assets.template_router)
 router.include_router(content_bridge.router)
-

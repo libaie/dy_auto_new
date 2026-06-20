@@ -31,7 +31,7 @@ async def poll_tasks(
         device_id = authed_device_id
 
     # HTTP poll itself is a heartbeat — update last_seen_at
-    from app.services.device_service import device_service
+    from app.domains.device_operations.device_service import device_service
     device_service.update_heartbeat(db, device_id)
 
     # Check cancellation FIRST — if there's a pending cancel, deliver it
@@ -80,7 +80,7 @@ async def poll_tasks(
             "status": task.status.value if hasattr(task.status, 'value') else str(task.status),
         })
 
-    from app.services.device_service import device_service
+    from app.domains.device_operations.device_service import device_service
     device_info = device_service.get_device_status(db, device_id)
     proxy = device_info.get("proxy_config") if device_info else None
 

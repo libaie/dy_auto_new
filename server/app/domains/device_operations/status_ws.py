@@ -119,7 +119,7 @@ async def ws_device_status(websocket: WebSocket):
         await pair_ws_manager.register_device_status(device_id, websocket)
 
         # Mark device online and capture IP
-        from app.services.device_service import device_service
+        from app.domains.device_operations.device_service import device_service
         ws_client_ip = websocket.headers.get("x-forwarded-for", "").split(",")[0].strip()
         if not ws_client_ip:
             ws_client_ip = websocket.client.host if websocket.client else ""

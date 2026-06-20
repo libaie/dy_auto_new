@@ -174,7 +174,7 @@ async def heartbeat(
     client_ip = raw_request.headers.get("x-forwarded-for", "").split(",")[0].strip()
     if not client_ip:
         client_ip = raw_request.client.host if raw_request.client else ""
-    from app.services.device_service import device_service
+    from app.domains.device_operations.device_service import device_service
     status_changed = device_service.update_heartbeat(db, device_id, ip=client_ip)
     if status_changed:
         await pair_ws_manager.broadcast_to_admins({

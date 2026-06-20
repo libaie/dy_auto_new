@@ -22,6 +22,9 @@ repair task routes.
 
 ## Current Modules
 
+- `agency_console.py` owns read-only agency transparency payloads for series
+  detail, including expert status, decision log, repair summary, creative patch
+  summary, readiness, quality report, and current episode context.
 - `agency_router.py` owns all `/api/agency/*` route handlers, agency response
   shaping, `_redact_model_config_snapshot`, repair task summaries, retry action
   decisions, `repair-tasks` endpoints, and paid repair authorization endpoints.
@@ -61,6 +64,7 @@ repair task routes.
 | Facade | Target | Exit condition |
 |---|---|---|
 | `app.routers.agency` | `app.domains.agency_operations.agency_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
+| `app.services.agency_console` | `app.domains.agency_operations.agency_console` | Keep while series read models and legacy tests import console payloads through `app.services`; remove after import inventory is clean. |
 | `app.services.agency_manifest` | `app.domains.agency_operations.agency_manifest` | Keep while dirty service modules have approved compatibility imports; remove only after import inventory shows no production legacy imports. |
 | `app.services.agency_contracts` | `app.domains.agency_operations.agency_contracts` | Keep while legacy tests or dirty service modules import agency response contracts from `app.services`; remove after import inventory is clean. |
 | `app.services.agency_repair_contracts` | `app.domains.agency_operations.agency_repair_contracts` | Keep while dirty service modules import repair contracts from `app.services`; remove after import inventory is clean. |

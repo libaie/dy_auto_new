@@ -6,6 +6,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DOMAIN_ROOT = REPO_ROOT / "server/app/domains"
 
 EXPECTED_DOMAIN_SERVICE_IMPORTS = {
+    ("server/app/domains/agency_operations/agency_console.py", "agency_orchestrator"),
+    ("server/app/domains/agency_operations/agency_console.py", "video_agency_team"),
     ("server/app/domains/agency_operations/agency_debate_audit.py", "agency_orchestrator"),
     ("server/app/domains/agency_operations/agency_multimodal_review.py", "agency_orchestrator"),
     ("server/app/domains/ai_text_artifacts/ai_text_artifact_service.py", "ai_generator"),

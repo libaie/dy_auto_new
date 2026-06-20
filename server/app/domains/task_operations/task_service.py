@@ -423,7 +423,8 @@ class TaskService:
             raise ValueError("Cannot delete a running task. Cancel it first.")
 
         # Reset associated ChannelItem so the keyword can be re-dispatched
-        from app.db_models import ChannelItem, CollectedComment, CollectedUser, Conversation, GeneratedVideo
+        from app.db.models.video_library import GeneratedVideo
+        from app.db_models import ChannelItem, CollectedComment, CollectedUser, Conversation
         from app.domains.account_operations.channel_service import channel_service as ch_svc
         channel_item = db.query(ChannelItem).filter(ChannelItem.task_id == task_id).first()
         if channel_item:
@@ -472,7 +473,8 @@ class TaskService:
             for cid in ch_ids:
                 ch_svc._reactivate_channel(db, cid)
         # Null out FK references from child tables
-        from app.db_models import CollectedComment, CollectedUser, Conversation, GeneratedVideo
+        from app.db.models.video_library import GeneratedVideo
+        from app.db_models import CollectedComment, CollectedUser, Conversation
         for model in (CollectedComment, CollectedUser, Conversation, GeneratedVideo):
             db.query(model).filter(model.task_id.in_(deletable_ids)).update(
                 {"task_id": None}, synchronize_session=False

@@ -5,11 +5,11 @@ from typing import Any
 
 from sqlalchemy.orm import object_session
 
+from app.db.models.video_library import GeneratedVideo
 from app.db_models import (
     AgencyCreativePatch,
     AgencyExpertInvocation,
     Episode,
-    GeneratedVideo,
     PipelineRun,
     ProductionJob,
     ProductionPlan,

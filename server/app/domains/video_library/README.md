@@ -16,16 +16,18 @@ This domain owns admin generated-video library routes.
 
 - `videos_router.py` owns generated-video list, detail, download, and delete
   routes.
+- `app.db.models.video_library` owns the `GeneratedVideo` ORM class body.
 
 ## Facade Register
 
 | Facade | Target | Exit condition |
 |---|---|---|
 | `app.routers.videos` | `app.domains.video_library.videos_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
+| `app.db_models.GeneratedVideo` | `app.db.models.video_library.GeneratedVideo` | Keep as a compatibility re-export until production imports use the domain model path. |
 
 ## Boundaries
 
-- Keep generated-video persistence on the existing `GeneratedVideo` ORM model.
+- Keep generated-video persistence on `app.db.models.video_library.GeneratedVideo`.
 - Keep video production, Pixelle, and Seedance execution flows outside this
   domain.
 - Preserve route paths, route names, auth dependencies, response shapes,

@@ -9,8 +9,8 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.db.models.video_library import GeneratedVideo
 from app.deps import verify_admin_token, verify_ws_admin_token
-from app.db_models import GeneratedVideo
 
 router = APIRouter(prefix="/api/videos", tags=["videos"])
 

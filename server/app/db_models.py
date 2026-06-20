@@ -21,6 +21,7 @@ from app.db.models.quality_audit import AuditReport
 from app.db.models.reporting import DailyStats, StatsEvent
 from app.db.models.selector_management import UISelector
 from app.db.models.system_configuration import SystemSetting
+from app.db.models.video_library import GeneratedVideo
 
 
 class Account(Base):
@@ -295,24 +296,6 @@ class Conversation(Base):
 
     account = relationship("Account")
     device = relationship("Device")
-    task = relationship("Task")
-
-
-class GeneratedVideo(Base):
-    """AI 生成的短视频"""
-    __tablename__ = "generated_videos"
-
-    id = Column(String(36), primary_key=True, default=_uuid)
-    task_id = Column(String(36), ForeignKey("tasks.id"), nullable=True)
-    keyword = Column(String(200), nullable=False)
-    title = Column(String(500), nullable=True)
-    video_path = Column(String(500), nullable=True)
-    duration = Column(Float, nullable=True)
-    status = Column(String(20), nullable=False, default="pending")
-    pixelle_task_id = Column(String(100), nullable=True)
-    error = Column(Text, nullable=True)
-    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
-
     task = relationship("Task")
 
 

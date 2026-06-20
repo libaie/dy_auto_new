@@ -1727,7 +1727,8 @@ def complete_final_video(
     *,
     gate_result: dict | None = None,
 ) -> VideoProductionAsset:
-    from app.db_models import GeneratedVideo, Series
+    from app.db.models.video_library import GeneratedVideo
+    from app.db_models import Series
 
     _assert_final_asset_ready_for_writeback(db, run, asset, gate_result=gate_result)
     duration = int(asset.duration_seconds or 0)

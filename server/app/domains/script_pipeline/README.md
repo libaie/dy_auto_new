@@ -9,8 +9,8 @@ generation pipeline runtime.
 
 ## Not Owned
 
-- ORM models such as `PipelineRun`, `Episode`, `GeneratedVideo`, and `Series`
-  stay in `app.db_models`.
+- ORM models such as `PipelineRun`, `Episode`, and `Series` stay in
+  `app.db_models`; `GeneratedVideo` lives in `app.db.models.video_library`.
 - Database session helpers stay in `app.database`.
 - Role dependencies stay in `app.deps`.
 - Pixelle transport stays in `app.services.pixelle_client`.

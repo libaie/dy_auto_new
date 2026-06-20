@@ -77,7 +77,8 @@ def test_selector_management_keeps_device_selector_routes_in_device_operations()
     script_assets = (DEVICE_OPERATIONS_PATH / "script_assets.py").read_text(encoding="utf-8")
 
     assert '@router.get("/selectors")' in script_assets
-    assert "app.domains.selector_management" not in script_assets
+    assert "APIRouter()" in script_assets
+    assert "selectors_router" not in script_assets
 
 
 def test_app_import_smoke_keeps_selector_management_routes_registered_once():

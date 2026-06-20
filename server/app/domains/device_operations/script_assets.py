@@ -152,7 +152,8 @@ async def device_calibrate(
     Saves templates and upserts UISelector rows for this resolution profile."""
     import base64
     from app.domains.selector_management.template_service import template_service
-    from app.db_models import UISelector, Device
+    from app.db.models.selector_management import UISelector
+    from app.db_models import Device
 
     resolution = request.resolution
     if not resolution:

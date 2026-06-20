@@ -18,6 +18,7 @@ This domain owns admin UI selector management routes.
 - `selector_service.py` owns `SelectorService`, `selector_service`, selector
   CRUD, revision counter updates, device selector filtering, and selector
   serialization.
+- `app.db.models.selector_management` owns the `UISelector` ORM class body.
 - `template_service.py` owns `TemplateService`, `template_service`,
   resolution-aware image listing, MD5 caching, template path lookup, save, and
   delete operations. It preserves storage under `server/app/template_images`.
@@ -29,6 +30,7 @@ This domain owns admin UI selector management routes.
 | `app.routers.selectors` | `app.domains.selector_management.selectors_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
 | `app.services.selector_service` | `app.domains.selector_management.selector_service` | All selector service callers import the domain service directly or belong to domains that have not moved yet. |
 | `app.services.template_service` | `app.domains.selector_management.template_service` | All template service callers import the domain service directly or belong to domains that have not moved yet. |
+| `app.db_models.UISelector` | `app.db.models.selector_management.UISelector` | Keep as a compatibility re-export until production imports use the domain model path. |
 
 ## Boundaries
 

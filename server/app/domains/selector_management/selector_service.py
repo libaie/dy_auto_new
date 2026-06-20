@@ -3,7 +3,9 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from app.db_models import UISelector, Device, SystemSetting
+from app.db.models.selector_management import UISelector
+from app.db.models.system_configuration import SystemSetting
+from app.db_models import Device
 
 _SELECTORS_REVISION_KEY = "selectors_revision"
 

@@ -511,10 +511,15 @@ const hasProducingEpisode = computed(() => episodes.value.some(ep => episodeHasP
 const targetEpisodeCount = computed(() => Math.max(0, Number(series.value?.total_episodes || 0)))
 const persistedEpisodeTargetReached = computed(() => episodes.value.length >= targetEpisodeCount.value)
 const hasMissingEpisodePlaceholders = computed(() => targetEpisodeCount.value > episodes.value.length)
+const incompleteTextEpisode = computed(() => episodes.value.find(ep => (
+  finishedEpisodeStatuses.has(ep.status)
+  && !episodeIsBusy(ep)
+  && !episodeTextReady(ep)
+)) || null)
 const allPersistedEpisodesFinished = computed(() => (
   episodes.value.length > 0
   && persistedEpisodeTargetReached.value
-  && episodes.value.every(ep => finishedEpisodeStatuses.has(ep.status) && !episodeHasActiveVideoRun(ep))
+  && episodes.value.every(ep => finishedEpisodeStatuses.has(ep.status) && episodeTextReady(ep) && !episodeHasActiveVideoRun(ep))
 ))
 const styleLockInProgress = computed(() => styleLocking.value || styleLock.value?.status === 'locking')
 const activeStoryPlanningStatuses = new Set(['planning', 'queued', 'running'])
@@ -534,13 +539,14 @@ const storyPlanButtonText = computed(() => {
   if (storyPlanningClosed.value) return '故事规划已完成'
   return '生成整季故事规划'
 })
-const pipelineStartDisabled = computed(() => pipelineStarting.value || (!runnableEpisode.value && !activeProductionRoute.value && !hasMissingEpisodePlaceholders.value))
+const pipelineStartDisabled = computed(() => pipelineStarting.value || (!runnableEpisode.value && !activeProductionRoute.value && !hasMissingEpisodePlaceholders.value && !incompleteTextEpisode.value))
 const pipelineButtonText = computed(() => {
   if (pipelineStarting.value) return '启动中...'
   if (canContinueActiveProduction.value) return hasProducingEpisode.value ? '剧集生产中，打开监控' : '继续生产计划'
   if (hasProducingEpisode.value) return '剧集生产中'
   if (hasBusyEpisode.value) return '生产计划已创建'
   if (hasMissingEpisodePlaceholders.value && !runnableEpisode.value) return '补齐剧集占位'
+  if (!runnableEpisode.value && incompleteTextEpisode.value) return `补齐第 ${incompleteTextEpisode.value.episode_number} 集剧本/分镜`
   if (!episodes.value.length) return '没有可启动剧集'
   if (!runnableEpisode.value) return allPersistedEpisodesFinished.value ? '全部剧集已完成' : '没有可启动剧集'
   return `生成第 ${runnableEpisode.value.episode_number} 集`
@@ -847,6 +853,9 @@ function episodeStoryboardText(ep) {
 function hasEpisodeScript(ep) {
   return Boolean(episodeScriptText(ep))
 }
+function episodeTextReady(ep) {
+  return hasEpisodeScript(ep) && storyboardFrameCount(ep) > 0
+}
 function applyStyleLockReferenceProgress(lock) {
   if (!series.value || !Array.isArray(lock?.reference_progress)) return
   const characters = Array.isArray(series.value.characters) ? [...series.value.characters] : []
@@ -1032,6 +1041,15 @@ async function startPipelineRun() {
     } catch (e) {
       const detail = e.response?.data?.detail
       error.value = detail?.message || detail || e.message || '补齐剧集失败'
+    } finally { pipelineStarting.value = false }
+    return
+  }
+  if (!runnableEpisode.value && incompleteTextEpisode.value) {
+    pipelineStarting.value = true; error.value = ''
+    const ep = incompleteTextEpisode.value
+    try {
+      await generateScriptForEpisode(ep)
+      if (episodeScriptErrors[ep.id]) error.value = episodeScriptErrors[ep.id]
     } finally { pipelineStarting.value = false }
     return
   }

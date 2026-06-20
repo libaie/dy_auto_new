@@ -131,4 +131,27 @@ describe('AITextArtifactWorkbenchPage', () => {
     expect(wrapper.text()).toContain('Regenerated AI body')
     expect(mocks.approveAITextArtifact).toHaveBeenCalledWith('artifact-regen-2')
   })
+
+  it('labels episode artifacts with their episode number and title', async () => {
+    mocks.listAITextArtifacts.mockResolvedValueOnce({
+      data: {
+        ok: true,
+        artifacts: [
+          artifact({
+            id: 'outline-2',
+            artifact_type: 'episode_outline',
+            target_type: 'episode',
+            episode_id: 'episode-2-id',
+            content_json: { episode_number: 2, title: 'Second Hook' },
+          }),
+        ],
+      },
+    })
+
+    const wrapper = mount(AITextArtifactWorkbenchPage)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('episode_outline · E02 · Second Hook')
+    expect(wrapper.text()).toContain('E02 · Second Hook')
+  })
 })

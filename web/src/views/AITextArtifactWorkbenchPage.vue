@@ -21,12 +21,13 @@
           @click="selectArtifact(artifact)"
         >
           <div class="flex items-center justify-between gap-2 text-sm">
-            <span class="font-medium text-slate-100">{{ artifact.artifact_type }}</span>
+            <span class="font-medium text-slate-100">{{ artifactListTitle(artifact) }}</span>
             <span class="rounded bg-slate-950 px-2 py-0.5 text-xs text-slate-300">v{{ artifact.version }}</span>
           </div>
-          <div class="mt-1 flex items-center gap-2 text-xs text-slate-500">
+          <div class="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
             <span>{{ artifact.status }}</span>
             <span>{{ artifact.source_type }}</span>
+            <span v-if="artifactTargetLabel(artifact)" class="text-cyan-400">{{ artifactTargetLabel(artifact) }}</span>
           </div>
         </button>
         <div v-if="!artifacts.length" class="px-4 py-6 text-sm text-slate-500">暂无 AI 文本产物</div>
@@ -37,7 +38,10 @@
           <div class="mb-3 flex items-center justify-between gap-3">
             <div>
               <h2 class="text-lg font-semibold">{{ selectedArtifact.artifact_type }} v{{ selectedArtifact.version }}</h2>
-              <div class="mt-1 text-xs text-slate-500">{{ selectedArtifact.status }} · {{ selectedArtifact.source_type }}</div>
+              <div class="mt-1 text-xs text-slate-500">
+                {{ selectedArtifact.status }} · {{ selectedArtifact.source_type }}
+                <span v-if="artifactTargetLabel(selectedArtifact)"> · {{ artifactTargetLabel(selectedArtifact) }}</span>
+              </div>
             </div>
             <div class="flex gap-2">
               <button data-test="artifact-save-edit" class="rounded bg-cyan-600 px-3 py-2 text-sm text-white hover:bg-cyan-500" @click="saveEdit">保存人工编辑</button>
@@ -107,6 +111,44 @@ const error = ref('')
 
 function formatJson(value) {
   return JSON.stringify(value || {}, null, 2)
+}
+
+function shortId(value) {
+  return String(value || '').slice(0, 8)
+}
+
+function artifactEpisodeNumber(artifact) {
+  const content = artifact?.content_json || {}
+  const input = artifact?.input_json || {}
+  const numberValue = Number(content.episode_number || input.episode_number)
+  return Number.isFinite(numberValue) && numberValue > 0 ? numberValue : null
+}
+
+function artifactEpisodeTitle(artifact) {
+  const content = artifact?.content_json || {}
+  const input = artifact?.input_json || {}
+  return content.title || content.episode_title || input.title || input.episode_title || ''
+}
+
+function artifactTargetLabel(artifact) {
+  if (!artifact) return ''
+  if (artifact.target_type === 'episode' || artifact.episode_id) {
+    const episodeNumber = artifactEpisodeNumber(artifact)
+    const title = artifactEpisodeTitle(artifact)
+    const episodeLabel = episodeNumber ? `E${String(episodeNumber).padStart(2, '0')}` : ''
+    if (episodeLabel && title) return `${episodeLabel} · ${title}`
+    if (episodeLabel) return episodeLabel
+    if (title) return title
+    return artifact.episode_id ? `剧集 ${shortId(artifact.episode_id)}` : '剧集'
+  }
+  if (artifact.target_type === 'series') return '系列'
+  if (artifact.target_type && artifact.target_id) return `${artifact.target_type} ${shortId(artifact.target_id)}`
+  return ''
+}
+
+function artifactListTitle(artifact) {
+  const target = artifactTargetLabel(artifact)
+  return target ? `${artifact.artifact_type} · ${target}` : artifact.artifact_type
 }
 
 function selectArtifact(artifact) {

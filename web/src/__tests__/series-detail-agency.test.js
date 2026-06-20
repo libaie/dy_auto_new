@@ -171,6 +171,23 @@ describe('SeriesDetailPage agency team status', () => {
     expect(wrapper.text()).toContain('Camera pushes in slowly.')
   })
 
+  it('offers to backfill text when a done episode is missing script and storyboard', async () => {
+    const wrapper = mount(SeriesDetailPage)
+    await flushPromises()
+
+    const button = wrapper.find('[data-test="start-pipeline"]')
+    expect(button.text()).toContain('补齐第 1 集剧本/分镜')
+    expect(button.attributes('disabled')).toBeUndefined()
+
+    await button.trigger('click')
+    await flushPromises()
+
+    expect(mocks.generateEpisodeScript).toHaveBeenCalledWith('sid', 'ep1', {
+      target_duration_seconds: 60,
+    })
+    expect(mocks.startEpisodeProduction).not.toHaveBeenCalled()
+  })
+
   it('shows per-episode character and scene assets', async () => {
     mocks.getSeries.mockResolvedValueOnce({
       data: {
@@ -654,6 +671,29 @@ describe('SeriesDetailPage agency team status', () => {
   })
 
   it('does not restart a completed episode when every episode is done', async () => {
+    mocks.getSeries.mockResolvedValueOnce({
+      data: {
+        ok: true,
+        series: {
+          id: 'sid',
+          title: 'City Healer',
+          logline: 'One sentence story',
+          total_episodes: 1,
+          genre: 'drama',
+          mode: 'fully_automatic',
+          target_duration: 60,
+        },
+        episodes: [{
+          id: 'ep1',
+          episode_number: 1,
+          title: 'Pilot',
+          status: 'done',
+          duration_seconds: 5,
+          script_json: { title: 'Pilot Script', scenes: [{ summary: 'Complete script' }] },
+          storyboard_json: { frames: [{ frame_id: 'frame-001', narration: 'Complete storyboard' }] },
+        }],
+      },
+    })
     const wrapper = mount(SeriesDetailPage)
     await flushPromises()
 

@@ -76,11 +76,17 @@ def test_content_collection_modules_import_domain_content_service_only():
         assert "app.services.content_service" not in text
 
 
-def test_legacy_service_bridges_stay_legacy_compatible():
-    for path in [AI_GENERATOR_PATH, CHANNEL_SERVICE_PATH]:
+def test_legacy_ai_bridge_stays_legacy_compatible():
+    for path in [AI_GENERATOR_PATH]:
         text = path.read_text(encoding="utf-8")
         assert "app.services.content_service" in text
         assert "app.domains.content_collection.content_service" not in text
+
+
+def test_channel_service_imports_domain_content_service_directly():
+    text = CHANNEL_SERVICE_PATH.read_text(encoding="utf-8")
+    assert "app.domains.content_collection.content_service" in text
+    assert "app.services.content_service" not in text
 
 
 def test_task_adapters_import_domain_content_service_directly():

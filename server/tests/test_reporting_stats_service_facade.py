@@ -73,6 +73,14 @@ def test_device_stats_increment_route_imports_domain_stats_service_directly():
     assert "app.services.stats_service" not in text
 
 
+def test_channel_service_imports_domain_stats_service_directly():
+    channel_service_path = REPO_ROOT / "server/app/domains/account_operations/channel_service.py"
+    text = channel_service_path.read_text(encoding="utf-8")
+
+    assert "app.domains.reporting.stats_service" in text
+    assert "app.services.stats_service" not in text
+
+
 def test_reporting_docs_register_stats_service_facade():
     readme = README_PATH.read_text(encoding="utf-8")
     design = REPORTING_SPEC_PATH.read_text(encoding="utf-8")

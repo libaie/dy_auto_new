@@ -59,7 +59,7 @@ def _resolve_nurture_subtask_templates(db: Session, params: dict, keyword: str) 
     if not isinstance(sub_tasks, list):
         return params
     try:
-        from app.services.content_service import content_service as cs
+        from app.domains.content_collection.content_service import content_service as cs
     except Exception:
         return params
     for sub_task in sub_tasks:
@@ -171,7 +171,7 @@ class ChannelService:
         if not accounts:
             raise ValueError("无可用账号")
 
-        from app.services.stats_service import stats_service
+        from app.domains.reporting.stats_service import stats_service
 
         account_usage = []
         for acc in accounts:
@@ -190,7 +190,7 @@ class ChannelService:
     def claim_channel_item(self, db: Session, device_id: str):
         """Claim a pending channel item. Returns (PydanticTask, channel_item_id) or None."""
         from app.services.task_service import _db_task_to_pydantic
-        from app.services.stats_service import stats_service
+        from app.domains.reporting.stats_service import stats_service
         from app.models import TaskType, TaskStatus
 
         now = bj_now()
@@ -442,7 +442,7 @@ class ChannelService:
             template_id = params.pop("content_template_id", None)
             if template_id:
                 try:
-                    from app.services.content_service import content_service as cs
+                    from app.domains.content_collection.content_service import content_service as cs
                     tpl_body = cs.get_template_body(db, template_id)
                     if tpl_body:
                         params["content"] = cs.substitute_variables(

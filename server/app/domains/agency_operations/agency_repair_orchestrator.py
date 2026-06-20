@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
-from app.db_models import AgencyExpertInvocation, ProductionAuditEvent, ProductionJob, ProductionPlan
+from app.db.models.agency_operations import AgencyExpertInvocation
+from app.db_models import ProductionAuditEvent, ProductionJob, ProductionPlan
 from app.domains.agency_operations.agency_repair_contracts import AUTO_REPAIR_STAGE, AutoRepairPolicy, RepairTask
 from app.domains.video_production.production_status import JOB_BLOCKED, JOB_LEASED, JOB_QUEUED, JOB_RETRY_WAIT, JOB_RUNNING
 from app.domains.video_production.provider_cost_reservation_service import active_reserved_cost

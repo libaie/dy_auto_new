@@ -6,9 +6,8 @@ from typing import Any
 from sqlalchemy.orm import object_session
 
 from app.db.models.video_library import GeneratedVideo
+from app.db.models.agency_operations import AgencyCreativePatch, AgencyExpertInvocation
 from app.db_models import (
-    AgencyCreativePatch,
-    AgencyExpertInvocation,
     Episode,
     PipelineRun,
     ProductionJob,

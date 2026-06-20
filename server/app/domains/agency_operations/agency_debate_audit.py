@@ -4,7 +4,8 @@ from typing import Any, Awaitable, Callable
 
 from sqlalchemy.orm import Session
 
-from app.db_models import AgencyExpertInvocation, ProductionAuditEvent, ProductionJob
+from app.db.models.agency_operations import AgencyExpertInvocation
+from app.db_models import ProductionAuditEvent, ProductionJob
 from app.domains.agency_operations.agency_scorecard_contracts import normalize_scorecard, scorecard_blocks_stage
 from app.domains.video_production.production_status import JOB_LEASED, JOB_QUEUED, JOB_RETRY_WAIT, JOB_RUNNING
 from app.domains.agency_operations.agency_orchestrator import AgencyOrchestrator, _hash_context

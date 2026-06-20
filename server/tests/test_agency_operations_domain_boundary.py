@@ -42,6 +42,24 @@ def test_agency_operations_domain_exports_metadata():
     assert domain.PUBLIC_ROUTE_PREFIX == "/api/agency"
 
 
+
+def test_agency_operations_orm_boundary_reexports_models():
+    from app.db_models import (
+        AgencyCreativePatch as LegacyAgencyCreativePatch,
+        AgencyExpertInvocation as LegacyAgencyExpertInvocation,
+        Base,
+    )
+    from app.db.models.agency_operations import AgencyCreativePatch, AgencyExpertInvocation
+
+    assert AgencyCreativePatch is LegacyAgencyCreativePatch
+    assert AgencyExpertInvocation is LegacyAgencyExpertInvocation
+    assert AgencyCreativePatch.metadata is Base.metadata
+    assert AgencyExpertInvocation.metadata is Base.metadata
+    assert AgencyCreativePatch.__module__ == "app.db.models.agency_operations"
+    assert AgencyExpertInvocation.__module__ == "app.db.models.agency_operations"
+    assert "agency_creative_patches" in Base.metadata.tables
+    assert "agency_expert_invocations" in Base.metadata.tables
+
 def test_agency_operations_readme_documents_facade_and_cleanup_gates():
     assert README_PATH.exists()
     text = README_PATH.read_text(encoding="utf-8")

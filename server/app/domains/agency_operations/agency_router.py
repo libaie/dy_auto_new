@@ -7,7 +7,8 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.db_models import AgencyCreativePatch, AgencyExpertInvocation, ProductionAuditEvent, ProductionJob, ProductionPlan, VideoProductionRun
+from app.db.models.agency_operations import AgencyCreativePatch, AgencyExpertInvocation
+from app.db_models import ProductionAuditEvent, ProductionJob, ProductionPlan, VideoProductionRun
 from app.deps import require_role, verify_admin_token
 from app.domains.agency_operations.agency_creative_patch_service import (
     apply_approved_patches,

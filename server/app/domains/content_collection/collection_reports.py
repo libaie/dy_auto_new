@@ -159,7 +159,8 @@ async def _apply_travel_destination_fallback(db, request):
         or request.comment.intended_attraction
     )
     if not has_destination and request.keyword and request.task_id:
-        from app.db_models import PromptTemplate, Task
+        from app.db.models.prompt_management import PromptTemplate
+        from app.db_models import Task
         task = db.query(Task).filter(Task.id == request.task_id).first()
         if task and task.params:
             template_id = task.params.get("prompt_template_id")

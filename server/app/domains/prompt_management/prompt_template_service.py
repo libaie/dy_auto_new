@@ -4,7 +4,8 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from app.db_models import PromptTemplate, SystemSetting
+from app.db.models.prompt_management import PromptTemplate
+from app.db.models.system_configuration import SystemSetting
 
 _TEMPLATES_REVISION_KEY = "prompt_templates_revision"
 

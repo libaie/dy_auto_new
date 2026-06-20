@@ -19,6 +19,7 @@ This domain owns admin prompt template management routes.
   `prompt_template_service`, CRUD, revision tracking, device payloads, rewrite
   request validation, rewrite output validation, serialized-size checks, and
   rewrite prompt construction.
+- `app.db.models.prompt_management` owns the `PromptTemplate` ORM class body.
 
 ## Facade Register
 
@@ -26,6 +27,7 @@ This domain owns admin prompt template management routes.
 |---|---|---|
 | `app.routers.prompt_templates` | `app.domains.prompt_management.prompt_templates_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
 | `app.services.prompt_template_service` | `app.domains.prompt_management.prompt_template_service` | All prompt template service callers import the domain service directly or belong to domains that have not moved yet. |
+| `app.db_models.PromptTemplate` | `app.db.models.prompt_management.PromptTemplate` | Keep as a compatibility re-export until production imports use the domain model path. |
 
 ## Boundaries
 

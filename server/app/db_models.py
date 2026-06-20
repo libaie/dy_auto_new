@@ -13,6 +13,7 @@ from sqlalchemy.orm import relationship
 
 from app.db.models.device_operations import DevicePairRequest
 from app.db.models.content_collection import ContentTemplate, SensitiveWord
+from app.db.models.prompt_management import PromptTemplate
 from app.db.models.system_configuration import SystemSetting
 
 
@@ -272,21 +273,6 @@ class StatsEvent(Base):
     op_index = Column(Integer, nullable=False, default=0)
     count = Column(Integer, nullable=False, default=1)
     created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
-
-
-class PromptTemplate(Base):
-    """AI 提示词模板 — 按行业可配置，设备端同步后按 template_id 加载"""
-    __tablename__ = "prompt_templates"
-
-    id = Column(String(36), primary_key=True, default=_uuid)
-    name = Column(String(100), nullable=False, unique=True, index=True)
-    industry = Column(String(50), nullable=False, default="health", index=True)
-    description = Column(String(200), nullable=False, default="")
-    content = Column(JSON, nullable=False)  # 完整提示词结构: { identity, semanticGuide, analysis, ... }
-    version = Column(Integer, nullable=False, default=1)
-    enabled = Column(Boolean, nullable=False, default=True)
-    created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
-    updated_at = Column(DateTime, nullable=False, default=lambda: bj_now(), onupdate=lambda: bj_now())
 
 
 class DMSequence(Base):

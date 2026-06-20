@@ -37,6 +37,8 @@ repair task routes.
   `scorecard_blocks_stage` for agency scorecard verdict contracts.
 - `agency_multimodal_review.py` owns `build_multimodal_asset_context` and
   `run_multimodal_asset_review` for real generated asset review handoff.
+- `agency_creative_patch_contracts.py` owns creative patch enums,
+  `CreativePatchProposal`, and `normalize_patch_payload`.
 
 ## Facade Register
 
@@ -50,6 +52,7 @@ repair task routes.
 | `app.services.agency_repair_orchestrator` | `app.domains.agency_operations.agency_repair_orchestrator` | Keep while dirty service modules import repair orchestration from `app.services`; remove after import inventory is clean. |
 | `app.services.agency_scorecard_contracts` | `app.domains.agency_operations.agency_scorecard_contracts` | Keep while dirty agency service modules import scorecard contracts from `app.services`; remove after import inventory is clean. |
 | `app.services.agency_multimodal_review` | `app.domains.agency_operations.agency_multimodal_review` | Keep while legacy tests monkeypatch multimodal review through `app.services`; remove after import inventory is clean. |
+| `app.services.agency_creative_patch_contracts` | `app.domains.agency_operations.agency_creative_patch_contracts` | Keep while dirty creative patch service code imports contracts from `app.services`; remove after import inventory is clean. |
 
 ## Boundaries
 

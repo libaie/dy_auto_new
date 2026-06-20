@@ -35,6 +35,23 @@ def test_storyboard_patch_accepts_only_allowed_after_fields():
     assert normalized.status == CreativePatchStatus.PROPOSED
 
 
+def test_patch_after_must_have_executable_allowed_field():
+    proposal = CreativePatchProposal.model_validate({
+        "patch_type": "image_prompt_patch",
+        "target_type": "production_segment",
+        "target_id": "segment-001",
+        "stage": "image_stage",
+        "title": "空改稿",
+        "reason": "专家必须给出可执行改稿。",
+        "before": {"image_prompt": "原图"},
+        "after": {"unknown_field": "should be rejected"},
+        "apply_policy": "requires_human_approval",
+    })
+
+    with pytest.raises(ValueError, match="executable"):
+        normalize_patch_payload(proposal)
+
+
 def test_unknown_patch_type_is_rejected():
     with pytest.raises(ValidationError):
         CreativePatchProposal.model_validate({

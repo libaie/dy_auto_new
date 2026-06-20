@@ -6,7 +6,11 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.config import bj_now
-from app.db_models import ImageProductionPolicyVersion, ImageProductionStrategy, ImageProductionStrategyVersion
+from app.db.models.image_production import (
+    ImageProductionPolicyVersion,
+    ImageProductionStrategy,
+    ImageProductionStrategyVersion,
+)
 from app.domains.image_generation.image_creation_errors import image_error
 from app.domains.production_observability.production_observability_service import record_production_event
 

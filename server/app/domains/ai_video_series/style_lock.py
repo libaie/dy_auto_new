@@ -47,7 +47,7 @@ from app.services.video_agency_team import (
     ensure_video_agency_team,
     summarize_video_agency_team,
 )
-from app.services.visual_style_inference_service import (
+from app.domains.creative_library.visual_style_inference_service import (
     append_visual_style_constraints,
     infer_visual_style_from_story,
     merge_visual_style,

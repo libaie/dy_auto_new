@@ -10,7 +10,7 @@ from app.database import get_db
 from app.deps import verify_admin_token
 from app.db_models import AuditReport, AIModel
 from app.domains.quality_audit.audit_gate import classify_audit_gate
-from app.services.crypto import decrypt
+from app.domains.system_configuration.crypto import decrypt
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/audit", tags=["audit"])

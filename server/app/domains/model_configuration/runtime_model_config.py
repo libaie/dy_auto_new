@@ -2,7 +2,7 @@
 from sqlalchemy.orm import Session
 
 from app.db_models import AIModel
-from app.services.crypto import decrypt
+from app.domains.system_configuration.crypto import decrypt
 
 
 class RuntimeModelConfigError(ValueError):

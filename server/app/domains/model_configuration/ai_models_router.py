@@ -11,7 +11,7 @@ import httpx
 from app.database import get_db
 from app.deps import verify_admin_token, require_role
 from app.db_models import AIModel
-from app.services.crypto import encrypt, decrypt
+from app.domains.system_configuration.crypto import encrypt, decrypt
 from app.domains.model_configuration.model_schema import get_schema_payload, get_provider_preset
 from app.data.model_schema_data import scene_key_to_model_type
 

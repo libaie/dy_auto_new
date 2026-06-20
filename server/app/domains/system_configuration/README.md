@@ -23,6 +23,7 @@ This domain owns admin key-value system configuration routes.
 | Facade | Target | Exit condition |
 |---|---|---|
 | `app.routers.settings` | `app.domains.system_configuration.settings_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
+| `app.services.crypto` | `app.domains.system_configuration.crypto` | Sensitive-setting crypto compatibility; remove after production callers use the domain path. |
 
 ## Boundaries
 

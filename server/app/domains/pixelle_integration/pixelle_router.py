@@ -95,7 +95,7 @@ async def get_pixelle_config(
 def _serialize_ai_models(db: Session) -> dict:
     """Read AIModel table and serialize to Pixelle-Video ai_models.scenes format."""
     from app.db_models import AIModel
-    from app.services.crypto import decrypt
+    from app.domains.system_configuration.crypto import decrypt
 
     models = db.query(AIModel).filter(AIModel.enabled == True).order_by(
         AIModel.sort_order.asc(),

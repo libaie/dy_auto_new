@@ -6,12 +6,13 @@ from typing import Any
 from langchain_core.tools import tool
 from sqlalchemy.orm import Session
 
-from app.db.models import Episode, Series
 from app.domains.agency_operations.agency_runtime_contracts import AgencyRuntimeError
 from app.domains.ai_video_series.langchain_runtime.agent_runner import extract_json_object
 
 
 def series_context_payload(db: Session, series_id: str, episode_id: str | None = None) -> dict[str, Any]:
+    from app.db.models import Episode, Series
+
     series = db.query(Series).filter(Series.id == series_id).first()
     if not series:
         raise AgencyRuntimeError("AI_VIDEO_CONTEXT_NOT_FOUND", "Series not found.")
@@ -54,7 +55,7 @@ def build_ai_video_tools(db: Session | None, allowed_tools: list[str] | None = N
         return extract_json_object(raw)
 
     @tool
-    def read_series_context(series_id: str, episode_id: str | None = None) -> str:
+    async def read_series_context(series_id: str, episode_id: str | None = None) -> str:
         """Read series and optional episode context as JSON."""
         if db is None:
             raise AgencyRuntimeError("AI_VIDEO_CONTEXT_NOT_FOUND", "Database session is required.")

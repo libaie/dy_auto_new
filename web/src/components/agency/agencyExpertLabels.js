@@ -1,3 +1,4 @@
+// 专家团队业务组件：展示或操作专家团队、审查、返修和创意补丁相关业务状态。
 const CORE_EXPERT_IDS = new Set([
   'story_generator',
   'narrative_designer',

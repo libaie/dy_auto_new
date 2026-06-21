@@ -1,3 +1,4 @@
+<!-- 管理端业务页面：承载 AITextArtifactWorkbenchPage 页面流程，协调接口数据、用户操作和业务状态展示。 -->
 <template>
   <div class="min-h-screen bg-slate-950 p-6 text-slate-100">
     <div class="mb-5 flex items-start justify-between gap-4">

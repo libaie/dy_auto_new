@@ -1,3 +1,4 @@
+// 前端业务常量：集中维护 tasks 相关中文文案、导航或状态枚举。
 export const TASK_TYPE_LABEL_MAP = {
   nurture: '养号',
   search_comment: '搜索评论',

@@ -1,3 +1,4 @@
+// 前端启动入口：挂载 Vue 应用、路由和全局状态，是管理端页面运行的入口。
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import router from './router'

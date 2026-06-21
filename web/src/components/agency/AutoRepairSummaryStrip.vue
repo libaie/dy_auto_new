@@ -1,3 +1,4 @@
+<!-- 专家团队业务组件：展示或操作专家团队、审查、返修和创意补丁相关业务状态。 -->
 <template>
   <section class="rounded-lg border border-amber-400/30 bg-amber-950/20 p-3" data-test="auto-repair-summary">
     <div class="flex flex-wrap items-center justify-between gap-3">

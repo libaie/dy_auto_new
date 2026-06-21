@@ -1,3 +1,4 @@
+<!-- 管理端业务页面：承载 ImageProductionStrategiesPage 页面流程，协调接口数据、用户操作和业务状态展示。 -->
 <template>
   <div class="min-h-full bg-slate-950 px-4 py-6 text-slate-100 sm:px-6">
     <div class="mx-auto max-w-7xl">

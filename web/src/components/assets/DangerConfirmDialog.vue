@@ -1,3 +1,4 @@
+<!-- 素材业务组件：展示或处理素材详情、参考图、AI 改写和危险操作确认。 -->
 <script setup>
 import AppDialog from '../ui/AppDialog.vue'
 import AppButton from '../ui/AppButton.vue'

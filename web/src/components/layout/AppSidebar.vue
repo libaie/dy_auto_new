@@ -1,3 +1,4 @@
+<!-- 管理端布局组件：提供导航、侧栏和页面容器等业务后台基础框架。 -->
 <script setup>
 import { ref, computed } from 'vue'
 import { useRoute } from 'vue-router'

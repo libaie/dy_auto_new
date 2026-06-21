@@ -1,3 +1,4 @@
+// 前端业务工具：封装 format 相关格式化或轻量转换逻辑。
 export function formatDate(dateStr) {
   if (!dateStr) return '-'
   const d = new Date(dateStr)

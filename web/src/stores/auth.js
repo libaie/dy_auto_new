@@ -1,3 +1,4 @@
+// 前端状态仓库：维护 auth 相关登录态、消息提示或跨页面状态。
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { login as loginApi } from '../api/auth.js'

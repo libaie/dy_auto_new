@@ -1,3 +1,4 @@
+// 视频工作台组件：承载 Pixelle、Seedance、媒体面板和生成参数相关业务配置。
 import {
   generateVideoAsync,
   getTask,

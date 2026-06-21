@@ -1,3 +1,4 @@
+<!-- 管理端通用组件：提供业务页面复用的展示、反馈或交互能力。 -->
 <script setup>
 import { useToastStore } from '../stores/toast.js'
 

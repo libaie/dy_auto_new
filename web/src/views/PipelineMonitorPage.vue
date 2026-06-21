@@ -1,3 +1,4 @@
+<!-- 管理端业务页面：承载 PipelineMonitorPage 页面流程，协调接口数据、用户操作和业务状态展示。 -->
 <template>
   <div class="p-6">
     <button @click="$router.back()" class="text-sky-400 hover:text-sky-300 mb-4 transition cursor-pointer">&larr; 返回</button>

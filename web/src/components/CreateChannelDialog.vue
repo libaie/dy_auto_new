@@ -1,3 +1,4 @@
+<!-- 管理端通用组件：提供业务页面复用的展示、反馈或交互能力。 -->
 <template>
   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="$emit('close')">
     <div class="bg-slate-800 rounded-xl shadow-xl w-full max-w-lg mx-4 p-6 border border-slate-700">

@@ -1,3 +1,4 @@
+// 前端业务常量：集中维护 navigation 相关中文文案、导航或状态枚举。
 export const NAV_CATEGORIES = [
   {
     key: 'ops',

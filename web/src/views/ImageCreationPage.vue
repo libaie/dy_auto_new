@@ -1,3 +1,4 @@
+<!-- 管理端业务页面：承载 ImageCreationPage 页面流程，协调接口数据、用户操作和业务状态展示。 -->
 <template>
   <div data-testid="image-workbench-shell" class="min-h-full bg-slate-950 text-slate-100">
     <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6">

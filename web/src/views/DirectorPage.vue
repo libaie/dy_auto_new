@@ -1,3 +1,4 @@
+<!-- 管理端业务页面：承载 DirectorPage 页面流程，协调接口数据、用户操作和业务状态展示。 -->
 <template>
   <div class="p-6">
     <div class="flex items-center gap-4 mb-6">

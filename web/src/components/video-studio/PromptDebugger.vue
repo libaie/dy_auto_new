@@ -1,3 +1,4 @@
+<!-- 视频工作台组件：承载 Pixelle、Seedance、媒体面板和生成参数相关业务配置。 -->
 <template>
   <div class="rounded-xl border border-gray-700 overflow-hidden" style="background: rgba(2, 6, 23, 0.9);">
     <div class="px-4 py-2 border-b border-gray-700/50 flex items-center justify-between">

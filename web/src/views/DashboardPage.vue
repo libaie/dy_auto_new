@@ -1,3 +1,4 @@
+<!-- 管理端业务页面：承载 DashboardPage 页面流程，协调接口数据、用户操作和业务状态展示。 -->
 <script setup>
 import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { Chart, registerables } from 'chart.js'

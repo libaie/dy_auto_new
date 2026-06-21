@@ -1,3 +1,4 @@
+<!-- 管理端业务页面：承载 DataCenterPage 页面流程，协调接口数据、用户操作和业务状态展示。 -->
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'

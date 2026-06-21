@@ -1,3 +1,4 @@
+// 前端状态仓库：维护 toast 相关登录态、消息提示或跨页面状态。
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 

@@ -1,3 +1,4 @@
+<!-- 管理端业务页面：承载 VideosPage 页面流程，协调接口数据、用户操作和业务状态展示。 -->
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { listVideos, deleteVideo, getVideoDownloadUrl } from '../api/videos.js'

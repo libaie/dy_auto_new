@@ -1,3 +1,4 @@
+<!-- 专家团队业务组件：展示或操作专家团队、审查、返修和创意补丁相关业务状态。 -->
 <template>
   <section v-if="patch" class="rounded-lg border border-white/10 bg-zinc-950/70 p-3">
     <div class="flex flex-wrap items-start justify-between gap-3">

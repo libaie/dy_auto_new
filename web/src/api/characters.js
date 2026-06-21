@@ -1,3 +1,4 @@
+// 前端 API 客户端：封装 characters 相关后端接口，统一给页面和组件调用。
 import client from './client.js'
 
 export function listCharacters(params) { return client.get('/characters', { params }) }

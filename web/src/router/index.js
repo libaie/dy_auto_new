@@ -1,3 +1,4 @@
+// 前端路由配置：定义管理端业务页面的访问路径和登录后的导航入口。
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../stores/auth.js'
 

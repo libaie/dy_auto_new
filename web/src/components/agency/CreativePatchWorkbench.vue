@@ -1,3 +1,4 @@
+<!-- 专家团队业务组件：展示或操作专家团队、审查、返修和创意补丁相关业务状态。 -->
 <template>
   <section class="space-y-4" data-test="creative-patch-workbench">
     <div class="rounded-lg border border-white/10 bg-zinc-900/90 p-4">

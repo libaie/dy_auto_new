@@ -1,3 +1,4 @@
+<!-- 管理端业务页面：承载 AgencyConsolePage 页面流程，协调接口数据、用户操作和业务状态展示。 -->
 <template>
   <main class="min-h-screen bg-zinc-950 px-4 py-5 text-zinc-100 md:px-6">
     <button class="mb-4 rounded border border-white/10 px-3 py-2 text-sm text-cyan-200 hover:border-cyan-400/60 hover:text-cyan-100" @click="router.back()">返回</button>

@@ -1,3 +1,4 @@
+// 前端组合式业务状态：封装 useWebSocket 相关轮询、弹窗、分页或连接状态。
 import { ref, onUnmounted } from 'vue'
 
 /**

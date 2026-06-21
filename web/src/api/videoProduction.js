@@ -1,3 +1,4 @@
+// 前端 API 客户端：封装 videoProduction 相关后端接口，统一给页面和组件调用。
 import client from './client.js'
 
 const DEFAULT_TREE_PAGE = 1

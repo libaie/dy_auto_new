@@ -1,3 +1,4 @@
+// 前端业务常量：集中维护 content 相关中文文案、导航或状态枚举。
 export const CATEGORY_LABELS = {
   comment: '评论',
   dm: '私信',

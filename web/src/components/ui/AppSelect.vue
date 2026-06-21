@@ -1,3 +1,4 @@
+<!-- 管理端通用 UI 组件：提供业务页面复用的按钮、输入、选择和弹窗基础能力。 -->
 <script setup>
 defineProps({
   modelValue: { type: [String, Number], default: '' },

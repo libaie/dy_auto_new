@@ -1,3 +1,4 @@
+<!-- 视频工作台组件：承载 Pixelle、Seedance、媒体面板和生成参数相关业务配置。 -->
 <template>
   <div class="rounded-xl border border-gray-700/50 p-4" style="background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(8px);">
     <h3 class="text-sm font-semibold text-slate-200 mb-3">模型路由配置</h3>

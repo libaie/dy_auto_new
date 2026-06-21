@@ -1,3 +1,4 @@
+// 前端 API 客户端：封装 channels 相关后端接口，统一给页面和组件调用。
 import client from './client';
 
 export function listChannels() {

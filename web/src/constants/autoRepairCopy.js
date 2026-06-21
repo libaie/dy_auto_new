@@ -1,3 +1,4 @@
+// 前端业务常量：集中维护 autoRepairCopy 相关中文文案、导航或状态枚举。
 const MOJIBAKE_PATTERN = /閿|闁|閻|閸|鐟|鐞|娓|锟|宸茶|瀹|鍥|瑙|绛|涓撳|杩斾慨|鍙傝/
 
 export const AUTO_REPAIR_STATUS_LABELS = {

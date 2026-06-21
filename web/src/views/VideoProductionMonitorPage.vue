@@ -1,3 +1,4 @@
+<!-- 管理端业务页面：承载 VideoProductionMonitorPage 页面流程，协调接口数据、用户操作和业务状态展示。 -->
 <template>
   <div class="p-6 text-slate-100">
     <div class="mb-6 flex flex-wrap items-start justify-between gap-4">

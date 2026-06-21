@@ -1,3 +1,4 @@
+<!-- 管理端业务页面：承载 ChainTemplatesPage 页面流程，协调接口数据、用户操作和业务状态展示。 -->
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue'
 import {

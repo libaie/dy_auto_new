@@ -1,3 +1,4 @@
+<!-- 专家团队业务组件：展示或操作专家团队、审查、返修和创意补丁相关业务状态。 -->
 <template>
   <section data-test="auto-repair-task-list">
     <div v-if="loading" class="rounded border border-white/10 bg-zinc-950/60 p-4 text-sm text-zinc-400">

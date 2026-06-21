@@ -1,3 +1,4 @@
+// 前端业务常量：集中维护 channels 相关中文文案、导航或状态枚举。
 export const CHANNEL_TASK_TYPE_LABEL = {
   search_comment: '评论搜索',
   search_like: '点赞搜索',

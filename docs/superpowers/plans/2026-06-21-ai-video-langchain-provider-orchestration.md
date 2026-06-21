@@ -85,7 +85,7 @@ async def test_submit_image_generation_uses_existing_worker_service(monkeypatch,
         )
 
     monkeypatch.setattr(provider_tools, "_load_run_and_job", lambda db_arg, run_id, job_id: (run, job))
-    monkeypatch.setattr(provider_tools, "execute_real_job", fake_execute_real_job)
+    monkeypatch.setattr(provider_tools, "_execute_provider_job", fake_execute_real_job)
 
     tools = provider_tools.build_provider_tools(db, allowed_tools=["submit_image_generation"])
     result = await _tool(tools, "submit_image_generation").ainvoke({"run_id": "run-1", "job_id": "job-1"})
@@ -104,12 +104,42 @@ async def test_submit_video_generation_rejects_wrong_stage(monkeypatch, db):
         raise AssertionError("should not submit wrong stage")
 
     monkeypatch.setattr(provider_tools, "_load_run_and_job", lambda db_arg, run_id, job_id: (run, job))
-    monkeypatch.setattr(provider_tools, "execute_real_job", fail_execute_real_job)
+    monkeypatch.setattr(provider_tools, "_execute_provider_job", fail_execute_real_job)
 
     tools = provider_tools.build_provider_tools(db, allowed_tools=["submit_video_generation"])
 
     with pytest.raises(ValueError, match="video_generation"):
         await _tool(tools, "submit_video_generation").ainvoke({"run_id": "run-1", "job_id": "image-job"})
+
+
+def test_provider_tools_import_has_no_config_side_effects_under_production_debug():
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    repo_root = Path(__file__).resolve().parents[2]
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(repo_root / "server")
+    env["DEBUG"] = "false"
+    for key in ("DEVICE_SECRET", "ADMIN_PASSWORD", "JWT_SECRET"):
+        env.pop(key, None)
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import app.domains.ai_video_series.langchain_runtime.provider_tools; print('import-ok')",
+        ],
+        cwd=repo_root,
+        env=env,
+        text=True,
+        capture_output=True,
+        timeout=20,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert "import-ok" in completed.stdout
 ```
 
 - [ ] **Step 2: Run the tests and verify RED**
@@ -135,7 +165,6 @@ from langchain_core.tools import tool
 from sqlalchemy.orm import Session
 
 from app.domains.agency_operations.agency_runtime_contracts import AgencyRuntimeError
-from app.domains.video_production.production_worker_service import execute_real_job
 
 
 def _load_run_and_job(db: Session, run_id: str, job_id: str):
@@ -164,13 +193,19 @@ def _result_payload(result: Any) -> dict[str, Any]:
     }
 
 
+async def _execute_provider_job(db: Session, run: Any, job: Any) -> Any:
+    from app.domains.video_production.production_worker_service import execute_real_job
+
+    return await execute_real_job(db, run, job)
+
+
 async def _run_provider_job(db: Session | None, *, run_id: str, job_id: str, expected_stage: str) -> dict[str, Any]:
     if db is None:
         raise AgencyRuntimeError("AI_VIDEO_PROVIDER_CONTEXT_NOT_FOUND", "Database session is required.")
     run, job = _load_run_and_job(db, run_id, job_id)
     if job.stage != expected_stage:
         raise ValueError(f"Provider tool expected stage {expected_stage}, got {job.stage}.")
-    return _result_payload(await execute_real_job(db, run, job))
+    return _result_payload(await _execute_provider_job(db, run, job))
 
 
 def build_provider_tools(db: Session | None, allowed_tools: list[str] | None = None) -> list[Any]:

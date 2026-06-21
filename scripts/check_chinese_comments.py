@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -66,12 +67,23 @@ DEVICE_HIGH_RISK_PATTERNS = [
 DEVICE_RISK_EXCLUDED_FILES = {
     "device/core/floating-window.js",
 }
+JS_DECLARATION_PATTERNS = [
+    re.compile(pattern)
+    for pattern in (
+        r"^\s*(?:export\s+)?(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\s*\(",
+        r"^\s*(?:export\s+)?class\s+([A-Za-z_$][\w$]*)\b",
+        r"^\s*(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s+)?function\s*\(",
+        r"^\s*([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+)\s*=\s*(?:async\s+)?function\s*\(",
+        r"^\s*([A-Za-z_$][\w$]*)\s*:\s*(?:async\s+)?function\s*\(",
+    )
+]
 
 
 @dataclass(frozen=True)
 class CheckResult:
     module_missing: list[Path]
     risk_missing: list[tuple[Path, int, str]]
+    declaration_missing: list[tuple[Path, int, str, str]]
 
 
 def _has_chinese(text: str) -> bool:
@@ -146,16 +158,66 @@ def high_risk_comment_gaps(path: Path) -> list[tuple[int, str]]:
     return gaps
 
 
+def _python_declaration_gaps(path: Path) -> list[tuple[int, str, str]]:
+    tree = ast.parse(path.read_text(encoding="utf-8", errors="ignore"))
+    gaps = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ClassDef):
+            if not _has_chinese(ast.get_docstring(node) or ""):
+                gaps.append((node.lineno, "class", node.name))
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            if not _has_chinese(ast.get_docstring(node) or ""):
+                gaps.append((node.lineno, "function", node.name))
+    return sorted(gaps)
+
+
+def _js_comment_window_has_chinese(lines: list[str], declaration_index: int) -> bool:
+    start = max(0, declaration_index - 5)
+    window = lines[start:declaration_index]
+    if declaration_index <= 2 and len([line for line in window if line.strip()]) <= 1:
+        return False
+    return _has_chinese("\n".join(window))
+
+
+def _js_declaration_gaps(path: Path) -> list[tuple[int, str, str]]:
+    lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
+    gaps: list[tuple[int, str, str]] = []
+    for index, line in enumerate(lines):
+        for pattern in JS_DECLARATION_PATTERNS:
+            match = pattern.search(line)
+            if not match:
+                continue
+            if not _js_comment_window_has_chinese(lines, index):
+                gaps.append((index + 1, "function", match.group(1)))
+            break
+    return gaps
+
+
+def declaration_comment_gaps(path: Path) -> list[tuple[int, str, str]]:
+    if path.suffix == ".py":
+        return _python_declaration_gaps(path)
+    if path.suffix in {".js", ".ts", ".tsx", ".vue"}:
+        return _js_declaration_gaps(path)
+    return []
+
+
 def check_files(paths: Iterable[Path], *, strict_risk: bool) -> CheckResult:
     module_missing = []
     risk_missing = []
+    declaration_missing = []
     for path in paths:
         if not has_chinese_module_comment(path):
             module_missing.append(path)
         if strict_risk:
             for line_no, line in high_risk_comment_gaps(path):
                 risk_missing.append((path, line_no, line))
-    return CheckResult(module_missing=module_missing, risk_missing=risk_missing)
+            for line_no, kind, name in declaration_comment_gaps(path):
+                declaration_missing.append((path, line_no, kind, name))
+    return CheckResult(
+        module_missing=module_missing,
+        risk_missing=risk_missing,
+        declaration_missing=declaration_missing,
+    )
 
 
 def _relative(path: Path) -> str:
@@ -176,13 +238,16 @@ def main() -> int:
     print(
         f"checked={len(files)} "
         f"module_missing={len(result.module_missing)} "
-        f"risk_missing={len(result.risk_missing)}"
+        f"risk_missing={len(result.risk_missing)} "
+        f"declaration_missing={len(result.declaration_missing)}"
     )
     for path in result.module_missing:
         print(f"MODULE {_relative(path)}")
     for path, line_no, line in result.risk_missing:
         print(f"RISK {_relative(path)}:{line_no} {line}")
-    return 1 if result.module_missing or result.risk_missing else 0
+    for path, line_no, kind, name in result.declaration_missing:
+        print(f"DECL {_relative(path)}:{line_no} {kind} {name}")
+    return 1 if result.module_missing or result.risk_missing or result.declaration_missing else 0
 
 
 if __name__ == "__main__":

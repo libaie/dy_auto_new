@@ -3,6 +3,7 @@ from pathlib import Path
 from scripts.check_chinese_comments import (
     CheckResult,
     check_files,
+    declaration_comment_gaps,
     has_chinese_module_comment,
     high_risk_comment_gaps,
     inventory,
@@ -27,6 +28,61 @@ def test_javascript_file_accepts_leading_chinese_comment(tmp_path: Path):
 
     assert has_chinese_module_comment(good)
     assert not has_chinese_module_comment(bad)
+
+
+def test_python_declarations_require_chinese_docstrings(tmp_path: Path):
+    path = tmp_path / "service.py"
+    path.write_text(
+        '"""视频生产服务。"""\n\n'
+        "class Runner:\n"
+        "    pass\n\n"
+        "def run():\n"
+        "    return True\n",
+        encoding="utf-8",
+    )
+
+    assert declaration_comment_gaps(path) == [
+        (3, "class", "Runner"),
+        (6, "function", "run"),
+    ]
+
+
+def test_python_declarations_accept_chinese_docstrings(tmp_path: Path):
+    path = tmp_path / "service.py"
+    path.write_text(
+        '"""视频生产服务。"""\n\n'
+        "class Runner:\n"
+        '    """生产任务运行器。"""\n'
+        "    def run(self):\n"
+        '        """执行一次生产任务。"""\n'
+        "        return True\n",
+        encoding="utf-8",
+    )
+
+    assert declaration_comment_gaps(path) == []
+
+
+def test_javascript_named_function_requires_nearby_chinese_comment(tmp_path: Path):
+    path = tmp_path / "api.js"
+    path.write_text(
+        "// 前端 API 客户端。\n"
+        "export function createRun() { return client.post('/runs') }\n",
+        encoding="utf-8",
+    )
+
+    assert declaration_comment_gaps(path) == [(2, "function", "createRun")]
+
+
+def test_javascript_named_function_accepts_nearby_chinese_comment(tmp_path: Path):
+    path = tmp_path / "api.js"
+    path.write_text(
+        "// 前端 API 客户端。\n"
+        "// 创建生产运行。\n"
+        "export function createRun() { return client.post('/runs') }\n",
+        encoding="utf-8",
+    )
+
+    assert declaration_comment_gaps(path) == []
 
 
 def test_vue_file_accepts_leading_chinese_html_comment(tmp_path: Path):
@@ -118,7 +174,7 @@ def test_check_files_reports_missing_module_comment(tmp_path: Path):
 
     result = check_files([bad], strict_risk=False)
 
-    assert result == CheckResult(module_missing=[bad], risk_missing=[])
+    assert result == CheckResult(module_missing=[bad], risk_missing=[], declaration_missing=[])
 
 
 def test_all_business_code_has_standard_chinese_comments():

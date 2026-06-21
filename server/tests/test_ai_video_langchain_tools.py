@@ -39,6 +39,13 @@ def test_build_ai_video_tools_returns_restricted_tool_names(db):
     assert [tool.name for tool in tools] == ["validate_json"]
 
 
+def test_build_ai_video_tools_can_select_provider_tool(db):
+    tools = build_ai_video_tools(db=None, allowed_tools=["submit_image_generation"])
+
+    assert [tool.name for tool in tools] == ["submit_image_generation"]
+    assert tools[0].coroutine is not None
+
+
 def test_build_ai_video_tools_respects_empty_allowed_tools(db):
     tools = build_ai_video_tools(db=None, allowed_tools=[])
 

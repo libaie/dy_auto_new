@@ -65,4 +65,22 @@ def build_ai_video_tools(db: Session | None, allowed_tools: list[str] | None = N
         "validate_json": validate_json,
         "read_series_context": read_series_context,
     }
-    return [tools_by_name[name] for name in tools_by_name if name in selected]
+    if allowed_tools is None:
+        from app.domains.ai_video_series.langchain_runtime.provider_tools import build_provider_tools
+
+        return [*tools_by_name.values(), *build_provider_tools(db)]
+    local_tools = [tools_by_name[name] for name in tools_by_name if name in selected]
+    provider_names = [
+        "submit_image_generation",
+        "query_image_task",
+        "submit_video_generation",
+        "query_video_task",
+        "submit_compose",
+        "query_compose_task",
+    ]
+    requested_provider_tools = [name for name in provider_names if name in selected]
+    if not requested_provider_tools:
+        return local_tools
+    from app.domains.ai_video_series.langchain_runtime.provider_tools import build_provider_tools
+
+    return [*local_tools, *build_provider_tools(db, allowed_tools=requested_provider_tools)]

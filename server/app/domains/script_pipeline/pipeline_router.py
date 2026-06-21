@@ -8,7 +8,6 @@ from sqlalchemy.orm import Session
 
 from app.database import SessionLocal, get_db
 from app.db.models.script_pipeline import PipelineRun
-from app.db.models.video_library import GeneratedVideo
 from app.deps import require_role
 from app.db.models import Episode, Series
 from app.domains.pixelle_integration.pixelle_client import _pixelle_request
@@ -141,6 +140,17 @@ def _missing_pipeline_agency_trace(stage: str, exc: Exception) -> dict:
     }
 
 
+def _provider_rendering_block_trace() -> dict:
+    return {
+        "stage": "provider_rendering",
+        "stage_status": "blocked",
+        "invocation_ids": [],
+        "invocations": [],
+        "error_code": "PROVIDER_RENDERING_REQUIRES_PRODUCTION_JOB",
+        "error_message": PROVIDER_RENDERING_REQUIRES_JOB,
+    }
+
+
 def _pipeline_trace_blocks(trace: dict | None) -> bool:
     return _pipeline_trace_status(trace) in {"blocked", "failed"}
 
@@ -254,12 +264,16 @@ def _block_provider_rendering_without_job(
     run.current_layer = layer
     run.error_log = PROVIDER_RENDERING_REQUIRES_JOB
     layers = dict(run.layers_json or {})
+    for key, value in list(layers.items()):
+        if key != str(layer) and isinstance(value, dict) and value.get("status") == "running" and len(value) == 1:
+            layers[key] = {"status": "pending"}
     layers[str(layer)] = _agency_layer_summary(
         series,
         phase,
         "blocked",
         error=PROVIDER_RENDERING_REQUIRES_JOB,
         output_summary={"message": PROVIDER_RENDERING_REQUIRES_JOB},
+        agency_trace=_provider_rendering_block_trace(),
     )
     run.layers_json = layers
     db.commit()
@@ -282,7 +296,7 @@ async def _run_all_layers(run_id: str) -> None:
 
         run.started_at = run.started_at or datetime.now(BJT)
         run.current_layer = 0
-        run.layers_json = {str(i): {"status": "running"} for i in range(6)}
+        run.layers_json = {str(i): {"status": "pending"} for i in range(6)}
         db.commit()
 
         storyboard_trace = await _run_pipeline_agency_stage(
@@ -363,65 +377,6 @@ async def _run_all_layers(run_id: str) -> None:
         _block_provider_rendering_without_job(db, run, series=series, layer=4)
         return
 
-        video_trace = await _run_pipeline_agency_stage(
-            db,
-            run,
-            stage="video_stage",
-            episode=episode,
-            stage_context={"segments": rendered_segments, "frames": frames},
-        )
-        if _pipeline_trace_blocks(video_trace):
-            _block_pipeline_stage(db, run, layer=4, phase="render", trace=video_trace, series=series)
-            return
-
-        edit_manifest = {
-            "subtitle_style": (storyboard.get("edit_packaging") or {}).get("subtitle_style", ""),
-            "bgm_policy": (storyboard.get("edit_packaging") or {}).get("bgm_policy", {}),
-            "output_spec": (storyboard.get("edit_packaging") or {}).get("output_spec", {}),
-        }
-        compose_trace = await _run_pipeline_agency_stage(
-            db,
-            run,
-            stage="compose",
-            episode=episode,
-            stage_context={"segments": rendered_segments, "edit_manifest": edit_manifest},
-        )
-        if _pipeline_trace_blocks(compose_trace):
-            _block_pipeline_stage(db, run, layer=5, phase="final_edit", trace=compose_trace, series=series)
-            return
-
-        final = await _pixelle_request("POST", "/api/postproduction/execute", db, json={
-            "segments": rendered_segments,
-            "edit_manifest": edit_manifest,
-        })
-        final_video_path = final.get("video_path") or final.get("final_video_path", "")
-        duration = final.get("duration") or sum(float(item.get("duration") or 0) for item in rendered_segments)
-
-        if episode:
-            episode.video_url = final_video_path
-            episode.duration_seconds = int(duration or 0)
-            episode.status = "completed"
-        video = GeneratedVideo(
-            task_id=str(run.id),
-            keyword=title,
-            title=title,
-            video_path=final_video_path,
-            duration=duration,
-            status="completed",
-        )
-        db.add(video)
-        run.status = "completed"
-        run.current_layer = 5
-        run.layers_json = {
-            "0": _agency_layer_summary(series, "storyboard", "completed", output_summary={"title": title}),
-            "1": _agency_layer_summary(series, "storyboard", "completed", input_summary={"frame_count": len(frames)}, output_summary={"frame_count": len(frames)}, agency_trace=storyboard_trace),
-            "2": _agency_layer_summary(series, "render", "completed", output_summary={"reference_urls": [f.get("reference_urls") or [] for f in frames]}, agency_trace=image_trace),
-            "3": _agency_layer_summary(series, "render", "completed", output_summary={"segment_count": len(rendered_segments)}),
-            "4": _agency_layer_summary(series, "render", "completed", input_summary={"frame_count": len(frames)}, output_summary={"video_path": rendered_segments[-1]["video_path"] if rendered_segments else "", "segment_count": len(rendered_segments), "edit_manifest": edit_manifest}, agency_trace=video_trace),
-            "5": _agency_layer_summary(series, "final_edit", "completed", input_summary={"segment_count": len(rendered_segments)}, output_summary=final, agency_trace=compose_trace),
-        }
-        run.completed_at = datetime.now(BJT)
-        db.commit()
     except Exception as exc:
         run = db.query(PipelineRun).filter(PipelineRun.id == run_id).first()
         if run:

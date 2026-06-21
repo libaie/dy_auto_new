@@ -330,6 +330,10 @@ async def test_pipeline_layers_block_provider_rendering_without_production_job(d
     db.expire_all()
     saved = db.query(PipelineRun).filter(PipelineRun.id == run.id).one()
     assert saved.status == "blocked"
+    assert saved.layers_json["0"]["status"] == "pending"
+    assert saved.layers_json["3"]["status"] == "pending"
+    assert saved.layers_json["5"]["status"] == "pending"
+    assert saved.layers_json["4"]["agency_trace_status"] == "blocked"
     layer_4 = saved.layers_json["4"]
     assert "agency_roles" in layer_4
     assert "quality_gates" in layer_4
@@ -1016,4 +1020,5 @@ async def test_pipeline_blocked_layer_gets_user_facing_recovery_summary(db, test
     saved = db.query(PipelineRun).filter(PipelineRun.id == run.id).one()
     assert saved.status == "blocked"
     assert saved.layers_json["4"]["status"] == "blocked"
+    assert saved.layers_json["4"]["agency_trace_status"] == "blocked"
     assert saved.layers_json["4"]["error"] == "Script pipeline provider rendering requires a production run job."

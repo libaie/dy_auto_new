@@ -15,18 +15,14 @@ from app.domains.agency_operations.agency_persistence import create_or_resume_in
 from app.domains.agency_operations.agency_runtime import (
     AgencyRuntimeError,
 )
-from app.domains.agency_operations.agency_runtime_contracts import (
-    OPENAI_CHAT_COMPLETIONS_PROTOCOL,
-    OPENAI_COMPATIBLE_PROVIDERS,
-    runtime_setting,
-)
+from app.domains.ai_video_series.langchain_runtime.agent_runner import LangChainAgentRunner
+from app.domains.ai_video_series.langchain_runtime.tools import build_ai_video_tools
 from app.domains.model_configuration.runtime_model_config import redact_runtime_model_config, resolve_runtime_model_config
 
 
 STORY_GENERATOR_EXPERT_ID = "story_generator"
 STORY_PLANNING_STAGE = "story_planning"
 SCRIPT_GENERATION_SCENE = "script_generation"
-_runtime_setting = runtime_setting
 
 
 @dataclass(frozen=True)
@@ -107,83 +103,6 @@ def _response_format(config: dict[str, Any]) -> dict[str, Any] | None:
             "schema": STORY_PLAN_OUTPUT_SCHEMA,
         },
     }
-
-
-def _chat_completion_url(base_url: str) -> str:
-    normalized = base_url.rstrip("/")
-    if normalized.endswith("/chat/completions"):
-        return normalized
-    return f"{normalized}/chat/completions"
-
-
-def _ensure_openai_compatible_provider(config: dict[str, Any]) -> None:
-    protocol = _runtime_setting(config, "protocol", "")
-    if isinstance(protocol, str) and protocol.lower() == OPENAI_CHAT_COMPLETIONS_PROTOCOL:
-        return
-
-    provider = config.get("provider", "")
-    if isinstance(provider, str) and provider.lower() in OPENAI_COMPATIBLE_PROVIDERS:
-        return
-
-    raise AgencyRuntimeError(
-        "EXPERT_MODEL_PROVIDER_UNSUPPORTED",
-        "Story generator only supports OpenAI-compatible chat completion providers.",
-    )
-
-
-async def _default_story_model_client(
-    system_prompt: str,
-    user_prompt: str,
-    runtime_config: dict[str, Any],
-    response_format: dict[str, Any] | None = None,
-) -> StoryModelClientResponse:
-    _ensure_openai_compatible_provider(runtime_config)
-    base_url = (runtime_config.get("base_url") or "").strip()
-    api_key = runtime_config.get("api_key") or ""
-    model = runtime_config.get("model") or runtime_config.get("model_id") or ""
-    if not base_url or not api_key or not model:
-        raise AgencyRuntimeError(
-            "EXPERT_MODEL_CONFIG_MISSING",
-            "Story generator model requires base_url, api_key, and model.",
-        )
-
-    payload: dict[str, Any] = {
-        "model": model,
-        "temperature": float(_runtime_setting(runtime_config, "temperature", 0.65)),
-        "max_tokens": int(_runtime_setting(runtime_config, "max_tokens", 4096)),
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-    }
-    if response_format is not None:
-        payload["response_format"] = response_format
-
-    async with httpx.AsyncClient(timeout=float(_runtime_setting(runtime_config, "timeout", 90))) as client:
-        response = await client.post(
-            _chat_completion_url(base_url),
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "content-type": "application/json",
-            },
-            json=payload,
-        )
-        response.raise_for_status()
-        data = response.json()
-
-    try:
-        content = data["choices"][0]["message"]["content"]
-    except (KeyError, IndexError, TypeError) as exc:
-        raise AgencyRuntimeError(
-            "EXPERT_MODEL_HTTP_ERROR",
-            "Story generator model response did not include chat completion content.",
-        ) from exc
-    if not isinstance(content, str):
-        raise AgencyRuntimeError(
-            "EXPERT_MODEL_HTTP_ERROR",
-            "Story generator model response content was not a string.",
-        )
-    return {"content": content, "token_usage": data.get("usage", {})}
 
 
 def _split_model_response(response: StoryModelClientResponse) -> tuple[str, dict[str, Any]]:
@@ -272,11 +191,11 @@ async def generate_story_plan_with_expert(
     existing_artifacts: list[dict[str, Any]],
     runtime_config: dict[str, Any] | None = None,
     model_client: StoryModelClient | None = None,
+    agent_runner: Any | None = None,
 ) -> StoryGeneratorResult:
     expert = get_expert(STORY_GENERATOR_EXPERT_ID)
     expert_markdown = read_expert_markdown(STORY_GENERATOR_EXPERT_ID)
     runtime_config = runtime_config or resolve_runtime_model_config(db, SCRIPT_GENERATION_SCENE)
-    model_client = model_client or _default_story_model_client
     context = {
         "series": {
             "id": series.id,
@@ -330,9 +249,19 @@ async def generate_story_plan_with_expert(
     system_prompt, user_prompt = _build_prompts(expert_markdown=expert_markdown, context=context)
 
     try:
-        model_response = await model_client(system_prompt, user_prompt, runtime_config, response_format)
-        raw_output, token_usage = _split_model_response(model_response)
-        parsed = _parse_json_object(raw_output)
+        if model_client is not None:
+            model_response = await model_client(system_prompt, user_prompt, runtime_config, response_format)
+            raw_output, token_usage = _split_model_response(model_response)
+            parsed = _parse_json_object(raw_output)
+        else:
+            parsed = await (agent_runner or LangChainAgentRunner()).run_json(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                runtime_config=runtime_config,
+                tools=build_ai_video_tools(db, allowed_tools=["validate_json", "read_series_context"]),
+            )
+            raw_output = json.dumps(parsed, ensure_ascii=False)
+            token_usage = parsed.get("token_usage", {}) if isinstance(parsed.get("token_usage"), dict) else {}
         _validate_story_payload(parsed)
     except httpx.TimeoutException as exc:
         error = AgencyRuntimeError("EXPERT_MODEL_TIMEOUT", "Story generator model call timed out.")

@@ -17,6 +17,7 @@ from app.domains.script_pipeline.script_pipeline_service import (
     PipelineManager,
     ScriptGenerationError,
     ScriptGenerationPipeline,
+    default_script_model_client,
     default_gate_runner,
 )
 
@@ -324,6 +325,41 @@ async def test_default_gate_runner_routes_script_stages_to_matching_agency_stage
         )
 
     assert [call[0] for call in calls] == ["story_planning", "story_planning", "storyboard"]
+
+
+@pytest.mark.asyncio
+async def test_default_script_model_client_uses_langchain_runner_with_validate_json(monkeypatch):
+    beats, _scenes, _shots = _stage_outputs()
+
+    class FakeRunner:
+        instances = []
+
+        def __init__(self):
+            self.calls = []
+            self.instances.append(self)
+
+        async def run_json(self, *, system_prompt, user_prompt, runtime_config, tools):
+            self.calls.append({
+                "system_prompt": system_prompt,
+                "user_prompt": user_prompt,
+                "runtime_config": runtime_config,
+                "tools": tools,
+            })
+            return beats
+
+    monkeypatch.setattr(script_pipeline_module, "LangChainAgentRunner", FakeRunner)
+    runtime_config = {"provider": "mock", "model": "script-model"}
+
+    result = await default_script_model_client(
+        system_prompt="system",
+        user_prompt="user",
+        runtime_config=runtime_config,
+    )
+
+    assert result == beats
+    call = FakeRunner.instances[0].calls[0]
+    assert call["runtime_config"] is runtime_config
+    assert [tool.name for tool in call["tools"]] == ["validate_json"]
 
 
 @pytest.mark.asyncio

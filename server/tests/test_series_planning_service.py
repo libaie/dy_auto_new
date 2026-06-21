@@ -642,3 +642,50 @@ async def test_story_generator_runtime_finalizes_safe_invocation_without_repair_
     assert invocation.output_summary_json["repair_tasks"] == []
     assert "creative_patches" not in invocation.output_summary_json
     assert db.query(AgencyCreativePatch).filter_by(source_invocation_id=invocation.id).count() == 0
+
+
+@pytest.mark.asyncio
+async def test_story_generator_default_path_uses_langchain_runner_with_tools(db):
+    from app.domains.ai_video_series.story_generator_expert import generate_story_plan_with_expert
+
+    payload = _planning_payload(total_episodes=1)
+
+    class FakeRunner:
+        def __init__(self):
+            self.calls = []
+
+        async def run_json(self, *, system_prompt, user_prompt, runtime_config, tools):
+            self.calls.append({
+                "system_prompt": system_prompt,
+                "user_prompt": user_prompt,
+                "runtime_config": runtime_config,
+                "tools": tools,
+            })
+            return payload
+
+    series = Series(title="Runner Story", logline="A secret returns.", total_episodes=1, status="draft")
+    character, scene = _add_series_assets(series, character_name="Runner Lead", scene_name="Runner Room")
+    db.add(series)
+    db.flush()
+    episode = Episode(series_id=series.id, episode_number=1, title="Pilot", status="pending")
+    db.add(episode)
+    db.commit()
+    payload["episode_outlines"][0]["character_ids"] = [character.id]
+    payload["episode_outlines"][0]["scene_ids"] = [scene.id]
+    runtime_config = {"scene_key": "script_generation", "provider": "mock", "model": "story-model"}
+    runner = FakeRunner()
+
+    result = await generate_story_plan_with_expert(
+        db,
+        series=series,
+        episodes=[episode],
+        character_ids=[character.id],
+        scene_ids=[scene.id],
+        existing_artifacts=[],
+        runtime_config=runtime_config,
+        agent_runner=runner,
+    )
+
+    assert result.parsed == payload
+    assert runner.calls[0]["runtime_config"] is runtime_config
+    assert [tool.name for tool in runner.calls[0]["tools"]] == ["validate_json", "read_series_context"]

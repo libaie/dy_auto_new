@@ -29,7 +29,8 @@ from app.models.script import (
 )
 from app.domains.agency_operations.agency_orchestrator import AgencyOrchestrator
 from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
-from app.domains.agency_operations.agency_runtime import _default_model_client
+from app.domains.ai_video_series.langchain_runtime.agent_runner import LangChainAgentRunner
+from app.domains.ai_video_series.langchain_runtime.tools import build_ai_video_tools
 from app.domains.model_configuration.runtime_model_config import resolve_runtime_model_config
 from app.domains.script_pipeline.storyboard_timing import (
     annotate_storyboard_with_timing,
@@ -170,8 +171,12 @@ async def default_script_model_client(
     user_prompt: str,
     runtime_config: dict[str, Any],
 ) -> Any:
-    response = await _default_model_client(system_prompt, user_prompt, runtime_config)
-    return response["content"]
+    return await LangChainAgentRunner().run_json(
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        runtime_config=runtime_config,
+        tools=build_ai_video_tools(None, allowed_tools=["validate_json"]),
+    )
 
 
 async def default_gate_runner(

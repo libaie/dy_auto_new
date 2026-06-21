@@ -29,6 +29,7 @@ async def create_channel(
     db: Session = Depends(get_db),
     user = Depends(require_role("admin")),
 ):
+    """业务函数：处理 create_channel 对应的业务流程、校验或数据转换。"""
     user_id, _ = user
     try:
         channel = channel_use_cases.create_channel(db, request, user_id)
@@ -43,6 +44,7 @@ def list_channels(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
+    """业务函数：处理 list_channels 对应的业务流程、校验或数据转换。"""
     return channel_use_cases.list_channels(db, user)
 
 
@@ -52,6 +54,7 @@ def get_channel(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
+    """业务函数：处理 get_channel 对应的业务流程、校验或数据转换。"""
     try:
         return channel_use_cases.get_channel(db, channel_id, user)
     except LookupError:
@@ -65,6 +68,7 @@ async def update_channel(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
+    """业务函数：处理 update_channel 对应的业务流程、校验或数据转换。"""
     if not request.status:
         raise HTTPException(status_code=400, detail="需要提供 status 字段")
     try:
@@ -85,6 +89,7 @@ async def delete_channel(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
+    """业务函数：处理 delete_channel 对应的业务流程、校验或数据转换。"""
     try:
         result = channel_use_cases.delete_channel(db, channel_id, user)
     except ValueError as error:
@@ -100,6 +105,7 @@ async def append_items(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
+    """业务函数：处理 append_items 对应的业务流程、校验或数据转换。"""
     try:
         result = channel_use_cases.append_items(db, channel_id, request.keywords, user)
     except ValueError as error:
@@ -116,6 +122,7 @@ async def update_item(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
+    """业务函数：处理 update_item 对应的业务流程、校验或数据转换。"""
     if not request.status:
         raise HTTPException(status_code=400, detail="需要提供 status 字段")
     try:
@@ -135,6 +142,7 @@ async def batch_edit_items(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
+    """业务函数：处理 batch_edit_items 对应的业务流程、校验或数据转换。"""
     result = channel_use_cases.batch_edit_items(db, request, user)
     await realtime_events.broadcast_channels_changed()
     return result
@@ -147,6 +155,7 @@ async def edit_channel_item(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
+    """业务函数：处理 edit_channel_item 对应的业务流程、校验或数据转换。"""
     try:
         item = channel_use_cases.edit_channel_item(db, item_id, request, user)
     except ValueError as error:
@@ -162,6 +171,7 @@ async def edit_channel(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
+    """业务函数：处理 edit_channel 对应的业务流程、校验或数据转换。"""
     try:
         channel = channel_use_cases.edit_channel(db, channel_id, request, user)
     except ValueError as error:

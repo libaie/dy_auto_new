@@ -31,6 +31,7 @@ router = APIRouter()
 
 
 class CommentRepliedRequest(BaseModel):
+    """业务类：承载 CommentRepliedRequest 相关的数据结构、状态或业务协作。"""
     author: str = Field(..., description="评论作者")
     text: str = Field(..., description="评论内容")
 
@@ -89,6 +90,7 @@ async def generate_content(
     db: Session = Depends(get_db),
     _: None = Depends(verify_device_secret),
 ):
+    """业务函数：处理 generate_content 对应的业务流程、校验或数据转换。"""
     """Generate content from a template on-demand."""
     try:
         content = await content_generation.generate_from_template(db, request)
@@ -132,6 +134,7 @@ async def collect_report(
     db: Session = Depends(get_db),
     device_id: str = Depends(verify_device_secret),
 ):
+    """业务函数：处理 collect_report 对应的业务流程、校验或数据转换。"""
     return await collection_reports.collect_report(db, request, device_id)
 
 # --- DM conversation endpoints ---
@@ -142,6 +145,7 @@ def dm_claim_recipient(
     db: Session = Depends(get_db),
     authed_device_id: str = Depends(verify_device_secret),
 ):
+    """业务函数：处理 dm_claim_recipient 对应的业务流程、校验或数据转换。"""
     return dm_claims.claim_recipient(db, request, authed_device_id)
 
 @router.post("/dm-send-report")
@@ -150,6 +154,7 @@ async def dm_send_report(
     db: Session = Depends(get_db),
     authed_device_id: str = Depends(verify_device_secret),
 ):
+    """业务函数：处理 dm_send_report 对应的业务流程、校验或数据转换。"""
     return await dm_claims.send_report(db, request, authed_device_id)
 
 @router.post("/dm-release-recipient", response_model=DMReleaseRecipientResponse)
@@ -158,9 +163,11 @@ def dm_release_recipient(
     db: Session = Depends(get_db),
     authed_device_id: str = Depends(verify_device_secret),
 ):
+    """业务函数：处理 dm_release_recipient 对应的业务流程、校验或数据转换。"""
     return dm_claims.release_recipient(db, request, authed_device_id)
 
 class CommentAIReplyRequest(BaseModel):
+    """业务类：承载 CommentAIReplyRequest 相关的数据结构、状态或业务协作。"""
     nickname: str
     text: str
     ai_reply: str
@@ -176,9 +183,11 @@ def save_comment_ai_reply(
     db: Session = Depends(get_db),
     _: str = Depends(verify_device_secret),
 ):
+    """业务函数：处理 save_comment_ai_reply 对应的业务流程、校验或数据转换。"""
     return collection_reports.save_comment_ai_reply(db, request)
 
 class UserProfileRequest(BaseModel):
+    """业务类：承载 UserProfileRequest 相关的数据结构、状态或业务协作。"""
     nickname: str
     douyin_id: str = ""
     fans_count: str = ""
@@ -202,9 +211,11 @@ def save_user_profile(
     db: Session = Depends(get_db),
     authed_device_id: str = Depends(verify_device_secret),
 ):
+    """业务函数：处理 save_user_profile 对应的业务流程、校验或数据转换。"""
     return collection_reports.save_user_profile(db, request, authed_device_id)
 
 class UserAvatarRequest(BaseModel):
+    """业务类：承载 UserAvatarRequest 相关的数据结构、状态或业务协作。"""
     douyin_id: str
     image_base64: str  # base64-encoded JPEG/PNG
 
@@ -215,6 +226,7 @@ def upload_user_avatar(
     db: Session = Depends(get_db),
     _: str = Depends(verify_device_secret),
 ):
+    """业务函数：处理 upload_user_avatar 对应的业务流程、校验或数据转换。"""
     return collection_reports.upload_user_avatar(db, request)
 
 @router.get("/avatar/{douyin_id}")

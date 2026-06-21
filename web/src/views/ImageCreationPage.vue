@@ -1144,20 +1144,24 @@ onBeforeUnmount(() => {
   clearTaskPoll()
 })
 
+// 前端业务函数：协调 setMode 对应的页面流程、接口调用或状态转换。
 function setMode(mode) {
   form.mode = mode
   error.value = ''
 }
 
+// 前端业务函数：协调 createIdempotencyKey 对应的页面流程、接口调用或状态转换。
 function createIdempotencyKey() {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID()
   return `image-${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
 
+// 前端业务函数：协调 assetUrl 对应的页面流程、接口调用或状态转换。
 function assetUrl(asset) {
   return asset?.image_url || asset?.url || ''
 }
 
+// 前端业务函数：协调 applyTaskResponse 对应的页面流程、接口调用或状态转换。
 function applyTaskResponse(response) {
   const data = response?.data?.data || response?.data || response || {}
   task.value = data.task || data || null
@@ -1165,18 +1169,22 @@ function applyTaskResponse(response) {
   scheduleTaskPoll()
 }
 
+// 前端业务函数：协调 updateAsset 对应的页面流程、接口调用或状态转换。
 function updateAsset(updated) {
   assets.value = assets.value.map(asset => (asset.id === updated.id ? { ...asset, ...updated } : asset))
 }
 
+// 前端业务函数：协调 taskNeedsPolling 对应的页面流程、接口调用或状态转换。
 function taskNeedsPolling(currentTask = task.value) {
   return Boolean(currentTask?.id && activeTaskStatuses.has(String(currentTask.status || '').toLowerCase()))
 }
 
+// 前端业务函数：协调 taskCanProviderSync 对应的页面流程、接口调用或状态转换。
 function taskCanProviderSync(currentTask = task.value) {
   return Boolean(currentTask?.pixelle_task_id || currentTask?.provider_task_id)
 }
 
+// 前端业务函数：协调 clearTaskPoll 对应的页面流程、接口调用或状态转换。
 function clearTaskPoll() {
   if (taskPollTimer) {
     clearTimeout(taskPollTimer)
@@ -1184,12 +1192,14 @@ function clearTaskPoll() {
   }
 }
 
+// 前端业务函数：协调 scheduleTaskPoll 对应的页面流程、接口调用或状态转换。
 function scheduleTaskPoll() {
   clearTaskPoll()
   if (!taskNeedsPolling()) return
   taskPollTimer = setTimeout(pollTaskOnce, TASK_POLL_INTERVAL_MS)
 }
 
+// 前端业务函数：协调 pollTaskOnce 对应的页面流程、接口调用或状态转换。
 async function pollTaskOnce() {
   taskPollTimer = null
   if (!taskNeedsPolling()) return
@@ -1214,24 +1224,29 @@ async function pollTaskOnce() {
   }
 }
 
+// 前端业务函数：协调 compactProviderOptions 对应的页面流程、接口调用或状态转换。
 function compactProviderOptions() {
   return Object.fromEntries(Object.entries(form.providerOptions)
     .filter(([, value]) => value !== '' && value !== null && value !== undefined))
 }
 
+// 前端业务函数：协调 modeAcceptsSource 对应的页面流程、接口调用或状态转换。
 function modeAcceptsSource(mode) {
   return ['image_to_image', 'image_to_image_set'].includes(mode)
 }
 
+// 前端业务函数：协调 modeAcceptsReferences 对应的页面流程、接口调用或状态转换。
 function modeAcceptsReferences(mode) {
   return ['multi_reference_to_image', 'multi_reference_to_image_set'].includes(mode)
 }
 
+// 前端业务函数：协调 schemaOptions 对应的页面流程、接口调用或状态转换。
 function schemaOptions(key, fallback) {
   const options = providerOptionSchema.value?.[key]?.options
   return Array.isArray(options) && options.length ? options : fallback
 }
 
+// 前端业务函数：协调 buildModelParameterPayload 对应的页面流程、接口调用或状态转换。
 function buildModelParameterPayload() {
   const payload = {}
   if (form.modelId) payload.model_id = form.modelId
@@ -1246,6 +1261,7 @@ function buildModelParameterPayload() {
   return payload
 }
 
+// 前端业务函数：协调 addSourceAndReferences 对应的页面流程、接口调用或状态转换。
 function addSourceAndReferences(payload) {
   if (modeAcceptsSource(form.mode) && form.sourceAssetId) {
     payload.source = { type: 'asset', asset_id: form.sourceAssetId, url: form.sourceUrl.trim() }
@@ -1258,6 +1274,7 @@ function addSourceAndReferences(payload) {
   return payload
 }
 
+// 前端业务函数：协调 buildSelectionPreviewPayload 对应的页面流程、接口调用或状态转换。
 function buildSelectionPreviewPayload() {
   const providerOptions = compactProviderOptions()
   if (form.watermark) {
@@ -1279,6 +1296,7 @@ function buildSelectionPreviewPayload() {
   })
 }
 
+// 前端业务函数：协调 buildAbPayload 对应的页面流程、接口调用或状态转换。
 function buildAbPayload() {
   const payload = { ...buildSelectionPreviewPayload() }
   delete payload.strategy_id
@@ -1287,6 +1305,7 @@ function buildAbPayload() {
   return payload
 }
 
+// 前端业务函数：协调 buildPayload 对应的页面流程、接口调用或状态转换。
 function buildPayload() {
   const hasConfirmedCurrentCost = Boolean(
     costConfirmed.value
@@ -1314,6 +1333,7 @@ function buildPayload() {
   return payload
 }
 
+// 前端业务函数：协调 resetSelectionPreview 对应的页面流程、接口调用或状态转换。
 function resetSelectionPreview() {
   requiresFreshPreviewAfterHighCost.value = previewCostRequiresConfirmation.value || requiresFreshPreviewAfterHighCost.value
   selectionPreviewRequestToken.value += 1
@@ -1323,6 +1343,7 @@ function resetSelectionPreview() {
   previewLoading.value = false
 }
 
+// 前端业务函数：协调 clearAbWinnerRecommendation 对应的页面流程、接口调用或状态转换。
 function clearAbWinnerRecommendation() {
   abRecommendationRequestToken.value += 1
   abWinnerRecommendation.value = null
@@ -1330,6 +1351,7 @@ function clearAbWinnerRecommendation() {
   abRecommendationLoading.value = false
 }
 
+// 前端业务函数：协调 resetAbPreview 对应的页面流程、接口调用或状态转换。
 function resetAbPreview() {
   abRequestToken.value += 1
   abPreview.value = null
@@ -1342,6 +1364,7 @@ function resetAbPreview() {
   abLoading.value = false
 }
 
+// 前端业务函数：协调 abCreateKeyForPreview 对应的页面流程、接口调用或状态转换。
 function abCreateKeyForPreview(requestHash) {
   if (!requestHash) return `ab-${createIdempotencyKey()}`
   if (!abCreateIdempotencyKey.value || abCreateRequestHash.value !== requestHash) {
@@ -1351,6 +1374,7 @@ function abCreateKeyForPreview(requestHash) {
   return abCreateIdempotencyKey.value
 }
 
+// 前端业务函数：协调 errorDetail 对应的页面流程、接口调用或状态转换。
 function errorDetail(e) {
   return e?.response?.data?.detail || e?.response?.data?.message || e?.message || '操作失败，请稍后重试'
 }
@@ -1364,16 +1388,19 @@ function errorText(value) {
   return String(value)
 }
 
+// 前端业务函数：协调 normalizeError 对应的页面流程、接口调用或状态转换。
 function normalizeError(e) {
   return errorText(errorDetail(e))
 }
 
+// 前端业务函数：协调 affectedTaskIdFromError 对应的页面流程、接口调用或状态转换。
 function affectedTaskIdFromError(e) {
   const detail = errorDetail(e)
   if (!detail || typeof detail !== 'object' || !Array.isArray(detail.affected_ids)) return ''
   return detail.affected_ids[0] || ''
 }
 
+// 前端业务函数：协调 loadAffectedTaskFromError 对应的页面流程、接口调用或状态转换。
 async function loadAffectedTaskFromError(e) {
   const affectedTaskId = affectedTaskIdFromError(e)
   if (!affectedTaskId) return false
@@ -1382,6 +1409,7 @@ async function loadAffectedTaskFromError(e) {
   return true
 }
 
+// 前端业务函数：协调 loadApprovedAssets 对应的页面流程、接口调用或状态转换。
 async function loadApprovedAssets() {
   try {
     const response = await listImageAssets({ status: 'approved', page_size: 30 })
@@ -1392,6 +1420,7 @@ async function loadApprovedAssets() {
   }
 }
 
+// 前端业务函数：协调 loadImageModels 对应的页面流程、接口调用或状态转换。
 async function loadImageModels() {
   try {
     const response = await listModels({ model_type: 'image', enabled: true })
@@ -1403,6 +1432,7 @@ async function loadImageModels() {
   }
 }
 
+// 前端业务函数：协调 loadStrategies 对应的页面流程、接口调用或状态转换。
 async function loadStrategies() {
   try {
     const response = await listImageProductionStrategies({ status: 'active' })
@@ -1413,6 +1443,7 @@ async function loadStrategies() {
   }
 }
 
+// 前端业务函数：协调 pruneProviderOptions 对应的页面流程、接口调用或状态转换。
 function pruneProviderOptions() {
   const allowed = new Set(providerOptionFields.value.map(field => field.key))
   for (const key of Object.keys(form.providerOptions)) {
@@ -1420,6 +1451,7 @@ function pruneProviderOptions() {
   }
 }
 
+// 前端业务函数：协调 providerOptionLabel 对应的页面流程、接口调用或状态转换。
 function providerOptionLabel(key) {
   const labels = {
     sequential_image_generation: '连续组图',
@@ -1463,6 +1495,7 @@ function timelineStepLabel(step) {
   return timelineStepLabels[step?.key] || step?.label || step?.key || ''
 }
 
+// 前端业务函数：协调 taskRescueActionLabel 对应的页面流程、接口调用或状态转换。
 function taskRescueActionLabel(action) {
   if (action?.type === 'retry_with_fallback_model') return '使用 fallback 模型重试'
   return '执行修复动作'
@@ -1473,6 +1506,7 @@ function isCurrentTimelineStep(step) {
   return current === step
 }
 
+// 前端业务函数：协调 timelineStatusClass 对应的页面流程、接口调用或状态转换。
 function timelineStatusClass(status) {
   if (status === 'completed') return 'text-emerald-300'
   if (status === 'failed' || status === 'blocked') return 'text-rose-300'
@@ -1480,6 +1514,7 @@ function timelineStatusClass(status) {
   return 'text-slate-400'
 }
 
+// 前端业务函数：协调 timelineDotClass 对应的页面流程、接口调用或状态转换。
 function timelineDotClass(status) {
   if (status === 'completed') return 'bg-emerald-400'
   if (status === 'failed' || status === 'blocked') return 'bg-rose-400'
@@ -1487,6 +1522,7 @@ function timelineDotClass(status) {
   return 'bg-slate-600'
 }
 
+// 前端业务函数：协调 uploadSource 对应的页面流程、接口调用或状态转换。
 async function uploadSource(event) {
   const file = event.target.files?.[0]
   if (!file) return
@@ -1507,16 +1543,19 @@ async function uploadSource(event) {
   }
 }
 
+// 前端业务函数：协调 useApprovedAsset 对应的页面流程、接口调用或状态转换。
 function useApprovedAsset(asset) {
   form.sourceUrl = assetUrl(asset)
   form.sourceAssetId = asset.id || ''
   resetSelectionPreview()
 }
 
+// 前端业务函数：协调 isReferenceAssetSelected 对应的页面流程、接口调用或状态转换。
 function isReferenceAssetSelected(asset) {
   return form.referenceAssetIds.includes(asset.id)
 }
 
+// 前端业务函数：协调 toggleReferenceAsset 对应的页面流程、接口调用或状态转换。
 function toggleReferenceAsset(asset) {
   if (!asset?.id) return
   if (isReferenceAssetSelected(asset)) {
@@ -1528,6 +1567,7 @@ function toggleReferenceAsset(asset) {
   resetSelectionPreview()
 }
 
+// 前端业务函数：协调 previewAbComparison 对应的页面流程、接口调用或状态转换。
 async function previewAbComparison() {
   if (!abHasValidStrategyCount.value || abLoading.value) return
   const requestToken = abRequestToken.value + 1
@@ -1556,6 +1596,7 @@ async function previewAbComparison() {
   }
 }
 
+// 前端业务函数：协调 createAbComparison 对应的页面流程、接口调用或状态转换。
 async function createAbComparison() {
   if (abCreateDisabled.value) return
   abLoading.value = true
@@ -1577,6 +1618,7 @@ async function createAbComparison() {
   }
 }
 
+// 前端业务函数：协调 refreshAbComparison 对应的页面流程、接口调用或状态转换。
 async function refreshAbComparison() {
   if (!abGroup.value?.id || abLoading.value) return
   const groupId = abGroup.value.id
@@ -1600,6 +1642,7 @@ async function refreshAbComparison() {
   }
 }
 
+// 前端业务函数：协调 loadAbWinnerRecommendation 对应的页面流程、接口调用或状态转换。
 async function loadAbWinnerRecommendation() {
   if (!abGroup.value?.id || abRecommendationLoading.value) return
   const groupId = abGroup.value.id
@@ -1623,6 +1666,7 @@ async function loadAbWinnerRecommendation() {
   }
 }
 
+// 前端业务函数：协调 chooseAbWinner 对应的页面流程、接口调用或状态转换。
 async function chooseAbWinner(attemptId) {
   const attempt = (abGroup.value?.attempts || []).find(item => item.id === attemptId)
   if (!abGroup.value?.id || !attemptId || abOutcomeDisabled.value || !attempt?.approved_asset_ready) return
@@ -1639,6 +1683,7 @@ async function chooseAbWinner(attemptId) {
   }
 }
 
+// 前端业务函数：协调 chooseAbNoWinner 对应的页面流程、接口调用或状态转换。
 async function chooseAbNoWinner() {
   if (!abGroup.value?.id || abOutcomeDisabled.value) return
   abLoading.value = true
@@ -1654,6 +1699,7 @@ async function chooseAbNoWinner() {
   }
 }
 
+// 前端业务函数：协调 runSelectionPreview 对应的页面流程、接口调用或状态转换。
 async function runSelectionPreview() {
   const payload = buildSelectionPreviewPayload()
   const requestToken = selectionPreviewRequestToken.value + 1
@@ -1677,6 +1723,7 @@ async function runSelectionPreview() {
   }
 }
 
+// 前端业务函数：协调 handleRescueAction 对应的页面流程、接口调用或状态转换。
 async function handleRescueAction(action) {
   if (action?.type !== 'confirm_fallback_model' || !action.model_id) return
   form.modelId = action.model_id
@@ -1684,6 +1731,7 @@ async function handleRescueAction(action) {
   await runSelectionPreview()
 }
 
+// 前端业务函数：协调 handleTaskRescueAction 对应的页面流程、接口调用或状态转换。
 async function handleTaskRescueAction(action) {
   if (action?.type !== 'retry_with_fallback_model' || !action.model_id) return
   form.modelId = action.model_id
@@ -1692,6 +1740,7 @@ async function handleTaskRescueAction(action) {
   await runSelectionPreview()
 }
 
+// 前端业务函数：协调 submit 对应的页面流程、接口调用或状态转换。
 async function submit() {
   if (!canSubmit.value || submitting.value) return
   submitting.value = true
@@ -1711,6 +1760,7 @@ async function submit() {
   }
 }
 
+// 前端业务函数：协调 refreshTask 对应的页面流程、接口调用或状态转换。
 async function refreshTask() {
   if (!task.value?.id || syncing.value) return
   syncing.value = true
@@ -1725,6 +1775,7 @@ async function refreshTask() {
   }
 }
 
+// 前端业务函数：协调 syncTask 对应的页面流程、接口调用或状态转换。
 async function syncTask() {
   if (!task.value?.id || syncing.value) return
   syncing.value = true
@@ -1739,6 +1790,7 @@ async function syncTask() {
   }
 }
 
+// 前端业务函数：协调 dispatchQueuedTask 对应的页面流程、接口调用或状态转换。
 async function dispatchQueuedTask() {
   if (!task.value?.id || syncing.value) return
   syncing.value = true
@@ -1753,10 +1805,12 @@ async function dispatchQueuedTask() {
   }
 }
 
+// 前端业务函数：协调 assetAllowed 对应的页面流程、接口调用或状态转换。
 function assetAllowed(asset, action) {
   return Array.isArray(asset?.allowed_actions) && asset.allowed_actions.includes(action)
 }
 
+// 前端业务函数：协调 canPromoteAsset 对应的页面流程、接口调用或状态转换。
 function canPromoteAsset(asset) {
   const context = asset?.destination_context || {}
   return assetAllowed(asset, 'promote_to_video_asset')
@@ -1764,6 +1818,7 @@ function canPromoteAsset(asset) {
     && Boolean(context.frame_id)
 }
 
+// 前端业务函数：协调 assetReviewGateLabel 对应的页面流程、接口调用或状态转换。
 function assetReviewGateLabel(gate) {
   if (gate?.status === 'approved') return '已通过'
   if (gate?.status === 'manual_review_pending') return '待人工审查'
@@ -1786,6 +1841,7 @@ async function reviewAsset(asset, action) {
   }
 }
 
+// 前端业务函数：协调 promoteAsset 对应的页面流程、接口调用或状态转换。
 async function promoteAsset(asset) {
   if (!asset.id) return
   const context = asset.destination_context || {}
@@ -1811,6 +1867,7 @@ async function promoteAsset(asset) {
   }
 }
 
+// 前端业务函数：协调 createTaskFromAsset 对应的页面流程、接口调用或状态转换。
 async function createTaskFromAsset(asset, action) {
   if (!asset.id) return
   error.value = ''
@@ -1833,11 +1890,13 @@ async function createTaskFromAsset(asset, action) {
   }
 }
 
+// 前端业务函数：协调 editAgain 对应的页面流程、接口调用或状态转换。
 async function editAgain(asset) {
   if (!assetAllowed(asset, 'repaint')) return
   await createTaskFromAsset(asset, 'repaint')
 }
 
+// 前端业务函数：协调 copyAsNewTask 对应的页面流程、接口调用或状态转换。
 async function copyAsNewTask(asset) {
   if (!assetAllowed(asset, 'copy_as_new_task')) return
   await createTaskFromAsset(asset, 'copy_as_new_task')

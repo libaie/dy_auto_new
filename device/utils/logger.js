@@ -46,9 +46,13 @@ var logger = {
     }
   },
 
+  // 设备业务函数：处理 debug 对应的抖音自动化动作、状态或安全边界。
   debug: function (tag, msg) { this._log("debug", tag, msg); },
+  // 设备业务函数：处理 info 对应的抖音自动化动作、状态或安全边界。
   info: function (tag, msg) { this._log("info", tag, msg); },
+  // 设备业务函数：处理 warn 对应的抖音自动化动作、状态或安全边界。
   warn: function (tag, msg) { this._log("warn", tag, msg); },
+  // 设备业务函数：处理 error 对应的抖音自动化动作、状态或安全边界。
   error: function (tag, msg) { this._log("error", tag, msg); },
 
   /**

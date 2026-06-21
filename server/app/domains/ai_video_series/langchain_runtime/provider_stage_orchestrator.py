@@ -31,6 +31,7 @@ async def run_provider_stage_agent(
     runtime_config: dict[str, Any],
     agent_runner: LangChainAgentRunner | None = None,
 ) -> dict[str, Any]:
+    """业务函数：处理 run_provider_stage_agent 对应的业务流程、校验或数据转换。"""
     allowed_tools = STAGE_TOOLS.get(job_stage)
     if allowed_tools is None:
         raise ValueError(f"Unsupported provider agent stage: {job_stage}")

@@ -36,6 +36,7 @@ const collection = ref(null)
 const acting = ref(false)
 const error = ref('')
 
+// 前端业务函数：协调 create 对应的页面流程、接口调用或状态转换。
 async function create() {
   acting.value = true
   error.value = ''

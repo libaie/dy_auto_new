@@ -91,12 +91,14 @@ async function fetchTemplates() {
   }
 }
 
+// 前端业务函数：协调 handlePageChange 对应的页面流程、接口调用或状态转换。
 function handlePageChange(p) {
   page.value = p
   fetchTemplates()
 }
 
 // --- Open create dialog ---
+// 前端业务函数：协调 openCreateDialog 对应的页面流程、接口调用或状态转换。
 function openCreateDialog() {
   isEditing.value = false
   editingId.value = null
@@ -108,6 +110,7 @@ function openCreateDialog() {
 }
 
 // --- Open edit dialog ---
+// 前端业务函数：协调 openEditDialog 对应的页面流程、接口调用或状态转换。
 function openEditDialog(template) {
   isEditing.value = true
   editingId.value = template.id
@@ -119,6 +122,7 @@ function openEditDialog(template) {
 }
 
 // --- Step management ---
+// 前端业务函数：协调 addStep 对应的页面流程、接口调用或状态转换。
 function addStep() {
   const nextOrder = form.steps.length + 1
   form.steps.push({
@@ -135,6 +139,7 @@ function removeStep(index) {
   form.steps.forEach((s, i) => { s.step_order = i + 1 })
 }
 
+// 前端业务函数：协调 moveStepUp 对应的页面流程、接口调用或状态转换。
 function moveStepUp(index) {
   if (index === 0) return
   const temp = form.steps[index]
@@ -143,6 +148,7 @@ function moveStepUp(index) {
   form.steps.forEach((s, i) => { s.step_order = i + 1 })
 }
 
+// 前端业务函数：协调 moveStepDown 对应的页面流程、接口调用或状态转换。
 function moveStepDown(index) {
   if (index === form.steps.length - 1) return
   const temp = form.steps[index]
@@ -151,12 +157,14 @@ function moveStepDown(index) {
   form.steps.forEach((s, i) => { s.step_order = i + 1 })
 }
 
+// 前端业务函数：协调 onStepTypeChange 对应的页面流程、接口调用或状态转换。
 function onStepTypeChange(step) {
   step.params = { ...typeParamDefaults[step.type] || {} }
   step.label = typeOptions.find(o => o.value === step.type)?.label || step.type
 }
 
 // --- Save ---
+// 前端业务函数：协调 handleSave 对应的页面流程、接口调用或状态转换。
 async function handleSave() {
   if (!form.name.trim()) {
     formError.value = '模板名称不能为空'
@@ -195,11 +203,13 @@ async function handleSave() {
 }
 
 // --- Delete ---
+// 前端业务函数：协调 openDeleteDialog 对应的页面流程、接口调用或状态转换。
 function openDeleteDialog(template) {
   deletingTemplate.value = template
   showDeleteDialog.value = true
 }
 
+// 前端业务函数：协调 handleDelete 对应的页面流程、接口调用或状态转换。
 async function handleDelete() {
   if (!deletingTemplate.value) return
   deleting.value = true

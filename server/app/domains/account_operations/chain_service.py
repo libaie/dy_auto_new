@@ -25,7 +25,9 @@ VALID_STEP_TYPES = {t.value for t in TaskType}
 
 
 class ChainService:
+    """业务类：承载 ChainService 相关的数据结构、状态或业务协作。"""
     def is_account_busy(self, db: Session, account_id: str) -> bool:
+        """业务函数：处理 is_account_busy 对应的业务流程、校验或数据转换。"""
         """Check if account has pending or running tasks."""
         count = db.query(DBTask).filter(
             DBTask.account_id == account_id,
@@ -41,6 +43,7 @@ class ChainService:
         device_id: Optional[str] = None,
         user_id: Optional[str] = None,
     ) -> dict:
+        """业务函数：处理 create_chain_instances 对应的业务流程、校验或数据转换。"""
         """Create chain instances for each account, skipping busy ones.
 
         Uses a thread lock to prevent TOCTOU race on is_account_busy check.
@@ -92,6 +95,7 @@ class ChainService:
         return results
 
     def resolve_accounts_from_groups(self, db: Session, group_ids: list[str], user_id: Optional[str] = None) -> list[str]:
+        """业务函数：处理 resolve_accounts_from_groups 对应的业务流程、校验或数据转换。"""
         """Expand group IDs to unique active account IDs, optionally scoped to user."""
         query = (
             db.query(AccountGroupMember.account_id)
@@ -107,6 +111,7 @@ class ChainService:
         return [a[0] for a in account_ids]
 
     def advance_chain(self, db: Session, task_id: str, status: str, result: dict = None):
+        """业务函数：处理 advance_chain 对应的业务流程、校验或数据转换。"""
         """Advance chain to next step after task completion/failure.
 
         Uses flush (not commit) — caller is responsible for the final commit.
@@ -143,6 +148,7 @@ class ChainService:
         # Do NOT commit here — caller (report_result) handles the commit
 
     def _create_step_task(self, db: Session, chain: ChainInstance, step_order: int, template: ChainTemplate):
+        """业务函数：处理 _create_step_task 对应的业务流程、校验或数据转换。"""
         """Create a Task for the given step. Caller is responsible for commit/flush."""
         step = next((s for s in template.steps if s["step_order"] == step_order), None)
         if not step:
@@ -165,6 +171,7 @@ class ChainService:
         db.add(task)
 
     def _safe_push_pending_tasks(self, db: Session, account_ids: list[str]):
+        """业务函数：处理 _safe_push_pending_tasks 对应的业务流程、校验或数据转换。"""
         """Push pending tasks for chain instances to devices.
 
         Uses chain's device_id if set, otherwise falls back to account-bound device.
@@ -196,6 +203,7 @@ class ChainService:
             })
 
     def _safe_push_step_task(self, db: Session, chain: ChainInstance):
+        """业务函数：处理 _safe_push_step_task 对应的业务流程、校验或数据转换。"""
         """Push the current step task to the device.
 
         Uses chain's device_id if set, otherwise falls back to account-bound device.
@@ -226,6 +234,7 @@ class ChainService:
 
     @staticmethod
     def _schedule_push(device_id: str, data: dict):
+        """业务函数：处理 _schedule_push 对应的业务流程、校验或数据转换。"""
         """Schedule a WS push, safe for both sync and async call sites."""
         from app.ws_manager import pair_ws_manager
 
@@ -235,6 +244,7 @@ class ChainService:
         except RuntimeError:
             # No running event loop — fire and forget via a new thread
             def _push():
+                """业务函数：处理 _push 对应的业务流程、校验或数据转换。"""
                 try:
                     asyncio.run(pair_ws_manager.send_to_device(device_id, data))
                 except Exception as e:
@@ -243,6 +253,7 @@ class ChainService:
 
 
 def _task_to_push_dict(task: DBTask) -> dict:
+    """业务函数：处理 _task_to_push_dict 对应的业务流程、校验或数据转换。"""
     return {
         "id": task.id,
         "type": task.type,

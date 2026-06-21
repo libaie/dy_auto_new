@@ -26,6 +26,7 @@ export function generateVideoAsync(payload) {
   return proxy.post('/api/video/generate/async', payload)
 }
 
+// 前端业务函数：协调 generateVideoSync 对应的页面流程、接口调用或状态转换。
 export function generateVideoSync(payload) {
   return proxy.post('/api/video/generate/sync', payload)
 }
@@ -36,6 +37,7 @@ export function getTask(taskId) {
   return proxy.get(`/api/tasks/${taskId}`)
 }
 
+// 前端业务函数：协调 listTasks 对应的页面流程、接口调用或状态转换。
 export function listTasks() {
   return proxy.get('/api/tasks')
 }
@@ -46,26 +48,32 @@ export function listTemplates() {
   return proxy.get('/api/resources/templates')
 }
 
+// 前端业务函数：协调 listMediaWorkflows 对应的页面流程、接口调用或状态转换。
 export function listMediaWorkflows() {
   return proxy.get('/api/resources/workflows/media')
 }
 
+// 前端业务函数：协调 listTTSWorkflows 对应的页面流程、接口调用或状态转换。
 export function listTTSWorkflows() {
   return proxy.get('/api/resources/workflows/tts')
 }
 
+// 前端业务函数：协调 listImageWorkflows 对应的页面流程、接口调用或状态转换。
 export function listImageWorkflows() {
   return proxy.get('/api/resources/workflows/image')
 }
 
+// 前端业务函数：协调 listBGMs 对应的页面流程、接口调用或状态转换。
 export function listBGMs() {
   return proxy.get('/api/resources/bgm')
 }
 
+// 前端业务函数：协调 renderFrame 对应的页面流程、接口调用或状态转换。
 export function renderFrame(template, text) {
   return proxy.post('/api/frame/render', { template, text })
 }
 
+// 前端业务函数：协调 getOpenAPISpec 对应的页面流程、接口调用或状态转换。
 export function getOpenAPISpec() {
   return proxy.get('/openapi.json')
 }
@@ -76,16 +84,19 @@ export function generateNarration(payload) {
   return proxy.post('/api/content/narration', payload)
 }
 
+// 前端业务函数：协调 generateImagePrompt 对应的页面流程、接口调用或状态转换。
 export function generateImagePrompt(payload) {
   return proxy.post('/api/content/image-prompt', payload)
 }
 
+// 前端业务函数：协调 generateTitle 对应的页面流程、接口调用或状态转换。
 export function generateTitle(payload) {
   return proxy.post('/api/content/title', payload)
 }
 
 // ==================== TTS ====================
 
+// 前端业务函数：协调 synthesizeTTS 对应的页面流程、接口调用或状态转换。
 export function synthesizeTTS(payload) {
   return proxy.post('/api/tts/synthesize', payload)
 }

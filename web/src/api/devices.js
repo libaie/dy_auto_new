@@ -5,32 +5,39 @@ export function listDevices(params = {}) {
   return client.get('/devices', { params })
 }
 
+// 前端业务函数：协调 createDevice 对应的页面流程、接口调用或状态转换。
 export function createDevice(data) {
   return client.post('/devices', data)
 }
 
+// 前端业务函数：协调 updateDevice 对应的页面流程、接口调用或状态转换。
 export function updateDevice(id, data) {
   return client.put(`/devices/${id}`, data)
 }
 
+// 前端业务函数：协调 deleteDevice 对应的页面流程、接口调用或状态转换。
 export function deleteDevice(id) {
   return client.delete(`/devices/${id}`)
 }
 
+// 前端业务函数：协调 disconnectDevice 对应的页面流程、接口调用或状态转换。
 export function disconnectDevice(id) {
   return client.post(`/devices/${id}/disconnect`)
 }
 
 // --- Pairing requests ---
 
+// 前端业务函数：协调 listPairRequests 对应的页面流程、接口调用或状态转换。
 export function listPairRequests(status = 'pending') {
   return client.get('/devices/pair-requests', { params: { status } })
 }
 
+// 前端业务函数：协调 approvePairRequest 对应的页面流程、接口调用或状态转换。
 export function approvePairRequest(requestId) {
   return client.post(`/devices/pair-requests/${requestId}/approve`)
 }
 
+// 前端业务函数：协调 rejectPairRequest 对应的页面流程、接口调用或状态转换。
 export function rejectPairRequest(requestId) {
   return client.post(`/devices/pair-requests/${requestId}/reject`)
 }

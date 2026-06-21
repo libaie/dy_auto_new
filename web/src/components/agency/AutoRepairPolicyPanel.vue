@@ -52,6 +52,7 @@ const props = defineProps({
 })
 const emit = defineEmits(['update:modelValue'])
 
+// 前端业务函数：协调 update 对应的页面流程、接口调用或状态转换。
 function update(patch) {
   emit('update:modelValue', {
     ...props.modelValue,

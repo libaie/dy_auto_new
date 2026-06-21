@@ -22,6 +22,7 @@ const form = reactive({
 const pixelleConnTest = ref(null)
 const pixelleTesting = ref(false)
 
+// 前端业务函数：协调 fetchSettings 对应的页面流程、接口调用或状态转换。
 async function fetchSettings() {
   loading.value = true
   try {
@@ -41,6 +42,7 @@ async function fetchSettings() {
   }
 }
 
+// 前端业务函数：协调 handleSave 对应的页面流程、接口调用或状态转换。
 async function handleSave() {
   saving.value = true
   try {
@@ -61,6 +63,7 @@ async function handleSave() {
   }
 }
 
+// 前端业务函数：协调 handleTestConnection 对应的页面流程、接口调用或状态转换。
 async function handleTestConnection() {
   pixelleTesting.value = true
   pixelleConnTest.value = null

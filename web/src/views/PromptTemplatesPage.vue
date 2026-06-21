@@ -22,6 +22,7 @@ import * as api from '../api/promptTemplates.js'
 const toast = useToastStore()
 
 // --- WebSocket ---
+// 前端业务函数：协调 wsUrl 对应的页面流程、接口调用或状态转换。
 function wsUrl() {
   const token = localStorage.getItem('token') || ''
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
@@ -51,6 +52,7 @@ const showDeleteDialog = ref(false)
 const deletingName = ref(null)
 
 // ---- helpers ----
+// 前端业务函数：协调 scenePreview 对应的页面流程、接口调用或状态转换。
 function scenePreview(content) {
   if (!content) return []
   const parts = []
@@ -69,11 +71,13 @@ function resetRewriteState() {
   rewriteHasRestore.value = false
 }
 
+// 前端业务函数：协调 closeDialog 对应的页面流程、接口调用或状态转换。
 function closeDialog() {
   if (generating.value || rewriting.value) return
   dialogOpen.value = false
 }
 
+// 前端业务函数：协调 restoreLastRewrite 对应的页面流程、接口调用或状态转换。
 function restoreLastRewrite() {
   if (!rewriteHasRestore.value) return
   form.value.contentJson = rewriteRestoreContent.value
@@ -95,6 +99,7 @@ function formatDate(iso) {
 }
 
 // ---- data ----
+// 前端业务函数：协调 fetchTemplates 对应的页面流程、接口调用或状态转换。
 async function fetchTemplates() {
   loading.value = true
   try {
@@ -107,6 +112,7 @@ async function fetchTemplates() {
   }
 }
 
+// 前端业务函数：协调 openCreate 对应的页面流程、接口调用或状态转换。
 function openCreate() {
   isEditing.value = false
   generatingStatus.value = ''
@@ -115,6 +121,7 @@ function openCreate() {
   dialogOpen.value = true
 }
 
+// 前端业务函数：协调 handleGenerate 对应的页面流程、接口调用或状态转换。
 async function handleGenerate() {
   if (generating.value) return
   if (!aiDesc.value.trim()) { toast.error('请输入模板需求描述'); return }
@@ -170,6 +177,7 @@ function openEdit(row) {
   dialogOpen.value = true
 }
 
+// 前端业务函数：协调 handleRewrite 对应的页面流程、接口调用或状态转换。
 async function handleRewrite() {
   if (rewriting.value) return
   const instruction = rewriteInstruction.value.trim()
@@ -234,6 +242,7 @@ async function handleRewrite() {
   }
 }
 
+// 前端业务函数：协调 handleSave 对应的页面流程、接口调用或状态转换。
 async function handleSave() {
   if (generating.value || rewriting.value) return
   let content
@@ -269,6 +278,7 @@ async function handleToggle(row, enabled) {
 
 function openDeleteConfirm(row) { deletingName.value = row.name; showDeleteDialog.value = true }
 
+// 前端业务函数：协调 handleDelete 对应的页面流程、接口调用或状态转换。
 async function handleDelete() {
   try {
     await api.deleteTemplate(deletingName.value)

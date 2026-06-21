@@ -11,6 +11,7 @@ from .read_models import account_to_dict
 
 
 def create_account(db, request, user_id: str) -> dict:
+    """业务函数：处理 create_account 对应的业务流程、校验或数据转换。"""
     account = Account(
         nickname=request.nickname,
         douyin_id=request.douyin_id,
@@ -26,6 +27,7 @@ def create_account(db, request, user_id: str) -> dict:
 
 
 def list_accounts(db, skip: int, limit: int, include_deleted: bool, user: tuple) -> dict:
+    """业务函数：处理 list_accounts 对应的业务流程、校验或数据转换。"""
     limit = min(limit, 100)
     user_id, role = user
     query = db.query(Account)
@@ -39,6 +41,7 @@ def list_accounts(db, skip: int, limit: int, include_deleted: bool, user: tuple)
 
 
 def get_account(db, account_id: str, include_deleted: bool, user: tuple) -> dict:
+    """业务函数：处理 get_account 对应的业务流程、校验或数据转换。"""
     account = _account_query(db, account_id, include_deleted, user).first()
     if not account:
         raise LookupError("Account not found")
@@ -46,6 +49,7 @@ def get_account(db, account_id: str, include_deleted: bool, user: tuple) -> dict
 
 
 def update_account(db, account_id: str, request, user: tuple) -> dict:
+    """业务函数：处理 update_account 对应的业务流程、校验或数据转换。"""
     account = _account_query(db, account_id, include_deleted=True, user=user).first()
     if not account:
         raise LookupError("Account not found")
@@ -69,6 +73,7 @@ def update_account(db, account_id: str, request, user: tuple) -> dict:
 
 
 def delete_account(db, account_id: str, user: tuple) -> dict:
+    """业务函数：处理 delete_account 对应的业务流程、校验或数据转换。"""
     account = _account_query(db, account_id, include_deleted=True, user=user).first()
     if not account:
         raise LookupError("Account not found")
@@ -90,6 +95,7 @@ def delete_account(db, account_id: str, user: tuple) -> dict:
 
 
 def _account_query(db, account_id: str, include_deleted: bool, user: tuple):
+    """业务函数：处理 _account_query 对应的业务流程、校验或数据转换。"""
     user_id, role = user
     query = db.query(Account).filter(Account.id == account_id)
     if not include_deleted:

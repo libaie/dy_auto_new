@@ -14,6 +14,7 @@ from app.db.models.image_production import ImageCreationTask, ImageProductionCos
 
 
 def _usage_from_provider_response(task: ImageCreationTask) -> dict[str, Any]:
+    """业务函数：处理 _usage_from_provider_response 对应的业务流程、校验或数据转换。"""
     response = task.provider_response_json or {}
     usage = response.get("usage") if isinstance(response, dict) else {}
     if isinstance(usage, dict) and usage:
@@ -23,12 +24,14 @@ def _usage_from_provider_response(task: ImageCreationTask) -> dict[str, Any]:
 
 
 def _event_key(task: ImageCreationTask, event_type: str) -> str:
+    """业务函数：处理 _event_key 对应的业务流程、校验或数据转换。"""
     if event_type == "actual":
         return f"{task.id}:actual:{task.provider_task_id or task.pixelle_task_id or 'current'}"
     return f"{task.id}:{event_type}"
 
 
 def _existing(db: Session, event_key: str) -> ImageProductionCostEvent | None:
+    """业务函数：处理 _existing 对应的业务流程、校验或数据转换。"""
     return (
         db.query(ImageProductionCostEvent)
         .filter(ImageProductionCostEvent.event_key == event_key)
@@ -37,6 +40,7 @@ def _existing(db: Session, event_key: str) -> ImageProductionCostEvent | None:
 
 
 def record_estimated_cost_event(db: Session, task: ImageCreationTask) -> ImageProductionCostEvent:
+    """业务函数：处理 record_estimated_cost_event 对应的业务流程、校验或数据转换。"""
     event_key = _event_key(task, "estimate")
     existing = _existing(db, event_key)
     if existing:
@@ -72,6 +76,7 @@ def record_estimated_cost_event(db: Session, task: ImageCreationTask) -> ImagePr
 
 
 def record_actual_cost_event(db: Session, task: ImageCreationTask) -> ImageProductionCostEvent | None:
+    """业务函数：处理 record_actual_cost_event 对应的业务流程、校验或数据转换。"""
     event_key = _event_key(task, "actual")
     existing = _existing(db, event_key)
     if existing:

@@ -383,10 +383,12 @@ const selectedReferenceUrls = computed(() => {
 const selectedCharacterReferenceUrls = computed(() => uniqueSafeUrls(selected.value?.reference_evidence?.character_reference_urls || []))
 const selectedStyleReferenceUrls = computed(() => uniqueSafeUrls(selected.value?.reference_evidence?.style_reference_urls || []))
 
+// 前端业务函数：协调 uniqueSafeUrls 对应的页面流程、接口调用或状态转换。
 function uniqueSafeUrls(values) {
   return [...new Set(values.map(safeReferenceUrl).filter(Boolean))]
 }
 
+// 前端业务函数：协调 safeReferenceUrl 对应的页面流程、接口调用或状态转换。
 function safeReferenceUrl(value) {
   if (typeof value !== 'string') return ''
   const trimmed = value.trim()
@@ -400,11 +402,13 @@ function safeReferenceUrl(value) {
   }
 }
 
+// 前端业务函数：协调 readableError 对应的页面流程、接口调用或状态转换。
 function readableError(e, fallback) {
   const detail = e.response?.data?.detail
   return detail?.message || detail || e.message || fallback
 }
 
+// 前端业务函数：协调 staleAssetId 对应的页面流程、接口调用或状态转换。
 function staleAssetId(e) {
   const detail = e.response?.data?.detail
   const code = detail?.code || e.response?.data?.code || ''
@@ -417,6 +421,7 @@ function staleAssetId(e) {
   return detail?.current_asset_id || detail?.latest_asset_id || detail?.asset_id || ''
 }
 
+// 前端业务函数：协调 refreshAfterStaleVersion 对应的页面流程、接口调用或状态转换。
 async function refreshAfterStaleVersion(e) {
   const preferredId = staleAssetId(e)
   if (!preferredId && !isStaleVersionError(e)) return false
@@ -435,6 +440,7 @@ function isStaleVersionError(e) {
     (normalizedCode.includes('STALE') && normalizedCode.includes('VERSION'))
 }
 
+// 前端业务函数：协调 cannotApprove 对应的页面流程、接口调用或状态转换。
 function cannotApprove(asset) {
   if (!asset) return true
   return (
@@ -446,6 +452,7 @@ function cannotApprove(asset) {
   )
 }
 
+// 前端业务函数：协调 approvalDisabledReason 对应的页面流程、接口调用或状态转换。
 function approvalDisabledReason(asset) {
   if (!asset) return ''
   if (asset.copy_status !== 'persisted' || !asset.checksum || !asset.storage_path) return '资产尚未持久化'
@@ -460,6 +467,7 @@ function isStorageFailed(asset) {
   return asset?.copy_status === 'storage_failed' || asset?.status === 'storage_failed'
 }
 
+// 前端业务函数：协调 storageFailureMessage 对应的页面流程、接口调用或状态转换。
 function storageFailureMessage(asset) {
   return asset?.storage_error_json?.message || asset?.storage_error_json?.cause || '资产持久化失败'
 }
@@ -491,6 +499,7 @@ async function load(preferredAssetId = '') {
   }
 }
 
+// 前端业务函数：协调 loadRepairTasks 对应的页面流程、接口调用或状态转换。
 async function loadRepairTasks() {
   if (!runId.value) return
   repairLoading.value = true
@@ -508,10 +517,12 @@ async function loadRepairTasks() {
   }
 }
 
+// 前端业务函数：协调 openRepairAction 对应的页面流程、接口调用或状态转换。
 function openRepairAction(task) {
   if (task?.repair_route) window.location.href = task.repair_route
 }
 
+// 前端业务函数：协调 retryRepairTask 对应的页面流程、接口调用或状态转换。
 async function retryRepairTask(task, authorizationPayload = null) {
   if (!task?.id || repairBusyId.value) return
   repairBusyId.value = task.id
@@ -534,16 +545,19 @@ async function retryRepairTask(task, authorizationPayload = null) {
   }
 }
 
+// 前端业务函数：协调 openImageEdit 对应的页面流程、接口调用或状态转换。
 function openImageEdit() {
   imageEditOpen.value = true
   imageEditError.value = ''
 }
 
+// 前端业务函数：协调 closeImageEdit 对应的页面流程、接口调用或状态转换。
 function closeImageEdit() {
   imageEditOpen.value = false
   imageEditError.value = ''
 }
 
+// 前端业务函数：协调 submitImageEdit 对应的页面流程、接口调用或状态转换。
 async function submitImageEdit() {
   if (!selected.value) return
   const instruction = imageEditInstruction.value.trim()
@@ -574,6 +588,7 @@ async function submitImageEdit() {
   }
 }
 
+// 前端业务函数：协调 voidCurrentAsset 对应的页面流程、接口调用或状态转换。
 async function voidCurrentAsset() {
   if (!selected.value) return
   const comment = prompt('作废原因（可选）：')
@@ -596,6 +611,7 @@ async function voidCurrentAsset() {
   }
 }
 
+// 前端业务函数：协调 selectGate 对应的页面流程、接口调用或状态转换。
 async function selectGate(assetType) {
   activeGate.value = assetType
   selectedIds.value = []
@@ -608,6 +624,7 @@ async function selectGate(assetType) {
   await load()
 }
 
+// 前端业务函数：协调 approve 对应的页面流程、接口调用或状态转换。
 async function approve() {
   if (!selected.value) return
   if (cannotApprove(selected.value)) return
@@ -622,6 +639,7 @@ async function approve() {
   }
 }
 
+// 前端业务函数：协调 retryPersist 对应的页面流程、接口调用或状态转换。
 async function retryPersist() {
   if (!selected.value || !isStorageFailed(selected.value)) return
   acting.value = true
@@ -635,6 +653,7 @@ async function retryPersist() {
   }
 }
 
+// 前端业务函数：协调 bulkApprove 对应的页面流程、接口调用或状态转换。
 async function bulkApprove() {
   if (!bulkApprovableSelectedIds.value.length) return
   acting.value = true
@@ -656,6 +675,7 @@ async function bulkApprove() {
   }
 }
 
+// 前端业务函数：协调 reject 对应的页面流程、接口调用或状态转换。
 async function reject() {
   if (!selected.value) return
   const reason = prompt('驳回原因（可选）：')
@@ -671,6 +691,7 @@ async function reject() {
   }
 }
 
+// 前端业务函数：协调 loadRunStatus 对应的页面流程、接口调用或状态转换。
 async function loadRunStatus() {
   if (!runId.value) return
   try {
@@ -682,6 +703,7 @@ async function loadRunStatus() {
   } catch (e) { /* ignore */ }
 }
 
+// 前端业务函数：协调 doSync 对应的页面流程、接口调用或状态转换。
 async function doSync() {
   if (!runId.value) return
   syncing.value = true
@@ -701,6 +723,7 @@ async function doSync() {
   }
 }
 
+// 前端业务函数：协调 regenerate 对应的页面流程、接口调用或状态转换。
 async function regenerate() {
   if (!selected.value) return
   acting.value = true
@@ -721,6 +744,7 @@ async function regenerate() {
   }
 }
 
+// 前端业务函数：协调 syncRegen 对应的页面流程、接口调用或状态转换。
 async function syncRegen() {
   if (!selected.value) return
   acting.value = true

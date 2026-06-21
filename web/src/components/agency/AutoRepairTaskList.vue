@@ -159,30 +159,37 @@ const dialogTitleId = `auto-repair-paid-confirm-${Math.random().toString(36).sli
 const visibleTasks = computed(() => expanded.value ? props.tasks : props.tasks.slice(0, props.initialVisibleCount))
 const hasHiddenTasks = computed(() => props.tasks.length > props.initialVisibleCount)
 
+// 前端业务函数：协调 text 对应的页面流程、接口调用或状态转换。
 function text(value, fallback) {
   return safeAutoRepairText(value, fallback)
 }
 
+// 前端业务函数：协调 typeLabel 对应的页面流程、接口调用或状态转换。
 function typeLabel(type) {
   return autoRepairTypeLabel(type)
 }
 
+// 前端业务函数：协调 statusLabel 对应的页面流程、接口调用或状态转换。
 function statusLabel(status) {
   return autoRepairStatusLabel(status)
 }
 
+// 前端业务函数：协调 canRetry 对应的页面流程、接口调用或状态转换。
 function canRetry(task) {
   return Boolean(task?.retry_actions?.retry_enabled || task?.retry_actions?.paid_authorization_required)
 }
 
+// 前端业务函数：协调 primaryLabel 对应的页面流程、接口调用或状态转换。
 function primaryLabel(task) {
   return safeAutoRepairText(task?.retry_actions?.primary_label, task?.retry_actions?.paid_authorization_required ? copy.authorizeRetry : copy.retry)
 }
 
+// 前端业务函数：协调 affectedTextFor 对应的页面流程、接口调用或状态转换。
 function affectedTextFor(task) {
   return (task.affected_ids || []).filter(Boolean).join('、')
 }
 
+// 前端业务函数：协调 handleRetry 对应的页面流程、接口调用或状态转换。
 async function handleRetry(task) {
   if (task?.retry_actions?.paid_authorization_required) {
     lastTrigger.value = document.activeElement
@@ -197,6 +204,7 @@ async function handleRetry(task) {
   emit('retry', task)
 }
 
+// 前端业务函数：协调 closePaidConfirm 对应的页面流程、接口调用或状态转换。
 function closePaidConfirm() {
   confirmTask.value = null
   confirmError.value = ''
@@ -205,6 +213,7 @@ function closePaidConfirm() {
   trigger?.focus?.()
 }
 
+// 前端业务函数：协调 confirmPaidRetry 对应的页面流程、接口调用或状态转换。
 function confirmPaidRetry() {
   if (!confirmReason.value.trim()) {
     confirmError.value = copy.paidConfirmMissingReason

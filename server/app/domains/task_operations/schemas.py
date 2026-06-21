@@ -11,6 +11,7 @@ from app.models import TaskType
 
 
 class TaskCreateRequest(BaseModel):
+    """业务类：承载 TaskCreateRequest 相关的数据结构、状态或业务协作。"""
     type: TaskType
     account_id: Optional[str] = None
     device_id: Optional[str] = None
@@ -18,6 +19,7 @@ class TaskCreateRequest(BaseModel):
 
 
 class TaskBatchCreateRequest(BaseModel):
+    """业务类：承载 TaskBatchCreateRequest 相关的数据结构、状态或业务协作。"""
     type: TaskType
     group_ids: list[str] = []
     account_ids: list[str] = []
@@ -26,4 +28,5 @@ class TaskBatchCreateRequest(BaseModel):
 
 
 class BatchDeleteRequest(BaseModel):
+    """业务类：承载 BatchDeleteRequest 相关的数据结构、状态或业务协作。"""
     task_ids: list[str]

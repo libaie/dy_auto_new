@@ -52,6 +52,7 @@ _REPAIR_AUDIT_EVENT_TYPES = (
 
 
 def _expert_summary(expert) -> dict:
+    """业务函数：处理 _expert_summary 对应的业务流程、校验或数据转换。"""
     manifest = load_manifest()
     return {
         "expert_id": expert.expert_id,
@@ -66,6 +67,7 @@ def _expert_summary(expert) -> dict:
 
 
 def _legacy_expert_summary(expert) -> dict:
+    """业务函数：处理 _legacy_expert_summary 对应的业务流程、校验或数据转换。"""
     return {
         "expert_id": expert.expert_id,
         "name": expert.name_zh,
@@ -79,6 +81,7 @@ def _legacy_expert_summary(expert) -> dict:
 
 
 def _invocation_summary(row: AgencyExpertInvocation) -> dict:
+    """业务函数：处理 _invocation_summary 对应的业务流程、校验或数据转换。"""
     output = row.output_summary_json or {}
     return {
         "id": row.id,
@@ -94,6 +97,7 @@ def _invocation_summary(row: AgencyExpertInvocation) -> dict:
 
 
 def _creative_patch_item(row: AgencyCreativePatch) -> dict:
+    """业务函数：处理 _creative_patch_item 对应的业务流程、校验或数据转换。"""
     return {
         "id": row.id,
         "series_id": row.series_id,
@@ -117,6 +121,7 @@ def _creative_patch_item(row: AgencyCreativePatch) -> dict:
 
 
 def _redact_secret_values(value):
+    """业务函数：处理 _redact_secret_values 对应的业务流程、校验或数据转换。"""
     if isinstance(value, dict):
         return {key: _redact_secret_values(item) for key, item in value.items()}
     if isinstance(value, list):
@@ -127,16 +132,19 @@ def _redact_secret_values(value):
 
 
 def _redact_model_config_snapshot(snapshot: dict | None) -> dict:
+    """业务函数：处理 _redact_model_config_snapshot 对应的业务流程、校验或数据转换。"""
     return _redact_secret_values(_redact_secret_fields(snapshot or {}))
 
 
 @router.get("/experts")
 def get_agency_experts(_=Depends(verify_admin_token)):
+    """业务函数：处理 get_agency_experts 对应的业务流程、校验或数据转换。"""
     return {"experts": [_expert_summary(expert) for expert in list_experts()]}
 
 
 @router.get("/experts/{expert_id}")
 def get_agency_expert(expert_id: str, _=Depends(require_role("admin"))):
+    """业务函数：处理 get_agency_expert 对应的业务流程、校验或数据转换。"""
     if not _EXPERT_ID_RE.fullmatch(expert_id):
         raise HTTPException(status_code=400, detail="专家标识无效")
     try:
@@ -170,6 +178,7 @@ def list_invocations(
     db: Session = Depends(get_db),
     _=Depends(require_role("admin")),
 ):
+    """业务函数：处理 list_invocations 对应的业务流程、校验或数据转换。"""
     query = db.query(AgencyExpertInvocation)
     if series_id:
         query = query.filter(AgencyExpertInvocation.series_id == series_id)
@@ -203,6 +212,7 @@ def list_invocations(
 
 @router.get("/invocations/{invocation_id}")
 def get_invocation(invocation_id: str, db: Session = Depends(get_db), _=Depends(require_role("admin"))):
+    """业务函数：处理 get_invocation 对应的业务流程、校验或数据转换。"""
     row = db.query(AgencyExpertInvocation).filter(AgencyExpertInvocation.id == invocation_id).first()
     if not row:
         raise HTTPException(status_code=404, detail="专家调用记录不存在")
@@ -237,6 +247,7 @@ def list_creative_patches(
     db: Session = Depends(get_db),
     _=Depends(require_role("admin")),
 ):
+    """业务函数：处理 list_creative_patches 对应的业务流程、校验或数据转换。"""
     query = db.query(AgencyCreativePatch)
     if series_id:
         query = query.filter(AgencyCreativePatch.series_id == series_id)
@@ -264,6 +275,7 @@ def update_creative_patch(
     db: Session = Depends(get_db),
     user=Depends(require_role("admin")),
 ):
+    """业务函数：处理 update_creative_patch 对应的业务流程、校验或数据转换。"""
     after = body.get("after")
     if not isinstance(after, dict):
         raise HTTPException(status_code=422, detail="必须提供 after 改稿内容")
@@ -280,6 +292,7 @@ def approve_creative_patch_route(
     db: Session = Depends(get_db),
     user=Depends(require_role("admin")),
 ):
+    """业务函数：处理 approve_creative_patch_route 对应的业务流程、校验或数据转换。"""
     try:
         row = approve_creative_patch(db, patch_id, reviewer_user_id=user[0] if isinstance(user, tuple) else None)
     except ValueError as exc:
@@ -294,6 +307,7 @@ def reject_creative_patch_route(
     db: Session = Depends(get_db),
     user=Depends(require_role("admin")),
 ):
+    """业务函数：处理 reject_creative_patch_route 对应的业务流程、校验或数据转换。"""
     reason = str(body.get("reason") or "").strip()
     if not reason:
         raise HTTPException(status_code=422, detail="必须填写拒绝原因")
@@ -310,6 +324,7 @@ def apply_creative_patch_route(
     db: Session = Depends(get_db),
     user=Depends(require_role("admin")),
 ):
+    """业务函数：处理 apply_creative_patch_route 对应的业务流程、校验或数据转换。"""
     try:
         return apply_creative_patch(db, patch_id, reviewer_user_id=user[0] if isinstance(user, tuple) else None)
     except ValueError as exc:
@@ -322,6 +337,7 @@ def apply_approved_creative_patches_route(
     db: Session = Depends(get_db),
     user=Depends(require_role("admin")),
 ):
+    """业务函数：处理 apply_approved_creative_patches_route 对应的业务流程、校验或数据转换。"""
     return apply_approved_patches(
         db,
         run_id=body.get("run_id"),
@@ -337,6 +353,7 @@ async def run_asset_multimodal_review(
     db: Session = Depends(get_db),
     _=Depends(require_role("admin")),
 ):
+    """业务函数：处理 run_asset_multimodal_review 对应的业务流程、校验或数据转换。"""
     from app.domains.agency_operations.agency_multimodal_review import run_multimodal_asset_review
 
     trace = await run_multimodal_asset_review(db, asset_id)
@@ -353,6 +370,7 @@ def list_repair_tasks(
     db: Session = Depends(get_db),
     _=Depends(require_role("admin")),
 ):
+    """业务函数：处理 list_repair_tasks 对应的业务流程、校验或数据转换。"""
     query = db.query(ProductionJob).filter(ProductionJob.stage.like("agency_auto_repair%"))
     if series_id:
         query = query.join(ProductionPlan, ProductionPlan.id == ProductionJob.plan_id).filter(ProductionPlan.series_id == series_id)
@@ -377,6 +395,7 @@ def retry_repair_task(
     db: Session = Depends(get_db),
     _=Depends(require_role("admin")),
 ):
+    """业务函数：处理 retry_repair_task 对应的业务流程、校验或数据转换。"""
     job = _repair_job(db, job_id)
     if job.status not in {JOB_FAILED, JOB_BLOCKED, JOB_RETRY_WAIT}:
         raise HTTPException(status_code=409, detail="当前返修任务状态不允许重试")
@@ -403,6 +422,7 @@ def authorize_paid_repair_retry(
     db: Session = Depends(get_db),
     _=Depends(require_role("admin")),
 ):
+    """业务函数：处理 authorize_paid_repair_retry 对应的业务流程、校验或数据转换。"""
     reason = str(body.get("reason") or "").strip()
     confirmed_budget_delta = float(body.get("confirmed_budget_delta") or body.get("budget_delta") or 0.0)
     if not reason:
@@ -465,6 +485,7 @@ def authorize_paid_repair_retry(
 
 
 def _repair_job(db: Session, job_id: str) -> ProductionJob:
+    """业务函数：处理 _repair_job 对应的业务流程、校验或数据转换。"""
     job = db.query(ProductionJob).filter(ProductionJob.id == job_id).first()
     if not job or not job.stage.startswith("agency_auto_repair"):
         raise HTTPException(status_code=404, detail="返修任务不存在")
@@ -472,6 +493,7 @@ def _repair_job(db: Session, job_id: str) -> ProductionJob:
 
 
 def _requeue_repair_job(job: ProductionJob) -> None:
+    """业务函数：处理 _requeue_repair_job 对应的业务流程、校验或数据转换。"""
     job.status = JOB_QUEUED
     job.error_code = None
     job.error_message = None
@@ -481,6 +503,7 @@ def _requeue_repair_job(job: ProductionJob) -> None:
 
 
 def _repair_audit_by_job(db: Session, job_ids: list[str], *, plan_ids: list[str], run_id: str | None = None) -> dict[str, dict]:
+    """业务函数：处理 _repair_audit_by_job 对应的业务流程、校验或数据转换。"""
     if not job_ids or not plan_ids:
         return {}
     query = (
@@ -507,6 +530,7 @@ def _repair_audit_by_job(db: Session, job_ids: list[str], *, plan_ids: list[str]
 
 
 def _repair_job_ids_for_run(db: Session, run_id: str) -> list[str]:
+    """业务函数：处理 _repair_job_ids_for_run 对应的业务流程、校验或数据转换。"""
     rows = (
         db.query(ProductionAuditEvent.payload_json)
         .filter(ProductionAuditEvent.run_id == run_id)
@@ -524,6 +548,7 @@ def _repair_job_ids_for_run(db: Session, run_id: str) -> list[str]:
 
 
 def _repair_task_item(job: ProductionJob, audit: dict | None) -> dict:
+    """业务函数：处理 _repair_task_item 对应的业务流程、校验或数据转换。"""
     repair_task = (audit or {}).get("repair_task") or {}
     return {
         "id": job.id,
@@ -545,6 +570,7 @@ def _repair_task_item(job: ProductionJob, audit: dict | None) -> dict:
 
 
 def _repair_retry_actions(job: ProductionJob, repair_task: dict) -> dict:
+    """业务函数：处理 _repair_retry_actions 对应的业务流程、校验或数据转换。"""
     repair_type = repair_task.get("type") or job.stage.split(":", 1)[-1]
     requires_paid = bool(repair_task.get("requires_paid_provider"))
     estimated_cost = float(repair_task.get("estimated_cost") or 0.0)
@@ -563,6 +589,7 @@ def _repair_retry_actions(job: ProductionJob, repair_task: dict) -> dict:
 
 
 def _repair_summary(items: list[dict]) -> dict:
+    """业务函数：处理 _repair_summary 对应的业务流程、校验或数据转换。"""
     summary = {"total": len(items), "queued": 0, "running": 0, "completed": 0, "failed": 0, "manual_required": 0, "recheck_required": 0}
     for item in items:
         status = item["status"]
@@ -583,6 +610,7 @@ def _can_retry_repair_job(
     *,
     policy_override: dict | None = None,
 ) -> tuple[bool, str]:
+    """业务函数：处理 _can_retry_repair_job 对应的业务流程、校验或数据转换。"""
     if not repair_task:
         return False, "缺少原始返修任务信息，需要人工确认"
     run_id = _latest_repair_run_id(db, job.id, job.plan_id)
@@ -610,6 +638,7 @@ def _can_retry_repair_job(
 
 
 def _next_retry_round_for_job(db: Session, job: ProductionJob, repair_task: dict, run_id: str | None) -> int:
+    """业务函数：处理 _next_retry_round_for_job 对应的业务流程、校验或数据转换。"""
     created_rounds = 0
     creation_query = (
         db.query(ProductionAuditEvent)
@@ -635,6 +664,7 @@ def _next_retry_round_for_job(db: Session, job: ProductionJob, repair_task: dict
 
 
 def _repair_task_scope(repair_task: dict, *, fallback_job: ProductionJob) -> tuple[str, str, str, str]:
+    """业务函数：处理 _repair_task_scope 对应的业务流程、校验或数据转换。"""
     repair_type = str(repair_task.get("type") or fallback_job.stage.split(":", 1)[-1])
     stage = str(repair_task.get("stage") or fallback_job.stage)
     target_type = str(repair_task.get("target_type") or fallback_job.target_type)
@@ -643,6 +673,7 @@ def _repair_task_scope(repair_task: dict, *, fallback_job: ProductionJob) -> tup
 
 
 def _latest_repair_run_id(db: Session, job_id: str, plan_id: str) -> str | None:
+    """业务函数：处理 _latest_repair_run_id 对应的业务流程、校验或数据转换。"""
     rows = (
         db.query(ProductionAuditEvent)
         .filter(ProductionAuditEvent.production_plan_id == plan_id)
@@ -657,6 +688,7 @@ def _latest_repair_run_id(db: Session, job_id: str, plan_id: str) -> str | None:
 
 
 def _auto_repair_policy_for_run(db: Session, run_id: str | None) -> dict:
+    """业务函数：处理 _auto_repair_policy_for_run 对应的业务流程、校验或数据转换。"""
     if not run_id:
         return {}
     run = db.query(VideoProductionRun).filter(VideoProductionRun.id == run_id).first()
@@ -664,6 +696,7 @@ def _auto_repair_policy_for_run(db: Session, run_id: str | None) -> dict:
 
 
 def _repair_budget_used_for_plan(db: Session, plan_id: str, run_id: str | None) -> float:
+    """业务函数：处理 _repair_budget_used_for_plan 对应的业务流程、校验或数据转换。"""
     query = (
         db.query(ProductionAuditEvent)
         .filter(ProductionAuditEvent.production_plan_id == plan_id)

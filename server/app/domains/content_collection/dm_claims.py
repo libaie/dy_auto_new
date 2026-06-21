@@ -17,6 +17,7 @@ from app.models import DMClaimRecipientResponse, DMReleaseRecipientResponse
 
 
 def claim_recipient(db, request, device_id: str):
+    """业务函数：处理 claim_recipient 对应的业务流程、校验或数据转换。"""
     now = bj_now()
     orphan_threshold = now - timedelta(minutes=30)
     db.query(Conversation).filter(
@@ -66,6 +67,7 @@ def claim_recipient(db, request, device_id: str):
 
 
 def _resolve_report_task(db, conversation: Conversation, request, device_id: str | None):
+    """业务函数：处理 _resolve_report_task 对应的业务流程、校验或数据转换。"""
     if not request.task_id:
         return None
     task = db.query(Task).filter(Task.id == request.task_id).first()
@@ -79,6 +81,7 @@ def _resolve_report_task(db, conversation: Conversation, request, device_id: str
 
 
 def _fallback_message_key(conversation: Conversation, request, message_order: int) -> str:
+    """业务函数：处理 _fallback_message_key 对应的业务流程、校验或数据转换。"""
     if request.message_key:
         return request.message_key
     if request.task_id and request.message_order:
@@ -89,6 +92,7 @@ def _fallback_message_key(conversation: Conversation, request, message_order: in
 
 
 async def send_report(db, request, device_id: str):
+    """业务函数：处理 send_report 对应的业务流程、校验或数据转换。"""
     try:
         conversation_id = _persist_send_report(db, request, device_id)
     except IntegrityError:
@@ -100,6 +104,7 @@ async def send_report(db, request, device_id: str):
 
 
 def _persist_send_report(db, request, device_id: str) -> str:
+    """业务函数：处理 _persist_send_report 对应的业务流程、校验或数据转换。"""
     now = bj_now()
     conversation = db.query(Conversation).filter(Conversation.id == request.conversation_id).first()
     if not conversation:
@@ -163,6 +168,7 @@ def _persist_send_report(db, request, device_id: str) -> str:
 
 
 def release_recipient(db, request, device_id: str):
+    """业务函数：处理 release_recipient 对应的业务流程、校验或数据转换。"""
     conversation = db.query(Conversation).filter(
         Conversation.id == request.conversation_id,
         Conversation.device_id == device_id,

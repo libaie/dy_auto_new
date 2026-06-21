@@ -70,6 +70,7 @@ _PROVIDER_STAGE_LOCKS_GUARD = threading.Lock()
 
 
 def _provider_stage_lock(provider: str, model_name: str, stage: str) -> threading.RLock:
+    """业务函数：处理 _provider_stage_lock 对应的业务流程、校验或数据转换。"""
     key = (provider, model_name, stage)
     with _PROVIDER_STAGE_LOCKS_GUARD:
         lock = _PROVIDER_STAGE_LOCKS.get(key)
@@ -80,6 +81,7 @@ def _provider_stage_lock(provider: str, model_name: str, stage: str) -> threadin
 
 
 def assert_paid_submit_deployment_safe(capability: dict) -> None:
+    """业务函数：处理 assert_paid_submit_deployment_safe 对应的业务流程、校验或数据转换。"""
     del capability
     raw_count = os.getenv(PROVIDER_SUBMIT_WORKER_COUNT_ENV)
     if raw_count is None:
@@ -114,7 +116,9 @@ def assert_paid_submit_deployment_safe(capability: dict) -> None:
 
 
 class ProviderStageExecutor:
+    """业务类：承载 ProviderStageExecutor 相关的数据结构、状态或业务协作。"""
     def __init__(self, client):
+        """初始化业务对象依赖，保存后续流程需要的运行上下文。"""
         self.client = client
 
     async def execute(
@@ -133,6 +137,7 @@ class ProviderStageExecutor:
         payload: dict,
         capability: dict | None = None,
     ) -> ProductionActionResult:
+        """业务函数：处理 execute 对应的业务流程、校验或数据转换。"""
         resolved_capability = {**DEFAULT_REAL_PROVIDER_CAPABILITY, **(capability or {})}
         assert_real_paid_allowed(resolved_capability)
         _assert_positive_estimated_cost(estimated_cost)
@@ -266,6 +271,7 @@ class ProviderStageExecutor:
 
 
 def _assert_positive_estimated_cost(estimated_cost: float) -> None:
+    """业务函数：处理 _assert_positive_estimated_cost 对应的业务流程、校验或数据转换。"""
     try:
         amount = float(estimated_cost)
     except (TypeError, ValueError) as exc:
@@ -289,6 +295,7 @@ def _assert_positive_estimated_cost(estimated_cost: float) -> None:
 
 
 def _submit_payload_with_external_task(payload: dict, *, task_id: str) -> dict:
+    """业务函数：处理 _submit_payload_with_external_task 对应的业务流程、校验或数据转换。"""
     submit_payload = dict(payload)
     submit_payload["external_task_id"] = task_id
     submit_payload["provider_stage_task_id"] = task_id
@@ -307,6 +314,7 @@ def _find_existing_task(
     model_name: str,
     payload: dict,
 ) -> ProviderStageTask | None:
+    """业务函数：处理 _find_existing_task 对应的业务流程、校验或数据转换。"""
     idempotency_key = provider_stage_idempotency_key(
         run_id=run_id,
         stage=stage,
@@ -322,6 +330,7 @@ def _find_existing_task(
 
 
 def _needs_submit_claim_repair(task: ProviderStageTask | None) -> bool:
+    """业务函数：处理 _needs_submit_claim_repair 对应的业务流程、校验或数据转换。"""
     return (
         task is not None
         and task.provider_task_id is None
@@ -330,6 +339,7 @@ def _needs_submit_claim_repair(task: ProviderStageTask | None) -> bool:
 
 
 def _raise_submit_claim_repair_error(db: Session, task: ProviderStageTask) -> None:
+    """业务函数：处理 _raise_submit_claim_repair_error 对应的业务流程、校验或数据转换。"""
     reservation = _reservation_for_task(db, task.id)
     error = ProductionRepairableError(
         code=ProductionErrorCode.PROVIDER_SUBMIT_FAILED,
@@ -345,6 +355,7 @@ def _raise_submit_claim_repair_error(db: Session, task: ProviderStageTask) -> No
 
 
 def _raise_missing_reservation_repair_error(task: ProviderStageTask) -> None:
+    """业务函数：处理 _raise_missing_reservation_repair_error 对应的业务流程、校验或数据转换。"""
     raise ProductionRepairableError(
         code=ProductionErrorCode.BUDGET_BLOCKED,
         message="Provider stage task has a provider task id but no cost reservation.",
@@ -365,6 +376,7 @@ def _assert_provider_capacity(
     stage: str,
     max_concurrent_tasks: Any,
 ) -> None:
+    """业务函数：处理 _assert_provider_capacity 对应的业务流程、校验或数据转换。"""
     if max_concurrent_tasks is None:
         return
     limit = int(max_concurrent_tasks)
@@ -406,6 +418,7 @@ def _assert_provider_capacity(
 
 
 def _reservation_for_task(db: Session, task_id: str) -> ProviderCostReservation | None:
+    """业务函数：处理 _reservation_for_task 对应的业务流程、校验或数据转换。"""
     return (
         db.query(ProviderCostReservation)
         .filter(ProviderCostReservation.provider_stage_task_id == task_id)
@@ -414,6 +427,7 @@ def _reservation_for_task(db: Session, task_id: str) -> ProviderCostReservation 
 
 
 def _reload_task(db: Session, task_id: str) -> ProviderStageTask:
+    """业务函数：处理 _reload_task 对应的业务流程、校验或数据转换。"""
     task = db.query(ProviderStageTask).filter(ProviderStageTask.id == task_id).first()
     if not task:
         raise ValueError("Provider stage task not found")
@@ -421,17 +435,20 @@ def _reload_task(db: Session, task_id: str) -> ProviderStageTask:
 
 
 def _reload_reservation(db: Session, reservation_id: str | None) -> ProviderCostReservation | None:
+    """业务函数：处理 _reload_reservation 对应的业务流程、校验或数据转换。"""
     if not reservation_id:
         return None
     return db.query(ProviderCostReservation).filter(ProviderCostReservation.id == reservation_id).first()
 
 
 def _close_transaction(db: Session) -> None:
+    """业务函数：处理 _close_transaction 对应的业务流程、校验或数据转换。"""
     if db.in_transaction():
         db.commit()
 
 
 def _provider_task_id(submit_result: dict) -> str:
+    """业务函数：处理 _provider_task_id 对应的业务流程、校验或数据转换。"""
     provider_task_id = submit_result.get("provider_task_id") or submit_result.get("task_id") or submit_result.get("id")
     if not provider_task_id:
         raise ProductionRepairableError(
@@ -453,6 +470,7 @@ def _record_provider_submit_failure(
     *,
     raw_error: Exception | None = None,
 ) -> None:
+    """业务函数：处理 _record_provider_submit_failure 对应的业务流程、校验或数据转换。"""
     if db.in_transaction():
         db.rollback()
     message = str(raw_error) if raw_error is not None else error.message
@@ -487,6 +505,7 @@ def _handle_sync_result(
     estimated_cost: float,
     sync_result: dict,
 ) -> ProductionActionResult:
+    """业务函数：处理 _handle_sync_result 对应的业务流程、校验或数据转换。"""
     provider_status = str(sync_result.get("status") or "").lower()
     if provider_status in COMPLETED_PROVIDER_STATUSES:
         failed_assets = _failed_provider_assets(sync_result)
@@ -620,6 +639,7 @@ def _handle_sync_result(
 
 
 def _failed_provider_assets(sync_result: dict) -> list[dict]:
+    """业务函数：处理 _failed_provider_assets 对应的业务流程、校验或数据转换。"""
     assets = sync_result.get("assets")
     if not isinstance(assets, list):
         return []
@@ -634,6 +654,7 @@ def _failed_provider_assets(sync_result: dict) -> list[dict]:
 
 
 def _is_retryable_quota_failure(sync_result: dict, failed_assets: list[dict] | None = None) -> bool:
+    """业务函数：处理 _is_retryable_quota_failure 对应的业务流程、校验或数据转换。"""
     payloads: list[dict] = [sync_result]
     if failed_assets is not None:
         payloads.extend(failed_assets)
@@ -662,6 +683,7 @@ def _actual_cost_from_usage(
     reservation: ProviderCostReservation,
     usage: dict,
 ) -> float:
+    """业务函数：处理 _actual_cost_from_usage 对应的业务流程、校验或数据转换。"""
     raw_cost = usage.get("actual_cost", usage.get("cost"))
     if raw_cost is None:
         mark_reservation_stale_needs_repair(db, reservation.id)
@@ -702,6 +724,7 @@ def _actual_cost_from_usage(
 
 
 def _sync_result_with_estimated_usage(sync_result: dict, estimated_cost: float) -> dict:
+    """业务函数：处理 _sync_result_with_estimated_usage 对应的业务流程、校验或数据转换。"""
     usage = sync_result.get("usage") if isinstance(sync_result.get("usage"), dict) else {}
     if usage.get("actual_cost", usage.get("cost")) is not None:
         return sync_result
@@ -716,12 +739,14 @@ def _sync_result_with_estimated_usage(sync_result: dict, estimated_cost: float) 
 
 
 def _mark_task_sync_required_blocked(db: Session, task_id: str, response_summary: dict) -> ProductionActionResult:
+    """业务函数：处理 _mark_task_sync_required_blocked 对应的业务流程、校验或数据转换。"""
     task = _reload_task(db, task_id)
     task = _mark_sync_required(db, task, response_summary)
     return _sync_required_result(task.id)
 
 
 def _sync_required_result(task_id: str) -> ProductionActionResult:
+    """业务函数：处理 _sync_required_result 对应的业务流程、校验或数据转换。"""
     return ProductionActionResult.blocked(
         ProductionErrorCode.PROVIDER_STAGE_TASK_SYNC_REQUIRED,
         "Provider stage task still requires sync.",
@@ -733,6 +758,7 @@ def _sync_required_result(task_id: str) -> ProductionActionResult:
 
 
 def _mark_succeeded(db: Session, task: ProviderStageTask, sync_result: dict) -> ProviderStageTask:
+    """业务函数：处理 _mark_succeeded 对应的业务流程、校验或数据转换。"""
     if task.status == PROVIDER_TASK_SYNC_REQUIRED:
         task = set_task_status(db, task, PROVIDER_TASK_RUNNING, response_summary_json=sync_result)
     if task.status == PROVIDER_TASK_SUCCEEDED:
@@ -750,6 +776,7 @@ def _mark_succeeded(db: Session, task: ProviderStageTask, sync_result: dict) -> 
 
 
 def _mark_sync_required(db: Session, task: ProviderStageTask, sync_result: dict) -> ProviderStageTask:
+    """业务函数：处理 _mark_sync_required 对应的业务流程、校验或数据转换。"""
     if task.status == PROVIDER_TASK_SYNC_REQUIRED:
         task.response_summary_json = sync_result
         db.commit()
@@ -774,6 +801,7 @@ def _mark_terminal_provider_failure(
     error_code: str | None = None,
     archive_idempotency_key: bool = False,
 ) -> ProviderStageTask:
+    """业务函数：处理 _mark_terminal_provider_failure 对应的业务流程、校验或数据转换。"""
     if task.status == terminal_status:
         task.response_summary_json = sync_result
         db.commit()
@@ -794,6 +822,7 @@ def _mark_terminal_provider_failure(
 
 
 def _archived_idempotency_key(task: ProviderStageTask) -> str:
+    """业务函数：处理 _archived_idempotency_key 对应的业务流程、校验或数据转换。"""
     archived = f"{task.idempotency_key}:archived:{task.id}"
     if len(archived) <= 220:
         return archived

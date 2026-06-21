@@ -30,6 +30,7 @@ def list_comments(
     skip: int = 0,
     limit: int = 50,
 ):
+    """业务函数：处理 list_comments 对应的业务流程、校验或数据转换。"""
     limit = min(limit, 100)
     query = db.query(CollectedComment)
     if keyword:
@@ -66,6 +67,7 @@ def list_users(
     skip: int = 0,
     limit: int = 50,
 ):
+    """业务函数：处理 list_users 对应的业务流程、校验或数据转换。"""
     limit = min(limit, 100)
     query = db.query(CollectedUser)
     if keyword:
@@ -108,6 +110,7 @@ def list_conversations(
     skip: int = 0,
     limit: int = 50,
 ):
+    """业务函数：处理 list_conversations 对应的业务流程、校验或数据转换。"""
     limit = min(limit, 100)
     query = db.query(Conversation)
     if account_id:
@@ -132,6 +135,7 @@ def list_conversations(
 
 
 def get_conversation(db, user, conversation_id: str):
+    """业务函数：处理 get_conversation 对应的业务流程、校验或数据转换。"""
     query = db.query(Conversation).filter(Conversation.id == conversation_id)
     user_id, role = user
     if role != "admin":
@@ -171,6 +175,7 @@ def export_comments(
     skip: Optional[int] = None,
     limit: Optional[int] = None,
 ):
+    """业务函数：处理 export_comments 对应的业务流程、校验或数据转换。"""
     query = db.query(CollectedComment)
     if keyword:
         query = query.filter(CollectedComment.keyword == keyword)
@@ -217,6 +222,7 @@ def export_users(
     skip: Optional[int] = None,
     limit: Optional[int] = None,
 ):
+    """业务函数：处理 export_users 对应的业务流程、校验或数据转换。"""
     query = db.query(CollectedUser)
     if keyword:
         query = query.filter(_like_contains(CollectedUser.keyword, keyword))
@@ -271,6 +277,7 @@ def export_conversations(
     skip: Optional[int] = None,
     limit: Optional[int] = None,
 ):
+    """业务函数：处理 export_conversations 对应的业务流程、校验或数据转换。"""
     query = db.query(Conversation)
     if account_id:
         query = query.filter(Conversation.account_id == account_id)
@@ -308,6 +315,7 @@ def export_conversations(
 
 
 def _conversation_payload(conversation: Conversation) -> dict:
+    """业务函数：处理 _conversation_payload 对应的业务流程、校验或数据转换。"""
     return {
         "id": conversation.id,
         "task_id": conversation.task_id,
@@ -330,6 +338,7 @@ def _conversation_payload(conversation: Conversation) -> dict:
 
 
 def _conversation_message_payload(message: ConversationMessage) -> dict:
+    """业务函数：处理 _conversation_message_payload 对应的业务流程、校验或数据转换。"""
     return {
         "id": message.id,
         "conversation_id": message.conversation_id,
@@ -349,6 +358,7 @@ def _conversation_message_payload(message: ConversationMessage) -> dict:
 
 
 def _legacy_conversation_message_payload(conversation: Conversation) -> dict:
+    """业务函数：处理 _legacy_conversation_message_payload 对应的业务流程、校验或数据转换。"""
     return {
         "id": None,
         "conversation_id": conversation.id,
@@ -368,6 +378,7 @@ def _legacy_conversation_message_payload(conversation: Conversation) -> dict:
 
 
 def _conversation_message_export_map(db, conversation_ids: list[str]) -> dict[str, list[str]]:
+    """业务函数：处理 _conversation_message_export_map 对应的业务流程、校验或数据转换。"""
     if not conversation_ids:
         return {}
     messages = db.query(ConversationMessage).filter(
@@ -386,12 +397,14 @@ def _conversation_message_export_map(db, conversation_ids: list[str]) -> dict[st
 
 
 def _paginate(query, skip: int, limit: int) -> dict:
+    """业务函数：处理 _paginate 对应的业务流程、校验或数据转换。"""
     total = query.count()
     items = query.offset(skip).limit(limit).all()
     return {"items": items, "total": total}
 
 
 def _apply_user_sort(query, sort_by: Optional[str], sort_order: Optional[str]):
+    """业务函数：处理 _apply_user_sort 对应的业务流程、校验或数据转换。"""
     numeric_sort_fields = {
         "fans_count": func.coalesce(cast(CollectedUser.fans_count, Integer), 0),
         "likes_count": func.coalesce(cast(CollectedUser.likes_count, Integer), 0),
@@ -405,6 +418,7 @@ def _apply_user_sort(query, sort_by: Optional[str], sort_order: Optional[str]):
 
 
 def _apply_date_range(query, column, date_from: Optional[str], date_to: Optional[str]):
+    """业务函数：处理 _apply_date_range 对应的业务流程、校验或数据转换。"""
     if date_from:
         try:
             query = query.filter(column >= datetime.strptime(date_from, "%Y-%m-%d"))
@@ -420,6 +434,7 @@ def _apply_date_range(query, column, date_from: Optional[str], date_to: Optional
 
 
 def _export_rows(query, skip: Optional[int], limit: Optional[int]):
+    """业务函数：处理 _export_rows 对应的业务流程、校验或数据转换。"""
     is_paged = limit is not None
     if is_paged:
         if skip:
@@ -433,18 +448,22 @@ def _export_rows(query, skip: Optional[int], limit: Optional[int]):
 
 
 def _escape_like(value: str) -> str:
+    """业务函数：处理 _escape_like 对应的业务流程、校验或数据转换。"""
     return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 def _build_like(pattern: str) -> str:
+    """业务函数：处理 _build_like 对应的业务流程、校验或数据转换。"""
     return f"%{_escape_like(pattern)}%"
 
 
 def _like_contains(column, value: str):
+    """业务函数：处理 _like_contains 对应的业务流程、校验或数据转换。"""
     return column.like(_build_like(value), escape="\\")
 
 
 def _build_xlsx(headers: list[str], rows: list[list]) -> io.BytesIO:
+    """业务函数：处理 _build_xlsx 对应的业务流程、校验或数据转换。"""
     workbook = Workbook(write_only=True)
     worksheet = workbook.create_sheet()
     worksheet.append(headers)
@@ -457,6 +476,7 @@ def _build_xlsx(headers: list[str], rows: list[list]) -> io.BytesIO:
 
 
 def _stream_xlsx(filename: str, buffer: io.BytesIO) -> StreamingResponse:
+    """业务函数：处理 _stream_xlsx 对应的业务流程、校验或数据转换。"""
     return StreamingResponse(
         buffer,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

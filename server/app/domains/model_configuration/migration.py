@@ -21,6 +21,7 @@ LEGACY_SEEDANCE_VIDEO_MODELS = (
 
 
 def _normalize_model_name(name: str | None) -> str:
+    """业务函数：处理 _normalize_model_name 对应的业务流程、校验或数据转换。"""
     """Normalize NULL/empty model_name to empty string for dedup matching."""
     if name is None:
         return ""
@@ -28,6 +29,7 @@ def _normalize_model_name(name: str | None) -> str:
 
 
 def _find_existing(db: Session, model_type: str, provider: str, model_name: str | None) -> AIModel | None:
+    """业务函数：处理 _find_existing 对应的业务流程、校验或数据转换。"""
     """Find an existing AIModel with matching type+provider+name, handling NULL/empty."""
     normalized = _normalize_model_name(model_name)
     q = db.query(AIModel).filter(
@@ -42,6 +44,7 @@ def _find_existing(db: Session, model_type: str, provider: str, model_name: str 
 
 
 def migrate_legacy_settings(db: Session) -> dict:
+    """业务函数：处理 migrate_legacy_settings 对应的业务流程、校验或数据转换。"""
     """
     Migrate legacy Settings/Pixelle/Seedance config into AIModel.
 

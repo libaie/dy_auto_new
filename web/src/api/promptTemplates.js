@@ -5,30 +5,37 @@ export function listTemplates(includeDisabled = false) {
   return client.get('/prompt-templates', { params: { include_disabled: includeDisabled } })
 }
 
+// 前端业务函数：协调 getTemplate 对应的页面流程、接口调用或状态转换。
 export function getTemplate(name) {
   return client.get(`/prompt-templates/${name}`)
 }
 
+// 前端业务函数：协调 createTemplate 对应的页面流程、接口调用或状态转换。
 export function createTemplate(data) {
   return client.post('/prompt-templates', data)
 }
 
+// 前端业务函数：协调 updateTemplate 对应的页面流程、接口调用或状态转换。
 export function updateTemplate(name, data) {
   return client.put(`/prompt-templates/${name}`, data)
 }
 
+// 前端业务函数：协调 deleteTemplate 对应的页面流程、接口调用或状态转换。
 export function deleteTemplate(name) {
   return client.delete(`/prompt-templates/${name}`)
 }
 
+// 前端业务函数：协调 generateTemplate 对应的页面流程、接口调用或状态转换。
 export function generateTemplate(description, industry = 'health') {
   return client.post('/prompt-templates/generate', { description, industry })
 }
 
+// 前端业务函数：协调 toggleTemplate 对应的页面流程、接口调用或状态转换。
 export function toggleTemplate(name, enabled) {
   return client.patch(`/prompt-templates/${name}/toggle`, { enabled })
 }
 
+// 前端业务函数：协调 parseErrorMessage 对应的页面流程、接口调用或状态转换。
 async function parseErrorMessage(response) {
   try {
     const data = await response.json()
@@ -38,6 +45,7 @@ async function parseErrorMessage(response) {
   }
 }
 
+// 前端业务函数：协调 processSseFrame 对应的页面流程、接口调用或状态转换。
 async function processSseFrame(frame, onEvent) {
   const data = frame
     .split(/\r?\n/)
@@ -58,6 +66,7 @@ async function processSseFrame(frame, onEvent) {
   }
 }
 
+// 前端业务函数：协调 streamPromptTemplateSse 对应的页面流程、接口调用或状态转换。
 export async function streamPromptTemplateSse(path, payload, { onEvent } = {}) {
   const token = localStorage.getItem('token')
   const headers = {
@@ -109,10 +118,12 @@ export async function streamPromptTemplateSse(path, payload, { onEvent } = {}) {
   }
 }
 
+// 前端业务函数：协调 streamTemplateGeneration 对应的页面流程、接口调用或状态转换。
 export function streamTemplateGeneration(payload, callbacks) {
   return streamPromptTemplateSse('/prompt-templates/generate-stream', payload, callbacks)
 }
 
+// 前端业务函数：协调 streamTemplateRewrite 对应的页面流程、接口调用或状态转换。
 export function streamTemplateRewrite(payload, callbacks) {
   return streamPromptTemplateSse('/prompt-templates/rewrite-stream', payload, callbacks)
 }

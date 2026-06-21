@@ -54,6 +54,7 @@ var antiDetect = {
    * @param {number} endX
    * @param {number} endY
    */
+  // 设备业务函数：处理 humanSwipe 对应的抖音自动化动作、状态或安全边界。
   humanSwipe: function (startX, startY, endX, endY) {
     var path = bezier.generateSwipePath(startX, startY, endX, endY);
     logger.debug(TAG, "拟人滑动 " + path.length + " 个轨迹点");
@@ -135,6 +136,7 @@ var antiDetect = {
    * @param {number} endX
    * @param {number} endY
    */
+  // 设备业务函数：处理 humanSwipeEnhanced 对应的抖音自动化动作、状态或安全边界。
   humanSwipeEnhanced: function (startX, startY, endX, endY) {
     // 添加起点微抖动（手指按下时不完全静止）
     var jitterX = Math.floor(Math.random() * 6 - 3);

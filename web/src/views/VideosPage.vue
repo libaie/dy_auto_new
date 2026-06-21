@@ -27,6 +27,7 @@ const showDeleteConfirm = ref(false)
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize)))
 
+// 前端业务函数：协调 wsUrl 对应的页面流程、接口调用或状态转换。
 function wsUrl() {
   const token = localStorage.getItem('token') || ''
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
@@ -40,6 +41,7 @@ const { connect: wsConnect } = useWebSocket(wsUrl, {
   },
 })
 
+// 前端业务函数：协调 fetchData 对应的页面流程、接口调用或状态转换。
 async function fetchData() {
   loading.value = true
   try {
@@ -56,31 +58,37 @@ async function fetchData() {
   }
 }
 
+// 前端业务函数：协调 handleSearch 对应的页面流程、接口调用或状态转换。
 function handleSearch() {
   page.value = 1
   fetchData()
 }
 
+// 前端业务函数：协调 goPage 对应的页面流程、接口调用或状态转换。
 function goPage(p) {
   page.value = p
   fetchData()
 }
 
+// 前端业务函数：协调 openPreview 对应的页面流程、接口调用或状态转换。
 function openPreview(video) {
   previewVideo.value = video
   showPreview.value = true
 }
 
+// 前端业务函数：协调 closePreview 对应的页面流程、接口调用或状态转换。
 function closePreview() {
   showPreview.value = false
   previewVideo.value = null
 }
 
+// 前端业务函数：协调 confirmDelete 对应的页面流程、接口调用或状态转换。
 function confirmDelete(video) {
   deleteTarget.value = video
   showDeleteConfirm.value = true
 }
 
+// 前端业务函数：协调 handleDelete 对应的页面流程、接口调用或状态转换。
 async function handleDelete() {
   if (!deleteTarget.value) return
   try {
@@ -99,6 +107,7 @@ function statusVariant(status) {
   return map[status] || 'info'
 }
 
+// 前端业务函数：协调 statusLabel 对应的页面流程、接口调用或状态转换。
 function statusLabel(status) {
   const map = { completed: '已完成', failed: '失败', processing: '生成中', pending: '待处理' }
   return map[status] || status

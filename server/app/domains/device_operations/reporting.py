@@ -28,6 +28,7 @@ async def report_progress(
     db: Session = Depends(get_db),
     authed_device_id: str = Depends(verify_device_secret),
 ):
+    """业务函数：处理 report_progress 对应的业务流程、校验或数据转换。"""
     """Device reports task execution progress. Broadcast to admin WS for real-time UI."""
     from app.db.models import Task as DBTask
     db_task = db.query(DBTask).filter(DBTask.id == report.task_id).first()
@@ -56,6 +57,7 @@ async def report_result(
     authed_device_id: Optional[str] = Depends(verify_device_secret),
 ):
     # Verify lease: accept current lease, log stale reports, fall back to device_id
+    """业务函数：处理 report_result 对应的业务流程、校验或数据转换。"""
     if authed_device_id:
         from app.db.models import Task as DBTask
         db_task = db.query(DBTask).filter(DBTask.id == report.task_id).first()
@@ -169,6 +171,7 @@ async def heartbeat(
     db: Session = Depends(get_db),
     authed_device_id: Optional[str] = Depends(verify_device_secret),
 ):
+    """业务函数：处理 heartbeat 对应的业务流程、校验或数据转换。"""
     device_id = body.get("device_id", "")
     # Per-device secret: use the verified device_id, reject mismatch
     if authed_device_id and authed_device_id != device_id:
@@ -196,6 +199,7 @@ async def report_risk(
     db: Session = Depends(get_db),
     _: None = Depends(verify_device_secret),
 ):
+    """业务函数：处理 report_risk 对应的业务流程、校验或数据转换。"""
     """Device reports risk control detection. Marks account as risk_controlled."""
     from app.db.models import Account
     account = db.query(Account).filter(Account.id == report.account_id).first()

@@ -253,6 +253,7 @@ const editableAccounts = computed(() => {
   return accounts.value.filter(a => groupMemberIds.value.has(a.id))
 })
 
+// 前端业务函数：协调 loadMembersForGroup 对应的页面流程、接口调用或状态转换。
 async function loadMembersForGroup(gid) {
   if (!gid) return
   try {
@@ -281,10 +282,12 @@ const editableDevices = computed(() => {
   return devices.value.filter(d => !d.bound_account_id || d.bound_account_id === aid)
 })
 
+// 前端业务函数：协调 isItemEditable 对应的页面流程、接口调用或状态转换。
 function isItemEditable(item) {
   return item.status === 'pending'
 }
 
+// 前端业务函数：协调 toggleItem 对应的页面流程、接口调用或状态转换。
 function toggleItem(id) {
   const next = new Set(selectedIds.value)
   if (next.has(id)) next.delete(id)
@@ -292,6 +295,7 @@ function toggleItem(id) {
   selectedIds.value = next
 }
 
+// 前端业务函数：协调 toggleSelectAll 对应的页面流程、接口调用或状态转换。
 function toggleSelectAll() {
   if (allSelected.value) {
     selectedIds.value = new Set()
@@ -300,6 +304,7 @@ function toggleSelectAll() {
   }
 }
 
+// 前端业务函数：协调 startEditChannel 对应的页面流程、接口调用或状态转换。
 function startEditChannel() {
   channelForm.value = {
     group_id: '',
@@ -311,6 +316,7 @@ function startEditChannel() {
   editingChannel.value = true
 }
 
+// 前端业务函数：协调 saveChannel 对应的页面流程、接口调用或状态转换。
 async function saveChannel() {
   savingChannel.value = true
   try {
@@ -330,6 +336,7 @@ async function saveChannel() {
   }
 }
 
+// 前端业务函数：协调 openItemEdit 对应的页面流程、接口调用或状态转换。
 function openItemEdit(item) {
   editDialog.value = {
     open: true,
@@ -342,6 +349,7 @@ function openItemEdit(item) {
   }
 }
 
+// 前端业务函数：协调 openBatchEdit 对应的页面流程、接口调用或状态转换。
 function openBatchEdit() {
   editDialog.value = {
     open: true,
@@ -354,6 +362,7 @@ function openBatchEdit() {
   }
 }
 
+// 前端业务函数：协调 saveItemEdit 对应的页面流程、接口调用或状态转换。
 async function saveItemEdit() {
   savingItem.value = true
   try {
@@ -383,6 +392,7 @@ async function saveItemEdit() {
   }
 }
 
+// 前端业务函数：协调 loadDetail 对应的页面流程、接口调用或状态转换。
 async function loadDetail() {
   try {
     const resp = await getChannel(props.channel.id)

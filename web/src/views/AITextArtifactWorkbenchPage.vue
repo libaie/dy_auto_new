@@ -110,14 +110,17 @@ const regenerateInstruction = ref('')
 const loading = ref(false)
 const error = ref('')
 
+// 前端业务函数：协调 formatJson 对应的页面流程、接口调用或状态转换。
 function formatJson(value) {
   return JSON.stringify(value || {}, null, 2)
 }
 
+// 前端业务函数：协调 shortId 对应的页面流程、接口调用或状态转换。
 function shortId(value) {
   return String(value || '').slice(0, 8)
 }
 
+// 前端业务函数：协调 artifactEpisodeNumber 对应的页面流程、接口调用或状态转换。
 function artifactEpisodeNumber(artifact) {
   const content = artifact?.content_json || {}
   const input = artifact?.input_json || {}
@@ -125,12 +128,14 @@ function artifactEpisodeNumber(artifact) {
   return Number.isFinite(numberValue) && numberValue > 0 ? numberValue : null
 }
 
+// 前端业务函数：协调 artifactEpisodeTitle 对应的页面流程、接口调用或状态转换。
 function artifactEpisodeTitle(artifact) {
   const content = artifact?.content_json || {}
   const input = artifact?.input_json || {}
   return content.title || content.episode_title || input.title || input.episode_title || ''
 }
 
+// 前端业务函数：协调 artifactTargetLabel 对应的页面流程、接口调用或状态转换。
 function artifactTargetLabel(artifact) {
   if (!artifact) return ''
   if (artifact.target_type === 'episode' || artifact.episode_id) {
@@ -152,12 +157,14 @@ function artifactListTitle(artifact) {
   return target ? `${artifact.artifact_type} · ${target}` : artifact.artifact_type
 }
 
+// 前端业务函数：协调 selectArtifact 对应的页面流程、接口调用或状态转换。
 function selectArtifact(artifact) {
   selectedArtifact.value = artifact
   draftText.value = artifact?.content_text || formatJson(artifact?.content_json)
   regenerateInstruction.value = ''
 }
 
+// 前端业务函数：协调 load 对应的页面流程、接口调用或状态转换。
 async function load(preferredArtifactId = '') {
   loading.value = true
   error.value = ''
@@ -187,6 +194,7 @@ async function load(preferredArtifactId = '') {
   }
 }
 
+// 前端业务函数：协调 saveEdit 对应的页面流程、接口调用或状态转换。
 async function saveEdit() {
   if (!selectedArtifact.value) return
   const { data } = await editAITextArtifact(selectedArtifact.value.id, {
@@ -196,12 +204,14 @@ async function saveEdit() {
   await load(data?.artifact?.id)
 }
 
+// 前端业务函数：协调 approve 对应的页面流程、接口调用或状态转换。
 async function approve() {
   if (!selectedArtifact.value) return
   const { data } = await approveAITextArtifact(selectedArtifact.value.id)
   await load(data?.artifact?.id || selectedArtifact.value.id)
 }
 
+// 前端业务函数：协调 regenerate 对应的页面流程、接口调用或状态转换。
 async function regenerate() {
   if (!selectedArtifact.value) return
   const { data } = await regenerateAITextArtifact(selectedArtifact.value.id, {

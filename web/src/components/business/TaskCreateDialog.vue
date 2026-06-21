@@ -46,10 +46,12 @@ const nurtureKeywordMatrix = ref([])
 const nurtureKeywordGenerating = ref(false)
 const nurtureKeywordExpandCount = ref(8)
 
+// 前端业务函数：协调 addSubTask 对应的页面流程、接口调用或状态转换。
 function addSubTask() {
   subTasks.value.push({ type: 'browse', count: 5, content_template_id: '' })
 }
 
+// 前端业务函数：协调 removeSubTask 对应的页面流程、接口调用或状态转换。
 function removeSubTask(index) {
   if (subTasks.value.length <= 1) return
   subTasks.value.splice(index, 1)
@@ -110,6 +112,7 @@ const countInputMeta = computed(() => {
   }
 })
 
+// 前端业务函数：协调 validateCountBounds 对应的页面流程、接口调用或状态转换。
 function validateCountBounds() {
   if (form.type === 'search_dm' && (form.count < 1 || form.count > 50)) {
     createError.value = '搜索私信数量需在 1-50 之间'
@@ -127,6 +130,7 @@ watch(() => form.account_id, () => {
   form.device_id = ''
 })
 
+// 前端业务函数：协调 buildParams 对应的页面流程、接口调用或状态转换。
 function buildParams() {
   if (form.type === 'nurture') {
     if (nurtureMode.value === 'advanced') {
@@ -183,6 +187,7 @@ function buildParams() {
   return params
 }
 
+// 前端业务函数：协调 handleCreate 对应的页面流程、接口调用或状态转换。
 async function handleCreate() {
   if (!form.type) { createError.value = '请选择任务类型'; return }
   if (selectionMode.value === 'single' && !form.account_id) { createError.value = '请选择账号'; return }
@@ -215,6 +220,7 @@ async function handleCreate() {
   }
 }
 
+// 前端业务函数：协调 expandNurtureKeywords 对应的页面流程、接口调用或状态转换。
 async function expandNurtureKeywords() {
   const seeds = nurtureKeywords.value.split(/[,，\s]+/).map(s => s.trim()).filter(Boolean)
   if (seeds.length === 0) return
@@ -234,6 +240,7 @@ async function expandNurtureKeywords() {
   }
 }
 
+// 前端业务函数：协调 expandCreateKeyword 对应的页面流程、接口调用或状态转换。
 async function expandCreateKeyword() {
   const seed = form.keyword.trim()
   if (!seed) return
@@ -257,6 +264,7 @@ async function expandCreateKeyword() {
   }
 }
 
+// 前端业务函数：协调 openDialog 对应的页面流程、接口调用或状态转换。
 function openDialog() {
   Object.assign(form, NURTURE_DEFAULT_FORM)
   selectedTemplateId.value = ''

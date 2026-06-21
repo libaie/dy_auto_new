@@ -26,6 +26,7 @@ COMPOSE_STAGES = {"episode_compose", "composition"}
 
 
 def _load_run_and_job(db: Session, run_id: str, job_id: str):
+    """业务函数：处理 _load_run_and_job 对应的业务流程、校验或数据转换。"""
     from app.db.models.video_production import ProductionJob, VideoProductionRun
 
     run = db.query(VideoProductionRun).filter(VideoProductionRun.id == run_id).first()
@@ -38,6 +39,7 @@ def _load_run_and_job(db: Session, run_id: str, job_id: str):
 
 
 def _json_safe(value: Any) -> Any:
+    """业务函数：处理 _json_safe 对应的业务流程、校验或数据转换。"""
     try:
         json.dumps(value)
         return value
@@ -50,12 +52,14 @@ def _json_safe(value: Any) -> Any:
 
 
 def _string_value(value: Any) -> str | None:
+    """业务函数：处理 _string_value 对应的业务流程、校验或数据转换。"""
     if value is None:
         return None
     return str(getattr(value, "value", value))
 
 
 def _result_payload(result: Any) -> dict[str, Any]:
+    """业务函数：处理 _result_payload 对应的业务流程、校验或数据转换。"""
     data = result.data if isinstance(getattr(result, "data", None), dict) else {}
     provider_result = data.get("provider_result") if isinstance(data.get("provider_result"), dict) else {}
     code = _string_value(getattr(result, "code", None))
@@ -79,6 +83,7 @@ def _result_payload(result: Any) -> dict[str, Any]:
 
 
 async def _execute_provider_job(db: Session, run: Any, job: Any) -> Any:
+    """业务函数：处理 _execute_provider_job 对应的业务流程、校验或数据转换。"""
     from app.domains.video_production.production_worker_service import execute_provider_job_direct
 
     return await execute_provider_job_direct(db, run, job)
@@ -91,6 +96,7 @@ async def _run_provider_job(
     job_id: str,
     expected_stage: str | set[str],
 ) -> dict[str, Any]:
+    """业务函数：处理 _run_provider_job 对应的业务流程、校验或数据转换。"""
     if db is None:
         raise AgencyRuntimeError("AI_VIDEO_PROVIDER_CONTEXT_NOT_FOUND", "Database session is required.")
     run, job = _load_run_and_job(db, run_id, job_id)
@@ -101,35 +107,42 @@ async def _run_provider_job(
 
 
 def build_provider_tools(db: Session | None, allowed_tools: list[str] | None = None) -> list[Any]:
+    """业务函数：处理 build_provider_tools 对应的业务流程、校验或数据转换。"""
     selected = set(PROVIDER_TOOL_NAMES if allowed_tools is None else allowed_tools)
 
     @tool
     async def submit_image_generation(run_id: str, job_id: str) -> dict[str, Any]:
+        """业务函数：处理 submit_image_generation 对应的业务流程、校验或数据转换。"""
         """Submit or resume one image_generation production job through guarded provider services."""
         return await _run_provider_job(db, run_id=run_id, job_id=job_id, expected_stage="image_generation")
 
     @tool
     async def query_image_task(run_id: str, job_id: str) -> dict[str, Any]:
+        """业务函数：处理 query_image_task 对应的业务流程、校验或数据转换。"""
         """Query or sync one image_generation production job through guarded provider services."""
         return await _run_provider_job(db, run_id=run_id, job_id=job_id, expected_stage="image_generation")
 
     @tool
     async def submit_video_generation(run_id: str, job_id: str) -> dict[str, Any]:
+        """业务函数：处理 submit_video_generation 对应的业务流程、校验或数据转换。"""
         """Submit or resume one video_generation production job through guarded provider services."""
         return await _run_provider_job(db, run_id=run_id, job_id=job_id, expected_stage="video_generation")
 
     @tool
     async def query_video_task(run_id: str, job_id: str) -> dict[str, Any]:
+        """业务函数：处理 query_video_task 对应的业务流程、校验或数据转换。"""
         """Query or sync one video_generation production job through guarded provider services."""
         return await _run_provider_job(db, run_id=run_id, job_id=job_id, expected_stage="video_generation")
 
     @tool
     async def submit_compose(run_id: str, job_id: str) -> dict[str, Any]:
+        """业务函数：处理 submit_compose 对应的业务流程、校验或数据转换。"""
         """Submit or resume one compose production job through guarded provider services."""
         return await _run_provider_job(db, run_id=run_id, job_id=job_id, expected_stage=COMPOSE_STAGES)
 
     @tool
     async def query_compose_task(run_id: str, job_id: str) -> dict[str, Any]:
+        """业务函数：处理 query_compose_task 对应的业务流程、校验或数据转换。"""
         """Query or sync one compose production job through guarded provider services."""
         return await _run_provider_job(db, run_id=run_id, job_id=job_id, expected_stage=COMPOSE_STAGES)
 

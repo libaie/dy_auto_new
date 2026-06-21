@@ -176,6 +176,7 @@ var deviceWs = {
       var request = new Request.Builder().url(wsUrl).build();
 
       var listener = new JavaAdapter(WebSocketListener, {
+        // 设备业务函数：处理 onOpen 对应的抖音自动化动作、状态或安全边界。
         onOpen: function (ws, response) {
           logger.info(TAG, "已连接，发送认证消息");
           self._ws = ws;
@@ -213,6 +214,7 @@ var deviceWs = {
           }
           self._handleMessage(str);
         },
+        // 设备业务函数：处理 onClosing 对应的抖音自动化动作、状态或安全边界。
         onClosing: function (ws, code, reason) {
           logger.info(TAG, "连接关闭: code=" + code + " reason=" + reason);
           try { ws.close(1000, null); } catch (e) { /* already closed */ }
@@ -231,6 +233,7 @@ var deviceWs = {
           }
           self._scheduleReconnect();
         },
+        // 设备业务函数：处理 onFailure 对应的抖音自动化动作、状态或安全边界。
         onFailure: function (ws, t, response) {
           var msg = t.getMessage() || "";
           var code = response ? response.code() : 0;
@@ -263,6 +266,7 @@ var deviceWs = {
     }, 15000);
   },
 
+  // 设备业务函数：处理 _cleanup 对应的抖音自动化动作、状态或安全边界。
   _cleanup: function () {
     this._connected = false;
     this._ws = null;
@@ -272,6 +276,7 @@ var deviceWs = {
     }
   },
 
+  // 设备业务函数：处理 _scheduleReconnect 对应的抖音自动化动作、状态或安全边界。
   _scheduleReconnect: function () {
     var self = this;
     if (this._stopped) return;

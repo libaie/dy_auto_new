@@ -9,10 +9,12 @@ export function autoPlanEpisode(seriesId, episodeId, targetDuration) {
   })
 }
 
+// 前端业务函数：协调 createEpisodePlan 对应的页面流程、接口调用或状态转换。
 export function createEpisodePlan(payload) {
   return client.post('/director/episode-plan', payload)
 }
 
+// 前端业务函数：协调 createShotSegments 对应的页面流程、接口调用或状态转换。
 export function createShotSegments(payload) {
   return client.post('/director/shot-segments', payload)
 }

@@ -18,6 +18,7 @@ from app.domains.agency_operations.agency_runtime_contracts import (
 
 
 def ensure_langchain_provider_supported(config: dict[str, Any]) -> None:
+    """业务函数：处理 ensure_langchain_provider_supported 对应的业务流程、校验或数据转换。"""
     protocol = str(runtime_setting(config, "protocol", "") or "").lower()
     provider = str(config.get("provider") or "").lower()
     if protocol == OPENAI_CHAT_COMPLETIONS_PROTOCOL or provider in OPENAI_COMPATIBLE_PROVIDERS:
@@ -29,6 +30,7 @@ def ensure_langchain_provider_supported(config: dict[str, Any]) -> None:
 
 
 def build_langchain_openai_kwargs(config: dict[str, Any]) -> dict[str, Any]:
+    """业务函数：处理 build_langchain_openai_kwargs 对应的业务流程、校验或数据转换。"""
     ensure_langchain_provider_supported(config)
     base_url = str(config.get("base_url") or "").strip()
     api_key = str(config.get("api_key") or "").strip()
@@ -50,4 +52,5 @@ def build_langchain_openai_kwargs(config: dict[str, Any]) -> dict[str, Any]:
 
 
 def create_chat_model(config: dict[str, Any]) -> ChatOpenAI:
+    """业务函数：处理 create_chat_model 对应的业务流程、校验或数据转换。"""
     return ChatOpenAI(**build_langchain_openai_kwargs(config))

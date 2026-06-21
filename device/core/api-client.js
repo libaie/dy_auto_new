@@ -12,6 +12,7 @@ var netConfig = config.network || {
   offlineQueueMax: 100,
 };
 
+// 设备业务函数：处理 getTaskExecutor 对应的抖音自动化动作、状态或安全边界。
 function getTaskExecutor() {
   return require("./task-executor");
 }
@@ -35,6 +36,7 @@ function _ensureDirPath(dir) {
 
 var apiClient = {
   _onAuthFailure: null,
+  // 设备业务函数：处理 _lastRequestWas4xx 对应的抖音自动化动作、状态或安全边界。
   _lastRequestWas4xx: function () { return _lastRequestWas4xx; },
 
   /**
@@ -124,6 +126,7 @@ var apiClient = {
     }
   },
 
+  // 设备业务函数：处理 _requestWithRetry 对应的抖音自动化动作、状态或安全边界。
   _requestWithRetry: function (method, url, opts) {
     var body = opts.body || null;
     var timeout = opts.timeout || netConfig.requestTimeout;
@@ -284,16 +287,19 @@ var apiClient = {
     return this.get("/api/device/poll", { device_id: config.deviceId });
   },
 
+  // 设备业务函数：处理 fetchDMSequences 对应的抖音自动化动作、状态或安全边界。
   fetchDMSequences: function () {
     return this.get("/api/dm-sequences/device/sync");
   },
 
+  // 设备业务函数：处理 fetchTemplateList 对应的抖音自动化动作、状态或安全边界。
   fetchTemplateList: function (resolution) {
     var path = "/api/device/templates";
     if (resolution) path += "?resolution=" + encodeURIComponent(resolution);
     return this.get(path);
   },
 
+  // 设备业务函数：处理 uploadCalibration 对应的抖音自动化动作、状态或安全边界。
   uploadCalibration: function (templates, resolution) {
     var body = {
       templates: templates.map(function (t) {
@@ -309,12 +315,14 @@ var apiClient = {
     return this.post("/api/device/calibrate", body);
   },
 
+  // 设备业务函数：处理 downloadTemplate 对应的抖音自动化动作、状态或安全边界。
   downloadTemplate: function (filename, resolution) {
     var url = config.serverUrl + "/api/device/templates/" + encodeURIComponent(filename);
     if (resolution) url += "?resolution=" + encodeURIComponent(resolution);
     return this._downloadWithRetry(url);
   },
 
+  // 设备业务函数：处理 _pushToOfflineQueue 对应的抖音自动化动作、状态或安全边界。
   _pushToOfflineQueue: function (path, body, label, critical) {
     if (offlineQueue.length >= netConfig.offlineQueueMax) {
       // Prefer evicting non-critical items (stats) over critical (task reports, collect)
@@ -364,6 +372,7 @@ var apiClient = {
     return this.post("/api/device/heartbeat", { device_id: config.deviceId });
   },
 
+  // 设备业务函数：处理 reportProgress 对应的抖音自动化动作、状态或安全边界。
   reportProgress: function (taskId, step, detail, progress) {
     var body = {
       task_id: taskId,
@@ -377,19 +386,23 @@ var apiClient = {
     return this.post("/api/device/progress", body);
   },
 
+  // 设备业务函数：处理 fetchSelectors 对应的抖音自动化动作、状态或安全边界。
   fetchSelectors: function (currentVersion) {
     return this.get("/api/device/selectors", { version: currentVersion || 0 });
   },
 
+  // 设备业务函数：处理 fetchPromptTemplates 对应的抖音自动化动作、状态或安全边界。
   fetchPromptTemplates: function (currentVersion) {
     return this.get("/api/device/prompt-templates", { version: currentVersion || 0 });
   },
 
+  // 设备业务函数：处理 getScriptVersion 对应的抖音自动化动作、状态或安全边界。
   getScriptVersion: function () {
     var result = this.get("/api/device/script-version");
     return result ? result.version : null;
   },
 
+  // 设备业务函数：处理 downloadScript 对应的抖音自动化动作、状态或安全边界。
   downloadScript: function () {
     var url = config.serverUrl + "/api/device/script-download";
     var body = this._downloadWithRetry(url);
@@ -448,6 +461,7 @@ var apiClient = {
     });
   },
 
+  // 设备业务函数：处理 releaseCommentReply 对应的抖音自动化动作、状态或安全边界。
   releaseCommentReply: function (author, text) {
     return this.post("/api/device/comment-claim-release", {
       author: author,
@@ -455,6 +469,7 @@ var apiClient = {
     });
   },
 
+  // 设备业务函数：处理 reportRiskControl 对应的抖音自动化动作、状态或安全边界。
   reportRiskControl: function (accountId, riskType, detail) {
     return this.post("/api/device/risk-report", {
       account_id: accountId,
@@ -465,28 +480,34 @@ var apiClient = {
     });
   },
 
+  // 设备业务函数：处理 isOnline 对应的抖音自动化动作、状态或安全边界。
   isOnline: function () {
     return isOnline;
   },
 
+  // 设备业务函数：处理 getOfflineQueueSize 对应的抖音自动化动作、状态或安全边界。
   getOfflineQueueSize: function () {
     return offlineQueue.length;
   },
 
   // --- DM conversation ---
 
+  // 设备业务函数：处理 claimDMRecipient 对应的抖音自动化动作、状态或安全边界。
   claimDMRecipient: function (data) {
     return this.post("/api/device/dm-claim-recipient", data);
   },
 
+  // 设备业务函数：处理 reportDMSend 对应的抖音自动化动作、状态或安全边界。
   reportDMSend: function (data) {
     return this.post("/api/device/dm-send-report", data);
   },
 
+  // 设备业务函数：处理 releaseDMRecipient 对应的抖音自动化动作、状态或安全边界。
   releaseDMRecipient: function (data) {
     return this.post("/api/device/dm-release-recipient", data);
   },
 
+  // 设备业务函数：处理 saveCommentAIReply 对应的抖音自动化动作、状态或安全边界。
   saveCommentAIReply: function (nickname, text, aiReply, taskId, intendedProvince, intendedCity, intendedAttraction) {
     var data = {
       nickname: nickname, text: text, ai_reply: aiReply, task_id: taskId || null,
@@ -497,6 +518,7 @@ var apiClient = {
     return this.post("/api/device/comment-ai-reply", data);
   },
 
+  // 设备业务函数：处理 saveUserProfile 对应的抖音自动化动作、状态或安全边界。
   saveUserProfile: function (data) {
     var payload = {
       nickname: data.nickname,
@@ -518,6 +540,7 @@ var apiClient = {
     return this.post("/api/device/user-profile", payload);
   },
 
+  // 设备业务函数：处理 uploadUserAvatar 对应的抖音自动化动作、状态或安全边界。
   uploadUserAvatar: function (douyinId, imageBase64) {
     return this.post("/api/device/user-avatar", { douyin_id: douyinId, image_base64: imageBase64 });
   },

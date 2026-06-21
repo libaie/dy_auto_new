@@ -189,11 +189,13 @@ const editCatKey = ref('')
 const editCatLabel = ref('')
 const deletingCat = ref(null)
 
+// 前端业务函数：协调 startAddCat 对应的页面流程、接口调用或状态转换。
 function startAddCat() {
   addingCat.value = true
   nextTick(() => catLabelInput.value?.focus())
 }
 
+// 前端业务函数：协调 loadCategories 对应的页面流程、接口调用或状态转换。
 async function loadCategories() {
   const { data } = await listCategories()
   if (data.ok) {
@@ -204,6 +206,7 @@ async function loadCategories() {
   }
 }
 
+// 前端业务函数：协调 addCategory 对应的页面流程、接口调用或状态转换。
 async function addCategory() {
   if (!newCatLabel.value.trim()) return
   const key = newCatKey.value.trim() || newCatLabel.value.trim()
@@ -212,20 +215,24 @@ async function addCategory() {
   await loadCategories()
 }
 
+// 前端业务函数：协调 cancelAddCat 对应的页面流程、接口调用或状态转换。
 function cancelAddCat() {
   newCatKey.value = ''; newCatLabel.value = ''; addingCat.value = false
 }
 
+// 前端业务函数：协调 startEditCat 对应的页面流程、接口调用或状态转换。
 function startEditCat(cat) {
   editingCat.value = cat
   editCatKey.value = cat.key
   editCatLabel.value = cat.label
 }
 
+// 前端业务函数：协调 cancelEditCat 对应的页面流程、接口调用或状态转换。
 function cancelEditCat() {
   editingCat.value = null
 }
 
+// 前端业务函数：协调 saveCategory 对应的页面流程、接口调用或状态转换。
 async function saveCategory() {
   if (!editingCat.value) return
   await updateCategory(editingCat.value.id, { key: editCatKey.value, label: editCatLabel.value })
@@ -233,10 +240,12 @@ async function saveCategory() {
   await loadCategories()
 }
 
+// 前端业务函数：协调 confirmDeleteCat 对应的页面流程、接口调用或状态转换。
 function confirmDeleteCat(cat) {
   deletingCat.value = cat
 }
 
+// 前端业务函数：协调 doDeleteCat 对应的页面流程、接口调用或状态转换。
 async function doDeleteCat() {
   if (!deletingCat.value) return
   const cat = deletingCat.value
@@ -249,12 +258,14 @@ async function doDeleteCat() {
   }
 }
 
+// 前端业务函数：协调 load 对应的页面流程、接口调用或状态转换。
 async function load() {
   if (!currentCat.value) { items.value = []; return }
   const { data } = await listAllItems(currentCat.value)
   if (data.ok) items.value = data.items
 }
 
+// 前端业务函数：协调 addItem 对应的页面流程、接口调用或状态转换。
 async function addItem() {
   if (!newLabel.value.trim()) return
   await createItem({
@@ -267,14 +278,17 @@ async function addItem() {
   await load()
 }
 
+// 前端业务函数：协调 saveLabel 对应的页面流程、接口调用或状态转换。
 async function saveLabel(item, newLabel) {
   if (newLabel !== item.label) { await updateItem(item.id, { label: newLabel }); item.label = newLabel }
 }
 
+// 前端业务函数：协调 toggleItem 对应的页面流程、接口调用或状态转换。
 async function toggleItem(item) {
   await updateItem(item.id, { enabled: !item.enabled }); await load()
 }
 
+// 前端业务函数：协调 removeItem 对应的页面流程、接口调用或状态转换。
 async function removeItem(item) {
   await deleteItem(item.id); await load()
 }

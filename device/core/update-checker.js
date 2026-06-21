@@ -4,6 +4,7 @@ var logger = require("../utils/logger");
 
 var TAG = "UPDATE";
 
+// 设备业务函数：处理 ensureDirPath 对应的抖音自动化动作、状态或安全边界。
 function ensureDirPath(dir) {
   if (!dir) return false;
   try {
@@ -16,12 +17,14 @@ function ensureDirPath(dir) {
   }
 }
 
+// 设备业务函数：处理 parentDir 对应的抖音自动化动作、状态或安全边界。
 function parentDir(path) {
   var s = String(path || "");
   var idx = Math.max(s.lastIndexOf("/"), s.lastIndexOf("\\"));
   return idx > 0 ? s.substring(0, idx) : "";
 }
 
+// 设备业务函数：处理 extractZip 对应的抖音自动化动作、状态或安全边界。
 function extractZip(zipPath, destDir) {
   ensureDirPath(destDir);
 
@@ -71,16 +74,19 @@ function extractZip(zipPath, destDir) {
 }
 
 var updateChecker = {
+  // 设备业务函数：处理 _getBaseDir 对应的抖音自动化动作、状态或安全边界。
   _getBaseDir: function () {
     try { return context.getFilesDir().getAbsolutePath(); } catch (e) {}
     try { return context.getExternalFilesDir(null).getAbsolutePath(); } catch (e2) {}
     return files.cwd();
   },
 
+  // 设备业务函数：处理 _versionFile 对应的抖音自动化动作、状态或安全边界。
   _versionFile: function () {
     return this._getBaseDir() + "/update/local_version.txt";
   },
 
+  // 设备业务函数：处理 getLocalVersion 对应的抖音自动化动作、状态或安全边界。
   getLocalVersion: function () {
     try {
       var vf = this._versionFile();
@@ -93,6 +99,7 @@ var updateChecker = {
     return "0.0.0";
   },
 
+  // 设备业务函数：处理 saveLocalVersion 对应的抖音自动化动作、状态或安全边界。
   saveLocalVersion: function (version) {
     try {
       var vf = this._versionFile();
@@ -103,6 +110,7 @@ var updateChecker = {
     }
   },
 
+  // 设备业务函数：处理 checkAndUpdate 对应的抖音自动化动作、状态或安全边界。
   checkAndUpdate: function () {
     logger.info(TAG, "Checking for script updates...");
 
@@ -172,6 +180,7 @@ var updateChecker = {
     }
   },
 
+  // 设备业务函数：处理 _copyDir 对应的抖音自动化动作、状态或安全边界。
   _copyDir: function (src, dst) {
     var items = files.listDir(src);
     for (var i = 0; i < items.length; i++) {

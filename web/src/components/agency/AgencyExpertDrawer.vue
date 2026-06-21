@@ -102,32 +102,38 @@ onBeforeUnmount(() => {
   removeEscapeListener()
 })
 
+// 前端业务函数：协调 addEscapeListener 对应的页面流程、接口调用或状态转换。
 function addEscapeListener() {
   if (escapeListenerActive || typeof document === 'undefined') return
   document.addEventListener('keydown', handleEscapeKeydown)
   escapeListenerActive = true
 }
 
+// 前端业务函数：协调 removeEscapeListener 对应的页面流程、接口调用或状态转换。
 function removeEscapeListener() {
   if (!escapeListenerActive || typeof document === 'undefined') return
   document.removeEventListener('keydown', handleEscapeKeydown)
   escapeListenerActive = false
 }
 
+// 前端业务函数：协调 handleEscapeKeydown 对应的页面流程、接口调用或状态转换。
 function handleEscapeKeydown(event) {
   if (event.key === 'Escape' && props.expertId) {
     emit('close')
   }
 }
 
+// 前端业务函数：协调 isCurrentRequest 对应的页面流程、接口调用或状态转换。
 function isCurrentRequest(requestId, requestedId) {
   return requestId === requestSequence && props.expertId === requestedId
 }
 
+// 前端业务函数：协调 expertName 对应的页面流程、接口调用或状态转换。
 function expertName(id, fallback = '') {
   return knownExpertName(id, fallback)
 }
 
+// 前端业务函数：协调 metadataText 对应的页面流程、接口调用或状态转换。
 function metadataText(value, fallback) {
   return value ? fallback : '-'
 }

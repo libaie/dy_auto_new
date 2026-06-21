@@ -40,10 +40,12 @@ LEGACY_EXPERT_PATHS = {
 
 
 class AgencyManifestError(RuntimeError):
+    """业务类：承载 AgencyManifestError 相关的数据结构、状态或业务协作。"""
     pass
 
 
 class AgencyExpertSource(BaseModel):
+    """业务类：承载 AgencyExpertSource 相关的数据结构、状态或业务协作。"""
     expert_id: str
     name_zh: str
     role_type: str
@@ -53,6 +55,7 @@ class AgencyExpertSource(BaseModel):
 
 
 class AgencyManifest(BaseModel):
+    """业务类：承载 AgencyManifest 相关的数据结构、状态或业务协作。"""
     source_repo: str
     source_commit: str
     team_version: str
@@ -60,6 +63,7 @@ class AgencyManifest(BaseModel):
 
     @model_validator(mode="after")
     def validate_expert_team(self) -> "AgencyManifest":
+        """业务函数：处理 validate_expert_team 对应的业务流程、校验或数据转换。"""
         expert_ids = [expert.expert_id for expert in self.experts]
         if expert_ids != list(EXPERT_IDS):
             raise ValueError(f"manifest experts must match expected team: {list(EXPERT_IDS)}")
@@ -67,10 +71,12 @@ class AgencyManifest(BaseModel):
 
 
 def _sha256(path: Path) -> str:
+    """业务函数：处理 _sha256 对应的业务流程、校验或数据转换。"""
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def _expert_path(expert: AgencyExpertSource) -> Path:
+    """业务函数：处理 _expert_path 对应的业务流程、校验或数据转换。"""
     path = (DATA_ROOT / expert.source_path).resolve()
     data_root = DATA_ROOT.resolve()
     if path != data_root and data_root not in path.parents:
@@ -80,6 +86,7 @@ def _expert_path(expert: AgencyExpertSource) -> Path:
 
 @lru_cache(maxsize=1)
 def load_manifest() -> AgencyManifest:
+    """业务函数：处理 load_manifest 对应的业务流程、校验或数据转换。"""
     if not MANIFEST_PATH.exists():
         raise AgencyManifestError(f"agency manifest not found: {MANIFEST_PATH}")
     try:
@@ -92,10 +99,12 @@ def load_manifest() -> AgencyManifest:
 
 
 def list_experts() -> list[AgencyExpertSource]:
+    """业务函数：处理 list_experts 对应的业务流程、校验或数据转换。"""
     return load_manifest().experts
 
 
 def get_expert(expert_id: str) -> AgencyExpertSource:
+    """业务函数：处理 get_expert 对应的业务流程、校验或数据转换。"""
     for expert in list_experts():
         if expert.expert_id == expert_id:
             return expert
@@ -103,6 +112,7 @@ def get_expert(expert_id: str) -> AgencyExpertSource:
 
 
 def get_legacy_expert(expert_id: str) -> AgencyExpertSource:
+    """业务函数：处理 get_legacy_expert 对应的业务流程、校验或数据转换。"""
     legacy = LEGACY_EXPERT_PATHS.get(expert_id)
     if not legacy:
         raise AgencyManifestError(f"unknown agency expert: {expert_id}")
@@ -121,6 +131,7 @@ def get_legacy_expert(expert_id: str) -> AgencyExpertSource:
 
 
 def _safe_expert_path(source_path: str) -> Path:
+    """业务函数：处理 _safe_expert_path 对应的业务流程、校验或数据转换。"""
     path = (DATA_ROOT / source_path).resolve()
     data_root = DATA_ROOT.resolve()
     if path != data_root and data_root not in path.parents:
@@ -129,6 +140,7 @@ def _safe_expert_path(source_path: str) -> Path:
 
 
 def read_expert_markdown(expert_id: str) -> str:
+    """业务函数：处理 read_expert_markdown 对应的业务流程、校验或数据转换。"""
     expert = get_expert(expert_id)
     path = _expert_path(expert)
     if not path.is_file():
@@ -140,12 +152,14 @@ def read_expert_markdown(expert_id: str) -> str:
 
 
 def read_legacy_expert_markdown(expert_id: str) -> str:
+    """业务函数：处理 read_legacy_expert_markdown 对应的业务流程、校验或数据转换。"""
     expert = get_legacy_expert(expert_id)
     path = _expert_path(expert)
     return path.read_text(encoding="utf-8")
 
 
 def verify_manifest() -> dict:
+    """业务函数：处理 verify_manifest 对应的业务流程、校验或数据转换。"""
     errors = []
     checked_count = 0
     try:

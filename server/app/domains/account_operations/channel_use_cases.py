@@ -11,6 +11,7 @@ from .read_models import channel_item_to_response, channel_to_response
 
 
 def create_channel(db, request, user_id: str) -> dict:
+    """业务函数：处理 create_channel 对应的业务流程、校验或数据转换。"""
     channel = channel_service.create_channel(
         db,
         group_id=request.group_id,
@@ -29,6 +30,7 @@ def create_channel(db, request, user_id: str) -> dict:
 
 
 def list_channels(db, user: tuple) -> dict:
+    """业务函数：处理 list_channels 对应的业务流程、校验或数据转换。"""
     user_id, role = user
     scope_user_id = None if role == "admin" else user_id
     channels = channel_service.list_channels(db, user_id=scope_user_id)
@@ -56,6 +58,7 @@ def list_channels(db, user: tuple) -> dict:
 
 
 def get_channel(db, channel_id: str, user: tuple) -> dict:
+    """业务函数：处理 get_channel 对应的业务流程、校验或数据转换。"""
     user_id, role = user
     scope_user_id = None if role == "admin" else user_id
     channel = channel_service.get_channel(db, channel_id, user_id=scope_user_id)
@@ -80,6 +83,7 @@ def get_channel(db, channel_id: str, user: tuple) -> dict:
 
 
 def update_channel_status(db, channel_id: str, status: str, user: tuple) -> dict:
+    """业务函数：处理 update_channel_status 对应的业务流程、校验或数据转换。"""
     user_id, role = user
     scope_user_id = None if role == "admin" else user_id
     channel_service.update_channel_status(db, channel_id, status, user_id=scope_user_id)
@@ -87,6 +91,7 @@ def update_channel_status(db, channel_id: str, status: str, user: tuple) -> dict
 
 
 def delete_channel(db, channel_id: str, user: tuple) -> dict:
+    """业务函数：处理 delete_channel 对应的业务流程、校验或数据转换。"""
     user_id, role = user
     scope_user_id = None if role == "admin" else user_id
     channel_service.soft_delete_channel(db, channel_id, user_id=scope_user_id)
@@ -94,6 +99,7 @@ def delete_channel(db, channel_id: str, user: tuple) -> dict:
 
 
 def append_items(db, channel_id: str, keywords: list[str], user: tuple) -> dict:
+    """业务函数：处理 append_items 对应的业务流程、校验或数据转换。"""
     user_id, role = user
     scope_user_id = None if role == "admin" else user_id
     channel_service.append_items(db, channel_id, keywords, user_id=scope_user_id)
@@ -101,6 +107,7 @@ def append_items(db, channel_id: str, keywords: list[str], user: tuple) -> dict:
 
 
 def update_item_status(db, item_id: str, status: str, user: tuple) -> dict:
+    """业务函数：处理 update_item_status 对应的业务流程、校验或数据转换。"""
     user_id, role = user
     scope_user_id = None if role == "admin" else user_id
     channel_service.update_item_status(db, item_id, status, user_id=scope_user_id)
@@ -108,6 +115,7 @@ def update_item_status(db, item_id: str, status: str, user: tuple) -> dict:
 
 
 def batch_edit_items(db, request, user: tuple) -> dict:
+    """业务函数：处理 batch_edit_items 对应的业务流程、校验或数据转换。"""
     user_id, role = user
     scope_user_id = None if role == "admin" else user_id
     return channel_service.batch_edit_items(
@@ -120,6 +128,7 @@ def batch_edit_items(db, request, user: tuple) -> dict:
 
 
 def edit_channel_item(db, item_id: str, request, user: tuple) -> dict:
+    """业务函数：处理 edit_channel_item 对应的业务流程、校验或数据转换。"""
     user_id, role = user
     scope_user_id = None if role == "admin" else user_id
     item = channel_service.edit_item(
@@ -142,6 +151,7 @@ def edit_channel_item(db, item_id: str, request, user: tuple) -> dict:
 
 
 def edit_channel(db, channel_id: str, request, user: tuple) -> dict:
+    """业务函数：处理 edit_channel 对应的业务流程、校验或数据转换。"""
     user_id, role = user
     scope_user_id = None if role == "admin" else user_id
     channel = channel_service.edit_channel(

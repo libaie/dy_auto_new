@@ -61,18 +61,22 @@ LOGICAL_HASH_EXCLUDED_FIELDS = {
 
 
 def _stable_json(value: Any) -> str:
+    """业务函数：处理 _stable_json 对应的业务流程、校验或数据转换。"""
     return json.dumps(value, sort_keys=True, ensure_ascii=False, default=str, separators=(",", ":"))
 
 
 def _hash(value: Any) -> str:
+    """业务函数：处理 _hash 对应的业务流程、校验或数据转换。"""
     return hashlib.sha256(_stable_json(value).encode("utf-8")).hexdigest()
 
 
 def _unique_strategy_ids(strategy_ids: list[str]) -> list[str]:
+    """业务函数：处理 _unique_strategy_ids 对应的业务流程、校验或数据转换。"""
     return [strategy_id for index, strategy_id in enumerate(strategy_ids) if strategy_id not in strategy_ids[:index]]
 
 
 def _normalized_group_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """业务函数：处理 _normalized_group_payload 对应的业务流程、校验或数据转换。"""
     normalized = dict(payload)
     if "strategy_ids" in normalized:
         normalized["strategy_ids"] = _unique_strategy_ids(list(normalized.get("strategy_ids") or []))
@@ -80,6 +84,7 @@ def _normalized_group_payload(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _canonical_request_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """业务函数：处理 _canonical_request_payload 对应的业务流程、校验或数据转换。"""
     return {
         key: value
         for key, value in payload.items()
@@ -88,10 +93,12 @@ def _canonical_request_payload(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _record(db: Session, event_type: str, payload: dict[str, Any]) -> None:
+    """业务函数：处理 _record 对应的业务流程、校验或数据转换。"""
     record_production_event(db, event_type=event_type, payload={"scope": "image_ab", **payload})
 
 
 def _safe_ab_error_message(value: Any) -> str:
+    """业务函数：处理 _safe_ab_error_message 对应的业务流程、校验或数据转换。"""
     message = str(value or "")
     message = re.sub(r"(?i)\bauthorization\s*[:=]\s*bearer\s+[^\s,;]+", "authorization=[REDACTED]", message)
     message = re.sub(r"(?i)\bbearer\s+[^\s,;]+", "Bearer [REDACTED]", message)
@@ -106,6 +113,7 @@ def _safe_ab_error_message(value: Any) -> str:
 
 
 def _strategy_rows(db: Session, strategy_ids: list[str]) -> list[ImageProductionStrategy]:
+    """业务函数：处理 _strategy_rows 对应的业务流程、校验或数据转换。"""
     unique_ids = _unique_strategy_ids(strategy_ids)
     if len(unique_ids) < 2 or len(unique_ids) > 4:
         raise image_error(
@@ -148,6 +156,7 @@ def _payload_for_strategy(
     *,
     for_preview: bool = False,
 ) -> dict[str, Any]:
+    """业务函数：处理 _payload_for_strategy 对应的业务流程、校验或数据转换。"""
     task_payload = dict(payload)
     task_payload.pop("strategy_ids", None)
     task_payload.pop("preview_request_hash", None)
@@ -162,10 +171,12 @@ def _payload_for_strategy(
 
 
 def _amount(preview: dict[str, Any]) -> float:
+    """业务函数：处理 _amount 对应的业务流程、校验或数据转换。"""
     return float((preview.get("cost_estimate") or {}).get("amount") or 0)
 
 
 def _currency(previews: list[dict[str, Any]]) -> str:
+    """业务函数：处理 _currency 对应的业务流程、校验或数据转换。"""
     for preview in previews:
         currency = (preview.get("cost_estimate") or {}).get("currency")
         if currency:
@@ -174,6 +185,7 @@ def _currency(previews: list[dict[str, Any]]) -> str:
 
 
 def _group_cap(previews: list[dict[str, Any]]) -> float | None:
+    """业务函数：处理 _group_cap 对应的业务流程、校验或数据转换。"""
     values = [
         float(preview["cost_estimate"]["ab_max_group_cost"])
         for preview in previews
@@ -183,6 +195,7 @@ def _group_cap(previews: list[dict[str, Any]]) -> float | None:
 
 
 def _total_cost(previews: list[dict[str, Any]]) -> dict[str, Any]:
+    """业务函数：处理 _total_cost 对应的业务流程、校验或数据转换。"""
     amount = sum(_amount(preview) for preview in previews)
     cap = _group_cap(previews)
     return {
@@ -195,6 +208,7 @@ def _total_cost(previews: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def _logical_request_hash(payload: dict[str, Any], strategies: list[ImageProductionStrategy]) -> str:
+    """业务函数：处理 _logical_request_hash 对应的业务流程、校验或数据转换。"""
     return _hash({
         "payload": _canonical_request_payload(payload),
         "strategy_ids": [strategy.id for strategy in strategies],
@@ -203,6 +217,7 @@ def _logical_request_hash(payload: dict[str, Any], strategies: list[ImageProduct
 
 
 def _ab_request_hash(payload: dict[str, Any], strategies: list[ImageProductionStrategy], preview_hashes: list[str | None]) -> str:
+    """业务函数：处理 _ab_request_hash 对应的业务流程、校验或数据转换。"""
     return _hash({
         "logical_request_hash": _logical_request_hash(payload, strategies),
         "preview_hashes": preview_hashes,
@@ -210,6 +225,7 @@ def _ab_request_hash(payload: dict[str, Any], strategies: list[ImageProductionSt
 
 
 def _preview_drift() -> HTTPException:
+    """业务函数：处理 _preview_drift 对应的业务流程、校验或数据转换。"""
     return image_error(
         409,
         "IMAGE_AB_TEST_PREVIEW_DRIFT",
@@ -220,6 +236,7 @@ def _preview_drift() -> HTTPException:
 
 
 def _valid_preview_hash(value: Any) -> bool:
+    """业务函数：处理 _valid_preview_hash 对应的业务流程、校验或数据转换。"""
     return isinstance(value, str) and bool(value.strip())
 
 
@@ -229,6 +246,7 @@ def _build_ab_preview(
     user_id: str | None = None,
     strategies: list[ImageProductionStrategy] | None = None,
 ) -> dict[str, Any]:
+    """业务函数：处理 _build_ab_preview 对应的业务流程、校验或数据转换。"""
     strategies = strategies or _strategy_rows(db, list(payload.get("strategy_ids") or []))
     previews = []
     for strategy in strategies:
@@ -255,6 +273,7 @@ def _build_ab_preview(
 
 
 def preview_ab_group(db: Session, payload: dict[str, Any], user_id: str | None = None) -> dict[str, Any]:
+    """业务函数：处理 preview_ab_group 对应的业务流程、校验或数据转换。"""
     result = _build_ab_preview(db, payload, user_id=user_id)
     _record(db, "image_ab.preview", {
         "request_hash": result["request_hash"],
@@ -278,6 +297,7 @@ def _ensure_preview_matches(
     user_id: str | None,
     strategies: list[ImageProductionStrategy] | None = None,
 ) -> dict[str, Any]:
+    """业务函数：处理 _ensure_preview_matches 对应的业务流程、校验或数据转换。"""
     preview = _build_ab_preview(db, payload, user_id=user_id, strategies=strategies)
     expected_hash = payload.get("preview_request_hash")
     if not expected_hash or expected_hash != preview["request_hash"]:
@@ -301,16 +321,19 @@ def _ensure_preview_matches(
 
 
 def _attempt_key(payload: dict[str, Any], group: ImageProductionAbGroup, index: int, strategy: ImageProductionStrategy) -> str:
+    """业务函数：处理 _attempt_key 对应的业务流程、校验或数据转换。"""
     base_key = payload.get("idempotency_key") or group.id
     return f"{base_key}:attempt:{index}:{strategy.id}:{strategy.version}"
 
 
 def _attempt_key_for_existing_attempt(group: ImageProductionAbGroup, index: int, attempt: ImageProductionAbAttempt) -> str:
+    """业务函数：处理 _attempt_key_for_existing_attempt 对应的业务流程、校验或数据转换。"""
     base_key = group.idempotency_key or group.id
     return f"{base_key}:attempt:{index}:{attempt.strategy_id}:{attempt.strategy_version}"
 
 
 def _idempotency_conflict(existing: ImageProductionAbGroup | None = None, *, expose_existing_id: bool = True) -> HTTPException:
+    """业务函数：处理 _idempotency_conflict 对应的业务流程、校验或数据转换。"""
     return image_error(
         409,
         "IMAGE_AB_TEST_IDEMPOTENCY_CONFLICT",
@@ -322,10 +345,12 @@ def _idempotency_conflict(existing: ImageProductionAbGroup | None = None, *, exp
 
 
 def _group_has_decision(group: ImageProductionAbGroup) -> bool:
+    """业务函数：处理 _group_has_decision 对应的业务流程、校验或数据转换。"""
     return bool(group.winner_attempt_id or group.status in DECISION_STATUSES or group.decision_json)
 
 
 def _normalize_datetime_for_compare(value: datetime | None, now: datetime) -> datetime | None:
+    """业务函数：处理 _normalize_datetime_for_compare 对应的业务流程、校验或数据转换。"""
     if value is None:
         return None
     if value.tzinfo is not None and now.tzinfo is None:
@@ -336,6 +361,7 @@ def _normalize_datetime_for_compare(value: datetime | None, now: datetime) -> da
 
 
 def _attempt_incomplete_stale(group: ImageProductionAbGroup, attempt: ImageProductionAbAttempt) -> bool:
+    """业务函数：处理 _attempt_incomplete_stale 对应的业务流程、校验或数据转换。"""
     now = bj_now()
     timestamps = [
         _normalize_datetime_for_compare(value, now)
@@ -346,6 +372,7 @@ def _attempt_incomplete_stale(group: ImageProductionAbGroup, attempt: ImageProdu
 
 
 def _existing_group_matches_payload(db: Session, existing: ImageProductionAbGroup, payload: dict[str, Any]) -> bool:
+    """业务函数：处理 _existing_group_matches_payload 对应的业务流程、校验或数据转换。"""
     payload = _normalized_group_payload(payload)
     snapshot = _normalized_group_payload(existing.prompt_snapshot_json or {})
     if _canonical_request_payload(payload) != _canonical_request_payload(snapshot):
@@ -379,6 +406,7 @@ def _existing_group_matches_payload(db: Session, existing: ImageProductionAbGrou
 
 
 def _reconcile_incomplete_existing_group(db: Session, group: ImageProductionAbGroup) -> None:
+    """业务函数：处理 _reconcile_incomplete_existing_group 对应的业务流程、校验或数据转换。"""
     if _group_has_decision(group):
         return
     attempts = _attempt_rows(db, group.id)
@@ -435,6 +463,7 @@ def _existing_group_for_key(
     user_id: str | None,
     payload: dict[str, Any] | None = None,
 ) -> ImageProductionAbGroup | None:
+    """业务函数：处理 _existing_group_for_key 对应的业务流程、校验或数据转换。"""
     if not idempotency_key:
         return None
     existing = db.query(ImageProductionAbGroup).filter_by(idempotency_key=idempotency_key).first()
@@ -452,12 +481,14 @@ def _existing_group_for_key(
 
 
 def _http_error_code(exc: HTTPException) -> str | None:
+    """业务函数：处理 _http_error_code 对应的业务流程、校验或数据转换。"""
     if isinstance(exc.detail, dict):
         return exc.detail.get("error_code")
     return None
 
 
 def _post_persist_failed_task(db: Session, idempotency_key: str | None, exc: HTTPException) -> ImageCreationTask | None:
+    """业务函数：处理 _post_persist_failed_task 对应的业务流程、校验或数据转换。"""
     if _http_error_code(exc) != "PIXELLE_IMAGE_SUBMIT_FAILED" or not idempotency_key:
         return None
     task = db.query(ImageCreationTask).filter(ImageCreationTask.idempotency_key == idempotency_key).first()
@@ -467,6 +498,7 @@ def _post_persist_failed_task(db: Session, idempotency_key: str | None, exc: HTT
 
 
 def _stored_preview_snapshot(db: Session, request_hash: str, user_id: str | None) -> dict[str, Any] | None:
+    """业务函数：处理 _stored_preview_snapshot 对应的业务流程、校验或数据转换。"""
     request_hash_expr = ProductionAuditEvent.payload_json["request_hash"].as_string()
     rows = (
         db.query(ProductionAuditEvent)
@@ -489,6 +521,7 @@ def _stored_preview_snapshot(db: Session, request_hash: str, user_id: str | None
 
 
 def _ensure_ab_cost_confirmation(payload: dict[str, Any], total_cost_estimate: dict[str, Any] | None) -> None:
+    """业务函数：处理 _ensure_ab_cost_confirmation 对应的业务流程、校验或数据转换。"""
     if not total_cost_estimate or not total_cost_estimate.get("requires_confirmation") or payload.get("cost_confirmation"):
         return
     raise image_error(
@@ -502,6 +535,7 @@ def _ensure_ab_cost_confirmation(payload: dict[str, Any], total_cost_estimate: d
 
 
 def _preview_expired(value: Any) -> bool:
+    """业务函数：处理 _preview_expired 对应的业务流程、校验或数据转换。"""
     if not value:
         return False
     try:
@@ -517,6 +551,7 @@ def _preview_expired(value: Any) -> bool:
 
 
 def _strategy_version_matches(preview_version: Any, expected_version: Any) -> bool:
+    """业务函数：处理 _strategy_version_matches 对应的业务流程、校验或数据转换。"""
     try:
         return int(preview_version) == int(expected_version)
     except (TypeError, ValueError):
@@ -524,6 +559,7 @@ def _strategy_version_matches(preview_version: Any, expected_version: Any) -> bo
 
 
 def _snapshot_total_cost_matches(previews: list[dict[str, Any]], snapshot_total_cost: Any) -> bool:
+    """业务函数：处理 _snapshot_total_cost_matches 对应的业务流程、校验或数据转换。"""
     if not isinstance(snapshot_total_cost, dict):
         return False
     try:
@@ -539,6 +575,7 @@ def _validate_stored_preview_snapshot(
     expected_hash: str | None,
     user_id: str | None,
 ) -> dict[str, Any]:
+    """业务函数：处理 _validate_stored_preview_snapshot 对应的业务流程、校验或数据转换。"""
     if not expected_hash or not snapshot:
         raise _preview_drift()
     strategy_ids = [strategy.id for strategy in strategies]
@@ -579,6 +616,7 @@ def _validate_stored_preview_snapshot(
 
 
 async def create_ab_group(db: Session, payload: dict[str, Any], user_id: str | None = None) -> ImageProductionAbGroup:
+    """业务函数：处理 create_ab_group 对应的业务流程、校验或数据转换。"""
     payload = _normalized_group_payload(payload)
     expected_hash = payload.get("preview_request_hash")
     idempotency_key = payload.get("idempotency_key")
@@ -750,6 +788,7 @@ async def create_ab_group(db: Session, payload: dict[str, Any], user_id: str | N
 
 
 def get_ab_group(db: Session, group_id: str, user_id: str | None = None) -> ImageProductionAbGroup:
+    """业务函数：处理 get_ab_group 对应的业务流程、校验或数据转换。"""
     group = db.query(ImageProductionAbGroup).filter_by(id=group_id).first()
     if not group or group.user_id != user_id:
         raise image_error(
@@ -764,6 +803,7 @@ def get_ab_group(db: Session, group_id: str, user_id: str | None = None) -> Imag
 
 
 def _attempt_rows(db: Session, group_id: str) -> list[ImageProductionAbAttempt]:
+    """业务函数：处理 _attempt_rows 对应的业务流程、校验或数据转换。"""
     return (
         db.query(ImageProductionAbAttempt)
         .filter_by(group_id=group_id)
@@ -773,6 +813,7 @@ def _attempt_rows(db: Session, group_id: str) -> list[ImageProductionAbAttempt]:
 
 
 def _assert_attempts_terminal_for_decision(db: Session, group: ImageProductionAbGroup) -> None:
+    """业务函数：处理 _assert_attempts_terminal_for_decision 对应的业务流程、校验或数据转换。"""
     attempts = _attempt_rows(db, group.id)
     statuses = {attempt.status for attempt in attempts}
     if attempts and statuses.issubset(TERMINAL_TASK_STATUSES):
@@ -788,6 +829,7 @@ def _assert_attempts_terminal_for_decision(db: Session, group: ImageProductionAb
 
 
 def _approved_assets(db: Session, attempt: ImageProductionAbAttempt) -> list[ImageCreationAsset]:
+    """业务函数：处理 _approved_assets 对应的业务流程、校验或数据转换。"""
     if not attempt.task_id:
         return []
     return (
@@ -800,6 +842,7 @@ def _approved_assets(db: Session, attempt: ImageProductionAbAttempt) -> list[Ima
 
 
 def _group_total_cost_estimate(group: ImageProductionAbGroup) -> dict[str, Any] | None:
+    """业务函数：处理 _group_total_cost_estimate 对应的业务流程、校验或数据转换。"""
     cost_confirmation = group.cost_confirmation_json or {}
     if not isinstance(cost_confirmation, dict):
         return None
@@ -808,6 +851,7 @@ def _group_total_cost_estimate(group: ImageProductionAbGroup) -> dict[str, Any] 
 
 
 def _attempt_audit_summary(db: Session, group_id: str) -> list[dict[str, Any]]:
+    """业务函数：处理 _attempt_audit_summary 对应的业务流程、校验或数据转换。"""
     summaries = []
     for attempt in _attempt_rows(db, group_id):
         metrics = attempt.metrics_snapshot_json or {}
@@ -826,6 +870,7 @@ def _attempt_audit_summary(db: Session, group_id: str) -> list[dict[str, Any]]:
 
 
 def _group_audit_payload(db: Session, group: ImageProductionAbGroup, *, status: str | None = None) -> dict[str, Any]:
+    """业务函数：处理 _group_audit_payload 对应的业务流程、校验或数据转换。"""
     attempts = _attempt_audit_summary(db, group.id)
     payload: dict[str, Any] = {
         "group_id": group.id,
@@ -840,6 +885,7 @@ def _group_audit_payload(db: Session, group: ImageProductionAbGroup, *, status: 
 
 
 def refresh_ab_group(db: Session, group_id: str, user_id: str | None = None) -> ImageProductionAbGroup:
+    """业务函数：处理 refresh_ab_group 对应的业务流程、校验或数据转换。"""
     group = get_ab_group(db, group_id, user_id=user_id)
     attempts = _attempt_rows(db, group.id)
     for attempt in attempts:
@@ -879,10 +925,12 @@ def refresh_ab_group(db: Session, group_id: str, user_id: str | None = None) -> 
 
 
 def recommend_ab_winner(db: Session, group_id: str, user_id: str | None = None) -> dict[str, Any]:
+    """业务函数：处理 recommend_ab_winner 对应的业务流程、校验或数据转换。"""
     return ab_winner_recommendation_payload(db, group_id, user_id=user_id)
 
 
 def _assert_no_decision(group: ImageProductionAbGroup) -> None:
+    """业务函数：处理 _assert_no_decision 对应的业务流程、校验或数据转换。"""
     if _group_has_decision(group):
         raise image_error(
             409,
@@ -900,6 +948,7 @@ def _ab_decision_evidence_snapshot(
     winner_attempt_id: str | None,
     decision: dict[str, Any],
 ) -> dict[str, Any]:
+    """业务函数：处理 _ab_decision_evidence_snapshot 对应的业务流程、校验或数据转换。"""
     attempts = []
     for attempt in _attempt_rows(db, group.id):
         task = db.query(ImageCreationTask).filter(ImageCreationTask.id == attempt.task_id).first() if attempt.task_id else None
@@ -934,6 +983,7 @@ def adopt_ab_winner(
     decision: dict[str, Any],
     user_id: str | None = None,
 ) -> ImageProductionAbGroup:
+    """业务函数：处理 adopt_ab_winner 对应的业务流程、校验或数据转换。"""
     group = get_ab_group(db, group_id, user_id=user_id)
     _assert_no_decision(group)
     attempt = db.query(ImageProductionAbAttempt).filter_by(id=attempt_id, group_id=group.id).first()
@@ -1014,6 +1064,7 @@ def mark_ab_no_winner(
     decision: dict[str, Any],
     user_id: str | None = None,
 ) -> ImageProductionAbGroup:
+    """业务函数：处理 mark_ab_no_winner 对应的业务流程、校验或数据转换。"""
     group = get_ab_group(db, group_id, user_id=user_id)
     _assert_no_decision(group)
     _assert_attempts_terminal_for_decision(db, group)
@@ -1064,6 +1115,7 @@ def mark_ab_no_winner(
 
 
 def serialize_ab_group(db: Session, group: ImageProductionAbGroup) -> dict[str, Any]:
+    """业务函数：处理 serialize_ab_group 对应的业务流程、校验或数据转换。"""
     attempts = []
     for attempt in _attempt_rows(db, group.id):
         task = db.query(ImageCreationTask).filter_by(id=attempt.task_id).first() if attempt.task_id else None

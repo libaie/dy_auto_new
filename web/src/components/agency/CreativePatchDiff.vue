@@ -54,18 +54,22 @@ const fields = computed(() => {
   return Array.from(new Set([...before, ...after]))
 })
 
+// 前端业务函数：协调 beforeValue 对应的页面流程、接口调用或状态转换。
 function beforeValue(field) {
   return props.patch?.before?.[field]
 }
 
+// 前端业务函数：协调 afterValue 对应的页面流程、接口调用或状态转换。
 function afterValue(field) {
   return props.after?.[field]
 }
 
+// 前端业务函数：协调 updateField 对应的页面流程、接口调用或状态转换。
 function updateField(field, value) {
   emit('update:after', { ...(props.after || {}), [field]: value })
 }
 
+// 前端业务函数：协调 displayValue 对应的页面流程、接口调用或状态转换。
 function displayValue(value) {
   if (value === undefined || value === null || value === '') return '空'
   if (typeof value === 'string') return value

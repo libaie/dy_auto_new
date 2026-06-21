@@ -277,18 +277,22 @@ const activeZoneKeys = computed(() => {
   return keys
 })
 
+// 前端业务函数：协调 expertName 对应的页面流程、接口调用或状态转换。
 function expertName(id, fallback = '') {
   return knownExpertName(id, fallback)
 }
 
+// 前端业务函数：协调 phaseText 对应的页面流程、接口调用或状态转换。
 function phaseText(phases) {
   return knownPhaseText(phases)
 }
 
+// 前端业务函数：协调 skillText 对应的页面流程、接口调用或状态转换。
 function skillText(expert) {
   return knownSkillText(expert)
 }
 
+// 前端业务函数：协调 normalizeRoleLabels 对应的页面流程、接口调用或状态转换。
 function normalizeRoleLabels(value) {
   if (!value) return []
   if (Array.isArray(value)) return value.flatMap(normalizeRoleLabels)
@@ -300,10 +304,12 @@ function normalizeRoleLabels(value) {
   return label ? [label] : []
 }
 
+// 前端业务函数：协调 addRoleLabels 对应的页面流程、接口调用或状态转换。
 function addRoleLabels(labels, value) {
   normalizeRoleLabels(value).forEach(label => labels.add(label))
 }
 
+// 前端业务函数：协调 roleText 对应的页面流程、接口调用或状态转换。
 function roleText(expert) {
   const expertId = expert.expert_id
   const labels = new Set()
@@ -326,6 +332,7 @@ function isActiveInvocation(item) {
   return ['running', 'pending'].includes(item.execution_status) || ['running', 'pending'].includes(item.result_status)
 }
 
+// 前端业务函数：协调 isAttentionStage 对应的页面流程、接口调用或状态转换。
 function isAttentionStage(status) {
   return [
     'blocked',
@@ -340,10 +347,12 @@ function isAttentionStage(status) {
   ].includes(normalizeStageStatus(status))
 }
 
+// 前端业务函数：协调 normalizeStageStatus 对应的页面流程、接口调用或状态转换。
 function normalizeStageStatus(status) {
   return String(status || '').toLowerCase()
 }
 
+// 前端业务函数：协调 normalizeExpertIds 对应的页面流程、接口调用或状态转换。
 function normalizeExpertIds(value) {
   if (!value) return []
   if (Array.isArray(value)) return value.flatMap(normalizeExpertIds)
@@ -353,12 +362,14 @@ function normalizeExpertIds(value) {
   return [String(value)].filter(Boolean)
 }
 
+// 前端业务函数：协调 addExpertIds 对应的页面流程、接口调用或状态转换。
 function addExpertIds(ids, value) {
   normalizeExpertIds(value)
     .filter(id => !isLegacyExpert(id))
     .forEach(id => ids.add(id))
 }
 
+// 前端业务函数：协调 normalizeStageInvocationIds 对应的页面流程、接口调用或状态转换。
 function normalizeStageInvocationIds(stage) {
   return [
     ...(stage.invocation_ids || []),
@@ -366,6 +377,7 @@ function normalizeStageInvocationIds(stage) {
   ].filter(Boolean)
 }
 
+// 前端业务函数：协调 normalizeStageInvocationSummaries 对应的页面流程、接口调用或状态转换。
 function normalizeStageInvocationSummaries(stage) {
   return [
     ...(stage.invocation_summaries || []),
@@ -375,10 +387,12 @@ function normalizeStageInvocationSummaries(stage) {
   ].filter(Boolean)
 }
 
+// 前端业务函数：协调 isExpertActive 对应的页面流程、接口调用或状态转换。
 function isExpertActive(expertId) {
   return activeExpertIds.value.has(expertId)
 }
 
+// 前端业务函数：协调 normalizeZoneKey 对应的页面流程、接口调用或状态转换。
 function normalizeZoneKey(stage) {
   if (['storyboard', 'style_lock'].includes(stage)) return 'storyboard'
   if (['image_stage', 'render'].includes(stage)) return 'image_stage'
@@ -388,14 +402,17 @@ function normalizeZoneKey(stage) {
   return ''
 }
 
+// 前端业务函数：协调 selectExpert 对应的页面流程、接口调用或状态转换。
 function selectExpert(expertId) {
   emit('select', expertId)
 }
 
+// 前端业务函数：协调 updateViewport 对应的页面流程、接口调用或状态转换。
 function updateViewport() {
   viewportWidth.value = window.innerWidth
 }
 
+// 前端业务函数：协调 hasWebglContext 对应的页面流程、接口调用或状态转换。
 function hasWebglContext() {
   if (typeof window.WebGLRenderingContext === 'undefined') return false
   try {
@@ -407,6 +424,7 @@ function hasWebglContext() {
   }
 }
 
+// 前端业务函数：协调 disposeMaterialTextures 对应的页面流程、接口调用或状态转换。
 function disposeMaterialTextures(material, disposedTextures) {
   Object.values(material).forEach(value => {
     if (Array.isArray(value)) {
@@ -425,6 +443,7 @@ function disposeMaterialTextures(material, disposedTextures) {
   })
 }
 
+// 前端业务函数：协调 disposeSceneGraph 对应的页面流程、接口调用或状态转换。
 function disposeSceneGraph(currentScene) {
   if (!currentScene?.traverse) return
   const disposedTextures = new Set()
@@ -439,6 +458,7 @@ function disposeSceneGraph(currentScene) {
   })
 }
 
+// 前端业务函数：协调 stopScene 对应的页面流程、接口调用或状态转换。
 function stopScene() {
   if (frameId) cancelAnimationFrame(frameId)
   frameId = 0
@@ -456,6 +476,7 @@ function stopScene() {
   camera = null
 }
 
+// 前端业务函数：协调 resizeRenderer 对应的页面流程、接口调用或状态转换。
 function resizeRenderer() {
   if (!renderer || !camera || !canvasEl.value) return
   const canvas = canvasEl.value
@@ -466,6 +487,7 @@ function resizeRenderer() {
   camera.updateProjectionMatrix()
 }
 
+// 前端业务函数：协调 createMaterial 对应的页面流程、接口调用或状态转换。
 function createMaterial(THREE, color, options = {}) {
   const materialOptions = {
     color,
@@ -480,6 +502,7 @@ function createMaterial(THREE, color, options = {}) {
   return new THREE.MeshStandardMaterial(materialOptions)
 }
 
+// 前端业务函数：协调 addBox 对应的页面流程、接口调用或状态转换。
 function addBox(THREE, target, size, position, color, options = {}) {
   const material = createMaterial(THREE, color, options)
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(size[0], size[1], size[2]), material)
@@ -495,6 +518,7 @@ function addBox(THREE, target, size, position, color, options = {}) {
   return mesh
 }
 
+// 前端业务函数：协调 addSphere 对应的页面流程、接口调用或状态转换。
 function addSphere(THREE, target, radius, position, color, options = {}) {
   const mesh = new THREE.Mesh(
     new THREE.SphereGeometry(radius, options.widthSegments || 18, options.heightSegments || 12),
@@ -506,6 +530,7 @@ function addSphere(THREE, target, radius, position, color, options = {}) {
   return mesh
 }
 
+// 前端业务函数：协调 addCapsule 对应的页面流程、接口调用或状态转换。
 function addCapsule(THREE, target, radius, length, position, color, options = {}) {
   const mesh = new THREE.Mesh(
     new THREE.CapsuleGeometry(radius, length, options.capSegments || 5, options.radialSegments || 12),
@@ -521,6 +546,7 @@ function addCapsule(THREE, target, radius, length, position, color, options = {}
   return mesh
 }
 
+// 前端业务函数：协调 addCone 对应的页面流程、接口调用或状态转换。
 function addCone(THREE, target, radius, height, position, color, options = {}) {
   const mesh = new THREE.Mesh(
     new THREE.ConeGeometry(radius, height, options.radialSegments || 16),
@@ -536,6 +562,7 @@ function addCone(THREE, target, radius, height, position, color, options = {}) {
   return mesh
 }
 
+// 前端业务函数：协调 addTorus 对应的页面流程、接口调用或状态转换。
 function addTorus(THREE, target, radius, tube, position, color, options = {}) {
   const mesh = new THREE.Mesh(
     new THREE.TorusGeometry(radius, tube, options.radialSegments || 8, options.tubularSegments || 32),
@@ -551,6 +578,7 @@ function addTorus(THREE, target, radius, tube, position, color, options = {}) {
   return mesh
 }
 
+// 前端业务函数：协调 drawRoundedRect 对应的页面流程、接口调用或状态转换。
 function drawRoundedRect(ctx, x, y, width, height, radius) {
   ctx.beginPath()
   ctx.moveTo(x + radius, y)
@@ -565,6 +593,7 @@ function drawRoundedRect(ctx, x, y, width, height, radius) {
   ctx.closePath()
 }
 
+// 前端业务函数：协调 createAvatarTitleTexture 对应的页面流程、接口调用或状态转换。
 function createAvatarTitleTexture(THREE, title, active) {
   const canvas = document.createElement('canvas')
   canvas.width = 384
@@ -590,6 +619,7 @@ function createAvatarTitleTexture(THREE, title, active) {
   return texture
 }
 
+// 前端业务函数：协调 addAvatarTitle 对应的页面流程、接口调用或状态转换。
 function addAvatarTitle(THREE, base, expert) {
   const active = isExpertActive(expert.expert_id)
   const texture = createAvatarTitleTexture(THREE, expert.name || expertName(expert.expert_id), active)
@@ -607,6 +637,7 @@ function addAvatarTitle(THREE, base, expert) {
   return title
 }
 
+// 前端业务函数：协调 addExpertStudio 对应的页面流程、接口调用或状态转换。
 function addExpertStudio(THREE, target) {
   const studio = new THREE.Group()
 
@@ -662,6 +693,7 @@ function addExpertStudio(THREE, target) {
   return studio
 }
 
+// 前端业务函数：协调 addFloorGrid 对应的页面流程、接口调用或状态转换。
 function addFloorGrid(THREE, target) {
   for (let x = -4; x <= 4; x += 1) {
     addBox(THREE, target, [0.018, 0.012, 7.0], [x, 0.035, 0], '#334155', { emissive: '#020617', opacity: 0.64, transparent: true })
@@ -671,6 +703,7 @@ function addFloorGrid(THREE, target) {
   }
 }
 
+// 前端业务函数：协调 addZonePanel 对应的页面流程、接口调用或状态转换。
 function addZonePanel(THREE, target, zoneKey, position, size, color) {
   const active = activeZoneKeys.value.has(zoneKey)
   const panel = addBox(THREE, target, size, position, color, {
@@ -695,6 +728,7 @@ function addZonePanel(THREE, target, zoneKey, position, size, color) {
   return panel
 }
 
+// 前端业务函数：协调 addWorkStation 对应的页面流程、接口调用或状态转换。
 function addWorkStation(THREE, target, position, color) {
   addBox(THREE, target, [1.28, 0.1, 0.68], [position[0], position[1] - 0.08, position[2]], '#374151')
   addBox(THREE, target, [1.1, 0.04, 0.5], [position[0], position[1] - 0.005, position[2]], '#52525b', { roughness: 0.36 })
@@ -706,6 +740,7 @@ function addWorkStation(THREE, target, position, color) {
   addSphere(THREE, target, 0.11, [position[0] + 0.57, position[1] + 0.39, position[2] + 0.02], '#fef3c7', { emissive: color, roughness: 0.42 })
 }
 
+// 前端业务函数：协调 addOverheadLights 对应的页面流程、接口调用或状态转换。
 function addOverheadLights(THREE, target) {
   ;[-3.2, 0, 3.2].forEach(x => {
     addBox(THREE, target, [1.35, 0.045, 0.22], [x, 2.86, -0.9], '#e0f2fe', {
@@ -718,20 +753,24 @@ function addOverheadLights(THREE, target) {
   })
 }
 
+// 前端业务函数：协调 seededUnit 对应的页面流程、接口调用或状态转换。
 function seededUnit(seed) {
   const value = Math.sin(seed * 12.9898 + 78.233) * 43758.5453
   return value - Math.floor(value)
 }
 
+// 前端业务函数：协调 clamp 对应的页面流程、接口调用或状态转换。
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max)
 }
 
+// 前端业务函数：协调 easeInOut 对应的页面流程、接口调用或状态转换。
 function easeInOut(value) {
   const t = clamp(value, 0, 1)
   return t * t * (3 - 2 * t)
 }
 
+// 前端业务函数：协调 pointInsideObstacle 对应的页面流程、接口调用或状态转换。
 function pointInsideObstacle(point, obstacle, padding = 0) {
   return (
     point.x >= obstacle.xMin - padding &&
@@ -741,10 +780,12 @@ function pointInsideObstacle(point, obstacle, padding = 0) {
   )
 }
 
+// 前端业务函数：协调 isPointWalkable 对应的页面流程、接口调用或状态转换。
 function isPointWalkable(point, padding = 0.18) {
   return !STUDIO_OBSTACLES.some(obstacle => pointInsideObstacle(point, obstacle, padding))
 }
 
+// 前端业务函数：协调 segmentsIntersect 对应的页面流程、接口调用或状态转换。
 function segmentsIntersect(a, b, c, d) {
   const cross = (p, q, r) => ((q.x - p.x) * (r.z - p.z)) - ((q.z - p.z) * (r.x - p.x))
   const abC = cross(a, b, c)
@@ -754,6 +795,7 @@ function segmentsIntersect(a, b, c, d) {
   return (abC * abD <= 0) && (cdA * cdB <= 0)
 }
 
+// 前端业务函数：协调 segmentIntersectsObstacle 对应的页面流程、接口调用或状态转换。
 function segmentIntersectsObstacle(start, end, obstacle, padding = 0.24) {
   const inflated = {
     xMin: obstacle.xMin - padding,
@@ -774,10 +816,12 @@ function segmentIntersectsObstacle(start, end, obstacle, padding = 0.24) {
   )
 }
 
+// 前端业务函数：协调 isWalkSegmentClear 对应的页面流程、接口调用或状态转换。
 function isWalkSegmentClear(start, end) {
   return STUDIO_OBSTACLES.every(obstacle => !segmentIntersectsObstacle(start, end, obstacle))
 }
 
+// 前端业务函数：协调 jitterWaypoint 对应的页面流程、接口调用或状态转换。
 function jitterWaypoint(point, seed) {
   const candidate = {
     x: clamp(point.x + (seededUnit(seed) - 0.5) * 0.42, -4.15, 4.15),
@@ -786,10 +830,12 @@ function jitterWaypoint(point, seed) {
   return isPointWalkable(candidate) ? candidate : point
 }
 
+// 前端业务函数：协调 distanceBetween 对应的页面流程、接口调用或状态转换。
 function distanceBetween(start, end) {
   return Math.hypot(end.x - start.x, end.z - start.z)
 }
 
+// 前端业务函数：协调 pickNextWaypointIndex 对应的页面流程、接口调用或状态转换。
 function pickNextWaypointIndex(currentIndex, seed) {
   const nearby = STUDIO_WALK_LINKS
     .filter(([a, b]) => a === currentIndex || b === currentIndex)
@@ -801,6 +847,7 @@ function pickNextWaypointIndex(currentIndex, seed) {
   return candidates[Math.floor(seededUnit(seed) * candidates.length) % candidates.length]
 }
 
+// 前端业务函数：协调 createWalkState 对应的页面流程、接口调用或状态转换。
 function createWalkState(index, total) {
   const currentIndex = index % STUDIO_WAYPOINTS.length
   const nextIndex = pickNextWaypointIndex(currentIndex, index * 17 + total + 5)
@@ -822,6 +869,7 @@ function createWalkState(index, total) {
   }
 }
 
+// 前端业务函数：协调 advanceWalkState 对应的页面流程、接口调用或状态转换。
 function advanceWalkState(state) {
   state.previous = state.target
   const nextIndex = pickNextWaypointIndex(state.currentIndex, state.seed)
@@ -834,6 +882,7 @@ function advanceWalkState(state) {
   state.seed += 1
 }
 
+// 前端业务函数：协调 randomWalkingPosition 对应的页面流程、接口调用或状态转换。
 function randomWalkingPosition(state, elapsedSeconds) {
   while (elapsedSeconds >= state.segmentStartedAt + state.duration + state.pause) {
     state.segmentStartedAt += state.duration + state.pause
@@ -851,15 +900,18 @@ function randomWalkingPosition(state, elapsedSeconds) {
   return { x, z, facing: state.facing, moving: rawProgress > 0 && rawProgress < 1 }
 }
 
+// 前端业务函数：协调 avatarStageFacing 对应的页面流程、接口调用或状态转换。
 function avatarStageFacing(facing, index) {
   return facing * 0.22 + Math.sin(index * 1.37) * 0.12
 }
 
+// 前端业务函数：协调 lerpAngle 对应的页面流程、接口调用或状态转换。
 function lerpAngle(current, target, amount) {
   const delta = Math.atan2(Math.sin(target - current), Math.cos(target - current))
   return current + delta * amount
 }
 
+// 前端业务函数：协调 addAvatar 对应的页面流程、接口调用或状态转换。
 function addAvatar(THREE, group, expert, index, total) {
   const walkState = createWalkState(index, total)
   const walk = randomWalkingPosition(walkState, 0)
@@ -936,6 +988,7 @@ function addAvatar(THREE, group, expert, index, total) {
   return base
 }
 
+// 前端业务函数：协调 addAvatarProp 对应的页面流程、接口调用或状态转换。
 function addAvatarProp(THREE, base, expertId, accentColor) {
   if (expertId === 'short_video_editing_coach') {
     addBox(THREE, base, [0.28, 0.2, 0.04], [-0.48, 1.08, 0.28], '#f8fafc', { roughness: 0.38 })
@@ -960,6 +1013,7 @@ function addAvatarProp(THREE, base, expertId, accentColor) {
   addSphere(THREE, base, 0.09, [0.44, 1.12, 0.28], accentColor, { emissive: accentColor, roughness: 0.4 })
 }
 
+// 前端业务函数：协调 updateAvatarWalkPose 对应的页面流程、接口调用或状态转换。
 function updateAvatarWalkPose(walker, index, elapsedSeconds, moving) {
   const parts = walker.userData.parts || {}
   const stride = moving ? Math.sin(elapsedSeconds * 7.2 + index * 0.71) : 0
@@ -1002,10 +1056,12 @@ function updateAvatarWalkPose(walker, index, elapsedSeconds, moving) {
   if (parts.head) parts.head.rotation.z = Math.sin(elapsedSeconds * 2.4 + index) * (moving ? 0.03 : 0.012)
 }
 
+// 前端业务函数：协调 isRenderCurrent 对应的页面流程、接口调用或状态转换。
 function isRenderCurrent(token) {
   return !unmounted && token === renderToken && canRender3d.value && canvasEl.value
 }
 
+// 前端业务函数：协调 expertIdFromObject 对应的页面流程、接口调用或状态转换。
 function expertIdFromObject(object) {
   let cursor = object
   while (cursor) {
@@ -1015,6 +1071,7 @@ function expertIdFromObject(object) {
   return ''
 }
 
+// 前端业务函数：协调 renderScene 对应的页面流程、接口调用或状态转换。
 async function renderScene() {
   const token = ++renderToken
   stopScene()

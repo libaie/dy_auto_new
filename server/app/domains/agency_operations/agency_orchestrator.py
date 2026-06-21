@@ -87,6 +87,7 @@ TERMINAL_EXECUTION_STATUSES = {"completed", "failed"}
 
 @dataclass(frozen=True)
 class _PreparedInvocation:
+    """业务类：承载 _PreparedInvocation 相关的数据结构、状态或业务协作。"""
     id: str
     role: str
     expert_id: str
@@ -96,6 +97,7 @@ class _PreparedInvocation:
 
 
 def _hash_context(context: dict[str, Any]) -> str:
+    """业务函数：处理 _hash_context 对应的业务流程、校验或数据转换。"""
     try:
         encoded = json.dumps(context, ensure_ascii=False, sort_keys=True).encode("utf-8")
     except TypeError as exc:
@@ -104,6 +106,7 @@ def _hash_context(context: dict[str, Any]) -> str:
 
 
 def _source(expert_id: str) -> dict[str, str]:
+    """业务函数：处理 _source 对应的业务流程、校验或数据转换。"""
     manifest = load_manifest()
     expert = get_expert(expert_id)
     return {
@@ -122,6 +125,7 @@ def _run_scope(
     production_segment_id: str | None,
     pipeline_run_id: str | None,
 ) -> str:
+    """业务函数：处理 _run_scope 对应的业务流程、校验或数据转换。"""
     return (
         run_id
         or pipeline_run_id
@@ -141,10 +145,12 @@ def _idempotency_key(
     expert_id: str,
     context_hash: str,
 ) -> str:
+    """业务函数：处理 _idempotency_key 对应的业务流程、校验或数据转换。"""
     return f"agency:{series_id}:{run_scope}:{stage}:{role}:{expert_id}:{context_hash}"
 
 
 def _stage_status(results: list[dict[str, Any]]) -> str:
+    """业务函数：处理 _stage_status 对应的业务流程、校验或数据转换。"""
     if any(item["result_status"] == "blocked" for item in results):
         return "blocked"
     if any(item["result_status"] == "failed" for item in results):
@@ -155,6 +161,7 @@ def _stage_status(results: list[dict[str, Any]]) -> str:
 
 
 def _runtime_config_value(config: dict[str, Any], key: str, default: Any = "") -> Any:
+    """业务函数：处理 _runtime_config_value 对应的业务流程、校验或数据转换。"""
     nested = config.get("config")
     if isinstance(nested, dict) and key in nested:
         return nested[key]
@@ -162,6 +169,7 @@ def _runtime_config_value(config: dict[str, Any], key: str, default: Any = "") -
 
 
 def _runtime_config_blocker(stage: str, runtime_config: dict[str, Any]) -> dict[str, Any] | None:
+    """业务函数：处理 _runtime_config_blocker 对应的业务流程、校验或数据转换。"""
     protocol = str(_runtime_config_value(runtime_config, "protocol", "") or "").lower()
     provider = str(runtime_config.get("provider") or "").lower()
     if protocol != OPENAI_CHAT_COMPLETIONS_PROTOCOL and provider not in OPENAI_COMPATIBLE_PROVIDERS:
@@ -188,6 +196,7 @@ def _runtime_config_blocker(stage: str, runtime_config: dict[str, Any]) -> dict[
 
 
 def _manifest_blocker(stage: str) -> dict[str, Any] | None:
+    """业务函数：处理 _manifest_blocker 对应的业务流程、校验或数据转换。"""
     try:
         verify_manifest()
     except AgencyManifestError:
@@ -203,45 +212,57 @@ def _manifest_blocker(stage: str) -> dict[str, Any] | None:
 
 
 class AgencyOrchestrator:
+    """业务类：承载 AgencyOrchestrator 相关的数据结构、状态或业务协作。"""
     def __init__(
         self,
         runtime_invoke: Callable[..., Awaitable[Any]] | None = None,
         reviewer_concurrency: int = 1,
         enable_debate: bool = True,
     ):
+        """初始化业务对象依赖，保存后续流程需要的运行上下文。"""
         self.runtime = AgencySkillRuntime()
         self.runtime_invoke = runtime_invoke or self.runtime.invoke
         self.reviewer_concurrency = max(1, reviewer_concurrency)
         self.enable_debate = enable_debate
 
     async def run_style_lock_review(self, db: Session, **kwargs) -> dict[str, Any]:
+        """业务函数：处理 run_style_lock_review 对应的业务流程、校验或数据转换。"""
         return await self._run_stage(db, "style_lock", **kwargs)
 
     async def run_story_planning_review(self, db: Session, **kwargs) -> dict[str, Any]:
+        """业务函数：处理 run_story_planning_review 对应的业务流程、校验或数据转换。"""
         return await self._run_stage(db, "story_planning", **kwargs)
 
     async def run_storyboard_review(self, db: Session, **kwargs) -> dict[str, Any]:
+        """业务函数：处理 run_storyboard_review 对应的业务流程、校验或数据转换。"""
         return await self._run_stage(db, "storyboard", **kwargs)
 
     async def run_image_stage_review(self, db: Session, **kwargs) -> dict[str, Any]:
+        """业务函数：处理 run_image_stage_review 对应的业务流程、校验或数据转换。"""
         return await self._run_stage(db, "image_stage", **kwargs)
 
     async def run_image_review(self, db: Session, **kwargs) -> dict[str, Any]:
+        """业务函数：处理 run_image_review 对应的业务流程、校验或数据转换。"""
         return await self._run_stage(db, "image_review", **kwargs)
 
     async def run_video_stage_review(self, db: Session, **kwargs) -> dict[str, Any]:
+        """业务函数：处理 run_video_stage_review 对应的业务流程、校验或数据转换。"""
         return await self._run_stage(db, "video_stage", **kwargs)
 
     async def run_video_review(self, db: Session, **kwargs) -> dict[str, Any]:
+        """业务函数：处理 run_video_review 对应的业务流程、校验或数据转换。"""
         return await self._run_stage(db, "video_review", **kwargs)
 
     async def run_compose_preflight_review(self, db: Session, **kwargs) -> dict[str, Any]:
+        """业务函数：处理 run_compose_preflight_review 对应的业务流程、校验或数据转换。"""
         return await self._run_stage(db, "compose_preflight", **kwargs)
 
     async def run_compose_review(self, db: Session, **kwargs) -> dict[str, Any]:
+        """业务函数：处理 run_compose_review 对应的业务流程、校验或数据转换。"""
         return await self._run_stage(db, "compose", **kwargs)
 
     async def _call_runtime(self, **kwargs) -> Any:
+        """业务函数：处理 _call_runtime 对应的业务流程、校验或数据转换。"""
         result = self.runtime_invoke(**kwargs)
         if inspect.isawaitable(result):
             return await result
@@ -265,6 +286,7 @@ class AgencyOrchestrator:
         production_segment_id: str | None = None,
         pipeline_run_id: str | None = None,
     ) -> dict[str, Any]:
+        """业务函数：处理 _invoke_one 对应的业务流程、校验或数据转换。"""
         prepared = self._prepare_invocation(
             db,
             series_id=series_id,
@@ -310,6 +332,7 @@ class AgencyOrchestrator:
         production_segment_id: str | None = None,
         pipeline_run_id: str | None = None,
     ) -> _PreparedInvocation:
+        """业务函数：处理 _prepare_invocation 对应的业务流程、校验或数据转换。"""
         run_scope = _run_scope(
             run_id=run_id,
             production_plan_id=production_plan_id,
@@ -350,6 +373,7 @@ class AgencyOrchestrator:
         )
 
     def _result_from_prepared(self, prepared: _PreparedInvocation) -> dict[str, Any]:
+        """业务函数：处理 _result_from_prepared 对应的业务流程、校验或数据转换。"""
         return {
             "id": prepared.id,
             "role": prepared.role,
@@ -369,6 +393,7 @@ class AgencyOrchestrator:
         stage_context: dict[str, Any],
         runtime_config: dict[str, Any],
     ) -> tuple[_PreparedInvocation, Any | None, AgencyRuntimeError | None]:
+        """业务函数：处理 _run_prepared_runtime 对应的业务流程、校验或数据转换。"""
         try:
             result = await self._call_runtime(
                 db=runtime_db,
@@ -391,6 +416,7 @@ class AgencyOrchestrator:
         result: Any | None,
         runtime_error: AgencyRuntimeError | None,
     ) -> dict[str, Any]:
+        """业务函数：处理 _finalize_prepared_runtime 对应的业务流程、校验或数据转换。"""
         if runtime_error is None:
             try:
                 finalized = finalize_invocation_and_audit(
@@ -452,6 +478,7 @@ class AgencyOrchestrator:
         stage_context: dict[str, Any],
         runtime_config: dict[str, Any],
     ) -> dict[str, Any]:
+        """业务函数：处理 _run_and_finalize_invocation 对应的业务流程、校验或数据转换。"""
         prepared, result, runtime_error = await self._run_prepared_runtime(
             None,
             prepared=prepared,
@@ -471,6 +498,7 @@ class AgencyOrchestrator:
         stage_context: dict[str, Any],
         common: dict[str, Any],
     ) -> list[dict[str, Any]]:
+        """业务函数：处理 _invoke_reviewers 对应的业务流程、校验或数据转换。"""
         prepare_common = {key: value for key, value in common.items() if key != "runtime_config"}
         prepared_reviewers = [
             self._prepare_invocation(
@@ -485,6 +513,7 @@ class AgencyOrchestrator:
         semaphore = asyncio.Semaphore(self.reviewer_concurrency)
 
         async def run_with_bound(prepared: _PreparedInvocation):
+            """业务函数：处理 run_with_bound 对应的业务流程、校验或数据转换。"""
             async with semaphore:
                 return await self._run_prepared_runtime(
                     None,
@@ -529,6 +558,7 @@ class AgencyOrchestrator:
         production_segment_id: str | None = None,
         pipeline_run_id: str | None = None,
     ) -> dict[str, Any]:
+        """业务函数：处理 _run_stage 对应的业务流程、校验或数据转换。"""
         spec = STAGE_DAG[stage]
         manifest_trace = _manifest_blocker(stage)
         if manifest_trace:
@@ -613,6 +643,7 @@ class AgencyOrchestrator:
         stage_context: dict[str, Any],
         common: dict[str, Any],
     ) -> dict[str, Any]:
+        """业务函数：处理 _run_stage_debate 对应的业务流程、校验或数据转换。"""
         from app.domains.agency_operations.agency_debate_audit import run_debate_audit
 
         return await run_debate_audit(
@@ -632,6 +663,7 @@ class AgencyOrchestrator:
 
 
 def _merge_debate_trace(trace: dict[str, Any], debate_trace: dict[str, Any]) -> dict[str, Any]:
+    """业务函数：处理 _merge_debate_trace 对应的业务流程、校验或数据转换。"""
     merged = dict(trace or {})
     merged["invocation_ids"] = [
         *(trace or {}).get("invocation_ids", []),

@@ -11,6 +11,7 @@ from app.db.models import Episode, Series
 
 
 def create_collection_from_approved_episodes(db: Session, series_id: str) -> VideoCollection:
+    """业务函数：处理 create_collection_from_approved_episodes 对应的业务流程、校验或数据转换。"""
     series = db.query(Series).filter(Series.id == series_id).first()
     if not series:
         raise ValueError("Series not found")

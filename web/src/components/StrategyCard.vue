@@ -47,10 +47,12 @@ const canHaveMatchMode = computed(() =>
   ['text', 'id', 'desc', 'className'].includes(props.strategy.type) && !isMultiCondition.value
 )
 
+// 前端业务函数：协调 updateField 对应的页面流程、接口调用或状态转换。
 function updateField(key, value) {
   emit('update', { ...props.strategy, [key]: value })
 }
 
+// 前端业务函数：协调 onTypeChange 对应的页面流程、接口调用或状态转换。
 function onTypeChange(newType) {
   const base = { type: newType }
   if (newType === 'coordinate') {
@@ -69,6 +71,7 @@ function onTypeChange(newType) {
 
 // --- Multi-condition helpers ---
 
+// 前端业务函数：协调 toggleConditionMode 对应的页面流程、接口调用或状态转换。
 function toggleConditionMode() {
   if (isMultiCondition.value) {
     const first = props.strategy.conditions[0]
@@ -90,15 +93,18 @@ function toggleConditionMode() {
   }
 }
 
+// 前端业务函数：协调 setLogic 对应的页面流程、接口调用或状态转换。
 function setLogic(val) {
   emit('update', { ...props.strategy, logic: val })
 }
 
+// 前端业务函数：协调 addCondition 对应的页面流程、接口调用或状态转换。
 function addCondition() {
   const conds = [...(props.strategy.conditions || []), { type: 'text', value: '', match_mode: 'exact' }]
   emit('update', { ...props.strategy, conditions: conds })
 }
 
+// 前端业务函数：协调 removeCondition 对应的页面流程、接口调用或状态转换。
 function removeCondition(index) {
   const conds = props.strategy.conditions.filter((_, i) => i !== index)
   if (conds.length === 0) {
@@ -108,6 +114,7 @@ function removeCondition(index) {
   emit('update', { ...props.strategy, conditions: conds })
 }
 
+// 前端业务函数：协调 updateCondition 对应的页面流程、接口调用或状态转换。
 function updateCondition(index, key, value) {
   const conds = props.strategy.conditions.map((c, i) =>
     i === index ? { ...c, [key]: value } : c
@@ -115,6 +122,7 @@ function updateCondition(index, key, value) {
   emit('update', { ...props.strategy, conditions: conds })
 }
 
+// 前端业务函数：协调 onCondTypeChange 对应的页面流程、接口调用或状态转换。
 function onCondTypeChange(index, newType) {
   const conds = props.strategy.conditions.map((c, i) =>
     i === index ? { type: newType, value: '', match_mode: 'exact' } : c
@@ -122,19 +130,23 @@ function onCondTypeChange(index, newType) {
   emit('update', { ...props.strategy, conditions: conds })
 }
 
+// 前端业务函数：协调 addStep 对应的页面流程、接口调用或状态转换。
 function addStep() {
   const steps = [...(props.strategy.steps || []), { type: 'text', value: '' }]
   emit('update', { ...props.strategy, steps })
 }
+// 前端业务函数：协调 addNavStep 对应的页面流程、接口调用或状态转换。
 function addNavStep(nav) {
   const step = nav === 'parent' ? { nav: 'parent' } : { nav, type: 'text', value: '' }
   const steps = [...(props.strategy.steps || []), step]
   emit('update', { ...props.strategy, steps })
 }
+// 前端业务函数：协调 removeStep 对应的页面流程、接口调用或状态转换。
 function removeStep(index) {
   const steps = props.strategy.steps.filter((_, i) => i !== index)
   emit('update', { ...props.strategy, steps })
 }
+// 前端业务函数：协调 updateStep 对应的页面流程、接口调用或状态转换。
 function updateStep(index, key, value) {
   const steps = props.strategy.steps.map((s, i) =>
     i === index ? { ...s, [key]: value } : s
@@ -142,6 +154,7 @@ function updateStep(index, key, value) {
   emit('update', { ...props.strategy, steps })
 }
 
+// 前端业务函数：协调 onImageFileSelect 对应的页面流程、接口调用或状态转换。
 async function onImageFileSelect(e) {
   const file = e.target.files?.[0]
   if (!file) return

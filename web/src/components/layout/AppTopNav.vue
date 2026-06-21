@@ -18,10 +18,12 @@ const currentTime = ref('')
 let clockTimer = null
 let statsTimer = null
 
+// 前端业务函数：协调 updateClock 对应的页面流程、接口调用或状态转换。
 function updateClock() {
   currentTime.value = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
 }
 
+// 前端业务函数：协调 fetchStats 对应的页面流程、接口调用或状态转换。
 async function fetchStats() {
   try { const res = await getRealtimeStats(); stats.value = res.data || stats.value } catch {}
 }
@@ -32,6 +34,7 @@ onMounted(() => {
 })
 onUnmounted(() => { clearInterval(clockTimer); clearInterval(statsTimer) })
 
+// 前端业务函数：协调 handleLogout 对应的页面流程、接口调用或状态转换。
 function handleLogout() { auth.logout(); router.push('/login') }
 
 const categories = [

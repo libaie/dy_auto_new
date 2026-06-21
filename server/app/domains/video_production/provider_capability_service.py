@@ -25,11 +25,13 @@ DEFAULT_REAL_PROVIDER_CAPABILITY = {
 
 
 def _merge_dict(target: dict, source: object) -> None:
+    """业务函数：处理 _merge_dict 对应的业务流程、校验或数据转换。"""
     if isinstance(source, dict):
         target.update(source)
 
 
 def capability_from_model_config(model_config: dict | None) -> dict:
+    """业务函数：处理 capability_from_model_config 对应的业务流程、校验或数据转换。"""
     capability = deepcopy(DEFAULT_REAL_PROVIDER_CAPABILITY)
     if not model_config:
         return capability
@@ -41,6 +43,7 @@ def capability_from_model_config(model_config: dict | None) -> dict:
 
 
 def assert_real_paid_allowed(capability: dict) -> None:
+    """业务函数：处理 assert_real_paid_allowed 对应的业务流程、校验或数据转换。"""
     required = (
         "real_paid_allowed",
         "supports_external_task_id",

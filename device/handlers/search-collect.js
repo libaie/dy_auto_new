@@ -12,6 +12,7 @@ var SearchCollectHandler = Object.create(CommentBaseHandler);
 
 SearchCollectHandler._config = { videoTimeoutMs: 0, interVideoDelay: 1500, maxVideoCount: 200 };
 
+// 设备业务函数：处理 SearchCollectHandler.execute 对应的抖音自动化动作、状态或安全边界。
 SearchCollectHandler.execute = function (params) {
   if (params.share_links && params.share_links.length > 0) {
     return this._executeShareLinks(params);
@@ -19,19 +20,23 @@ SearchCollectHandler.execute = function (params) {
   return CommentBaseHandler.execute.call(this, params);
 };
 
+// 设备业务函数：处理 SearchCollectHandler._beforeSearch 对应的抖音自动化动作、状态或安全边界。
 SearchCollectHandler._beforeSearch = function (params) {
   this._currentDest = aiAnalyzer.resolveDestination(params.keyword);
 };
 
+// 设备业务函数：处理 SearchCollectHandler._prepareAnalyzer 对应的抖音自动化动作、状态或安全边界。
 SearchCollectHandler._prepareAnalyzer = function (params) {
   aiAnalyzer.useTemplate(params.prompt_template_id, "general");
 };
 
+// 设备业务函数：处理 SearchCollectHandler._initStats 对应的抖音自动化动作、状态或安全边界。
 SearchCollectHandler._initStats = function (params) {
   return { success_count: 0, fail_count: 0, details: [],
     _taskId: params.task_id || "", _keyword: params.keyword || "" };
 };
 
+// 设备业务函数：处理 SearchCollectHandler._shouldProcessVideo 对应的抖音自动化动作、状态或安全边界。
 SearchCollectHandler._shouldProcessVideo = function (params, videoIndex) {
   // 残留在评论区则先退出
   if (uiOperator.isOnPage("is_comment_view")) {
@@ -42,6 +47,7 @@ SearchCollectHandler._shouldProcessVideo = function (params, videoIndex) {
   return CommentBaseHandler._shouldProcessVideo.call(this, params, videoIndex);
 };
 
+// 设备业务函数：处理 SearchCollectHandler._closeComments 对应的抖音自动化动作、状态或安全边界。
 SearchCollectHandler._closeComments = function () {
   this.safeClick("comment_off_btn", 2);
   sleep(400);
@@ -52,6 +58,7 @@ SearchCollectHandler._closeComments = function () {
   }
 };
 
+// 设备业务函数：处理 SearchCollectHandler._processComments 对应的抖音自动化动作、状态或安全边界。
 SearchCollectHandler._processComments = function (params, stats, videoIndex) {
   var keyword = params.keyword;
   var taskId = params.task_id || "";
@@ -217,6 +224,7 @@ SearchCollectHandler._openComments = function () {
   return commentUtils.openComments();
 };
 
+// 设备业务函数：处理 SearchCollectHandler._aiQualify 对应的抖音自动化动作、状态或安全边界。
 SearchCollectHandler._aiQualify = function (comment) {
   if (!comment || !comment.text) return false;
   try {
@@ -257,6 +265,7 @@ SearchCollectHandler._collectCommentData = function (item, comment) {
   return data;
 };
 
+// 设备业务函数：处理 SearchCollectHandler._collectUserData 对应的抖音自动化动作、状态或安全边界。
 SearchCollectHandler._collectUserData = function (item, comment) {
   var avatarEl = this._findChildBySelector(item, "comment_author_avatar");
   if (!avatarEl) { logger.warn(TAG, "头像未找到"); return null; }
@@ -291,6 +300,7 @@ SearchCollectHandler._collectUserData = function (item, comment) {
   return data;
 };
 
+// 设备业务函数：处理 SearchCollectHandler._reportCollection 对应的抖音自动化动作、状态或安全边界。
 SearchCollectHandler._reportCollection = function (taskId, keyword, commentData, userData, dataSourceType) {
   var payload = { task_id: taskId, keyword: keyword, comment: commentData, data_source_type: dataSourceType || 0 };
   if (userData) payload.user = userData;
@@ -306,6 +316,7 @@ SearchCollectHandler.execute = function (params) {
   return CommentBaseHandler.execute.call(this, params);
 };
 
+// 设备业务函数：处理 SearchCollectHandler._executeShareLinks 对应的抖音自动化动作、状态或安全边界。
 SearchCollectHandler._executeShareLinks = function (params) {
   var links = params.share_links;
   var taskId = params.task_id || "";

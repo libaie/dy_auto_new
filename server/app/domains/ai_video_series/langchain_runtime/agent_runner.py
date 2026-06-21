@@ -16,6 +16,7 @@ from app.domains.ai_video_series.langchain_runtime.models import create_chat_mod
 
 
 def extract_json_object(raw: Any) -> dict[str, Any]:
+    """业务函数：处理 extract_json_object 对应的业务流程、校验或数据转换。"""
     if isinstance(raw, dict):
         return raw
     if not isinstance(raw, str) or not raw.strip():
@@ -55,6 +56,7 @@ def extract_json_object(raw: Any) -> dict[str, Any]:
 
 
 def _content_from_agent_response(response: Any) -> Any:
+    """业务函数：处理 _content_from_agent_response 对应的业务流程、校验或数据转换。"""
     if isinstance(response, str):
         return response
     if isinstance(response, dict):
@@ -72,7 +74,9 @@ def _content_from_agent_response(response: Any) -> Any:
 
 
 class LangChainAgentRunner:
+    """业务类：承载 LangChainAgentRunner 相关的数据结构、状态或业务协作。"""
     def __init__(self, agent_factory: Callable[..., Any] | None = None):
+        """初始化业务对象依赖，保存后续流程需要的运行上下文。"""
         self.agent_factory = agent_factory or create_agent
 
     async def run_json(
@@ -83,6 +87,7 @@ class LangChainAgentRunner:
         runtime_config: dict[str, Any],
         tools: list[Any],
     ) -> dict[str, Any]:
+        """业务函数：处理 run_json 对应的业务流程、校验或数据转换。"""
         model = None if self.agent_factory is not create_agent else create_chat_model(runtime_config)
         agent = self.agent_factory(model=model, tools=tools)
         response = await agent.ainvoke(
@@ -104,6 +109,7 @@ async def run_structured_ai_video_json(
     db: Any = None,
     allowed_tools: list[str] | None = None,
 ) -> dict[str, Any]:
+    """业务函数：处理 run_structured_ai_video_json 对应的业务流程、校验或数据转换。"""
     from app.domains.ai_video_series.langchain_runtime.tools import build_ai_video_tools
 
     return await LangChainAgentRunner().run_json(

@@ -104,7 +104,9 @@ const genreOptions = ref([])
 const form = reactive({ title: '', logline: '', genre: 'drama', total_episodes: 30, target_duration: 90, mode: 'step_by_step', pilot_first: true })
 const instance = getCurrentInstance()
 
+// 前端业务函数：协调 loadGenres 对应的页面流程、接口调用或状态转换。
 async function loadGenres() { try { const { data } = await listItems('series_genre'); if (data.ok) { genreOptions.value = data.items; if (data.items.length && !genreOptions.value.find(g => g.value === form.genre)) form.genre = data.items[0].value } } catch (e) { /* fallback to hardcoded */ } }
+// 前端业务函数：协调 loadSeries 对应的页面流程、接口调用或状态转换。
 async function loadSeries() { loading.value = true; error.value = ''; try { const { data } = await listSeries(); seriesList.value = data.ok ? data.series : [] } catch (e) { error.value = e.message || '加载失败' } finally { loading.value = false } }
 async function doCreate() {
   creating.value = true
@@ -128,9 +130,13 @@ async function doCreate() {
   }
 }
 
+// 前端业务函数：协调 statusClass 对应的页面流程、接口调用或状态转换。
 function statusClass(s) { return { draft: 'bg-gray-800 text-slate-400', rendering: 'bg-yellow-900/40 text-yellow-400', done: 'bg-emerald-900/40 text-emerald-400', failed: 'bg-red-900/40 text-red-400' }[s] || 'bg-gray-800 text-slate-400' }
+// 前端业务函数：协调 progressColor 对应的页面流程、接口调用或状态转换。
 function progressColor(s) { return s === 'done' ? 'bg-emerald-500' : s === 'rendering' ? 'bg-sky-500 animate-pulse' : 'bg-slate-600' }
+// 前端业务函数：协调 progressPercent 对应的页面流程、接口调用或状态转换。
 function progressPercent(s) { if (s === 'done') return 100; if (s === 'draft') return 0; return s === 'rendering' ? 50 : 10 }
+// 前端业务函数：协调 genreLabel 对应的页面流程、接口调用或状态转换。
 function genreLabel(v) { const g = genreOptions.value.find(x => x.value === v); return g ? g.label : v }
 
 onMounted(async () => { await loadGenres(); await loadSeries() })

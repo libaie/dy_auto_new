@@ -309,18 +309,22 @@ function openExpert(expertId) {
   selectedExpertId.value = expertId
 }
 
+// 前端业务函数：协调 scrollToDecisionLog 对应的页面流程、接口调用或状态转换。
 function scrollToDecisionLog() {
   document.getElementById('agency-decision-log')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
+// 前端业务函数：协调 stageLabel 对应的页面流程、接口调用或状态转换。
 function stageLabel(stage) {
   return phaseLabel(stage?.stage, stage?.label)
 }
 
+// 前端业务函数：协调 stepLabel 对应的页面流程、接口调用或状态转换。
 function stepLabel(step) {
   return stepName(step)
 }
 
+// 前端业务函数：协调 stepSummary 对应的页面流程、接口调用或状态转换。
 function stepSummary(step) {
   const text = step.summary || step.next_action || ''
   if (!text) return '等待该步骤产生记录。'
@@ -354,6 +358,7 @@ async function load(options = {}) {
   }
 }
 
+// 前端业务函数：协调 refreshCreativePatches 对应的页面流程、接口调用或状态转换。
 async function refreshCreativePatches() {
   if (disposed) return
   patchLoading.value = true
@@ -380,6 +385,7 @@ async function refreshCreativePatches() {
   }
 }
 
+// 前端业务函数：协调 normalizeRepairTask 对应的页面流程、接口调用或状态转换。
 function normalizeRepairTask(task) {
   const retryActions = { ...(task?.retry_actions || {}) }
   if (retryActions.paid_authorization_required === undefined && retryActions.paid_authorize_required !== undefined) {
@@ -388,6 +394,7 @@ function normalizeRepairTask(task) {
   return { ...(task || {}), retry_actions: retryActions }
 }
 
+// 前端业务函数：协调 repairTaskParams 对应的页面流程、接口调用或状态转换。
 function repairTaskParams() {
   const params = { series_id: route.params.seriesId, page: 1, page_size: 20 }
   const runId = consoleData.value?.latest_run?.id
@@ -395,6 +402,7 @@ function repairTaskParams() {
   return params
 }
 
+// 前端业务函数：协调 refreshRepairTasks 对应的页面流程、接口调用或状态转换。
 async function refreshRepairTasks() {
   if (disposed || !consoleData.value) return
   repairLoading.value = true
@@ -415,6 +423,7 @@ async function refreshRepairTasks() {
   }
 }
 
+// 前端业务函数：协调 handleCreativePatchAction 对应的页面流程、接口调用或状态转换。
 async function handleCreativePatchAction(patch, action) {
   if (!patch?.id) return
   patchBusyId.value = patch.id
@@ -430,14 +439,17 @@ async function handleCreativePatchAction(patch, action) {
   }
 }
 
+// 前端业务函数：协调 saveCreativePatch 对应的页面流程、接口调用或状态转换。
 function saveCreativePatch(patch) {
   return handleCreativePatchAction(patch, () => updateAgencyCreativePatch(patch.id, { after: patch.after || {} }))
 }
 
+// 前端业务函数：协调 approveCreativePatch 对应的页面流程、接口调用或状态转换。
 function approveCreativePatch(patch) {
   return handleCreativePatchAction(patch, () => approveAgencyCreativePatch(patch.id))
 }
 
+// 前端业务函数：协调 rejectCreativePatch 对应的页面流程、接口调用或状态转换。
 function rejectCreativePatch(patch) {
   return handleCreativePatchAction(patch, () => rejectAgencyCreativePatch(patch.id, { reason: '人工拒绝该补丁' }))
 }
@@ -446,10 +458,12 @@ function applyCreativePatch(patch) {
   return handleCreativePatchAction(patch, () => applyAgencyCreativePatch(patch.id))
 }
 
+// 前端业务函数：协调 openPatchInvocation 对应的页面流程、接口调用或状态转换。
 function openPatchInvocation() {
   activeTab.value = 'control'
 }
 
+// 前端业务函数：协调 handleRepairManualAction 对应的页面流程、接口调用或状态转换。
 function handleRepairManualAction(task) {
   if (!task?.repair_route) return
   if (String(task.repair_route).startsWith('/')) {
@@ -459,6 +473,7 @@ function handleRepairManualAction(task) {
   window.location.href = task.repair_route
 }
 
+// 前端业务函数：协调 retryRepairTask 对应的页面流程、接口调用或状态转换。
 async function retryRepairTask(task, authorizationPayload = null) {
   if (!task?.id || repairBusyId.value) return
   repairBusyId.value = task.id
@@ -478,11 +493,13 @@ async function retryRepairTask(task, authorizationPayload = null) {
   }
 }
 
+// 前端业务函数：协调 shouldPollConsole 对应的页面流程、接口调用或状态转换。
 function shouldPollConsole() {
   const status = consoleData.value?.latest_run?.status
   return Boolean(status && !TERMINAL_RUN_STATUSES.has(status))
 }
 
+// 前端业务函数：协调 scheduleConsolePoll 对应的页面流程、接口调用或状态转换。
 function scheduleConsolePoll() {
   if (consolePollTimer) {
     clearTimeout(consolePollTimer)

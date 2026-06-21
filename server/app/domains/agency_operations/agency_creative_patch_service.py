@@ -35,6 +35,7 @@ def create_patches_for_invocation(
     invocation: AgencyExpertInvocation,
     output_summary: dict[str, Any],
 ) -> list[AgencyCreativePatch]:
+    """业务函数：处理 create_patches_for_invocation 对应的业务流程、校验或数据转换。"""
     created: list[AgencyCreativePatch] = []
     for raw in output_summary.get("creative_patches") or []:
         if not isinstance(raw, dict):
@@ -86,6 +87,7 @@ def update_patch_after(
     *,
     reviewer_user_id: str | None = None,
 ) -> AgencyCreativePatch:
+    """业务函数：处理 update_patch_after 对应的业务流程、校验或数据转换。"""
     patch = _patch_or_raise(db, patch_id)
     if patch.status not in {"proposed", "edited"}:
         raise ValueError("creative patch is not editable")
@@ -112,6 +114,7 @@ def update_patch_after(
 
 
 def approve_patch(db: Session, patch_id: str, *, reviewer_user_id: str | None = None) -> AgencyCreativePatch:
+    """业务函数：处理 approve_patch 对应的业务流程、校验或数据转换。"""
     patch = _patch_or_raise(db, patch_id)
     if patch.status not in {"proposed", "edited", "approved"}:
         raise ValueError("creative patch cannot be approved from current status")
@@ -130,6 +133,7 @@ def reject_patch(
     reason: str,
     reviewer_user_id: str | None = None,
 ) -> AgencyCreativePatch:
+    """业务函数：处理 reject_patch 对应的业务流程、校验或数据转换。"""
     patch = _patch_or_raise(db, patch_id)
     if patch.status == "applied":
         raise ValueError("applied creative patch cannot be rejected")
@@ -154,6 +158,7 @@ def apply_patch(
     reviewer_user_id: str | None = None,
     commit: bool = True,
 ) -> dict[str, Any]:
+    """业务函数：处理 apply_patch 对应的业务流程、校验或数据转换。"""
     patch = _patch_or_raise(db, patch_id)
     if patch.status == "applied":
         return {"id": patch.id, "status": patch.status}
@@ -190,6 +195,7 @@ def apply_approved_patches(
     stage: str | None = None,
     reviewer_user_id: str | None = None,
 ) -> dict[str, Any]:
+    """业务函数：处理 apply_approved_patches 对应的业务流程、校验或数据转换。"""
     query = db.query(AgencyCreativePatch).filter(AgencyCreativePatch.status == "approved")
     if run_id:
         query = query.filter(AgencyCreativePatch.run_id == run_id)
@@ -222,6 +228,7 @@ def creative_patch_summary(
     series_id: str | None = None,
     run_id: str | None = None,
 ) -> dict[str, int]:
+    """业务函数：处理 creative_patch_summary 对应的业务流程、校验或数据转换。"""
     query = db.query(AgencyCreativePatch)
     if series_id:
         query = query.filter(AgencyCreativePatch.series_id == series_id)
@@ -240,6 +247,7 @@ def creative_patch_summary(
 
 
 def unresolved_patch_gate(db: Session, run: VideoProductionRun, *, stage: str) -> dict[str, Any]:
+    """业务函数：处理 unresolved_patch_gate 对应的业务流程、校验或数据转换。"""
     rows = (
         db.query(AgencyCreativePatch)
         .filter(AgencyCreativePatch.run_id == run.id)
@@ -257,6 +265,7 @@ def unresolved_patch_gate(db: Session, run: VideoProductionRun, *, stage: str) -
 
 
 def _patch_or_raise(db: Session, patch_id: str) -> AgencyCreativePatch:
+    """业务函数：处理 _patch_or_raise 对应的业务流程、校验或数据转换。"""
     patch = db.query(AgencyCreativePatch).filter(AgencyCreativePatch.id == patch_id).first()
     if not patch:
         raise ValueError("creative patch not found")
@@ -264,6 +273,7 @@ def _patch_or_raise(db: Session, patch_id: str) -> AgencyCreativePatch:
 
 
 def _target_exists(db: Session, invocation: AgencyExpertInvocation, target_type: str, target_id: str) -> bool:
+    """业务函数：处理 _target_exists 对应的业务流程、校验或数据转换。"""
     if target_type == "episode_script":
         return bool(invocation.episode_id and target_id in {invocation.episode_id, "episode_script", "script"})
     if target_type == "storyboard_frame":
@@ -294,6 +304,7 @@ def _target_exists(db: Session, invocation: AgencyExpertInvocation, target_type:
 
 
 def _segment_belongs_to_plan(db: Session, segment_id: str, plan_id: str) -> bool:
+    """业务函数：处理 _segment_belongs_to_plan 对应的业务流程、校验或数据转换。"""
     return bool(
         db.query(ProductionSegment.id)
         .join(ProductionShot, ProductionShot.id == ProductionSegment.shot_plan_id)
@@ -305,6 +316,7 @@ def _segment_belongs_to_plan(db: Session, segment_id: str, plan_id: str) -> bool
 
 
 def _segment_belongs_to_episode_plan(db: Session, segment_id: str, episode_plan_id: str) -> bool:
+    """业务函数：处理 _segment_belongs_to_episode_plan 对应的业务流程、校验或数据转换。"""
     return bool(
         db.query(ProductionSegment.id)
         .join(ProductionShot, ProductionShot.id == ProductionSegment.shot_plan_id)
@@ -315,6 +327,7 @@ def _segment_belongs_to_episode_plan(db: Session, segment_id: str, episode_plan_
 
 
 def _frame_index(storyboard: dict, target_id: str) -> int | None:
+    """业务函数：处理 _frame_index 对应的业务流程、校验或数据转换。"""
     frames = storyboard.get("frames") or []
     for index, frame in enumerate(frames):
         if str(frame.get("frame_id") or frame.get("shot_id") or "") == target_id:
@@ -323,6 +336,7 @@ def _frame_index(storyboard: dict, target_id: str) -> int | None:
 
 
 def _record_invalid_patch(db: Session, invocation: AgencyExpertInvocation, reason: str, raw: Any) -> None:
+    """业务函数：处理 _record_invalid_patch 对应的业务流程、校验或数据转换。"""
     db.add(ProductionAuditEvent(
         event_type="agency_creative_patch.invalid",
         run_id=invocation.run_id,
@@ -343,6 +357,7 @@ def _record_patch_event(
     patch: AgencyCreativePatch,
     payload: dict[str, Any] | None = None,
 ) -> None:
+    """业务函数：处理 _record_patch_event 对应的业务流程、校验或数据转换。"""
     db.add(ProductionAuditEvent(
         event_type=event_type,
         run_id=patch.run_id,
@@ -354,6 +369,7 @@ def _record_patch_event(
 
 
 def _apply_script_patch(db: Session, patch: AgencyCreativePatch) -> None:
+    """业务函数：处理 _apply_script_patch 对应的业务流程、校验或数据转换。"""
     episode = db.query(Episode).filter(Episode.id == patch.episode_id).first()
     if not episode:
         raise ValueError("episode not found for script patch")
@@ -364,6 +380,7 @@ def _apply_script_patch(db: Session, patch: AgencyCreativePatch) -> None:
 
 
 def _apply_storyboard_patch(db: Session, patch: AgencyCreativePatch) -> None:
+    """业务函数：处理 _apply_storyboard_patch 对应的业务流程、校验或数据转换。"""
     episode = db.query(Episode).filter(Episode.id == patch.episode_id).first() if patch.episode_id else None
     run = db.query(VideoProductionRun).filter(VideoProductionRun.id == patch.run_id).first() if patch.run_id else None
     applied = False
@@ -378,6 +395,7 @@ def _apply_storyboard_patch(db: Session, patch: AgencyCreativePatch) -> None:
 
 
 def _update_storyboard_frame(storyboard: dict, target_id: str, after: dict[str, Any]) -> bool:
+    """业务函数：处理 _update_storyboard_frame 对应的业务流程、校验或数据转换。"""
     index = _frame_index(storyboard, target_id)
     if index is None:
         return False
@@ -388,6 +406,7 @@ def _update_storyboard_frame(storyboard: dict, target_id: str, after: dict[str, 
 
 
 def _apply_segment_prompt_patch(db: Session, patch: AgencyCreativePatch) -> None:
+    """业务函数：处理 _apply_segment_prompt_patch 对应的业务流程、校验或数据转换。"""
     segment = db.query(ProductionSegment).filter(ProductionSegment.id == patch.target_id).first()
     if not segment:
         raise ValueError("production segment not found for prompt patch")
@@ -424,6 +443,7 @@ def _sync_run_storyboard_frame_for_segment(
     segment: ProductionSegment,
     updates: dict[str, Any],
 ) -> None:
+    """业务函数：处理 _sync_run_storyboard_frame_for_segment 对应的业务流程、校验或数据转换。"""
     if not updates or not patch.run_id:
         return
     run = db.query(VideoProductionRun).filter(VideoProductionRun.id == patch.run_id).first()
@@ -448,6 +468,7 @@ def _sync_run_storyboard_frame_for_segment(
 
 
 def _frame_matches_segment(frame: dict[str, Any], match_ids: set[str]) -> bool:
+    """业务函数：处理 _frame_matches_segment 对应的业务流程、校验或数据转换。"""
     frame_values = {
         str(frame.get("production_segment_id") or ""),
         str(frame.get("frame_id") or ""),
@@ -458,6 +479,7 @@ def _frame_matches_segment(frame: dict[str, Any], match_ids: set[str]) -> bool:
 
 
 def _apply_edit_manifest_patch(db: Session, patch: AgencyCreativePatch) -> None:
+    """业务函数：处理 _apply_edit_manifest_patch 对应的业务流程、校验或数据转换。"""
     run = db.query(VideoProductionRun).filter(VideoProductionRun.id == patch.run_id).first()
     if not run:
         raise ValueError("run not found for edit manifest patch")
@@ -468,6 +490,7 @@ def _apply_edit_manifest_patch(db: Session, patch: AgencyCreativePatch) -> None:
 
 
 def _record_applied_patch_text_artifacts(db: Session, patch: AgencyCreativePatch) -> None:
+    """业务函数：处理 _record_applied_patch_text_artifacts 对应的业务流程、校验或数据转换。"""
     if patch.patch_type == "script_patch":
         episode = db.query(Episode).filter(Episode.id == patch.episode_id).first() if patch.episode_id else None
         if episode and isinstance(episode.script_json, dict):
@@ -508,6 +531,7 @@ def _record_storyboard_text_artifacts(
     target_id: str,
     storyboard: dict[str, Any],
 ) -> None:
+    """业务函数：处理 _record_storyboard_text_artifacts 对应的业务流程、校验或数据转换。"""
     dialogue_lines = _storyboard_lines(storyboard, "narration")
     image_prompts = _storyboard_lines(storyboard, "image_prompt")
     video_prompts = _storyboard_lines(storyboard, "video_prompt")
@@ -535,6 +559,7 @@ def _record_segment_prompt_text_artifacts(
     patch: AgencyCreativePatch,
     segment: ProductionSegment,
 ) -> None:
+    """业务函数：处理 _record_segment_prompt_text_artifacts 对应的业务流程、校验或数据转换。"""
     after = patch.after_json or {}
     text_fields = ("image_prompt", "video_prompt", "expected_end_state", "continuity_notes", "negative_prompt", "reference_instructions")
     changed_text = {
@@ -580,6 +605,7 @@ def _record_segment_prompt_text_artifacts(
 
 
 def _storyboard_lines(storyboard: dict[str, Any], key: str) -> list[str]:
+    """业务函数：处理 _storyboard_lines 对应的业务流程、校验或数据转换。"""
     frames = storyboard.get("frames") or []
     if not isinstance(frames, list):
         return []
@@ -596,6 +622,7 @@ def _create_approved_text_artifact(
     content_json: dict[str, Any],
     content_text: str,
 ) -> AITextArtifact:
+    """业务函数：处理 _create_approved_text_artifact 对应的业务流程、校验或数据转换。"""
     now = bj_now()
     version = _next_text_artifact_version(db, target_type, target_id, artifact_type)
     active = (
@@ -654,6 +681,7 @@ def _create_approved_text_artifact(
 
 
 def _next_text_artifact_version(db: Session, target_type: str, target_id: str, artifact_type: str) -> int:
+    """业务函数：处理 _next_text_artifact_version 对应的业务流程、校验或数据转换。"""
     latest = (
         db.query(AITextArtifact.version)
         .filter(

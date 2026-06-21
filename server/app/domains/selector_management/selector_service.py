@@ -15,6 +15,7 @@ _SELECTORS_REVISION_KEY = "selectors_revision"
 
 
 def _get_revision(db: Session) -> int:
+    """业务函数：处理 _get_revision 对应的业务流程、校验或数据转换。"""
     """Get current selectors revision counter. Falls back to max(updated_at)
     ts for migration from pre-revision installations."""
     row = db.query(SystemSetting).filter(SystemSetting.key == _SELECTORS_REVISION_KEY).first()
@@ -33,6 +34,7 @@ def _get_revision(db: Session) -> int:
 
 
 def _set_revision(db: Session, rev: int) -> None:
+    """业务函数：处理 _set_revision 对应的业务流程、校验或数据转换。"""
     row = db.query(SystemSetting).filter(SystemSetting.key == _SELECTORS_REVISION_KEY).first()
     if row:
         row.value = str(rev)
@@ -42,6 +44,7 @@ def _set_revision(db: Session, rev: int) -> None:
 
 
 def _bump_revision(db: Session) -> int:
+    """业务函数：处理 _bump_revision 对应的业务流程、校验或数据转换。"""
     """Increment selectors revision counter and return new value."""
     rev = _get_revision(db) + 1
     _set_revision(db, rev)
@@ -49,6 +52,7 @@ def _bump_revision(db: Session) -> int:
 
 
 def _aspect_tag(resolution: str) -> str:
+    """业务函数：处理 _aspect_tag 对应的业务流程、校验或数据转换。"""
     """Compute aspect-ratio tag from 'WxH' string, e.g. '1080x2400' → '9:20'."""
     try:
         w, h = resolution.split("x")
@@ -66,6 +70,7 @@ def _aspect_tag(resolution: str) -> str:
 
 
 def _profile_priority(sel_profile: str, dev_resolution: str, dev_ar: str) -> int:
+    """业务函数：处理 _profile_priority 对应的业务流程、校验或数据转换。"""
     """Score a selector's resolution_profile against device resolution.
     3=exact match, 2=same aspect ratio, 1=default, 0=other."""
     if not sel_profile or sel_profile == "default":
@@ -78,6 +83,7 @@ def _profile_priority(sel_profile: str, dev_resolution: str, dev_ar: str) -> int
 
 
 def _to_dict(sel: UISelector) -> dict:
+    """业务函数：处理 _to_dict 对应的业务流程、校验或数据转换。"""
     return {
         "action_name": sel.action_name,
         "description": sel.description or "",
@@ -97,6 +103,7 @@ def _to_dict(sel: UISelector) -> dict:
 
 
 def _to_device_dict(sel: UISelector) -> dict:
+    """业务函数：处理 _to_device_dict 对应的业务流程、校验或数据转换。"""
     """Device-facing dict (no description/version/enabled)."""
     return {
         "action_name": sel.action_name,
@@ -113,9 +120,11 @@ def _to_device_dict(sel: UISelector) -> dict:
 
 
 class SelectorService:
+    """业务类：承载 SelectorService 相关的数据结构、状态或业务协作。"""
     """UI selector management — DB-backed."""
 
     def get_all_selectors(self, db: Session, device_id: str = None) -> tuple[int, list[dict]]:
+        """业务函数：处理 get_all_selectors 对应的业务流程、校验或数据转换。"""
         """Returns (version, selectors_list). Version is max version across all selectors.
         When device_id is given, filters by resolution_profile: exact match > same AR > default.
         """
@@ -141,6 +150,7 @@ class SelectorService:
         return version, [_to_device_dict(s) for s in selectors]
 
     def get_selector(self, db: Session, action_name: str) -> Optional[dict]:
+        """业务函数：处理 get_selector 对应的业务流程、校验或数据转换。"""
         """Get a single selector by action_name."""
         s = db.query(UISelector).filter(
             UISelector.action_name == action_name,
@@ -151,6 +161,7 @@ class SelectorService:
         return _to_dict(s)
 
     def get_version(self, db: Session) -> int:
+        """业务函数：处理 get_version 对应的业务流程、校验或数据转换。"""
         """Get current selectors revision — guaranteed monotonic across all CRUD."""
         return _get_revision(db)
 
@@ -161,6 +172,7 @@ class SelectorService:
                         extract_field: str = None,
                         clean_mode: str = None, clean_pattern: str = None,
                         clean_prompt: str = None, resolution_profile: str = "default") -> dict:
+        """业务函数：处理 create_selector 对应的业务流程、校验或数据转换。"""
         """Create a new UI selector."""
         existing = db.query(UISelector).filter(
             UISelector.action_name == action_name,
@@ -198,6 +210,7 @@ class SelectorService:
                         extract_field: str = None,
                         clean_mode: str = None, clean_pattern: str = None,
                         clean_prompt: str = None, resolution_profile: str = None) -> dict:
+        """业务函数：处理 update_selector 对应的业务流程、校验或数据转换。"""
         """Update an existing selector. platform_version and resolution_profile
         are lookup-only (composite key) — never updated. To change them, delete+recreate."""
         q = db.query(UISelector).filter(UISelector.action_name == action_name)
@@ -237,6 +250,7 @@ class SelectorService:
 
     def delete_selector(self, db: Session, action_name: str, platform_version: str = None,
                         resolution_profile: str = None) -> bool:
+        """业务函数：处理 delete_selector 对应的业务流程、校验或数据转换。"""
         """Delete a selector by (action_name, platform_version, resolution_profile)."""
         q = db.query(UISelector).filter(UISelector.action_name == action_name)
         if platform_version:
@@ -253,6 +267,7 @@ class SelectorService:
 
     def toggle_selector(self, db: Session, action_name: str, enabled: bool,
                         platform_version: str = None, resolution_profile: str = None) -> dict:
+        """业务函数：处理 toggle_selector 对应的业务流程、校验或数据转换。"""
         """Enable or disable a selector by (action_name, platform_version, resolution_profile)."""
         q = db.query(UISelector).filter(UISelector.action_name == action_name)
         if platform_version:
@@ -271,6 +286,7 @@ class SelectorService:
 
     def list_all_selectors(self, db: Session, include_disabled: bool = False,
                            category: str = None) -> list[dict]:
+        """业务函数：处理 list_all_selectors 对应的业务流程、校验或数据转换。"""
         """List all selectors (optionally including disabled ones and filtering by category)."""
         query = db.query(UISelector)
         if not include_disabled:

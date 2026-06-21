@@ -16,9 +16,12 @@ const progress = ref({ percent: 0, message: '' })
 const result = ref(null)
 const videoUrl = ref('')
 
+// 前端业务函数：协调 handleCharacters 对应的页面流程、接口调用或状态转换。
 function handleCharacters(e) { characterFiles.value = Array.from(e.target.files || []) }
+// 前端业务函数：协调 handleGoods 对应的页面流程、接口调用或状态转换。
 function handleGoods(e) { goodsFiles.value = Array.from(e.target.files || []) }
 
+// 前端业务函数：协调 handleGenerate 对应的页面流程、接口调用或状态转换。
 async function handleGenerate() {
   if (characterFiles.value.length === 0) return
   generating.value = true; result.value = null; videoUrl.value = ''

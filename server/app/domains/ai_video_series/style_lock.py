@@ -90,13 +90,16 @@ STYLE_LOCK_REFERENCE_CONCURRENCY = 4
 
 
 class StyleLockDomainError(RuntimeError):
+    """业务类：承载 StyleLockDomainError 相关的数据结构、状态或业务协作。"""
     def __init__(self, status_code: int, detail: object):
+        """初始化业务对象依赖，保存后续流程需要的运行上下文。"""
         self.status_code = status_code
         self.detail = detail
         super().__init__(str(detail))
 
 
 async def auto_generate_series_assets(series: Series, db: Session) -> dict:
+    """业务函数：处理 auto_generate_series_assets 对应的业务流程、校验或数据转换。"""
     if not series.logline:
         raise StyleLockDomainError(400, "请先填写系列的故事概要 (logline)")
 
@@ -196,6 +199,7 @@ async def auto_generate_series_assets(series: Series, db: Session) -> dict:
 
 
 def missing_agency_trace(stage: str, exc: Exception) -> dict:
+    """业务函数：处理 missing_agency_trace 对应的业务流程、校验或数据转换。"""
     return {
         "stage": stage,
         "stage_status": "partial",
@@ -207,6 +211,7 @@ def missing_agency_trace(stage: str, exc: Exception) -> dict:
 
 
 def timeout_agency_trace(stage: str, timeout_seconds: float) -> dict:
+    """业务函数：处理 timeout_agency_trace 对应的业务流程、校验或数据转换。"""
     return {
         "stage": stage,
         "stage_status": "partial",
@@ -218,14 +223,17 @@ def timeout_agency_trace(stage: str, timeout_seconds: float) -> dict:
 
 
 def agency_trace_blocks(trace: dict | None) -> bool:
+    """业务函数：处理 agency_trace_blocks 对应的业务流程、校验或数据转换。"""
     return bool(isinstance(trace, dict) and trace.get("stage_status") in {"blocked", "failed"})
 
 
 def utc_now_iso() -> str:
+    """业务函数：处理 utc_now_iso 对应的业务流程、校验或数据转换。"""
     return datetime.now(timezone.utc).isoformat()
 
 
 def style_lock_status(lock: dict | None) -> str:
+    """业务函数：处理 style_lock_status 对应的业务流程、校验或数据转换。"""
     if not isinstance(lock, dict):
         return "unlocked"
     if lock.get("status"):
@@ -234,6 +242,7 @@ def style_lock_status(lock: dict | None) -> str:
 
 
 def style_lock_payload(db: Session, series: Series) -> dict:
+    """业务函数：处理 style_lock_payload 对应的业务流程、校验或数据转换。"""
     story_bible = dict(series.story_bible_json or {})
     lock = story_bible.get("style_lock", {})
     before_team = deepcopy(lock.get("agency_team")) if isinstance(lock, dict) else None
@@ -261,6 +270,7 @@ def style_lock_payload(db: Session, series: Series) -> dict:
 
 
 def upsert_reference_progress_item(series: Series, item: dict) -> None:
+    """业务函数：处理 upsert_reference_progress_item 对应的业务流程、校验或数据转换。"""
     story_bible = dict(series.story_bible_json or {})
     lock = dict(story_bible.get("style_lock") or {})
     progress = list(lock.get("reference_progress") or [])
@@ -293,6 +303,7 @@ def record_reference_slot_progress(
     url: str | None = None,
     error: str | None = None,
 ) -> None:
+    """业务函数：处理 record_reference_slot_progress 对应的业务流程、校验或数据转换。"""
     meta_json = dict(row.meta_json or {})
     reference_generation = dict(meta_json.get("reference_generation") or {})
     reference_generation[slot] = {
@@ -322,6 +333,7 @@ def record_reference_slot_progress(
 
 
 def stored_reference_prompt_matches(row, slot: str, visual_style: dict) -> bool:
+    """业务函数：处理 stored_reference_prompt_matches 对应的业务流程、校验或数据转换。"""
     meta_json = row.meta_json or {}
     reference_generation = meta_json.get("reference_generation") if isinstance(meta_json, dict) else {}
     slot_meta = reference_generation.get(slot) if isinstance(reference_generation, dict) else {}
@@ -338,6 +350,7 @@ def set_style_lock_state(
     locked: bool | None = None,
     error: str | None = None,
 ) -> dict:
+    """业务函数：处理 set_style_lock_state 对应的业务流程、校验或数据转换。"""
     story_bible = dict(series.story_bible_json or {})
     current = dict(story_bible.get("style_lock") or {})
     current["status"] = status
@@ -371,6 +384,7 @@ def record_style_lock_series_bible_artifact(
     *,
     missing_assets: list[dict],
 ) -> None:
+    """业务函数：处理 record_style_lock_series_bible_artifact 对应的业务流程、校验或数据转换。"""
     style_lock = story_bible.get("style_lock") if isinstance(story_bible, dict) else {}
     if not isinstance(style_lock, dict):
         return
@@ -403,6 +417,7 @@ def record_style_lock_series_bible_artifact(
 
 
 def style_lock_in_progress_error() -> StyleLockDomainError:
+    """业务函数：处理 style_lock_in_progress_error 对应的业务流程、校验或数据转换。"""
     return StyleLockDomainError(409, {
         "code": "STYLE_LOCK_IN_PROGRESS",
         "message": "Style lock is already running for this series.",
@@ -410,6 +425,7 @@ def style_lock_in_progress_error() -> StyleLockDomainError:
 
 
 def active_style_lock_job(db: Session, series_id: str) -> ProductionJob | None:
+    """业务函数：处理 active_style_lock_job 对应的业务流程、校验或数据转换。"""
     return (
         db.query(ProductionJob)
         .filter(ProductionJob.target_type == "series")
@@ -422,6 +438,7 @@ def active_style_lock_job(db: Session, series_id: str) -> ProductionJob | None:
 
 
 def enqueue_style_lock_job(db: Session, series: Series, version: int) -> ProductionJob:
+    """业务函数：处理 enqueue_style_lock_job 对应的业务流程、校验或数据转换。"""
     if active_style_lock_job(db, series.id):
         raise style_lock_in_progress_error()
 
@@ -460,6 +477,7 @@ def enqueue_style_lock_job(db: Session, series: Series, version: int) -> Product
 
 
 def start_style_lock(db: Session, series: Series) -> dict:
+    """业务函数：处理 start_style_lock 对应的业务流程、校验或数据转换。"""
     story_bible = dict(series.story_bible_json or {})
     current = story_bible.get("style_lock", {})
     version = int(current.get("version") or 0) + 1 if isinstance(current, dict) else 1
@@ -482,6 +500,7 @@ def start_style_lock(db: Session, series: Series) -> dict:
 
 
 def parse_json_with_key(raw: str, key: str) -> dict:
+    """业务函数：处理 parse_json_with_key 对应的业务流程、校验或数据转换。"""
     import re
     try:
         return json.loads(raw)
@@ -520,6 +539,7 @@ async def generate_reference_image(
     *,
     destination_context: dict | None = None,
 ) -> str | None:
+    """业务函数：处理 generate_reference_image 对应的业务流程、校验或数据转换。"""
     try:
         return await generate_reference_url(
             db,
@@ -540,6 +560,7 @@ async def generate_reference_image_isolated(
     destination_context: dict,
     semaphore: asyncio.Semaphore,
 ) -> str | None:
+    """业务函数：处理 generate_reference_image_isolated 对应的业务流程、校验或数据转换。"""
     SessionFactory = sessionmaker(bind=db.get_bind(), autocommit=False, autoflush=False)
     async with semaphore:
         generation_db = SessionFactory()
@@ -554,6 +575,7 @@ async def generate_reference_image_isolated(
 
 
 async def ensure_series_assets(series: Series, db: Session) -> tuple[list[Character], list[Scene]]:
+    """业务函数：处理 ensure_series_assets 对应的业务流程、校验或数据转换。"""
     created_chars: list[Character] = []
     created_scenes: list[Scene] = []
 
@@ -612,6 +634,7 @@ async def ensure_series_assets(series: Series, db: Session) -> tuple[list[Charac
 
 
 async def fill_reference_assets(series: Series, db: Session) -> list[dict]:
+    """业务函数：处理 fill_reference_assets 对应的业务流程、校验或数据转换。"""
     missing: list[dict] = []
     pending_jobs: list[dict] = []
     current_lock = (series.story_bible_json or {}).get("style_lock", {})
@@ -718,6 +741,7 @@ async def fill_reference_assets(series: Series, db: Session) -> list[dict]:
     semaphore = asyncio.Semaphore(STYLE_LOCK_REFERENCE_CONCURRENCY)
 
     async def run_job(job: dict) -> tuple[dict, str | None]:
+        """业务函数：处理 run_job 对应的业务流程、校验或数据转换。"""
         url = await generate_reference_image_isolated(
             db,
             job["prompt"],
@@ -767,6 +791,7 @@ async def fill_reference_assets(series: Series, db: Session) -> list[dict]:
 
 
 def build_story_bible(series: Series, version: int, missing_assets: list[dict]) -> dict:
+    """业务函数：处理 build_story_bible 对应的业务流程、校验或数据转换。"""
     story_bible = dict(series.story_bible_json or {})
     current_lock = story_bible.get("style_lock", {})
     agency_team = ensure_video_agency_team(current_lock if isinstance(current_lock, dict) else {})
@@ -831,6 +856,7 @@ def build_story_bible(series: Series, version: int, missing_assets: list[dict]) 
 
 
 async def run_style_lock_job(series_id: str, db: Session | None = None) -> dict:
+    """业务函数：处理 run_style_lock_job 对应的业务流程、校验或数据转换。"""
     owns_session = db is None
     db = db or SessionLocal()
     story_bible: dict = {}
@@ -900,6 +926,7 @@ async def run_style_lock_job(series_id: str, db: Session | None = None) -> dict:
 
 
 async def run_style_lock_worker_step(db: Session, *, lease_id: str, batch_size: int = 1) -> dict:
+    """业务函数：处理 run_style_lock_worker_step 对应的业务流程、校验或数据转换。"""
     limit = max(1, min(int(batch_size or 1), 20))
     items: list[dict] = []
     for _ in range(limit):

@@ -11,6 +11,7 @@ const showCreate = ref(false)
 const newUser = ref({ username: '', password: '', role: 'operator', nickname: '' })
 const creating = ref(false)
 
+// 前端业务函数：协调 fetchUsers 对应的页面流程、接口调用或状态转换。
 async function fetchUsers() {
   loading.value = true
   try { const resp = await listUsers(); users.value = resp.data.users || [] }

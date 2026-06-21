@@ -12,6 +12,7 @@ const password = ref('')
 const error = ref('')
 const loading = ref(false)
 
+// 前端业务函数：协调 handleLogin 对应的页面流程、接口调用或状态转换。
 async function handleLogin() {
   error.value = ''
   loading.value = true

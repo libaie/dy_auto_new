@@ -19,11 +19,13 @@ router = APIRouter(prefix="/api/ai-text-artifacts", tags=["ai-text-artifacts"])
 
 
 class ArtifactEditRequest(BaseModel):
+    """业务类：承载 ArtifactEditRequest 相关的数据结构、状态或业务协作。"""
     content_json: dict | None = None
     content_text: str | None = None
 
 
 class ArtifactRegenerateRequest(BaseModel):
+    """业务类：承载 ArtifactRegenerateRequest 相关的数据结构、状态或业务协作。"""
     input_json: dict | None = None
     content_json: dict | None = None
     content_text: str | None = None
@@ -31,6 +33,7 @@ class ArtifactRegenerateRequest(BaseModel):
 
 
 def _actor_id(user) -> str | None:
+    """业务函数：处理 _actor_id 对应的业务流程、校验或数据转换。"""
     if isinstance(user, tuple) and user:
         return str(user[0])
     if isinstance(user, str):
@@ -39,6 +42,7 @@ def _actor_id(user) -> str | None:
 
 
 def _artifact_dict(row: AITextArtifact) -> dict:
+    """业务函数：处理 _artifact_dict 对应的业务流程、校验或数据转换。"""
     return {
         "id": row.id,
         "series_id": row.series_id,
@@ -67,6 +71,7 @@ def _artifact_dict(row: AITextArtifact) -> dict:
 
 
 def _get_artifact_or_404(db: Session, artifact_id: str) -> AITextArtifact:
+    """业务函数：处理 _get_artifact_or_404 对应的业务流程、校验或数据转换。"""
     artifact = db.query(AITextArtifact).filter(AITextArtifact.id == artifact_id).first()
     if not artifact:
         raise HTTPException(404, "AI text artifact not found")
@@ -82,6 +87,7 @@ def list_artifacts(
     db: Session = Depends(get_db),
     user=Depends(verify_admin_token),
 ):
+    """业务函数：处理 list_artifacts 对应的业务流程、校验或数据转换。"""
     query = db.query(AITextArtifact)
     if series_id:
         query = query.filter(AITextArtifact.series_id == series_id)
@@ -101,6 +107,7 @@ def get_artifact(
     db: Session = Depends(get_db),
     user=Depends(verify_admin_token),
 ):
+    """业务函数：处理 get_artifact 对应的业务流程、校验或数据转换。"""
     return {"ok": True, "artifact": _artifact_dict(_get_artifact_or_404(db, artifact_id))}
 
 
@@ -110,6 +117,7 @@ def get_lineage(
     db: Session = Depends(get_db),
     user=Depends(verify_admin_token),
 ):
+    """业务函数：处理 get_lineage 对应的业务流程、校验或数据转换。"""
     service = AITextArtifactService(db)
     try:
         rows = service.lineage(artifact_id)
@@ -127,6 +135,7 @@ def edit_artifact(
     db: Session = Depends(get_db),
     user=Depends(require_role("admin")),
 ):
+    """业务函数：处理 edit_artifact 对应的业务流程、校验或数据转换。"""
     service = AITextArtifactService(db)
     try:
         artifact = service.edit_artifact(
@@ -148,6 +157,7 @@ def approve_artifact(
     db: Session = Depends(get_db),
     user=Depends(require_role("admin")),
 ):
+    """业务函数：处理 approve_artifact 对应的业务流程、校验或数据转换。"""
     service = AITextArtifactService(db)
     try:
         artifact = service.approve_artifact(artifact_id, actor_user_id=_actor_id(user))
@@ -167,6 +177,7 @@ async def regenerate_artifact(
     db: Session = Depends(get_db),
     user=Depends(require_role("admin")),
 ):
+    """业务函数：处理 regenerate_artifact 对应的业务流程、校验或数据转换。"""
     service = AITextArtifactService(db)
     try:
         artifact = await service.regenerate_artifact_with_ai(

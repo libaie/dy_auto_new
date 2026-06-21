@@ -8,6 +8,7 @@ function _positiveNumber(value, fallback) {
   return n;
 }
 
+// 设备业务函数：处理 getTaskTimeoutMs 对应的抖音自动化动作、状态或安全边界。
 function getTaskTimeoutMs(task) {
   task = task || {};
   var params = task.params || {};

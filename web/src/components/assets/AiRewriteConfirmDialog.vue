@@ -24,6 +24,7 @@ watch(
   { immediate: true, deep: true },
 )
 
+// 前端业务函数：协调 cancel 对应的页面流程、接口调用或状态转换。
 function cancel() {
   emit('cancel')
 }

@@ -15,6 +15,7 @@ _TEMPLATES_REVISION_KEY = "prompt_templates_revision"
 
 
 def _get_tmpl_revision(db: Session) -> int:
+    """业务函数：处理 _get_tmpl_revision 对应的业务流程、校验或数据转换。"""
     row = db.query(SystemSetting).filter(SystemSetting.key == _TEMPLATES_REVISION_KEY).first()
     if row and row.value:
         try:
@@ -30,6 +31,7 @@ def _get_tmpl_revision(db: Session) -> int:
 
 
 def _set_tmpl_revision(db: Session, rev: int) -> None:
+    """业务函数：处理 _set_tmpl_revision 对应的业务流程、校验或数据转换。"""
     row = db.query(SystemSetting).filter(SystemSetting.key == _TEMPLATES_REVISION_KEY).first()
     if row:
         row.value = str(rev)
@@ -39,12 +41,14 @@ def _set_tmpl_revision(db: Session, rev: int) -> None:
 
 
 def _bump_tmpl_revision(db: Session) -> int:
+    """业务函数：处理 _bump_tmpl_revision 对应的业务流程、校验或数据转换。"""
     rev = _get_tmpl_revision(db) + 1
     _set_tmpl_revision(db, rev)
     return rev
 
 
 def _to_dict(tmpl: PromptTemplate) -> dict:
+    """业务函数：处理 _to_dict 对应的业务流程、校验或数据转换。"""
     return {
         "id": tmpl.id,
         "name": tmpl.name,
@@ -59,6 +63,7 @@ def _to_dict(tmpl: PromptTemplate) -> dict:
 
 
 def _to_device_dict(tmpl: PromptTemplate) -> dict:
+    """业务函数：处理 _to_device_dict 对应的业务流程、校验或数据转换。"""
     """Device-facing dict — strips admin fields."""
     return {
         "id": tmpl.id,
@@ -73,9 +78,11 @@ PROMPT_TEMPLATE_REWRITE_MAX_CONTENT_BYTES = 50 * 1024
 
 
 class PromptTemplateService:
+    """业务类：承载 PromptTemplateService 相关的数据结构、状态或业务协作。"""
     """Prompt template management — DB-backed."""
 
     def get_all_templates(self, db: Session) -> tuple[int, list[dict]]:
+        """业务函数：处理 get_all_templates 对应的业务流程、校验或数据转换。"""
         """Returns (version, templates_list)."""
         templates = db.query(PromptTemplate).filter(PromptTemplate.enabled == True).all()
         if not templates:
@@ -84,10 +91,12 @@ class PromptTemplateService:
         return version, [_to_device_dict(t) for t in templates]
 
     def get_version(self, db: Session) -> int:
+        """业务函数：处理 get_version 对应的业务流程、校验或数据转换。"""
         """Get current prompt templates revision — guaranteed monotonic across all CRUD."""
         return _get_tmpl_revision(db)
 
     def get_template(self, db: Session, name: str) -> Optional[dict]:
+        """业务函数：处理 get_template 对应的业务流程、校验或数据转换。"""
         """Get a single template by name."""
         t = db.query(PromptTemplate).filter(
             PromptTemplate.name == name,
@@ -123,6 +132,7 @@ class PromptTemplateService:
 
     @classmethod
     def _validate_content(cls, content: dict) -> None:
+        """业务函数：处理 _validate_content 对应的业务流程、校验或数据转换。"""
         """Validate required template content fields. Raises ValueError on mismatch."""
         required = ["identity", "disabledWords", "semanticGuide", "analysis", "localFilter"]
         for field in required:
@@ -138,6 +148,7 @@ class PromptTemplateService:
 
     @classmethod
     def _validate_complete_content(cls, content: dict) -> None:
+        """业务函数：处理 _validate_complete_content 对应的业务流程、校验或数据转换。"""
         """Validate fields required for a complete generated prompt template."""
         cls._validate_content(content)
 
@@ -181,6 +192,7 @@ class PromptTemplateService:
 
     @classmethod
     def _serialized_content_size(cls, content: dict) -> int:
+        """业务函数：处理 _serialized_content_size 对应的业务流程、校验或数据转换。"""
         return len(json.dumps(content, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
 
     @classmethod
@@ -191,6 +203,7 @@ class PromptTemplateService:
         max_instruction_chars: int = PROMPT_TEMPLATE_REWRITE_MAX_INSTRUCTION_CHARS,
         max_content_bytes: int = PROMPT_TEMPLATE_REWRITE_MAX_CONTENT_BYTES,
     ) -> str:
+        """业务函数：处理 validate_rewrite_request 对应的业务流程、校验或数据转换。"""
         """Validate rewrite input without reading or writing template rows."""
         if not isinstance(instruction, str) or not instruction.strip():
             raise ValueError("instruction is required")
@@ -206,6 +219,7 @@ class PromptTemplateService:
 
     @classmethod
     def validate_rewrite_output(cls, content):
+        """业务函数：处理 validate_rewrite_output 对应的业务流程、校验或数据转换。"""
         """Validate AI rewritten output before emitting SSE done."""
         if not isinstance(content, dict):
             raise ValueError("rewritten content must be an object")
@@ -214,6 +228,7 @@ class PromptTemplateService:
 
     @staticmethod
     def build_rewrite_prompt(industry: str, content: dict, instruction: str) -> str:
+        """业务函数：处理 build_rewrite_prompt 对应的业务流程、校验或数据转换。"""
         current_json = json.dumps(content, ensure_ascii=False, indent=2)
         return (
             f"Industry: {industry or 'health'}\n"
@@ -235,6 +250,7 @@ class PromptTemplateService:
 
     def create_template(self, db: Session, name: str, industry: str,
                         content: dict, description: str = "") -> dict:
+        """业务函数：处理 create_template 对应的业务流程、校验或数据转换。"""
         """Create a new prompt template."""
         self._validate_content(content)
         existing = db.query(PromptTemplate).filter(PromptTemplate.name == name).first()
@@ -257,6 +273,7 @@ class PromptTemplateService:
     def update_template(self, db: Session, name: str,
                         content: dict = None, industry: str = None,
                         description: str = None) -> dict:
+        """业务函数：处理 update_template 对应的业务流程、校验或数据转换。"""
         """Update an existing template. Auto-bumps version on any change."""
         if content is not None:
             self._validate_content(content)
@@ -278,6 +295,7 @@ class PromptTemplateService:
         return _to_dict(tmpl)
 
     def delete_template(self, db: Session, name: str) -> bool:
+        """业务函数：处理 delete_template 对应的业务流程、校验或数据转换。"""
         """Delete a template by name."""
         tmpl = db.query(PromptTemplate).filter(PromptTemplate.name == name).first()
         if not tmpl:
@@ -288,6 +306,7 @@ class PromptTemplateService:
         return True
 
     def toggle_template(self, db: Session, name: str, enabled: bool) -> dict:
+        """业务函数：处理 toggle_template 对应的业务流程、校验或数据转换。"""
         """Enable or disable a template."""
         tmpl = db.query(PromptTemplate).filter(PromptTemplate.name == name).first()
         if not tmpl:
@@ -300,6 +319,7 @@ class PromptTemplateService:
         return _to_dict(tmpl)
 
     def list_all_templates(self, db: Session, include_disabled: bool = False) -> list[dict]:
+        """业务函数：处理 list_all_templates 对应的业务流程、校验或数据转换。"""
         """List all templates (optionally including disabled ones)."""
         query = db.query(PromptTemplate)
         if not include_disabled:

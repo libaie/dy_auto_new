@@ -12,22 +12,27 @@ from .read_models import chain_instance_to_dict, chain_template_to_dict
 
 
 class StepOrderError(ValueError):
+    """业务类：承载 StepOrderError 相关的数据结构、状态或业务协作。"""
     pass
 
 
 class ActiveInstancesError(ValueError):
+    """业务类：承载 ActiveInstancesError 相关的数据结构、状态或业务协作。"""
     pass
 
 
 class NoAccountsError(ValueError):
+    """业务类：承载 NoAccountsError 相关的数据结构、状态或业务协作。"""
     pass
 
 
 class InvalidStateError(ValueError):
+    """业务类：承载 InvalidStateError 相关的数据结构、状态或业务协作。"""
     pass
 
 
 def create_template(db, request, user_id: str) -> dict:
+    """业务函数：处理 create_template 对应的业务流程、校验或数据转换。"""
     _validate_step_order(request.steps)
     template = ChainTemplate(
         name=request.name,
@@ -42,6 +47,7 @@ def create_template(db, request, user_id: str) -> dict:
 
 
 def list_templates(db, skip: int, limit: int, user: tuple) -> dict:
+    """业务函数：处理 list_templates 对应的业务流程、校验或数据转换。"""
     limit = min(limit, 100)
     user_id, role = user
     query = db.query(ChainTemplate)
@@ -53,6 +59,7 @@ def list_templates(db, skip: int, limit: int, user: tuple) -> dict:
 
 
 def get_template(db, template_id: str, user: tuple) -> dict:
+    """业务函数：处理 get_template 对应的业务流程、校验或数据转换。"""
     template = _template_query(db, template_id, user).first()
     if not template:
         raise LookupError("模板不存在")
@@ -60,6 +67,7 @@ def get_template(db, template_id: str, user: tuple) -> dict:
 
 
 def update_template(db, template_id: str, request, user: tuple) -> dict:
+    """业务函数：处理 update_template 对应的业务流程、校验或数据转换。"""
     template = _template_query(db, template_id, user).first()
     if not template:
         raise LookupError("模板不存在")
@@ -82,6 +90,7 @@ def update_template(db, template_id: str, request, user: tuple) -> dict:
 
 
 def delete_template(db, template_id: str, user: tuple) -> dict:
+    """业务函数：处理 delete_template 对应的业务流程、校验或数据转换。"""
     template = _template_query(db, template_id, user).first()
     if not template:
         raise LookupError("模板不存在")
@@ -97,6 +106,7 @@ def delete_template(db, template_id: str, user: tuple) -> dict:
 
 
 def create_instances(db, request, user: tuple) -> dict:
+    """业务函数：处理 create_instances 对应的业务流程、校验或数据转换。"""
     user_id, role = user
     account_ids = list(request.account_ids or [])
     if request.group_ids:
@@ -132,6 +142,7 @@ def create_instances(db, request, user: tuple) -> dict:
 
 
 def list_instances(db, template_id: str, account_id: str, status: str, skip: int, limit: int, user: tuple) -> dict:
+    """业务函数：处理 list_instances 对应的业务流程、校验或数据转换。"""
     limit = min(limit, 100)
     query = db.query(ChainInstance)
     if template_id:
@@ -168,6 +179,7 @@ def list_instances(db, template_id: str, account_id: str, status: str, skip: int
 
 
 def get_instance(db, instance_id: str, user: tuple) -> dict:
+    """业务函数：处理 get_instance 对应的业务流程、校验或数据转换。"""
     instance = _instance_query(db, instance_id, user).first()
     if not instance:
         raise LookupError("链实例不存在")
@@ -205,6 +217,7 @@ def get_instance(db, instance_id: str, user: tuple) -> dict:
 
 
 def cancel_instance(db, instance_id: str, user: tuple) -> tuple[dict, list[tuple[str, str]]]:
+    """业务函数：处理 cancel_instance 对应的业务流程、校验或数据转换。"""
     instance = _instance_query(db, instance_id, user).first()
     if not instance:
         raise LookupError("链实例不存在")
@@ -234,6 +247,7 @@ def cancel_instance(db, instance_id: str, user: tuple) -> tuple[dict, list[tuple
 
 
 def retry_instance(db, instance_id: str, user: tuple) -> dict:
+    """业务函数：处理 retry_instance 对应的业务流程、校验或数据转换。"""
     instance = _instance_query(db, instance_id, user).first()
     if not instance:
         raise LookupError("链实例不存在")
@@ -269,12 +283,14 @@ def retry_instance(db, instance_id: str, user: tuple) -> dict:
 
 
 def _validate_step_order(steps):
+    """业务函数：处理 _validate_step_order 对应的业务流程、校验或数据转换。"""
     orders = sorted(step.step_order for step in steps)
     if orders != list(range(1, len(steps) + 1)):
         raise StepOrderError("步骤序号必须从 1 连续递增")
 
 
 def _template_query(db, template_id: str, user: tuple):
+    """业务函数：处理 _template_query 对应的业务流程、校验或数据转换。"""
     user_id, role = user
     query = db.query(ChainTemplate).filter(ChainTemplate.id == template_id)
     if role != "admin":
@@ -283,6 +299,7 @@ def _template_query(db, template_id: str, user: tuple):
 
 
 def _instance_query(db, instance_id: str, user: tuple):
+    """业务函数：处理 _instance_query 对应的业务流程、校验或数据转换。"""
     user_id, role = user
     query = db.query(ChainInstance).filter(ChainInstance.id == instance_id)
     if role != "admin":

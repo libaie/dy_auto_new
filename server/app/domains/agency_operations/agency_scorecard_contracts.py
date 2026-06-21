@@ -22,6 +22,7 @@ ALLOWED_REPAIR_INTENTS = {
 
 
 def normalize_scorecard(raw: dict[str, Any] | None) -> dict[str, Any]:
+    """业务函数：处理 normalize_scorecard 对应的业务流程、校验或数据转换。"""
     payload = raw if isinstance(raw, dict) else {}
     dimensions = [_normalize_dimension(item) for item in payload.get("dimensions") or [] if isinstance(item, dict)]
     pass_threshold = _clamp_score(payload.get("pass_threshold"), default=80.0)
@@ -43,6 +44,7 @@ def normalize_scorecard(raw: dict[str, Any] | None) -> dict[str, Any]:
 
 
 def scorecard_blocks_stage(scorecard: dict[str, Any] | None) -> bool:
+    """业务函数：处理 scorecard_blocks_stage 对应的业务流程、校验或数据转换。"""
     card = normalize_scorecard(scorecard)
     return (
         card["verdict"] in BLOCKING_SCORECARD_VERDICTS
@@ -51,6 +53,7 @@ def scorecard_blocks_stage(scorecard: dict[str, Any] | None) -> bool:
 
 
 def _normalize_dimension(raw: dict[str, Any]) -> dict[str, Any]:
+    """业务函数：处理 _normalize_dimension 对应的业务流程、校验或数据转换。"""
     key = str(raw.get("key") or "quality").strip() or "quality"
     threshold = _clamp_score(raw.get("threshold"), default=80.0)
     score = _clamp_score(raw.get("score"), default=0.0)
@@ -67,6 +70,7 @@ def _normalize_dimension(raw: dict[str, Any]) -> dict[str, Any]:
 
 
 def _overall_score(raw_score: Any, dimensions: list[dict[str, Any]]) -> float:
+    """业务函数：处理 _overall_score 对应的业务流程、校验或数据转换。"""
     if raw_score is not None:
         return _clamp_score(raw_score, default=0.0)
     if not dimensions:
@@ -79,6 +83,7 @@ def _overall_score(raw_score: Any, dimensions: list[dict[str, Any]]) -> float:
 
 
 def _normalize_verdict(raw_verdict: Any, overall_score: float, pass_threshold: float) -> str:
+    """业务函数：处理 _normalize_verdict 对应的业务流程、校验或数据转换。"""
     verdict = str(raw_verdict or "").strip().lower()
     if verdict in BLOCKING_SCORECARD_VERDICTS:
         return verdict
@@ -90,6 +95,7 @@ def _normalize_verdict(raw_verdict: Any, overall_score: float, pass_threshold: f
 
 
 def _float(value: Any, default: float) -> float:
+    """业务函数：处理 _float 对应的业务流程、校验或数据转换。"""
     try:
         return float(value)
     except (TypeError, ValueError):
@@ -97,8 +103,10 @@ def _float(value: Any, default: float) -> float:
 
 
 def _clamp_score(value: Any, default: float) -> float:
+    """业务函数：处理 _clamp_score 对应的业务流程、校验或数据转换。"""
     return round(min(100.0, max(0.0, _float(value, default))), 2)
 
 
 def _clamp_unit(value: Any, default: float) -> float:
+    """业务函数：处理 _clamp_unit 对应的业务流程、校验或数据转换。"""
     return round(min(1.0, max(0.0, _float(value, default))), 4)

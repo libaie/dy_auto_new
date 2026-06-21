@@ -71,6 +71,7 @@ def list_categories(db: Session = Depends(get_db)):
 
 
 class CategoryCreate(BaseModel):
+    """业务类：承载 CategoryCreate 相关的数据结构、状态或业务协作。"""
     key: str
     label: str
     sort_order: int = 0
@@ -79,6 +80,7 @@ class CategoryCreate(BaseModel):
 @router.post("/reference-categories")
 def create_category(body: CategoryCreate, db: Session = Depends(get_db),
                     user = Depends(verify_admin_token)):
+    """业务函数：处理 create_category 对应的业务流程、校验或数据转换。"""
     cat = ReferenceCategory(key=body.key, label=body.label, sort_order=body.sort_order)
     db.add(cat)
     try:
@@ -92,6 +94,7 @@ def create_category(body: CategoryCreate, db: Session = Depends(get_db),
 @router.put("/reference-categories/{cat_id}")
 def update_category(cat_id: str, body: dict, db: Session = Depends(get_db),
                     user = Depends(verify_admin_token)):
+    """业务函数：处理 update_category 对应的业务流程、校验或数据转换。"""
     cat = db.query(ReferenceCategory).filter(ReferenceCategory.id == cat_id).first()
     if not cat:
         raise HTTPException(404, "分类不存在")
@@ -115,6 +118,7 @@ def update_category(cat_id: str, body: dict, db: Session = Depends(get_db),
 @router.delete("/reference-categories/{cat_id}")
 def delete_category(cat_id: str, db: Session = Depends(get_db),
                     user = Depends(verify_admin_token)):
+    """业务函数：处理 delete_category 对应的业务流程、校验或数据转换。"""
     cat = db.query(ReferenceCategory).filter(ReferenceCategory.id == cat_id).first()
     if not cat:
         raise HTTPException(404, "分类不存在")
@@ -139,6 +143,7 @@ def list_items(category: str, db: Session = Depends(get_db)):
 
 
 class RefDataCreate(BaseModel):
+    """业务类：承载 RefDataCreate 相关的数据结构、状态或业务协作。"""
     category: str
     value: str
     label: str
@@ -149,6 +154,7 @@ class RefDataCreate(BaseModel):
 @router.post("/reference-data")
 def create_item(body: RefDataCreate, db: Session = Depends(get_db),
                 user = Depends(verify_admin_token)):
+    """业务函数：处理 create_item 对应的业务流程、校验或数据转换。"""
     item = ReferenceData(**body.model_dump())
     db.add(item)
     try:
@@ -162,6 +168,7 @@ def create_item(body: RefDataCreate, db: Session = Depends(get_db),
 @router.put("/reference-data/{item_id}")
 def update_item(item_id: str, body: dict, db: Session = Depends(get_db),
                 user = Depends(verify_admin_token)):
+    """业务函数：处理 update_item 对应的业务流程、校验或数据转换。"""
     item = db.query(ReferenceData).filter(ReferenceData.id == item_id).first()
     if not item: raise HTTPException(404)
     for k, v in body.items():
@@ -173,6 +180,7 @@ def update_item(item_id: str, body: dict, db: Session = Depends(get_db),
 @router.delete("/reference-data/{item_id}")
 def delete_item(item_id: str, db: Session = Depends(get_db),
                 user = Depends(verify_admin_token)):
+    """业务函数：处理 delete_item 对应的业务流程、校验或数据转换。"""
     db.query(ReferenceData).filter(ReferenceData.id == item_id).delete()
     db.commit()
     return {"ok": True}

@@ -214,6 +214,7 @@ function startMainLoop(serverUrl, secret) {
     return false;
   }
 
+  // 设备业务函数：处理 handleTask 对应的抖音自动化动作、状态或安全边界。
   function handleTask(task) {
     if (!task || !task.id) return;
     if (_isDuplicateTask(task.id)) {
@@ -225,6 +226,7 @@ function startMainLoop(serverUrl, secret) {
     processTaskQueue();
   }
 
+  // 设备业务函数：处理 processTaskQueue 对应的抖音自动化动作、状态或安全边界。
   function processTaskQueue() {
     if (_needsRestart || _taskBusy || _taskQueue.length === 0) return;
     _taskBusy = true;
@@ -295,10 +297,12 @@ function startMainLoop(serverUrl, secret) {
     });
   }
 
+  // 设备业务函数：处理 applyDMSequences 对应的抖音自动化动作、状态或安全边界。
   function applyDMSequences(dmSequences) {
     SearchBaseHandler.applyDMSequences(dmSequences || []);
   }
 
+  // 设备业务函数：处理 applyPollSideData 对应的抖音自动化动作、状态或安全边界。
   function applyPollSideData(response) {
     if (!response) return;
     if (response.proxy) apiClient.setProxy(response.proxy);
@@ -310,6 +314,7 @@ function startMainLoop(serverUrl, secret) {
     if (response.server_date) SearchBaseHandler._serverDate = response.server_date;
   }
 
+  // 设备业务函数：处理 syncDMSequences 对应的抖音自动化动作、状态或安全边界。
   function syncDMSequences() {
     return SearchBaseHandler.syncDMSequences();
   }
@@ -362,9 +367,11 @@ function startMainLoop(serverUrl, secret) {
       syncDMSequences();
       handleTask(task);
     },
+    // 设备业务函数：处理 onCancelTask 对应的抖音自动化动作、状态或安全边界。
     onCancelTask: function (taskId) {
       _handleCancelledTask(taskId);
     },
+    // 设备业务函数：处理 onSelectorsUpdated 对应的抖音自动化动作、状态或安全边界。
     onSelectorsUpdated: function (version) {
       logger.info(TAG, "选择器更新: v" + version);
       selectorLoader.checkAndUpdate(version);
@@ -377,9 +384,11 @@ function startMainLoop(serverUrl, secret) {
       if (serverConfig) applyServerConfig(serverConfig);
       if (proxy) apiClient.setProxy(proxy);
     },
+    // 设备业务函数：处理 onNewTaskAvailable 对应的抖音自动化动作、状态或安全边界。
     onNewTaskAvailable: function () {
       catchUpPoll();
     },
+    // 设备业务函数：处理 onDeviceRemoved 对应的抖音自动化动作、状态或安全边界。
     onDeviceRemoved: function () {
       logger.error(TAG, "设备已被服务端移除，返回配对界面");
       deviceWs.stop();
@@ -526,6 +535,7 @@ global.__mainLoopRuntime = _mainLoopRuntime;
 var _idleTicks = 0;
 var _idlePollTimer = null;
 
+// 设备业务函数：处理 _startIdlePoll 对应的抖音自动化动作、状态或安全边界。
 function _startIdlePoll() {
   if (_idlePollTimer) clearInterval(_idlePollTimer);
   _idlePollTimer = setInterval(function () {

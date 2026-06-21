@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class CreativePatchType(StrEnum):
+    """业务类：承载 CreativePatchType 相关的数据结构、状态或业务协作。"""
     SCRIPT = "script_patch"
     STORYBOARD = "storyboard_patch"
     IMAGE_PROMPT = "image_prompt_patch"
@@ -20,6 +21,7 @@ class CreativePatchType(StrEnum):
 
 
 class CreativePatchTargetType(StrEnum):
+    """业务类：承载 CreativePatchTargetType 相关的数据结构、状态或业务协作。"""
     EPISODE_SCRIPT = "episode_script"
     STORYBOARD_FRAME = "storyboard_frame"
     PRODUCTION_SEGMENT = "production_segment"
@@ -27,6 +29,7 @@ class CreativePatchTargetType(StrEnum):
 
 
 class CreativePatchStatus(StrEnum):
+    """业务类：承载 CreativePatchStatus 相关的数据结构、状态或业务协作。"""
     PROPOSED = "proposed"
     EDITED = "edited"
     APPROVED = "approved"
@@ -35,6 +38,7 @@ class CreativePatchStatus(StrEnum):
 
 
 class CreativePatchPriority(StrEnum):
+    """业务类：承载 CreativePatchPriority 相关的数据结构、状态或业务协作。"""
     LOW = "low"
     NORMAL = "normal"
     HIGH = "high"
@@ -75,6 +79,7 @@ TARGETS_BY_PATCH_TYPE: dict[CreativePatchType, set[CreativePatchTargetType]] = {
 
 
 class CreativePatchProposal(BaseModel):
+    """业务类：承载 CreativePatchProposal 相关的数据结构、状态或业务协作。"""
     patch_type: CreativePatchType
     target_type: CreativePatchTargetType
     target_id: str
@@ -90,6 +95,7 @@ class CreativePatchProposal(BaseModel):
     @field_validator("target_id", "stage", "title", "reason")
     @classmethod
     def non_empty(cls, value: str) -> str:
+        """业务函数：处理 non_empty 对应的业务流程、校验或数据转换。"""
         text = str(value or "").strip()
         if not text:
             raise ValueError("must not be empty")
@@ -98,18 +104,21 @@ class CreativePatchProposal(BaseModel):
     @field_validator("apply_policy")
     @classmethod
     def requires_human_approval(cls, value: str) -> str:
+        """业务函数：处理 requires_human_approval 对应的业务流程、校验或数据转换。"""
         if value != "requires_human_approval":
             raise ValueError("creative patches require human approval")
         return value
 
     @model_validator(mode="after")
     def validate_target_matches_patch(self) -> "CreativePatchProposal":
+        """业务函数：处理 validate_target_matches_patch 对应的业务流程、校验或数据转换。"""
         if self.target_type not in TARGETS_BY_PATCH_TYPE[self.patch_type]:
             raise ValueError("target_type does not match patch_type")
         return self
 
 
 def normalize_patch_payload(proposal: CreativePatchProposal) -> CreativePatchProposal:
+    """业务函数：处理 normalize_patch_payload 对应的业务流程、校验或数据转换。"""
     allowed = ALLOWED_AFTER_FIELDS[proposal.patch_type]
     normalized_after = {key: value for key, value in proposal.after.items() if key in allowed}
     if not normalized_after:

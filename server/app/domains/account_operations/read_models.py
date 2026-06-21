@@ -4,6 +4,7 @@
 """
 
 def account_to_dict(acc) -> dict:
+    """业务函数：处理 account_to_dict 对应的业务流程、校验或数据转换。"""
     return {
         "id": acc.id,
         "nickname": acc.nickname,
@@ -17,6 +18,7 @@ def account_to_dict(acc) -> dict:
 
 
 def group_to_dict(group, member_count: int = 0) -> dict:
+    """业务函数：处理 group_to_dict 对应的业务流程、校验或数据转换。"""
     return {
         "id": group.id,
         "name": group.name,
@@ -28,6 +30,7 @@ def group_to_dict(group, member_count: int = 0) -> dict:
 
 
 def member_to_dict(account) -> dict:
+    """业务函数：处理 member_to_dict 对应的业务流程、校验或数据转换。"""
     return {
         "id": account.id,
         "nickname": account.nickname,
@@ -37,6 +40,7 @@ def member_to_dict(account) -> dict:
 
 
 def channel_to_response(channel, stats: dict, group_name: str = "") -> dict:
+    """业务函数：处理 channel_to_response 对应的业务流程、校验或数据转换。"""
     return {
         "id": channel.id,
         "group_id": channel.group_id,
@@ -60,6 +64,7 @@ def channel_to_response(channel, stats: dict, group_name: str = "") -> dict:
 
 
 def channel_item_to_response(item, account_nickname: str = "", device_name: str = "") -> dict:
+    """业务函数：处理 channel_item_to_response 对应的业务流程、校验或数据转换。"""
     return {
         "id": item.id,
         "keyword": item.keyword,
@@ -76,6 +81,7 @@ def channel_item_to_response(item, account_nickname: str = "", device_name: str 
 
 
 def chain_template_to_dict(template) -> dict:
+    """业务函数：处理 chain_template_to_dict 对应的业务流程、校验或数据转换。"""
     return {
         "id": template.id,
         "name": template.name,
@@ -87,6 +93,7 @@ def chain_template_to_dict(template) -> dict:
 
 
 def chain_instance_to_dict(instance, template_name: str = "", account_nickname: str = "", device_name: str = "") -> dict:
+    """业务函数：处理 chain_instance_to_dict 对应的业务流程、校验或数据转换。"""
     return {
         "id": instance.id,
         "template_id": instance.template_id,

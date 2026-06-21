@@ -42,6 +42,7 @@ MOJIBAKE_TOKENS = (
 
 
 class AutoRepairPolicy(BaseModel):
+    """业务类：承载 AutoRepairPolicy 相关的数据结构、状态或业务协作。"""
     enabled: bool = False
     max_rounds: int = Field(default=MAX_AUTO_REPAIR_ROUNDS, ge=0, le=MAX_AUTO_REPAIR_ROUNDS)
     budget_limit: float = Field(default=0.0, ge=0.0)
@@ -52,6 +53,7 @@ class AutoRepairPolicy(BaseModel):
 
 
 class RepairTask(BaseModel):
+    """业务类：承载 RepairTask 相关的数据结构、状态或业务协作。"""
     type: str
     stage: str
     target_type: str = "manual"
@@ -72,11 +74,13 @@ class RepairTask(BaseModel):
     @field_validator("type")
     @classmethod
     def validate_type(cls, value: str) -> str:
+        """业务函数：处理 validate_type 对应的业务流程、校验或数据转换。"""
         return value if value in ALLOWED_REPAIR_TYPES else "manual_incomplete_repair_task"
 
     @field_validator("reason", "expected_result", "repair_action_label")
     @classmethod
     def readable_text(cls, value: str) -> str:
+        """业务函数：处理 readable_text 对应的业务流程、校验或数据转换。"""
         text = str(value or "").strip()
         if not text:
             return text
@@ -86,6 +90,7 @@ class RepairTask(BaseModel):
 
 
 class RepairClassificationResult(BaseModel):
+    """业务类：承载 RepairClassificationResult 相关的数据结构、状态或业务协作。"""
     repairable: bool = False
     manual_gate_required: bool = False
     blocked_reason: str | None = None
@@ -93,6 +98,7 @@ class RepairClassificationResult(BaseModel):
 
 
 def looks_unreadable(text: str) -> bool:
+    """业务函数：处理 looks_unreadable 对应的业务流程、校验或数据转换。"""
     value = str(text or "")
     if not value.strip():
         return False
@@ -100,6 +106,7 @@ def looks_unreadable(text: str) -> bool:
 
 
 def action_for_task(task_type: str, target_type: str, target_id: str | None) -> tuple[str, str | None]:
+    """业务函数：处理 action_for_task 对应的业务流程、校验或数据转换。"""
     if target_type == "character" and target_id:
         return "去角色资产补参考图", f"/characters/{target_id}"
     if target_type == "scene" and target_id:

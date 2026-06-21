@@ -163,6 +163,7 @@ var commentUtils = {
     return y + "-" + mo + "-" + d + "T" + h + ":" + mi + ":" + s + "+08:00";
   },
 
+  // 设备业务函数：处理 parseTime 对应的抖音自动化动作、状态或安全边界。
   parseTime: function (timeStr) {
 	    if (!timeStr) return null;
 	    var now = new Date();
@@ -249,6 +250,7 @@ var commentUtils = {
 	  return raw;
 	},
 
+// 设备业务函数：处理 localPreFilter 对应的抖音自动化动作、状态或安全边界。
 localPreFilter: function (text) {
     if (!text) return false;
     var stripped = text

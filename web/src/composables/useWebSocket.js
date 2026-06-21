@@ -7,11 +7,13 @@ import { ref, onUnmounted } from 'vue'
  * @param {Function} [options.onMessage] — called with parsed JSON message
  * @param {number} [options.reconnectDelay=5000]
  */
+// 前端业务函数：协调 useWebSocket 对应的页面流程、接口调用或状态转换。
 export function useWebSocket(urlOrFn, { onMessage, reconnectDelay = 5000 } = {}) {
   const connected = ref(false)
   let ws = null
   let timer = null
 
+  // 前端业务函数：协调 connect 对应的页面流程、接口调用或状态转换。
   function connect() {
     const url = typeof urlOrFn === 'function' ? urlOrFn() : urlOrFn
     if (!url) return
@@ -36,17 +38,20 @@ export function useWebSocket(urlOrFn, { onMessage, reconnectDelay = 5000 } = {})
     }
   }
 
+  // 前端业务函数：协调 send 对应的页面流程、接口调用或状态转换。
   function send(data) {
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(typeof data === 'string' ? data : JSON.stringify(data))
     }
   }
 
+  // 前端业务函数：协调 disconnect 对应的页面流程、接口调用或状态转换。
   function disconnect() {
     cleanup()
     connected.value = false
   }
 
+  // 前端业务函数：协调 cleanup 对应的页面流程、接口调用或状态转换。
   function cleanup() {
     if (timer) { clearTimeout(timer); timer = null }
     if (ws) { ws.onclose = null; ws.close(); ws = null }

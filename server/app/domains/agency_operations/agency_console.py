@@ -105,6 +105,7 @@ LEGACY_LAYER_PHASES = {
 
 
 def _safe_text(value: Any, limit: int = 160) -> str:
+    """业务函数：处理 _safe_text 对应的业务流程、校验或数据转换。"""
     if value is None:
         return ""
     text = str(value)
@@ -112,6 +113,7 @@ def _safe_text(value: Any, limit: int = 160) -> str:
 
 
 def _localized_role(role: dict) -> dict:
+    """业务函数：处理 _localized_role 对应的业务流程、校验或数据转换。"""
     role_id = role.get("id", "")
     return {
         "id": role_id,
@@ -125,6 +127,7 @@ def _localized_role(role: dict) -> dict:
 
 
 def _localized_quality_gates(team: dict) -> dict:
+    """业务函数：处理 _localized_quality_gates 对应的业务流程、校验或数据转换。"""
     quality_gates = team.get("quality_gates") or {}
     return {
         phase: QUALITY_GATE_LABELS.get(phase, ["\u5b8c\u6210\u8be5\u9636\u6bb5\u8d28\u91cf\u68c0\u67e5\u3002"] * len(items))
@@ -134,6 +137,7 @@ def _localized_quality_gates(team: dict) -> dict:
 
 
 def _localized_agency_team(team: dict) -> dict:
+    """业务函数：处理 _localized_agency_team 对应的业务流程、校验或数据转换。"""
     return {
         "enabled": bool(team.get("enabled")),
         "version": team.get("version", ""),
@@ -147,11 +151,13 @@ def _localized_agency_team(team: dict) -> dict:
 
 
 def _gate_list(team: dict, phase: str) -> list[str]:
+    """业务函数：处理 _gate_list 对应的业务流程、校验或数据转换。"""
     gates = team.get("quality_gates") or {}
     return list(gates.get(phase, []))
 
 
 def _roles_for_phase(team: dict, phase: str) -> list[str]:
+    """业务函数：处理 _roles_for_phase 对应的业务流程、校验或数据转换。"""
     roles: list[str] = []
     for role in (
         list(team.get("core_roles") or []) +
@@ -168,6 +174,7 @@ def _roles_for_phase(team: dict, phase: str) -> list[str]:
 def _step(step_id: str, label: str, status: str, phase: str, team: dict,
           input_summary: dict | None = None, output_summary: dict | None = None,
           persistence: list[str] | None = None, error: str = "") -> dict:
+    """业务函数：处理 _step 对应的业务流程、校验或数据转换。"""
     input_summary = input_summary or {}
     output_summary = output_summary or {}
     gates = _gate_list(team, phase)
@@ -190,6 +197,7 @@ def _step(step_id: str, label: str, status: str, phase: str, team: dict,
 
 
 def _step_summary(label: str, status: str, input_summary: dict, output_summary: dict, error: str) -> str:
+    """业务函数：处理 _step_summary 对应的业务流程、校验或数据转换。"""
     if status == "failed":
         return f"{label}失败，系统已记录失败原因和建议操作。"
     if status == "running":
@@ -209,6 +217,7 @@ def _step_summary(label: str, status: str, input_summary: dict, output_summary: 
 
 
 def _next_action(step_id: str, status: str, error: str = "") -> str:
+    """业务函数：处理 _next_action 对应的业务流程、校验或数据转换。"""
     if status == "completed":
         return "无需处理"
     if status == "running":
@@ -226,6 +235,7 @@ def _next_action(step_id: str, status: str, error: str = "") -> str:
 
 
 def _recovery_action(error: str) -> str:
+    """业务函数：处理 _recovery_action 对应的业务流程、校验或数据转换。"""
     text = (error or "").lower()
     if "timeout" in text or "超时" in text:
         return "检查外部视频服务状态后从失败层重试"
@@ -237,6 +247,7 @@ def _recovery_action(error: str) -> str:
 
 
 def _gate_results(gates: list[str], status: str) -> list[dict]:
+    """业务函数：处理 _gate_results 对应的业务流程、校验或数据转换。"""
     if not gates:
         return []
     gate_status = "passed" if status == "completed" else "failed" if status == "failed" else "warn"
@@ -248,6 +259,7 @@ def _gate_results(gates: list[str], status: str) -> list[dict]:
 
 
 def _readiness_check(check_id: str, label: str, status: str, message: str, next_action: str) -> dict:
+    """业务函数：处理 _readiness_check 对应的业务流程、校验或数据转换。"""
     return {
         "id": check_id,
         "label": label,
@@ -258,6 +270,7 @@ def _readiness_check(check_id: str, label: str, status: str, message: str, next_
 
 
 def _build_readiness(series: Series, style_lock: dict, current_episode: Episode | None) -> dict:
+    """业务函数：处理 _build_readiness 对应的业务流程、校验或数据转换。"""
     missing_assets = style_lock.get("missing_assets") or []
     characters = style_lock.get("characters") or []
     scenes = style_lock.get("scenes") or []
@@ -298,6 +311,7 @@ def _build_readiness(series: Series, style_lock: dict, current_episode: Episode 
 
 
 def _build_quality_report(steps: list[dict], generated_video: GeneratedVideo | None, current_episode: Episode | None) -> dict:
+    """业务函数：处理 _build_quality_report 对应的业务流程、校验或数据转换。"""
     if generated_video and generated_video.video_path and current_episode and current_episode.video_url:
         return {
             "status": "pass",
@@ -326,6 +340,7 @@ def _build_quality_report(steps: list[dict], generated_video: GeneratedVideo | N
 
 
 def _expert_team() -> list[dict]:
+    """业务函数：处理 _expert_team 对应的业务流程、校验或数据转换。"""
     manifest = load_manifest()
     return [{
         "expert_id": expert.expert_id,
@@ -339,6 +354,7 @@ def _expert_team() -> list[dict]:
 
 
 def _invocation_summary(row: AgencyExpertInvocation) -> dict:
+    """业务函数：处理 _invocation_summary 对应的业务流程、校验或数据转换。"""
     output = row.output_summary_json or {}
     is_legacy = row.expert_id == "reality_checker"
     decision = output.get("decision") or output.get("summary") or row.error_message or ""
@@ -368,6 +384,7 @@ def _invocation_summary(row: AgencyExpertInvocation) -> dict:
 
 
 def _redact_user_text(value: Any) -> str:
+    """业务函数：处理 _redact_user_text 对应的业务流程、校验或数据转换。"""
     text = _safe_text(value, 500)
     lowered = text.lower()
     if "authorization" in lowered or "bearer " in lowered or "api_key" in lowered or "api key" in lowered:
@@ -376,6 +393,7 @@ def _redact_user_text(value: Any) -> str:
 
 
 def _redact_user_list(value: Any, *, limit: int = 5) -> list[str]:
+    """业务函数：处理 _redact_user_list 对应的业务流程、校验或数据转换。"""
     if not value:
         return []
     values = value if isinstance(value, list) else [value]
@@ -399,6 +417,7 @@ def _redact_user_list(value: Any, *, limit: int = 5) -> list[str]:
 
 
 def _current_stage_assignments() -> set[tuple[str, str, str]]:
+    """业务函数：处理 _current_stage_assignments 对应的业务流程、校验或数据转换。"""
     assignments: set[tuple[str, str, str]] = set()
     for stage, config in STAGE_DAG.items():
         for expert_id in config.get("reviewers") or []:
@@ -412,6 +431,7 @@ def _current_stage_assignments() -> set[tuple[str, str, str]]:
 
 
 def _current_latest_invocations(rows: list[AgencyExpertInvocation]) -> list[AgencyExpertInvocation]:
+    """业务函数：处理 _current_latest_invocations 对应的业务流程、校验或数据转换。"""
     assignments = _current_stage_assignments()
     latest_by_assignment: dict[tuple[str, str, str], AgencyExpertInvocation] = {}
     for row in rows:
@@ -428,6 +448,7 @@ def _current_latest_invocations(rows: list[AgencyExpertInvocation]) -> list[Agen
 
 
 def _style_lock_trace(series: Series) -> dict | None:
+    """业务函数：处理 _style_lock_trace 对应的业务流程、校验或数据转换。"""
     story_bible = series.story_bible_json or {}
     if not isinstance(story_bible, dict):
         return None
@@ -439,11 +460,13 @@ def _style_lock_trace(series: Series) -> dict | None:
 
 
 def _style_lock_trace_invocation_ids(series: Series) -> set[str] | None:
+    """业务函数：处理 _style_lock_trace_invocation_ids 对应的业务流程、校验或数据转换。"""
     trace = _style_lock_trace(series)
     return _trace_invocation_ids(trace)
 
 
 def _storyboard_trace(episode: Episode | None) -> dict | None:
+    """业务函数：处理 _storyboard_trace 对应的业务流程、校验或数据转换。"""
     storyboard = episode.storyboard_json if episode else None
     if not isinstance(storyboard, dict):
         return None
@@ -452,6 +475,7 @@ def _storyboard_trace(episode: Episode | None) -> dict | None:
 
 
 def _trace_invocation_ids(trace: dict | None) -> set[str] | None:
+    """业务函数：处理 _trace_invocation_ids 对应的业务流程、校验或数据转换。"""
     if not trace or "invocation_ids" not in trace:
         return None
     invocation_ids = trace.get("invocation_ids") or []
@@ -461,10 +485,12 @@ def _trace_invocation_ids(trace: dict | None) -> set[str] | None:
 
 
 def _storyboard_trace_invocation_ids(episode: Episode | None) -> set[str] | None:
+    """业务函数：处理 _storyboard_trace_invocation_ids 对应的业务流程、校验或数据转换。"""
     return _trace_invocation_ids(_storyboard_trace(episode))
 
 
 def _front_stage_trace_invocation_ids(series: Series, current_episode: Episode | None) -> set[str]:
+    """业务函数：处理 _front_stage_trace_invocation_ids 对应的业务流程、校验或数据转换。"""
     invocation_ids: set[str] = set()
     for ids in (
         _style_lock_trace_invocation_ids(series),
@@ -480,6 +506,7 @@ def _filter_current_front_stage_rows(
     series: Series,
     current_episode: Episode | None,
 ) -> list[AgencyExpertInvocation]:
+    """业务函数：处理 _filter_current_front_stage_rows 对应的业务流程、校验或数据转换。"""
     style_lock_trace_ids = _style_lock_trace_invocation_ids(series)
     storyboard_trace_ids = _storyboard_trace_invocation_ids(current_episode)
     filtered = rows
@@ -502,6 +529,7 @@ def _load_agency_invocation_rows(
     latest_run: PipelineRun | VideoProductionRun | None,
     run_type: str | None,
 ) -> list[AgencyExpertInvocation]:
+    """业务函数：处理 _load_agency_invocation_rows 对应的业务流程、校验或数据转换。"""
     db = object_session(series)
     if db is None:
         return []
@@ -532,10 +560,12 @@ def _load_agency_invocations(
     latest_run: PipelineRun | VideoProductionRun | None,
     run_type: str | None,
 ) -> list[AgencyExpertInvocation]:
+    """业务函数：处理 _load_agency_invocations 对应的业务流程、校验或数据转换。"""
     return _current_latest_invocations(_load_agency_invocation_rows(series, current_episode, latest_run, run_type))
 
 
 def _load_legacy_reality_checker_rows(series: Series, *, limit: int = 50) -> list[AgencyExpertInvocation]:
+    """业务函数：处理 _load_legacy_reality_checker_rows 对应的业务流程、校验或数据转换。"""
     db = object_session(series)
     if db is None:
         return []
@@ -557,6 +587,7 @@ def _load_decision_log_invocations(
     latest_run: PipelineRun | VideoProductionRun | None,
     run_type: str | None,
 ) -> list[AgencyExpertInvocation]:
+    """业务函数：处理 _load_decision_log_invocations 对应的业务流程、校验或数据转换。"""
     rows = _load_agency_invocation_rows(series, current_episode, latest_run, run_type)
     legacy_rows = _load_legacy_reality_checker_rows(series, limit=50)
     merged = {row.id: row for row in [*rows, *legacy_rows]}
@@ -568,6 +599,7 @@ def _agency_trace_status(
     legacy_layers: dict | None,
     style_lock_trace: dict | None = None,
 ) -> str:
+    """业务函数：处理 _agency_trace_status 对应的业务流程、校验或数据转换。"""
     if invocations:
         if any(row.execution_status == "failed" or row.result_status == "failed" for row in invocations):
             return "failed"
@@ -613,6 +645,7 @@ def _agency_trace_status(
 
 
 def _stage_status(rows: list[AgencyExpertInvocation]) -> str:
+    """业务函数：处理 _stage_status 对应的业务流程、校验或数据转换。"""
     if not rows:
         return "pending"
     if any(row.execution_status == "failed" or row.result_status == "failed" for row in rows):
@@ -627,6 +660,7 @@ def _stage_status(rows: list[AgencyExpertInvocation]) -> str:
 
 
 def _stage_graph(invocations: list[AgencyExpertInvocation]) -> list[dict]:
+    """业务函数：处理 _stage_graph 对应的业务流程、校验或数据转换。"""
     by_stage: dict[str, list[AgencyExpertInvocation]] = {}
     for row in invocations:
         by_stage.setdefault(row.stage, []).append(row)
@@ -646,6 +680,7 @@ def _stage_graph(invocations: list[AgencyExpertInvocation]) -> list[dict]:
 
 
 def _decision_log(invocations: list[AgencyExpertInvocation]) -> list[dict]:
+    """业务函数：处理 _decision_log 对应的业务流程、校验或数据转换。"""
     entries = []
     for row in invocations:
         summary = _invocation_summary(row)
@@ -672,6 +707,7 @@ def _decision_log(invocations: list[AgencyExpertInvocation]) -> list[dict]:
 
 
 def _style_lock_trace_decision_log(series: Series, existing_entries: list[dict]) -> list[dict]:
+    """业务函数：处理 _style_lock_trace_decision_log 对应的业务流程、校验或数据转换。"""
     trace = _style_lock_trace(series)
     if not trace:
         return []
@@ -718,6 +754,7 @@ def _style_lock_trace_decision_log(series: Series, existing_entries: list[dict])
 
 
 def _repair_summary_for_series(series: Series, latest_run: PipelineRun | VideoProductionRun | None) -> dict:
+    """业务函数：处理 _repair_summary_for_series 对应的业务流程、校验或数据转换。"""
     db = object_session(series)
     if db is None:
         return {"total": 0, "queued": 0, "running": 0, "completed": 0, "failed": 0, "manual_required": 0, "recheck_required": 0}
@@ -742,10 +779,12 @@ def _repair_summary_for_series(series: Series, latest_run: PipelineRun | VideoPr
 
 
 def _empty_creative_patch_summary() -> dict:
+    """业务函数：处理 _empty_creative_patch_summary 对应的业务流程、校验或数据转换。"""
     return {"total": 0, "blocking": 0, "proposed": 0, "edited": 0, "approved": 0, "applied": 0, "rejected": 0}
 
 
 def _creative_patch_summary_for_series(series: Series, latest_run: PipelineRun | VideoProductionRun | None) -> dict:
+    """业务函数：处理 _creative_patch_summary_for_series 对应的业务流程、校验或数据转换。"""
     db = object_session(series)
     if db is None:
         return _empty_creative_patch_summary()
@@ -757,6 +796,7 @@ def _creative_patch_summary_for_series(series: Series, latest_run: PipelineRun |
 
 
 def _creative_patch_items_for_series(series: Series, latest_run: PipelineRun | VideoProductionRun | None, *, limit: int = 20) -> list[dict]:
+    """业务函数：处理 _creative_patch_items_for_series 对应的业务流程、校验或数据转换。"""
     db = object_session(series)
     if db is None:
         return []
@@ -786,6 +826,7 @@ def build_agency_console_payload(series: Series, episodes: list[Episode],
                                  latest_run: PipelineRun | VideoProductionRun | None,
                                  generated_video: GeneratedVideo | None,
                                  run_type: str | None = None) -> dict:
+    """业务函数：处理 build_agency_console_payload 对应的业务流程、校验或数据转换。"""
     if latest_run and not run_type:
         run_type = "video_production" if isinstance(latest_run, VideoProductionRun) else "pipeline"
     story_bible = series.story_bible_json or {}

@@ -206,6 +206,7 @@ var pairing = {
       var request = new Request.Builder().url(wsUrl).build();
 
       var listener = new JavaAdapter(WebSocketListener, {
+        // 设备业务函数：处理 onOpen 对应的抖音自动化动作、状态或安全边界。
         onOpen: function (ws, response) {
           logger.info(TAG, "WS 已连接，等待审批...");
         },

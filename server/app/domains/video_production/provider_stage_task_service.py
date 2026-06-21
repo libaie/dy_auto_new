@@ -19,6 +19,7 @@ from app.domains.video_production.production_state_contract import (
 
 
 def request_hash(payload: dict) -> str:
+    """业务函数：处理 request_hash 对应的业务流程、校验或数据转换。"""
     encoded = json.dumps(
         payload,
         sort_keys=True,
@@ -37,6 +38,7 @@ def provider_stage_idempotency_key(
     provider: str,
     model_name: str,
 ) -> str:
+    """业务函数：处理 provider_stage_idempotency_key 对应的业务流程、校验或数据转换。"""
     return f"{run_id}:{stage}:{target_type}:{target_id}:{provider}:{model_name}"
 
 
@@ -53,6 +55,7 @@ def get_or_create_stage_task(
     model_name: str,
     payload: dict,
 ) -> tuple[ProviderStageTask, bool]:
+    """业务函数：处理 get_or_create_stage_task 对应的业务流程、校验或数据转换。"""
     digest = request_hash(payload)
     idempotency_key = provider_stage_idempotency_key(
         run_id=run_id,
@@ -97,6 +100,7 @@ def get_or_create_stage_task(
 
 
 def set_task_status(db: Session, task: ProviderStageTask, next_status: str, **values) -> ProviderStageTask:
+    """业务函数：处理 set_task_status 对应的业务流程、校验或数据转换。"""
     if task.status != next_status and not validate_transition("provider_stage_task", task.status, next_status):
         raise ValueError(f"Invalid provider stage task transition: {task.status} -> {next_status}")
     for key, value in values.items():
@@ -109,6 +113,7 @@ def set_task_status(db: Session, task: ProviderStageTask, next_status: str, **va
 
 
 def claim_stage_task_for_submit(db: Session, task_id: str) -> bool:
+    """业务函数：处理 claim_stage_task_for_submit 对应的业务流程、校验或数据转换。"""
     now = bj_now()
     updated = (
         db.query(ProviderStageTask)

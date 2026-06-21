@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 def create_template(db, request):
+    """业务函数：处理 create_template 对应的业务流程、校验或数据转换。"""
     return content_service.create_template(
         db,
         name=request.name,
@@ -29,38 +30,46 @@ def create_template(db, request):
 
 
 def list_templates(db, category=None, skip: int = 0, limit: int = 50):
+    """业务函数：处理 list_templates 对应的业务流程、校验或数据转换。"""
     limit = min(limit, 100)
     templates, total = content_service.list_templates(db, category=category, skip=skip, limit=limit)
     return {"templates": templates, "total": total}
 
 
 def get_template(db, template_id: str):
+    """业务函数：处理 get_template 对应的业务流程、校验或数据转换。"""
     return content_service.get_template(db, template_id)
 
 
 def update_template(db, template_id: str, request):
+    """业务函数：处理 update_template 对应的业务流程、校验或数据转换。"""
     updates = request.model_dump(exclude_none=True)
     return content_service.update_template(db, template_id, **updates)
 
 
 def delete_template(db, template_id: str):
+    """业务函数：处理 delete_template 对应的业务流程、校验或数据转换。"""
     return content_service.delete_template(db, template_id)
 
 
 def add_sensitive_word(db, request):
+    """业务函数：处理 add_sensitive_word 对应的业务流程、校验或数据转换。"""
     return content_service.add_sensitive_word(db, request.word)
 
 
 def list_sensitive_words(db, skip: int = 0, limit: int = 200):
+    """业务函数：处理 list_sensitive_words 对应的业务流程、校验或数据转换。"""
     words, total = content_service.list_sensitive_words(db, skip=skip, limit=limit)
     return {"words": words, "total": total}
 
 
 def delete_sensitive_word(db, word_id: str):
+    """业务函数：处理 delete_sensitive_word 对应的业务流程、校验或数据转换。"""
     return content_service.delete_sensitive_word(db, word_id)
 
 
 def list_dm_sequences(db, user, industry=None):
+    """业务函数：处理 list_dm_sequences 对应的业务流程、校验或数据转换。"""
     user_id, _ = user
     query = db.query(DMSequence).filter(
         (DMSequence.user_id == user_id) | (DMSequence.user_id == None)
@@ -72,6 +81,7 @@ def list_dm_sequences(db, user, industry=None):
 
 
 def create_dm_sequence(db, user, body):
+    """业务函数：处理 create_dm_sequence 对应的业务流程、校验或数据转换。"""
     sorted_messages = sorted(
         [
             {"order": index + 1, "content": message.content, "delay_ms": message.delay_ms}
@@ -93,6 +103,7 @@ def create_dm_sequence(db, user, body):
 
 
 def get_dm_sequence(db, user, sequence_id: str):
+    """业务函数：处理 get_dm_sequence 对应的业务流程、校验或数据转换。"""
     user_id, _ = user
     sequence = db.query(DMSequence).filter(
         DMSequence.id == sequence_id,
@@ -104,6 +115,7 @@ def get_dm_sequence(db, user, sequence_id: str):
 
 
 def update_dm_sequence(db, user, sequence_id: str, body):
+    """业务函数：处理 update_dm_sequence 对应的业务流程、校验或数据转换。"""
     user_id, _ = user
     sequence = db.query(DMSequence).filter(DMSequence.id == sequence_id).first()
     if not sequence:
@@ -135,6 +147,7 @@ def update_dm_sequence(db, user, sequence_id: str, body):
 
 
 def delete_dm_sequence(db, user, sequence_id: str):
+    """业务函数：处理 delete_dm_sequence 对应的业务流程、校验或数据转换。"""
     user_id, _ = user
     sequence = db.query(DMSequence).filter(DMSequence.id == sequence_id).first()
     if not sequence:
@@ -147,6 +160,7 @@ def delete_dm_sequence(db, user, sequence_id: str):
 
 
 async def generate_dm_sequence_events(db, body):
+    """业务函数：处理 generate_dm_sequence_events 对应的业务流程、校验或数据转换。"""
     from app.domains.model_configuration.ai_generator import ai_generator as generator
     from app.domains.content_collection.industry_profile_service import load_profile
 
@@ -182,6 +196,7 @@ async def generate_dm_sequence_events(db, body):
     )
 
     async def event_stream():
+        """业务函数：处理 event_stream 对应的业务流程、校验或数据转换。"""
         label = profile.get("label", body.industry)
         yield f"data: {json.dumps({'type': 'status', 'text': f'AI 正在生成 {label} 行业序列...'})}\n\n"
 
@@ -230,6 +245,7 @@ async def generate_dm_sequence_events(db, body):
 
 
 async def generate_dm_variants(db, seq_id: str, body):
+    """业务函数：处理 generate_dm_variants 对应的业务流程、校验或数据转换。"""
     from app.domains.model_configuration.ai_generator import ai_generator as generator
     from app.domains.content_collection.industry_profile_service import load_profile
 
@@ -325,11 +341,13 @@ async def generate_dm_variants(db, seq_id: str, body):
 
 
 def device_sync_dm_sequences(db, device_id):
+    """业务函数：处理 device_sync_dm_sequences 对应的业务流程、校验或数据转换。"""
     sequences = get_device_visible_dm_sequences(db, device_id)
     return {"dm_sequences": [_dm_sequence_to_device_dict(sequence) for sequence in sequences]}
 
 
 def _dm_sequence_to_dict(sequence: DMSequence) -> dict:
+    """业务函数：处理 _dm_sequence_to_dict 对应的业务流程、校验或数据转换。"""
     return {
         "id": sequence.id,
         "name": sequence.name,
@@ -344,12 +362,14 @@ def _dm_sequence_to_dict(sequence: DMSequence) -> dict:
 
 
 def _dm_sequence_to_device_dict(sequence: DMSequence) -> dict:
+    """业务函数：处理 _dm_sequence_to_device_dict 对应的业务流程、校验或数据转换。"""
     messages = _jitter_messages(sequence.messages) if sequence.messages else None
     variants = _randomize_variants(sequence.variants) if sequence.variants else None
     return {"id": sequence.id, "messages": messages, "variants": variants}
 
 
 def _jitter(delay_ms: int) -> int:
+    """业务函数：处理 _jitter 对应的业务流程、校验或数据转换。"""
     if delay_ms <= 0:
         return delay_ms
     delta = int(delay_ms * 0.25)
@@ -357,6 +377,7 @@ def _jitter(delay_ms: int) -> int:
 
 
 def _jitter_messages(messages: list[dict]) -> list[dict]:
+    """业务函数：处理 _jitter_messages 对应的业务流程、校验或数据转换。"""
     return [
         {**message, "delay_ms": _jitter(message.get("delay_ms", 0))}
         for message in messages
@@ -364,18 +385,22 @@ def _jitter_messages(messages: list[dict]) -> list[dict]:
 
 
 def _variant_delay_ms() -> int:
+    """业务函数：处理 _variant_delay_ms 对应的业务流程、校验或数据转换。"""
     return random.randint(1500, 3000)
 
 
 def _randomize_variant_delays(variant: list[dict]) -> list[dict]:
+    """业务函数：处理 _randomize_variant_delays 对应的业务流程、校验或数据转换。"""
     return [{**message, "delay_ms": _variant_delay_ms()} for message in variant]
 
 
 def _randomize_variants(variants: list[list[dict]]) -> list[list[dict]]:
+    """业务函数：处理 _randomize_variants 对应的业务流程、校验或数据转换。"""
     return [_randomize_variant_delays(variant) for variant in variants]
 
 
 def _robust_parse_variant_json(raw: str) -> dict | None:
+    """业务函数：处理 _robust_parse_variant_json 对应的业务流程、校验或数据转换。"""
     if not raw:
         return None
     clean = raw.strip()
@@ -423,6 +448,7 @@ def _robust_parse_variant_json(raw: str) -> dict | None:
 
 
 def _normalize_generated_sequence_messages(messages: list) -> list[dict]:
+    """业务函数：处理 _normalize_generated_sequence_messages 对应的业务流程、校验或数据转换。"""
     normalized = []
     for index, message in enumerate(messages):
         if not isinstance(message, dict):
@@ -444,6 +470,7 @@ def _normalize_generated_sequence_messages(messages: list) -> list[dict]:
 
 
 def _contains_blocked_word(message1: str, message3: str, profile: dict) -> bool:
+    """业务函数：处理 _contains_blocked_word 对应的业务流程、校验或数据转换。"""
     for word in profile["sensitive_words"]:
         if word in message1 or word in message3:
             return True

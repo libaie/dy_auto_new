@@ -142,6 +142,7 @@ CommentBaseHandler._beforeSearch = function (params) {
   // default: no-op
 };
 
+// 设备业务函数：处理 CommentBaseHandler._prepareAnalyzer 对应的抖音自动化动作、状态或安全边界。
 CommentBaseHandler._prepareAnalyzer = function (params) {
   aiAnalyzer.useTemplate(params.prompt_template_id);
 };

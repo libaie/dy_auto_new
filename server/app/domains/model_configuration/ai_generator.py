@@ -19,9 +19,11 @@ SYSTEM_PROMPT = """你是一个抖音评论/私信内容生成助手。根据给
 
 
 class AiGeneratorService:
+    """业务类：承载 AiGeneratorService 相关的数据结构、状态或业务协作。"""
     """Generates content through LangChain while preserving the legacy service API."""
 
     async def aclose(self):
+        """业务函数：处理 aclose 对应的业务流程、校验或数据转换。"""
         """Kept for app shutdown compatibility; LangChain models are per-call."""
         return None
 
@@ -31,6 +33,7 @@ class AiGeneratorService:
         template_body: str,
         context: dict[str, Any],
     ) -> str:
+        """业务函数：处理 generate 对应的业务流程、校验或数据转换。"""
         from app.config import get_ai_config_with_key
 
         ai_cfg = get_ai_config_with_key(db)
@@ -61,6 +64,7 @@ class AiGeneratorService:
         self, db, system_prompt: str, user_prompt: str,
         max_tokens: int = 4096, temperature: float = 0.7,
     ):
+        """业务函数：处理 generate_custom_stream 对应的业务流程、校验或数据转换。"""
         from app.config import get_ai_config_with_key
 
         ai_cfg = get_ai_config_with_key(db)
@@ -81,6 +85,7 @@ class AiGeneratorService:
         max_tokens: int = 4096,
         temperature: float = 0.7,
     ):
+        """业务函数：处理 generate_custom_stream_with_config 对应的业务流程、校验或数据转换。"""
         if not ai_cfg or not ai_cfg.get("api_key"):
             raise RuntimeError("AI API not configured")
         self._ensure_openai_compatible(ai_cfg)
@@ -124,6 +129,7 @@ class AiGeneratorService:
         thinking_enabled: bool = None,
         request_timeout_seconds: float | None = None,
     ) -> str:
+        """业务函数：处理 generate_custom 对应的业务流程、校验或数据转换。"""
         from app.config import get_ai_config_with_key
 
         ai_cfg = get_ai_config_with_key(db)
@@ -150,13 +156,16 @@ class AiGeneratorService:
         raise RuntimeError("generate_custom failed")
 
     async def _call_api(self, cfg: dict, user_prompt: str) -> str:
+        """业务函数：处理 _call_api 对应的业务流程、校验或数据转换。"""
         self._ensure_openai_compatible(cfg)
         return await self._call_openai(cfg, user_prompt)
 
     async def _call_anthropic(self, cfg: dict, user_prompt: str) -> str:
+        """业务函数：处理 _call_anthropic 对应的业务流程、校验或数据转换。"""
         raise RuntimeError("LangChain AI generator only supports OpenAI-compatible APIs")
 
     async def _call_openai(self, cfg: dict, user_prompt: str) -> str:
+        """业务函数：处理 _call_openai 对应的业务流程、校验或数据转换。"""
         model = self._create_chat_model(
             cfg,
             max_tokens=512,
@@ -175,6 +184,7 @@ class AiGeneratorService:
         thinking_enabled: bool | None = None,
         request_timeout_seconds: float | None = None,
     ) -> ChatOpenAI:
+        """业务函数：处理 _create_chat_model 对应的业务流程、校验或数据转换。"""
         return ChatOpenAI(**self._langchain_kwargs(
             cfg,
             max_tokens=max_tokens,
@@ -193,6 +203,7 @@ class AiGeneratorService:
         thinking_enabled: bool | None = None,
         request_timeout_seconds: float | None = None,
     ) -> dict[str, Any]:
+        """业务函数：处理 _langchain_kwargs 对应的业务流程、校验或数据转换。"""
         api_key = str((cfg or {}).get("api_key") or "").strip()
         model = str((cfg or {}).get("model") or "deepseek-chat").strip()
         base_url = cls._base_url_from_config(cfg or {})
@@ -212,12 +223,14 @@ class AiGeneratorService:
 
     @staticmethod
     def _ensure_openai_compatible(cfg: dict) -> None:
+        """业务函数：处理 _ensure_openai_compatible 对应的业务流程、校验或数据转换。"""
         api_url = str((cfg or {}).get("api_url") or (cfg or {}).get("base_url") or "")
         if "/v1/messages" in api_url:
             raise RuntimeError("LangChain AI generator only supports OpenAI-compatible APIs")
 
     @classmethod
     def _base_url_from_config(cls, cfg: dict) -> str:
+        """业务函数：处理 _base_url_from_config 对应的业务流程、校验或数据转换。"""
         api_url = str(cfg.get("api_url") or cfg.get("base_url") or "").strip().rstrip("/")
         if "/v1/messages" in api_url:
             raise RuntimeError("LangChain AI generator only supports OpenAI-compatible APIs")
@@ -226,6 +239,7 @@ class AiGeneratorService:
 
     @staticmethod
     def _message_text(message: Any, *, strip: bool = True) -> str:
+        """业务函数：处理 _message_text 对应的业务流程、校验或数据转换。"""
         content = getattr(message, "content", message)
         if isinstance(content, list):
             text = "".join(
@@ -238,6 +252,7 @@ class AiGeneratorService:
 
     @staticmethod
     def _build_prompt(template_body: str, context: dict[str, Any]) -> str:
+        """业务函数：处理 _build_prompt 对应的业务流程、校验或数据转换。"""
         parts = [f"模板内容：{template_body}"]
         key_labels = {
             "keyword": "搜索关键词",

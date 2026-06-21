@@ -22,11 +22,13 @@ from app.domains.image_generation.image_production_strategy_service import strat
 
 
 def _provider_schema(model: AIModel) -> dict[str, Any]:
+    """业务函数：处理 _provider_schema 对应的业务流程、校验或数据转换。"""
     schema = (model.config_json or {}).get("provider_options_schema") or {}
     return schema if isinstance(schema, dict) else {}
 
 
 def _validate_provider_options(provider_options: dict[str, Any], model: AIModel) -> None:
+    """业务函数：处理 _validate_provider_options 对应的业务流程、校验或数据转换。"""
     schema = _provider_schema(model)
     unknown = set(provider_options) - set(schema)
     if unknown or contains_protected_provider_option_key(provider_options):
@@ -57,6 +59,7 @@ def _validate_provider_options(provider_options: dict[str, Any], model: AIModel)
 
 
 def _get_strategy(db: Session, strategy_id: str | None) -> ImageProductionStrategy | None:
+    """业务函数：处理 _get_strategy 对应的业务流程、校验或数据转换。"""
     if not strategy_id:
         return None
     strategy = db.query(ImageProductionStrategy).filter(ImageProductionStrategy.id == strategy_id).first()
@@ -82,6 +85,7 @@ def _get_strategy(db: Session, strategy_id: str | None) -> ImageProductionStrate
 
 
 def _selected_model_payload(model: AIModel, scene_key: str, capability_key: str) -> dict[str, Any]:
+    """业务函数：处理 _selected_model_payload 对应的业务流程、校验或数据转换。"""
     config = model.config_json or {}
     return {
         "model_id": model.id,
@@ -95,6 +99,7 @@ def _selected_model_payload(model: AIModel, scene_key: str, capability_key: str)
 
 
 def create_selection_preview(db: Session, payload: dict[str, Any], user_id: str | None = None) -> dict[str, Any]:
+    """业务函数：处理 create_selection_preview 对应的业务流程、校验或数据转换。"""
     mode = payload.get("mode")
     if mode not in MODE_TO_SCENE_CAPABILITY:
         raise image_error(400, "IMAGE_MODE_UNSUPPORTED", "Unsupported image mode.", "Choose a supported image mode.", retryable=False)

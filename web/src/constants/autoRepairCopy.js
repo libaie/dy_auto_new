@@ -64,6 +64,7 @@ export function safeAutoRepairText(value, fallback = '信息待补充') {
   return text
 }
 
+// 前端业务函数：协调 autoRepairStatusLabel 对应的页面流程、接口调用或状态转换。
 export function autoRepairStatusLabel(status) {
   return AUTO_REPAIR_STATUS_LABELS[String(status || '').toLowerCase()] || safeAutoRepairText(status, '未知状态')
 }

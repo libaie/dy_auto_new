@@ -111,6 +111,7 @@ var uiOperator = {
     } catch (e) { return false; }
   },
 
+  // 设备业务函数：处理 _applyStrategyOffset 对应的抖音自动化动作、状态或安全边界。
   _applyStrategyOffset: function (element, strategy) {
     if (!element || !strategy || (strategy.x_percent == null && strategy.y_percent == null)) return element;
 
@@ -502,6 +503,7 @@ var uiOperator = {
     } catch (e) { return String(Math.random()); }
   },
 
+  // 设备业务函数：处理 _findByChainAll 对应的抖音自动化动作、状态或安全边界。
   _findByChainAll: function (steps) {
     if (!steps || steps.length === 0) return [];
     // Build selector chain from filter steps (same as _findByChain)
@@ -627,6 +629,7 @@ var uiOperator = {
     var res = device.width + "x" + device.height;
     threshold = threshold || 0.75;
 
+    // 设备业务函数：处理 addCandidate 对应的抖音自动化动作、状态或安全边界。
     function addCandidate(list, seen, dir, name) {
       if (!dir || !name) return;
       var path = dir + name;
@@ -636,6 +639,7 @@ var uiOperator = {
       }
     }
 
+    // 设备业务函数：处理 _arTag 对应的抖音自动化动作、状态或安全边界。
     function _arTag(r) {
       try {
         var parts = r.split("x");
@@ -646,6 +650,7 @@ var uiOperator = {
         return (_w / _a) + ":" + (_h / _a);
       } catch (e) { return "unknown"; }
     }
+    // 设备业务函数：处理 _sameARDirs 对应的抖音自动化动作、状态或安全边界。
     function _sameARDirs() {
       var target = _arTag(res);
       if (target === "unknown") return [];
@@ -665,6 +670,7 @@ var uiOperator = {
       return result;
     }
 
+    // 设备业务函数：处理 collectCandidates 对应的抖音自动化动作、状态或安全边界。
     function collectCandidates(templateName) {
       var dirs = [
         "/sdcard/dy_auto/templates/" + res + "/",
@@ -890,6 +896,7 @@ var uiOperator = {
     }
   },
 
+  // 设备业务函数：处理 _chainSelector 对应的抖音自动化动作、状态或安全边界。
   _chainSelector: function (sel, step) {
     var contains = step.match_mode === "contains";
     switch (step.type) {
@@ -905,6 +912,7 @@ var uiOperator = {
     }
   },
 
+  // 设备业务函数：处理 _elementMatchesStep 对应的抖音自动化动作、状态或安全边界。
   _elementMatchesStep: function (el, step) {
     var actual;
     try {

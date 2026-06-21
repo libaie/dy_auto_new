@@ -33,6 +33,7 @@ SCRIPT_GENERATION_SCENE = "script_generation"
 
 @dataclass(frozen=True)
 class StoryGeneratorResult:
+    """业务类：承载 StoryGeneratorResult 相关的数据结构、状态或业务协作。"""
     parsed: dict[str, Any]
     source_type: str
     model_trace: dict[str, Any]
@@ -74,6 +75,7 @@ STORY_PLAN_OUTPUT_SCHEMA: dict[str, Any] = {
 
 
 def _source(expert_id: str) -> dict[str, str]:
+    """业务函数：处理 _source 对应的业务流程、校验或数据转换。"""
     manifest = load_manifest()
     expert = get_expert(expert_id)
     return {
@@ -85,11 +87,13 @@ def _source(expert_id: str) -> dict[str, str]:
 
 
 def _context_hash(context: dict[str, Any]) -> str:
+    """业务函数：处理 _context_hash 对应的业务流程、校验或数据转换。"""
     encoded = json.dumps(context, ensure_ascii=False, sort_keys=True).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()[:24]
 
 
 def _supports_json_schema_response(config: dict[str, Any]) -> bool:
+    """业务函数：处理 _supports_json_schema_response 对应的业务流程、校验或数据转换。"""
     nested = config.get("config") if isinstance(config.get("config"), dict) else {}
     for source in (config, nested):
         for key in ("supports_json_schema", "json_schema_response", "response_format_json_schema"):
@@ -99,6 +103,7 @@ def _supports_json_schema_response(config: dict[str, Any]) -> bool:
 
 
 def _response_format(config: dict[str, Any]) -> dict[str, Any] | None:
+    """业务函数：处理 _response_format 对应的业务流程、校验或数据转换。"""
     if not _supports_json_schema_response(config):
         return None
     return {
@@ -112,6 +117,7 @@ def _response_format(config: dict[str, Any]) -> dict[str, Any] | None:
 
 
 def _split_model_response(response: StoryModelClientResponse) -> tuple[str, dict[str, Any]]:
+    """业务函数：处理 _split_model_response 对应的业务流程、校验或数据转换。"""
     if isinstance(response, str):
         return response, {}
     if isinstance(response, dict):
@@ -123,6 +129,7 @@ def _split_model_response(response: StoryModelClientResponse) -> tuple[str, dict
 
 
 def _parse_json_object(raw_text: str) -> dict[str, Any]:
+    """业务函数：处理 _parse_json_object 对应的业务流程、校验或数据转换。"""
     if not isinstance(raw_text, str) or not raw_text.strip():
         raise AgencyRuntimeError("EXPERT_OUTPUT_INVALID_JSON", "Story generator output was empty.")
     text = raw_text.strip()
@@ -157,6 +164,7 @@ def _parse_json_object(raw_text: str) -> dict[str, Any]:
 
 
 def _validate_story_payload(parsed: dict[str, Any]) -> None:
+    """业务函数：处理 _validate_story_payload 对应的业务流程、校验或数据转换。"""
     if not isinstance(parsed.get("series_story_plan"), dict):
         raise AgencyRuntimeError("EXPERT_OUTPUT_INVALID_JSON", "Story payload missing series_story_plan object.")
     if not isinstance(parsed.get("season_arc"), dict):
@@ -170,6 +178,7 @@ def _build_prompts(
     expert_markdown: str,
     context: dict[str, Any],
 ) -> tuple[str, str]:
+    """业务函数：处理 _build_prompts 对应的业务流程、校验或数据转换。"""
     system_prompt = "\n".join([
         expert_markdown,
         "",
@@ -199,6 +208,7 @@ async def generate_story_plan_with_expert(
     model_client: StoryModelClient | None = None,
     agent_runner: Any | None = None,
 ) -> StoryGeneratorResult:
+    """业务函数：处理 generate_story_plan_with_expert 对应的业务流程、校验或数据转换。"""
     expert = get_expert(STORY_GENERATOR_EXPERT_ID)
     expert_markdown = read_expert_markdown(STORY_GENERATOR_EXPERT_ID)
     runtime_config = runtime_config or resolve_runtime_model_config(db, SCRIPT_GENERATION_SCENE)
@@ -360,6 +370,7 @@ def _finalize_failed(
     error: AgencyRuntimeError,
     started: float,
 ) -> None:
+    """业务函数：处理 _finalize_failed 对应的业务流程、校验或数据转换。"""
     finalize_invocation_and_audit(
         db,
         invocation_id=invocation_id,

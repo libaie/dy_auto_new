@@ -27,6 +27,7 @@ def list_comments(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
+    """业务函数：处理 list_comments 对应的业务流程、校验或数据转换。"""
     return read_models.list_comments(
         db=db,
         user=user,
@@ -55,6 +56,7 @@ def list_users(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
+    """业务函数：处理 list_users 对应的业务流程、校验或数据转换。"""
     return read_models.list_users(
         db=db,
         user=user,
@@ -84,6 +86,7 @@ def list_conversations(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
+    """业务函数：处理 list_conversations 对应的业务流程、校验或数据转换。"""
     return read_models.list_conversations(
         db=db,
         user=user,
@@ -103,6 +106,7 @@ def get_conversation(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
+    """业务函数：处理 get_conversation 对应的业务流程、校验或数据转换。"""
     return read_models.get_conversation(
         db=db,
         user=user,
@@ -121,6 +125,7 @@ def export_comments(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
+    """业务函数：处理 export_comments 对应的业务流程、校验或数据转换。"""
     return read_models.export_comments(
         db=db,
         user=user,
@@ -151,6 +156,7 @@ def export_users(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
+    """业务函数：处理 export_users 对应的业务流程、校验或数据转换。"""
     return read_models.export_users(
         db=db,
         user=user,
@@ -182,6 +188,7 @@ def export_conversations(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
+    """业务函数：处理 export_conversations 对应的业务流程、校验或数据转换。"""
     return read_models.export_conversations(
         db=db,
         user=user,

@@ -29,6 +29,7 @@ _ACTIVE_RESERVATION_STATUSES = (
 
 
 def _reservation_costs(db: Session, plan_id: str) -> dict:
+    """业务函数：处理 _reservation_costs 对应的业务流程、校验或数据转换。"""
     active_reserved, stale, settled, released = (
         db.query(
             func.coalesce(
@@ -92,6 +93,7 @@ def _reservation_costs(db: Session, plan_id: str) -> dict:
 
 
 def get_run_costs(db: Session, run_id: str) -> dict:
+    """业务函数：处理 get_run_costs 对应的业务流程、校验或数据转换。"""
     run = db.query(VideoProductionRun).filter(VideoProductionRun.id == run_id).first()
     if not run:
         raise ValueError("Run not found")

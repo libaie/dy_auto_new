@@ -77,6 +77,7 @@ async function handleTTSPreview() {
   finally { ttsPreviewLoading.value = false }
 }
 
+// 前端业务函数：协调 getTemplatePreviewUrl 对应的页面流程、接口调用或状态转换。
 function getTemplatePreviewUrl(tpl) {
   const key = (tpl.key || tpl.path || tpl.name || '').replace(/\\/g, '/')
   const parts = key.split('/')
@@ -89,10 +90,12 @@ function getTemplatePreviewUrl(tpl) {
   return ''
 }
 
+// 前端业务函数：协调 isSelected 对应的页面流程、接口调用或状态转换。
 function isSelected(tpl) {
   return (props.modelValue.frameTemplate || '') === (tpl.key || tpl.path || tpl.name)
 }
 
+// 前端业务函数：协调 filteredTemplates 对应的页面流程、接口调用或状态转换。
 function filteredTemplates() {
   let list = props.templates || []
   list = list.filter(t => {
@@ -129,6 +132,7 @@ function openRenderPreview(tpl) {
   }
 }
 
+// 前端业务函数：协调 handlePlaywrightRender 对应的页面流程、接口调用或状态转换。
 async function handlePlaywrightRender() {
   previewLoading.value = true
   try {
@@ -144,12 +148,14 @@ async function handlePlaywrightRender() {
   finally { previewLoading.value = false }
 }
 
+// 前端业务函数：协调 closePreview 对应的页面流程、接口调用或状态转换。
 function closePreview() {
   showPreview.value = false
   previewTemplate.value = null
   previewImage.value = ''
 }
 
+// 前端业务函数：协调 getTemplateSize 对应的页面流程、接口调用或状态转换。
 function getTemplateSize(tplPath) {
   if (!tplPath) return ''
   const key = tplPath.replace(/\\/g, '/')
@@ -165,6 +171,7 @@ const mediaPreviewLoading = ref(false)
 const mediaPreviewUrl = ref('')
 const mediaPreviewPrompt = ref('')
 
+// 前端业务函数：协调 handleMediaPreview 对应的页面流程、接口调用或状态转换。
 async function handleMediaPreview() {
   mediaPreviewLoading.value = true
   mediaPreviewUrl.value = ''

@@ -12,6 +12,7 @@ DEFAULT_TIMED_SHOT_SECONDS = 2.0
 
 
 def _duration(value: Any, default_seconds: float) -> float:
+    """业务函数：处理 _duration 对应的业务流程、校验或数据转换。"""
     try:
         parsed = float(value)
     except (TypeError, ValueError):
@@ -20,6 +21,7 @@ def _duration(value: Any, default_seconds: float) -> float:
 
 
 def format_second(value: float) -> str:
+    """业务函数：处理 format_second 对应的业务流程、校验或数据转换。"""
     rounded = round(float(value), 2)
     if rounded.is_integer():
         return str(int(rounded))
@@ -27,6 +29,7 @@ def format_second(value: float) -> str:
 
 
 def format_time_range(start_second: float, end_second: float) -> str:
+    """业务函数：处理 format_time_range 对应的业务流程、校验或数据转换。"""
     return f"{format_second(start_second)}-{format_second(end_second)}秒"
 
 
@@ -35,6 +38,7 @@ def shot_durations_for_total(
     *,
     preferred_seconds: float = DEFAULT_TIMED_SHOT_SECONDS,
 ) -> list[float]:
+    """业务函数：处理 shot_durations_for_total 对应的业务流程、校验或数据转换。"""
     remaining = _duration(total_seconds, preferred_seconds)
     preferred = max(0.1, float(preferred_seconds or DEFAULT_TIMED_SHOT_SECONDS))
     durations: list[float] = []
@@ -55,6 +59,7 @@ def annotate_frames_with_timing(
     *,
     default_duration_seconds: float = DEFAULT_TIMED_SHOT_SECONDS,
 ) -> list[dict[str, Any]]:
+    """业务函数：处理 annotate_frames_with_timing 对应的业务流程、校验或数据转换。"""
     elapsed = 0.0
     timed_frames: list[dict[str, Any]] = []
     for index, frame in enumerate(frames):
@@ -80,6 +85,7 @@ def annotate_storyboard_with_timing(
     *,
     default_duration_seconds: float = DEFAULT_TIMED_SHOT_SECONDS,
 ) -> dict[str, Any]:
+    """业务函数：处理 annotate_storyboard_with_timing 对应的业务流程、校验或数据转换。"""
     frames = storyboard.get("frames") if isinstance(storyboard, dict) else []
     if not isinstance(frames, list):
         frames = []
@@ -96,6 +102,7 @@ def annotate_storyboard_with_timing(
 
 
 def timed_storyboard_lines(storyboard: dict[str, Any]) -> list[str]:
+    """业务函数：处理 timed_storyboard_lines 对应的业务流程、校验或数据转换。"""
     frames = storyboard.get("frames") if isinstance(storyboard, dict) else []
     if not isinstance(frames, list):
         return []
@@ -119,6 +126,7 @@ def timed_storyboard_lines(storyboard: dict[str, Any]) -> list[str]:
 
 
 def _compact_text(value: str, fallback: str) -> str:
+    """业务函数：处理 _compact_text 对应的业务流程、校验或数据转换。"""
     compacted = " ".join(str(value or "").split()).strip("；;，,。 ")
     return compacted or fallback
 
@@ -130,6 +138,7 @@ def build_second_level_motion_detail(
     emotion: str,
     raw_prompt: str = "",
 ) -> str:
+    """业务函数：处理 build_second_level_motion_detail 对应的业务流程、校验或数据转换。"""
     action_text = _compact_text(action or raw_prompt, "执行本秒段剧情动作")
     emotion_text = _compact_text(emotion, "当前情绪")
     return (
@@ -155,6 +164,7 @@ def build_detailed_image_prompt(
     raw_prompt: str = "",
     continuity: str = "",
 ) -> str:
+    """业务函数：处理 build_detailed_image_prompt 对应的业务流程、校验或数据转换。"""
     second_level_detail = build_second_level_motion_detail(
         time_range=time_range,
         action=action,
@@ -187,6 +197,7 @@ def build_detailed_video_prompt(
     raw_prompt: str = "",
     continuity: str = "",
 ) -> str:
+    """业务函数：处理 build_detailed_video_prompt 对应的业务流程、校验或数据转换。"""
     second_level_detail = build_second_level_motion_detail(
         time_range=time_range,
         action=action,

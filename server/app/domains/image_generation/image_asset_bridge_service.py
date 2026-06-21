@@ -17,6 +17,7 @@ from app.domains.image_generation.image_review_gate_service import asset_review_
 
 
 def _review_snapshot(asset: ImageCreationAsset) -> dict[str, Any]:
+    """业务函数：处理 _review_snapshot 对应的业务流程、校验或数据转换。"""
     return {
         "status": asset.status,
         "audit_status": asset.audit_status,
@@ -27,6 +28,7 @@ def _review_snapshot(asset: ImageCreationAsset) -> dict[str, Any]:
 
 
 def _metadata(asset: ImageCreationAsset, task: ImageCreationTask | None, payload: dict[str, Any]) -> dict[str, Any]:
+    """业务函数：处理 _metadata 对应的业务流程、校验或数据转换。"""
     return {
         "source_image_asset_id": asset.id,
         "source_image_task_id": asset.task_id,
@@ -61,6 +63,7 @@ def _metadata(asset: ImageCreationAsset, task: ImageCreationTask | None, payload
 
 
 def _scope_conflict(message: str, affected_ids: list[str]) -> None:
+    """业务函数：处理 _scope_conflict 对应的业务流程、校验或数据转换。"""
     raise image_error(
         409,
         "IMAGE_ASSET_SCOPE_CONFLICT",
@@ -72,6 +75,7 @@ def _scope_conflict(message: str, affected_ids: list[str]) -> None:
 
 
 def _validate_scope(asset: ImageCreationAsset, task: ImageCreationTask | None, run: VideoProductionRun, payload: dict[str, Any]) -> None:
+    """业务函数：处理 _validate_scope 对应的业务流程、校验或数据转换。"""
     user_id = payload.get("user_id")
     for source_user_id in [asset.user_id, task.user_id if task else None]:
         if source_user_id and source_user_id != user_id:
@@ -90,6 +94,7 @@ def _validate_scope(asset: ImageCreationAsset, task: ImageCreationTask | None, r
 
 
 def video_asset_payload(asset: VideoProductionAsset) -> dict[str, Any]:
+    """业务函数：处理 video_asset_payload 对应的业务流程、校验或数据转换。"""
     return {
         "id": asset.id,
         "run_id": asset.run_id,
@@ -112,6 +117,7 @@ def promote_image_asset_to_video_asset(
     asset_id: str,
     payload: dict[str, Any],
 ) -> VideoProductionAsset:
+    """业务函数：处理 promote_image_asset_to_video_asset 对应的业务流程、校验或数据转换。"""
     asset = db.query(ImageCreationAsset).filter(ImageCreationAsset.id == asset_id).first()
     if not asset:
         raise image_error(

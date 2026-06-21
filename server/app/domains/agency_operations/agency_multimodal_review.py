@@ -15,6 +15,7 @@ from app.domains.model_configuration.runtime_model_config import resolve_runtime
 
 
 def build_multimodal_asset_context(db: Session, asset_id: str) -> dict[str, Any]:
+    """业务函数：处理 build_multimodal_asset_context 对应的业务流程、校验或数据转换。"""
     asset = db.query(VideoProductionAsset).filter(VideoProductionAsset.id == asset_id).first()
     if not asset:
         raise ValueError("asset not found")
@@ -58,6 +59,7 @@ async def run_multimodal_asset_review(
     asset_id: str,
     runtime_config: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    """业务函数：处理 run_multimodal_asset_review 对应的业务流程、校验或数据转换。"""
     asset = db.query(VideoProductionAsset).filter(VideoProductionAsset.id == asset_id).first()
     if not asset:
         raise ValueError("asset not found")
@@ -84,6 +86,7 @@ async def run_multimodal_asset_review(
 
 
 def _frame_by_id(storyboard: dict[str, Any], frame_id: str) -> dict[str, Any]:
+    """业务函数：处理 _frame_by_id 对应的业务流程、校验或数据转换。"""
     for frame in storyboard.get("frames") or []:
         if str(frame.get("frame_id") or frame.get("shot_id") or "") == frame_id:
             return frame
@@ -91,6 +94,7 @@ def _frame_by_id(storyboard: dict[str, Any], frame_id: str) -> dict[str, Any]:
 
 
 def _media_inputs_for_asset(asset: VideoProductionAsset) -> list[dict[str, str]]:
+    """业务函数：处理 _media_inputs_for_asset 对应的业务流程、校验或数据转换。"""
     media_inputs = []
     if asset.asset_type == "image" and asset.url:
         media_inputs.append({"type": "image_url", "url": asset.url})

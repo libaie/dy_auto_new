@@ -20,11 +20,13 @@ from app.db.models.video_production import VideoProductionAsset, VideoReviewReco
 
 @dataclass
 class ReviewAssetEditError(ValueError):
+    """业务类：承载 ReviewAssetEditError 相关的数据结构、状态或业务协作。"""
     code: str
     message: str
     details: dict[str, Any] | None = None
 
     def __str__(self) -> str:
+        """业务函数：处理 __str__ 对应的业务流程、校验或数据转换。"""
         return self.message
 
 
@@ -35,6 +37,7 @@ FAILED_IMAGE_TASK_STATUSES = {"failed", "blocked", "rejected", "error"}
 
 
 def _asset_snapshot(asset: VideoProductionAsset) -> dict[str, Any]:
+    """业务函数：处理 _asset_snapshot 对应的业务流程、校验或数据转换。"""
     return {
         "id": asset.id,
         "run_id": asset.run_id,
@@ -58,6 +61,7 @@ def _asset_snapshot(asset: VideoProductionAsset) -> dict[str, Any]:
 
 
 def _load_asset(db: Session, asset_id: str) -> VideoProductionAsset:
+    """业务函数：处理 _load_asset 对应的业务流程、校验或数据转换。"""
     asset = db.query(VideoProductionAsset).filter(VideoProductionAsset.id == asset_id).first()
     if not asset:
         raise ReviewAssetEditError("ASSET_NOT_FOUND", "Asset not found")
@@ -65,6 +69,7 @@ def _load_asset(db: Session, asset_id: str) -> VideoProductionAsset:
 
 
 def _assert_latest(asset: VideoProductionAsset, expected_version: int | None) -> None:
+    """业务函数：处理 _assert_latest 对应的业务流程、校验或数据转换。"""
     if expected_version is not None and asset.version != expected_version:
         raise ReviewAssetEditError("STALE_ASSET_VERSION", "The submitted asset version is no longer current")
     if not asset.is_latest:
@@ -72,6 +77,7 @@ def _assert_latest(asset: VideoProductionAsset, expected_version: int | None) ->
 
 
 def _assert_image_editable(asset: VideoProductionAsset) -> None:
+    """业务函数：处理 _assert_image_editable 对应的业务流程、校验或数据转换。"""
     if asset.status in {"regenerating"}:
         raise ReviewAssetEditError(
             "IMAGE_EDIT_IN_PROGRESS",
@@ -91,6 +97,7 @@ def _reserve_image_edit(
     asset: VideoProductionAsset,
     expected_version: int | None,
 ) -> None:
+    """业务函数：处理 _reserve_image_edit 对应的业务流程、校验或数据转换。"""
     filters = [
         VideoProductionAsset.id == asset.id,
         VideoProductionAsset.asset_type == "image",
@@ -122,6 +129,7 @@ def void_asset_version(
     comment: str = "",
     expected_version: int | None = None,
 ) -> dict[str, Any]:
+    """业务函数：处理 void_asset_version 对应的业务流程、校验或数据转换。"""
     asset = _load_asset(db, asset_id)
     _assert_latest(asset, expected_version)
     if asset.status not in VOIDABLE_STATUSES:
@@ -156,6 +164,7 @@ def void_asset_version(
 
 
 def _provider_failure(exc: HTTPException) -> ReviewAssetEditError:
+    """业务函数：处理 _provider_failure 对应的业务流程、校验或数据转换。"""
     detail = exc.detail if isinstance(exc.detail, dict) else {"message": str(exc.detail)}
     code = detail.get("error_code") or detail.get("code") or "IMAGE_EDIT_PROVIDER_FAILED"
     message = detail.get("message") or "Image edit provider request failed."
@@ -167,11 +176,13 @@ def _provider_failure(exc: HTTPException) -> ReviewAssetEditError:
 
 
 def _edit_idempotency_key(asset: VideoProductionAsset, instruction: str) -> str:
+    """业务函数：处理 _edit_idempotency_key 对应的业务流程、校验或数据转换。"""
     instruction_hash = hashlib.sha256(instruction.encode("utf-8")).hexdigest()
     return f"video-review-edit:{asset.id}:{asset.version}:{instruction_hash}"
 
 
 def _raise_failed_task(task) -> None:
+    """业务函数：处理 _raise_failed_task 对应的业务流程、校验或数据转换。"""
     if task.status in FAILED_IMAGE_TASK_STATUSES or task.error_code:
         raise ReviewAssetEditError(
             "IMAGE_EDIT_PROVIDER_FAILED",
@@ -186,6 +197,7 @@ def _raise_failed_task(task) -> None:
 
 
 async def _generate_edited_image(db: Session, asset: VideoProductionAsset, instruction: str) -> dict[str, Any]:
+    """业务函数：处理 _generate_edited_image 对应的业务流程、校验或数据转换。"""
     from app.db.models import ImageCreationAsset
     from app.domains.image_generation.image_creation_service import create_image_task, sync_image_task
 
@@ -270,6 +282,7 @@ async def edit_image_asset(
     instruction: str,
     expected_version: int | None = None,
 ) -> dict[str, Any]:
+    """业务函数：处理 edit_image_asset 对应的业务流程、校验或数据转换。"""
     clean_instruction = instruction.strip()
     asset = _load_asset(db, asset_id)
     if asset.asset_type != "image":

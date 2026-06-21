@@ -11,6 +11,7 @@ from app.db.models.image_production import ImageCreationAsset, ImageCreationTask
 
 
 def asset_review_gate(task: ImageCreationTask | None, asset: ImageCreationAsset) -> dict[str, Any]:
+    """业务函数：处理 asset_review_gate 对应的业务流程、校验或数据转换。"""
     task_gate = ((task.request_json or {}).get("review_gate") if task else None) or {}
     asset_gate = ((asset.metadata_json or {}).get("review_gate")) or {}
     gate = {**task_gate, **asset_gate}
@@ -48,6 +49,7 @@ def asset_review_gate(task: ImageCreationTask | None, asset: ImageCreationAsset)
 
 
 def review_gate_passed(task: ImageCreationTask | None, asset: ImageCreationAsset) -> bool:
+    """业务函数：处理 review_gate_passed 对应的业务流程、校验或数据转换。"""
     gate = asset_review_gate(task, asset)
     if gate.get("status") == "blocked":
         return False
@@ -63,6 +65,7 @@ def review_gate_passed(task: ImageCreationTask | None, asset: ImageCreationAsset
 
 
 def review_gate_rescue_actions(asset: ImageCreationAsset) -> list[dict[str, Any]]:
+    """业务函数：处理 review_gate_rescue_actions 对应的业务流程、校验或数据转换。"""
     return [
         {"type": "manual_review_required", "asset_id": asset.id},
         {"type": "repaint_image", "asset_id": asset.id},

@@ -60,6 +60,7 @@ const cancellingTask = ref(null)
 const cancelling = ref(false)
 
 // --- WebSocket ---
+// 前端业务函数：协调 wsUrl 对应的页面流程、接口调用或状态转换。
 function wsUrl() {
   const token = localStorage.getItem('token') || ''
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
@@ -73,6 +74,7 @@ useWebSocket(wsUrl, {
 })
 
 // --- Tasks ---
+// 前端业务函数：协调 fetchTasks 对应的页面流程、接口调用或状态转换。
 async function fetchTasks(silent) {
   if (!silent) loading.value = true
   try {
@@ -109,12 +111,16 @@ function handleSort(col) {
   else { sortBy.value = col; sortOrder.value = 'desc' }
   fetchTasks()
 }
+// 前端业务函数：协调 toggleSelectAll 对应的页面流程、接口调用或状态转换。
 function toggleSelectAll() {
   if (selectedTaskIds.value.length === tasks.value.length) selectedTaskIds.value = []
   else selectedTaskIds.value = tasks.value.map(t => t.id)
 }
+// 前端业务函数：协调 handlePageChange 对应的页面流程、接口调用或状态转换。
 function handlePageChange(p) { page.value = p; fetchTasks() }
+// 前端业务函数：协调 openCancelDialog 对应的页面流程、接口调用或状态转换。
 function openCancelDialog(task) { cancellingTask.value = task; showCancelDialog.value = true }
+// 前端业务函数：协调 handleCancel 对应的页面流程、接口调用或状态转换。
 async function handleCancel() {
   if (!cancellingTask.value) return
   cancelling.value = true
@@ -134,6 +140,7 @@ const activeChannelCount = () => channels.value.filter(c => c.status === 'active
 const pausedChannelCount = () => channels.value.filter(c => c.status === 'paused').length
 
 // --- Ref data ---
+// 前端业务函数：协调 loadRefData 对应的页面流程、接口调用或状态转换。
 async function loadRefData() {
   try {
     const [acctRes, grpRes, devRes, tplRes, ptRes] = await Promise.all([
@@ -148,10 +155,12 @@ async function loadRefData() {
   } catch {}
 }
 
+// 前端业务函数：协调 onCreated 对应的页面流程、接口调用或状态转换。
 function onCreated() {
   showCreateDialog.value = false; showKeywordDialog.value = false
   page.value = 1; fetchTasks(); fetchChannels()
 }
+// 前端业务函数：协调 onChannelRefresh 对应的页面流程、接口调用或状态转换。
 function onChannelRefresh() { fetchChannels(); fetchTasks(true) }
 
 watch(statusFilter, () => { page.value = 1; fetchTasks() })

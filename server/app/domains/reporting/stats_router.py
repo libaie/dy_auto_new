@@ -23,6 +23,7 @@ def dashboard_summary(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
+    """业务函数：处理 dashboard_summary 对应的业务流程、校验或数据转换。"""
     """Dashboard overview — account/device/task counts and status distribution."""
     # Account stats
     total_accounts = db.query(Account).count()
@@ -68,6 +69,7 @@ def daily_stats(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
+    """业务函数：处理 daily_stats 对应的业务流程、校验或数据转换。"""
     """Daily operation stats for all accounts."""
     if not date:
         date = bj_now().strftime("%Y-%m-%d")
@@ -104,6 +106,7 @@ def account_stats(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
+    """业务函数：处理 account_stats 对应的业务流程、校验或数据转换。"""
     """Stats for a specific account — today's counts and remaining quotas."""
     account = db.query(Account).filter(Account.id == account_id).first()
     if not account:
@@ -125,6 +128,7 @@ def realtime_stats(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
+    """业务函数：处理 realtime_stats 对应的业务流程、校验或数据转换。"""
     """Realtime metrics for dashboard auto-refresh."""
     online_devices = db.query(Device).filter(Device.status == "online").count()
     running_tasks = db.query(Task).filter(Task.status == "running").count()

@@ -15,6 +15,7 @@ def _provider_stage_metadata(
     provider_stage_task_id: str | None,
     provider_idempotency_key: str | None,
 ) -> dict:
+    """业务函数：处理 _provider_stage_metadata 对应的业务流程、校验或数据转换。"""
     template = template_config if isinstance(template_config, dict) else {}
     return {
         "external_task_id": external_task_id or template.get("external_task_id"),
@@ -24,6 +25,7 @@ def _provider_stage_metadata(
 
 
 def _add_provider_stage_metadata(payload: dict, metadata: dict) -> None:
+    """业务函数：处理 _add_provider_stage_metadata 对应的业务流程、校验或数据转换。"""
     for key, value in metadata.items():
         if value:
             payload[key] = value
@@ -40,6 +42,7 @@ async def submit_image_batch(
     provider_stage_task_id: str | None = None,
     provider_idempotency_key: str | None = None,
 ) -> dict:
+    """业务函数：处理 submit_image_batch 对应的业务流程、校验或数据转换。"""
     payload = {
         "external_run_id": run_id,
         "episode_id": episode_id,
@@ -77,6 +80,7 @@ async def submit_image_create(
     model_config: dict | None = None,
     context: dict | None = None,
 ) -> dict:
+    """业务函数：处理 submit_image_create 对应的业务流程、校验或数据转换。"""
     if not model_config:
         raise ValueError("submit_image_create requires a non-empty model_config")
 
@@ -101,6 +105,7 @@ async def submit_image_create(
 
 
 async def get_stage_task(db: Session | None, stage_task_id: str) -> dict:
+    """业务函数：处理 get_stage_task 对应的业务流程、校验或数据转换。"""
     return await _pixelle_request("GET", f"/api/stages/tasks/{stage_task_id}", db)
 
 
@@ -114,6 +119,7 @@ async def submit_video_batch(
     provider_stage_task_id: str | None = None,
     provider_idempotency_key: str | None = None,
 ) -> dict:
+    """业务函数：处理 submit_video_batch 对应的业务流程、校验或数据转换。"""
     payload = {
         "external_run_id": run_id,
         "frames": frames,
@@ -142,6 +148,7 @@ async def submit_compose(
     provider_stage_task_id: str | None = None,
     provider_idempotency_key: str | None = None,
 ) -> dict:
+    """业务函数：处理 submit_compose 对应的业务流程、校验或数据转换。"""
     if not model_config:
         raise ValueError("submit_compose requires a non-empty model_config")
 

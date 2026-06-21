@@ -28,10 +28,12 @@ ACTIVE_PLAN_STATUSES = (PLAN_READY, PLAN_RUNNING)
 
 
 def _active_plan_ids_query():
+    """业务函数：处理 _active_plan_ids_query 对应的业务流程、校验或数据转换。"""
     return select(ProductionPlan.id).where(ProductionPlan.status.in_(ACTIVE_PLAN_STATUSES))
 
 
 def _ensure_plan_accepts_jobs(db: Session, plan_id: str) -> None:
+    """业务函数：处理 _ensure_plan_accepts_jobs 对应的业务流程、校验或数据转换。"""
     plan = db.query(ProductionPlan).filter(ProductionPlan.id == plan_id).first()
     if not plan:
         raise ValueError("Production plan not found")
@@ -50,6 +52,7 @@ def enqueue_job(
     max_attempts: int = 3,
     commit: bool = True,
 ) -> ProductionJob:
+    """业务函数：处理 enqueue_job 对应的业务流程、校验或数据转换。"""
     existing = db.query(ProductionJob).filter(ProductionJob.idempotency_key == idempotency_key).first()
     if existing:
         return existing
@@ -90,6 +93,7 @@ def claim_next_job(
     plan_id: str | None = None,
     stage: str | None = None,
 ) -> ProductionJob | None:
+    """业务函数：处理 claim_next_job 对应的业务流程、校验或数据转换。"""
     skipped_ids: set[str] = set()
     while True:
         now = bj_now()
@@ -143,6 +147,7 @@ def claim_next_job(
 
 
 def release_expired_leases(db: Session) -> int:
+    """业务函数：处理 release_expired_leases 对应的业务流程、校验或数据转换。"""
     now = bj_now()
     count = (
         db.query(ProductionJob)
@@ -162,6 +167,7 @@ def mark_job_completed(
     allowed_statuses: tuple[str, ...] | list[str] | None = None,
     expected_lease_id: str | None = None,
 ) -> ProductionJob:
+    """业务函数：处理 mark_job_completed 对应的业务流程、校验或数据转换。"""
     del payload
     default_allowed = (JOB_LEASED, JOB_RUNNING)
     explicitly_allowed = (JOB_QUEUED, JOB_LEASED, JOB_RUNNING)
@@ -222,6 +228,7 @@ def fail_job(
     retryable: bool,
     retry_after_seconds: int = 60,
 ) -> ProductionJob:
+    """业务函数：处理 fail_job 对应的业务流程、校验或数据转换。"""
     job = db.query(ProductionJob).filter(ProductionJob.id == job_id).first()
     if not job:
         raise ValueError("Production job not found")
@@ -254,6 +261,7 @@ def retry_job_without_attempt(
     retry_after_seconds: int = 60,
     expected_lease_id: str | None = None,
 ) -> ProductionJob:
+    """业务函数：处理 retry_job_without_attempt 对应的业务流程、校验或数据转换。"""
     job = db.query(ProductionJob).filter(ProductionJob.id == job_id).first()
     if not job:
         raise ValueError("Production job not found")
@@ -275,6 +283,7 @@ def retry_job_without_attempt(
 
 
 def pause_plan_jobs(db: Session, plan_id: str, reason: str) -> int:
+    """业务函数：处理 pause_plan_jobs 对应的业务流程、校验或数据转换。"""
     now = bj_now()
     jobs = db.query(ProductionJob).filter(
         ProductionJob.plan_id == plan_id,
@@ -292,6 +301,7 @@ def pause_plan_jobs(db: Session, plan_id: str, reason: str) -> int:
 
 
 def resume_plan_jobs(db: Session, plan_id: str) -> int:
+    """业务函数：处理 resume_plan_jobs 对应的业务流程、校验或数据转换。"""
     now = bj_now()
     jobs = db.query(ProductionJob).filter(
         ProductionJob.plan_id == plan_id,

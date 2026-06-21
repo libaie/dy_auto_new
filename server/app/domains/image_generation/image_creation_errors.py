@@ -19,6 +19,7 @@ def image_error(
     details: dict[str, Any] | None = None,
     rescue_actions: list[dict[str, Any]] | None = None,
 ) -> HTTPException:
+    """业务函数：处理 image_error 对应的业务流程、校验或数据转换。"""
     payload: dict[str, Any] = {
         "ok": False,
         "error_code": error_code,

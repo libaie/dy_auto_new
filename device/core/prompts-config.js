@@ -474,6 +474,7 @@ var promptsConfig = {
     return this.industries[this.industry] || this.industries["health"];
   },
 
+  // 设备业务函数：处理 setOverride 对应的抖音自动化动作、状态或安全边界。
   setOverride: function (templateContent) {
     if (!templateContent) { this._override = null; return true; }
     // Validate required top-level fields
@@ -490,6 +491,7 @@ var promptsConfig = {
     return true;
   },
 
+  // 设备业务函数：处理 setIndustry 对应的抖音自动化动作、状态或安全边界。
   setIndustry: function (name) {
     if (this.industries[name]) {
       this.industry = name;

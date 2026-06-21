@@ -17,6 +17,7 @@ const llmPresets = [
   { name: 'Ollama', baseUrl: 'http://localhost:11434/v1', model: 'llama3.2' },
 ]
 
+// 前端业务函数：协调 applyLLMPreset 对应的页面流程、接口调用或状态转换。
 function applyLLMPreset(preset) {
   emit('update:modelValue', {
     ...props.modelValue,
@@ -25,6 +26,7 @@ function applyLLMPreset(preset) {
   })
 }
 
+// 前端业务函数：协调 updateField 对应的页面流程、接口调用或状态转换。
 function updateField(key, value) {
   emit('update:modelValue', { ...props.modelValue, [key]: value })
 }

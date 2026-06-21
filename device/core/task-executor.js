@@ -68,6 +68,7 @@ var taskExecutor = {
     return this._currentAccountId;
   },
 
+  // 设备业务函数：处理 execute 对应的抖音自动化动作、状态或安全边界。
   execute: function (task) {
     logger.info(TAG, "执行任务: " + task.id + " 类型=" + task.type);
 

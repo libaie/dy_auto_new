@@ -79,6 +79,7 @@ DEFAULT_STRATEGIES = [
 
 
 def _default_policy(db: Session, policy_type: str, name: str, snapshot: dict[str, Any]) -> ImageProductionPolicyVersion:
+    """业务函数：处理 _default_policy 对应的业务流程、校验或数据转换。"""
     policy = (
         db.query(ImageProductionPolicyVersion)
         .filter(
@@ -103,6 +104,7 @@ def _default_policy(db: Session, policy_type: str, name: str, snapshot: dict[str
 
 
 def _strategy_snapshot(strategy: ImageProductionStrategy) -> dict[str, Any]:
+    """业务函数：处理 _strategy_snapshot 对应的业务流程、校验或数据转换。"""
     return {
         "id": strategy.id,
         "slug": strategy.slug,
@@ -124,6 +126,7 @@ def _strategy_snapshot(strategy: ImageProductionStrategy) -> dict[str, Any]:
 
 
 def _write_version(db: Session, strategy: ImageProductionStrategy) -> ImageProductionStrategyVersion:
+    """业务函数：处理 _write_version 对应的业务流程、校验或数据转换。"""
     version = ImageProductionStrategyVersion(
         strategy_id=strategy.id,
         version=strategy.version,
@@ -135,6 +138,7 @@ def _write_version(db: Session, strategy: ImageProductionStrategy) -> ImageProdu
 
 
 def _validate_strategy_input(payload: dict[str, Any]) -> None:
+    """业务函数：处理 _validate_strategy_input 对应的业务流程、校验或数据转换。"""
     if payload.get("destination_role") not in VALID_DESTINATION_ROLES:
         raise image_error(
             422,
@@ -163,6 +167,7 @@ def _validate_strategy_input(payload: dict[str, Any]) -> None:
 
 
 def _validate_policy_refs(db: Session, payload: dict[str, Any]) -> None:
+    """业务函数：处理 _validate_policy_refs 对应的业务流程、校验或数据转换。"""
     for field, expected_type in POLICY_FIELDS.items():
         policy_id = payload.get(field)
         if not policy_id:
@@ -198,6 +203,7 @@ def _validate_policy_refs(db: Session, payload: dict[str, Any]) -> None:
 
 
 def _is_slug_conflict(exc: IntegrityError) -> bool:
+    """业务函数：处理 _is_slug_conflict 对应的业务流程、校验或数据转换。"""
     message = str(exc.orig).lower()
     return "uq_image_strategy_slug" in message or (
         "unique" in message
@@ -207,6 +213,7 @@ def _is_slug_conflict(exc: IntegrityError) -> bool:
 
 
 def _is_strategy_version_conflict(exc: IntegrityError) -> bool:
+    """业务函数：处理 _is_strategy_version_conflict 对应的业务流程、校验或数据转换。"""
     message = str(exc.orig).lower()
     return "uq_image_strategy_version" in message or (
         "unique" in message
@@ -215,6 +222,7 @@ def _is_strategy_version_conflict(exc: IntegrityError) -> bool:
 
 
 def _raise_integrity_error(exc: IntegrityError) -> None:
+    """业务函数：处理 _raise_integrity_error 对应的业务流程、校验或数据转换。"""
     raise image_error(
         409,
         "IMAGE_STRATEGY_INTEGRITY_ERROR",
@@ -225,6 +233,7 @@ def _raise_integrity_error(exc: IntegrityError) -> None:
 
 
 def seed_default_image_strategies(db: Session) -> None:
+    """业务函数：处理 seed_default_image_strategies 对应的业务流程、校验或数据转换。"""
     review_policy = _default_policy(db, "review", "default-image-review", {"manual_required_for": ["image_to_video_input"]})
     cost_policy = _default_policy(db, "cost", "default-image-cost", {"confirmation_threshold_amount": 1})
     capacity_policy = _default_policy(db, "capacity", "default-image-capacity", {"mode": "preview_only"})
@@ -270,6 +279,7 @@ def list_strategies(
     status: str | None = None,
     destination_role: str | None = None,
 ) -> list[ImageProductionStrategy]:
+    """业务函数：处理 list_strategies 对应的业务流程、校验或数据转换。"""
     query = db.query(ImageProductionStrategy)
     if status:
         query = query.filter(ImageProductionStrategy.status == status)
@@ -279,6 +289,7 @@ def list_strategies(
 
 
 def get_strategy(db: Session, strategy_id: str) -> ImageProductionStrategy:
+    """业务函数：处理 get_strategy 对应的业务流程、校验或数据转换。"""
     strategy = db.query(ImageProductionStrategy).filter(ImageProductionStrategy.id == strategy_id).first()
     if not strategy:
         raise image_error(
@@ -293,6 +304,7 @@ def get_strategy(db: Session, strategy_id: str) -> ImageProductionStrategy:
 
 
 def create_strategy(db: Session, payload: dict[str, Any]) -> ImageProductionStrategy:
+    """业务函数：处理 create_strategy 对应的业务流程、校验或数据转换。"""
     _validate_strategy_input(payload)
     _validate_policy_refs(db, payload)
     strategy = ImageProductionStrategy(
@@ -333,6 +345,7 @@ def create_strategy(db: Session, payload: dict[str, Any]) -> ImageProductionStra
 
 
 def update_strategy(db: Session, strategy_id: str, payload: dict[str, Any]) -> ImageProductionStrategy:
+    """业务函数：处理 update_strategy 对应的业务流程、校验或数据转换。"""
     _validate_strategy_input(payload)
     _validate_policy_refs(db, payload)
     strategy = get_strategy(db, strategy_id)
@@ -380,6 +393,7 @@ def update_strategy(db: Session, strategy_id: str, payload: dict[str, Any]) -> I
 
 
 def set_strategy_status(db: Session, strategy_id: str, status: str) -> ImageProductionStrategy:
+    """业务函数：处理 set_strategy_status 对应的业务流程、校验或数据转换。"""
     if status not in VALID_STATUSES:
         raise image_error(
             422,
@@ -410,6 +424,7 @@ def set_strategy_status(db: Session, strategy_id: str, status: str) -> ImageProd
 
 
 def strategy_payload(strategy: ImageProductionStrategy) -> dict[str, Any]:
+    """业务函数：处理 strategy_payload 对应的业务流程、校验或数据转换。"""
     return {
         "id": strategy.id,
         "slug": strategy.slug,

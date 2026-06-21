@@ -97,10 +97,12 @@ watch(
   { immediate: true },
 )
 
+// 前端业务函数：协调 selectPatch 对应的页面流程、接口调用或状态转换。
 function selectPatch(patch) {
   selectedId.value = patch.id
 }
 
+// 前端业务函数：协调 emitSave 对应的页面流程、接口调用或状态转换。
 function emitSave() {
   if (!selectedPatch.value) return
   emit('save', { ...selectedPatch.value, after: { ...editableAfter.value } })

@@ -89,6 +89,7 @@ var promptTemplateLoader = global.__promptTemplateLoader || {
     return result;
   },
 
+  // 设备业务函数：处理 _applyTemplates 对应的抖音自动化动作、状态或安全边界。
   _applyTemplates: function (templates) {
     for (var i = 0; i < templates.length; i++) {
       var t = templates[i];

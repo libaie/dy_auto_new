@@ -24,6 +24,7 @@ async def create_pair_request(
     raw_request: Request,
     db: Session = Depends(get_db),
 ):
+    """业务函数：处理 create_pair_request 对应的业务流程、校验或数据转换。"""
     """Unauthenticated — device sends pairing request to server.
 
     Flow:
@@ -161,6 +162,7 @@ async def create_pair_request(
 
 
 def _build_approved_payload(pair_req, db=None) -> dict:
+    """业务函数：处理 _build_approved_payload 对应的业务流程、校验或数据转换。"""
     """Build the approved response payload (shared by HTTP and WS)."""
     from app.config import DEVICE_CONFIG, ANTI_DETECT_CONFIG, ANTI_DETECT_CONFIG_VERSION, get_ai_config
 
@@ -185,6 +187,7 @@ def check_pair_status(
     token: str = Query(...),
     db: Session = Depends(get_db),
 ):
+    """业务函数：处理 check_pair_status 对应的业务流程、校验或数据转换。"""
     """Unauthenticated — device polls for approval result."""
     from app.db.models.device_operations import Device, DevicePairRequest
 
@@ -213,6 +216,7 @@ def check_pair_status(
 
 @router.websocket("/ws/pair/{token}")
 async def ws_pair_status(websocket: WebSocket, token: str):
+    """业务函数：处理 ws_pair_status 对应的业务流程、校验或数据转换。"""
     """Device connects via WS to receive real-time pairing approval result."""
     from app.db.models.device_operations import Device, DevicePairRequest
 

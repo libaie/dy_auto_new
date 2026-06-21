@@ -227,6 +227,7 @@ watch(() => form.value.group_id, async (gid) => {
   }
 })
 
+// 前端业务函数：协调 expandKeywords 对应的页面流程、接口调用或状态转换。
 async function expandKeywords() {
   var seed = seedKeyword.value.trim()
   if (!seed) return
@@ -255,6 +256,7 @@ async function expandKeywords() {
   }
 }
 
+// 前端业务函数：协调 submit 对应的页面流程、接口调用或状态转换。
 async function submit() {
   error.value = ''
   const keywords = keywordsText.value.split('\n').map(k => k.trim()).filter(Boolean)

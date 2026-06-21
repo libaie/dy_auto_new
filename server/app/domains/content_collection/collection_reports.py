@@ -18,6 +18,7 @@ _dest_cache: dict[str, dict] = {}
 
 
 async def collect_report(db, request, device_id: str):
+    """业务函数：处理 collect_report 对应的业务流程、校验或数据转换。"""
     await _apply_travel_destination_fallback(db, request)
 
     comment = CollectedComment(
@@ -51,6 +52,7 @@ async def collect_report(db, request, device_id: str):
 
 
 def save_comment_ai_reply(db, request):
+    """业务函数：处理 save_comment_ai_reply 对应的业务流程、校验或数据转换。"""
     query = db.query(CollectedComment).filter(
         CollectedComment.nickname == request.nickname,
         CollectedComment.content == request.text,
@@ -74,6 +76,7 @@ def save_comment_ai_reply(db, request):
 
 
 def save_user_profile(db, request, device_id: str):
+    """业务函数：处理 save_user_profile 对应的业务流程、校验或数据转换。"""
     douyin_id = request.douyin_id.strip()
     if not douyin_id:
         return {"saved": False, "reason": "empty douyin_id"}
@@ -127,6 +130,7 @@ def save_user_profile(db, request, device_id: str):
 
 
 def upload_user_avatar(db, request):
+    """业务函数：处理 upload_user_avatar 对应的业务流程、校验或数据转换。"""
     douyin_id = request.douyin_id.strip()
     if not douyin_id:
         return {"saved": False, "reason": "empty douyin_id"}
@@ -156,6 +160,7 @@ def upload_user_avatar(db, request):
 
 
 async def _apply_travel_destination_fallback(db, request):
+    """业务函数：处理 _apply_travel_destination_fallback 对应的业务流程、校验或数据转换。"""
     is_travel = False
     has_destination = (
         request.comment.intended_province
@@ -183,6 +188,7 @@ async def _apply_travel_destination_fallback(db, request):
 
 
 async def _resolve_destination(keyword: str, db) -> dict | None:
+    """业务函数：处理 _resolve_destination 对应的业务流程、校验或数据转换。"""
     if not keyword or keyword in _dest_cache:
         return _dest_cache.get(keyword)
     from app.domains.model_configuration.ai_generator import ai_generator
@@ -208,6 +214,7 @@ async def _resolve_destination(keyword: str, db) -> dict | None:
 
 
 def _upsert_collected_user(db, request, device_id: str) -> bool:
+    """业务函数：处理 _upsert_collected_user 对应的业务流程、校验或数据转换。"""
     if not request.user:
         return False
     user_douyin_id = (request.user.douyin_id or "").strip()
@@ -258,6 +265,7 @@ def _upsert_collected_user(db, request, device_id: str) -> bool:
 
 
 def _apply_user_fields(user, request, nickname: str, device_id: str):
+    """业务函数：处理 _apply_user_fields 对应的业务流程、校验或数据转换。"""
     user.nickname = nickname
     user.likes_count = request.user.likes_count
     user.follow_count = request.user.follow_count

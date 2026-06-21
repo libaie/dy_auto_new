@@ -490,6 +490,7 @@ SearchBaseHandler._clickSearchResult = function (index) {
   var screenW = device.width;
   var screenH = device.height;
 
+  // 设备业务函数：处理 isVisible 对应的抖音自动化动作、状态或安全边界。
   function isVisible(el) {
     if (!el) return false;
     if (el.isCoordinate || el.isImage || el.isPress) {
@@ -505,6 +506,7 @@ SearchBaseHandler._clickSearchResult = function (index) {
     } catch (e) { return false; }
   }
 
+  // 设备业务函数：处理 tryClick 对应的抖音自动化动作、状态或安全边界。
   function tryClick(el) {
     if (!el) return false;
     if (el.isCoordinate || el.isImage || el.isPress || el.isPackage) return uiOperator.clickElement(el);
@@ -517,6 +519,7 @@ SearchBaseHandler._clickSearchResult = function (index) {
     return false;
   }
 
+  // 设备业务函数：处理 findRecyclerView 对应的抖音自动化动作、状态或安全边界。
   function findRecyclerView() {
     var rv = id("recycler_view").findOne(500);
     if (rv) return rv;
@@ -653,8 +656,10 @@ SearchBaseHandler._getCacheDir = function () {
   return dirs[0] || "/sdcard/dy_auto/cache";
 };
 
+// 设备业务函数：处理 SearchBaseHandler._getCacheDirCandidates 对应的抖音自动化动作、状态或安全边界。
 SearchBaseHandler._getCacheDirCandidates = function () {
   var dirs = [];
+  // 设备业务函数：处理 add 对应的抖音自动化动作、状态或安全边界。
   function add(dir) {
     if (dir && dirs.indexOf(dir) === -1) dirs.push(dir);
   }
@@ -670,6 +675,7 @@ SearchBaseHandler._getCacheDirCandidates = function () {
   return dirs;
 };
 
+// 设备业务函数：处理 SearchBaseHandler._ensureCacheDir 对应的抖音自动化动作、状态或安全边界。
 SearchBaseHandler._ensureCacheDir = function (dir) {
   try {
     var f = new java.io.File(String(dir));
@@ -698,6 +704,7 @@ SearchBaseHandler._storageGet = function (key, defaultVal) {
   return defaultVal;
 };
 
+// 设备业务函数：处理 SearchBaseHandler._storageSet 对应的抖音自动化动作、状态或安全边界。
 SearchBaseHandler._storageSet = function (key, val) {
   var dirs = this._getCacheDirCandidates();
   var lastErr = "";
@@ -835,6 +842,7 @@ SearchBaseHandler._countSentDMResults = function (results) {
   return count;
 };
 
+// 设备业务函数：处理 SearchBaseHandler._buildFallbackRecipientId 对应的抖音自动化动作、状态或安全边界。
 SearchBaseHandler._buildFallbackRecipientId = function (nickname) {
   var value = nickname || "unknown";
   var hash = 0;
@@ -845,12 +853,14 @@ SearchBaseHandler._buildFallbackRecipientId = function (nickname) {
   return "fb_" + Math.abs(hash).toString(16);
 };
 
+// 设备业务函数：处理 SearchBaseHandler._buildDMMessageKey 对应的抖音自动化动作、状态或安全边界。
 SearchBaseHandler._buildDMMessageKey = function (conversationId, params, order) {
   var taskId = (params && params.task_id) || conversationId || "task";
   var sequenceId = (params && params.dm_sequence_id) || "single";
   return taskId + ":" + sequenceId + ":" + order;
 };
 
+// 设备业务函数：处理 SearchBaseHandler._reportDMSendResults 对应的抖音自动化动作、状态或安全边界。
 SearchBaseHandler._reportDMSendResults = function (conversationId, results, params, stage, intent, keyword) {
   if (!conversationId || !results || results.length === 0) return 0;
   var apiClient = require("../core/api-client");
@@ -881,6 +891,7 @@ SearchBaseHandler._reportDMSendResults = function (conversationId, results, para
   return reported;
 };
 
+// 设备业务函数：处理 SearchBaseHandler._buildDMFailureResults 对应的抖音自动化动作、状态或安全边界。
 SearchBaseHandler._buildDMFailureResults = function (messages, keyword, errorMessage) {
   var results = [];
   if (!messages) return results;
@@ -899,6 +910,7 @@ SearchBaseHandler._buildDMFailureResults = function (messages, keyword, errorMes
   return results;
 };
 
+// 设备业务函数：处理 SearchBaseHandler._sendMessageSequence 对应的抖音自动化动作、状态或安全边界。
 SearchBaseHandler._sendMessageSequence = function (messages, stats, keyword) {
   var results = [];
   var antiDetect = require("../core/anti-detect");

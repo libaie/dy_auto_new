@@ -34,12 +34,14 @@ DEFAULT_FRAME_SECONDS = 5.0
 
 
 def _style_lock(series: Series) -> dict[str, Any]:
+    """业务函数：处理 _style_lock 对应的业务流程、校验或数据转换。"""
     story_bible = series.story_bible_json if isinstance(series.story_bible_json, dict) else {}
     style_lock = story_bible.get("style_lock") or {}
     return style_lock if isinstance(style_lock, dict) else {}
 
 
 def _frames(episode: Episode) -> list[dict[str, Any]]:
+    """业务函数：处理 _frames 对应的业务流程、校验或数据转换。"""
     storyboard = episode.storyboard_json if isinstance(episode.storyboard_json, dict) else {}
     frames = storyboard.get("frames") or []
     if not isinstance(frames, list):
@@ -50,6 +52,7 @@ def _frames(episode: Episode) -> list[dict[str, Any]]:
 
 
 def _style_lock_version(style_lock: dict[str, Any]) -> int:
+    """业务函数：处理 _style_lock_version 对应的业务流程、校验或数据转换。"""
     try:
         return int(style_lock.get("version") or 1)
     except (TypeError, ValueError):
@@ -57,6 +60,7 @@ def _style_lock_version(style_lock: dict[str, Any]) -> int:
 
 
 def _frame_duration(frame: dict[str, Any]) -> float:
+    """业务函数：处理 _frame_duration 对应的业务流程、校验或数据转换。"""
     try:
         duration = float(frame.get("duration") or frame.get("duration_seconds") or DEFAULT_FRAME_SECONDS)
     except (TypeError, ValueError):
@@ -65,6 +69,7 @@ def _frame_duration(frame: dict[str, Any]) -> float:
 
 
 def _segment_durations(duration: float, max_seconds: float = MAX_SEGMENT_SECONDS) -> list[float]:
+    """业务函数：处理 _segment_durations 对应的业务流程、校验或数据转换。"""
     count = max(1, ceil(duration / max_seconds))
     each = round(duration / count, 2)
     values = [each for _ in range(count)]
@@ -73,6 +78,7 @@ def _segment_durations(duration: float, max_seconds: float = MAX_SEGMENT_SECONDS
 
 
 def _extract_urls(value: Any) -> list[str]:
+    """业务函数：处理 _extract_urls 对应的业务流程、校验或数据转换。"""
     if not value:
         return []
     if isinstance(value, str):
@@ -94,10 +100,12 @@ def _extract_urls(value: Any) -> list[str]:
 
 
 def _dedupe_urls(urls: list[str]) -> list[str]:
+    """业务函数：处理 _dedupe_urls 对应的业务流程、校验或数据转换。"""
     return list(dict.fromkeys(url for url in urls if url))
 
 
 def _style_reference_urls(style_lock: dict[str, Any]) -> list[str]:
+    """业务函数：处理 _style_reference_urls 对应的业务流程、校验或数据转换。"""
     visual_style = style_lock.get("visual_style") or {}
     if not isinstance(visual_style, dict):
         visual_style = {}
@@ -108,6 +116,7 @@ def _style_reference_urls(style_lock: dict[str, Any]) -> list[str]:
 
 
 def _reference_roles(frame: dict[str, Any], style_lock: dict[str, Any]) -> list[dict[str, Any]]:
+    """业务函数：处理 _reference_roles 对应的业务流程、校验或数据转换。"""
     roles = []
     priority = 1
     for url in _dedupe_urls(_extract_urls(frame.get("reference_urls"))):
@@ -120,6 +129,7 @@ def _reference_roles(frame: dict[str, Any], style_lock: dict[str, Any]) -> list[
 
 
 def _frame_continuity_mode(frame: dict[str, Any], segment_count: int) -> str:
+    """业务函数：处理 _frame_continuity_mode 对应的业务流程、校验或数据转换。"""
     if segment_count > 1:
         return CONTINUITY_CONTINUOUS_ACTION
     return str(frame.get("continuity_mode") or CONTINUITY_NARRATIVE_CUT)
@@ -133,6 +143,7 @@ def create_episode_production_plan(
     budget_limit: float | None = None,
     include_segments: bool = True,
 ) -> ProductionPlan:
+    """业务函数：处理 create_episode_production_plan 对应的业务流程、校验或数据转换。"""
     series = db.query(Series).filter(Series.id == series_id).first()
     if not series:
         raise ValueError("Series not found")
@@ -260,6 +271,7 @@ def ensure_episode_production_plan(
     budget_limit: float | None = None,
     include_segments: bool = True,
 ) -> ProductionPlan:
+    """业务函数：处理 ensure_episode_production_plan 对应的业务流程、校验或数据转换。"""
     existing = (
         db.query(ProductionPlan)
         .join(ProductionEpisode, ProductionEpisode.plan_id == ProductionPlan.id)
@@ -290,6 +302,7 @@ def ensure_shot_segments(
     production_episode_id: str,
     preferred_segment_seconds: float = MAX_SEGMENT_SECONDS,
 ) -> list[ProductionSegment]:
+    """业务函数：处理 ensure_shot_segments 对应的业务流程、校验或数据转换。"""
     production_episode = db.query(ProductionEpisode).filter(ProductionEpisode.id == production_episode_id).first()
     if not production_episode:
         raise ValueError("Production episode not found")

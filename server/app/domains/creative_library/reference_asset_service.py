@@ -26,7 +26,9 @@ from app.domains.creative_library.visual_style_inference_service import (
 
 
 class ReferenceAssetError(Exception):
+    """业务类：承载 ReferenceAssetError 相关的数据结构、状态或业务协作。"""
     def __init__(self, code: str, message: str, details: dict | None = None):
+        """初始化业务对象依赖，保存后续流程需要的运行上下文。"""
         super().__init__(message)
         self.code = code
         self.message = message
@@ -59,6 +61,7 @@ PROJECT_MANAGED_REFERENCE_PREFIXES = ("/static/image-creation/", "/api/image-cre
 
 
 def _tos_signed_url_expires_at(value: str) -> datetime | None:
+    """业务函数：处理 _tos_signed_url_expires_at 对应的业务流程、校验或数据转换。"""
     parsed = urlparse(str(value or "").strip())
     query = {key.lower(): values for key, values in parse_qs(parsed.query).items()}
     date_values = query.get("x-tos-date")
@@ -74,6 +77,7 @@ def _tos_signed_url_expires_at(value: str) -> datetime | None:
 
 
 def reference_url_is_usable(value: str | None, *, now: datetime | None = None) -> bool:
+    """业务函数：处理 reference_url_is_usable 对应的业务流程、校验或数据转换。"""
     clean = str(value or "").strip()
     if not clean:
         return False
@@ -87,6 +91,7 @@ def reference_url_is_usable(value: str | None, *, now: datetime | None = None) -
 
 
 def _reference_url_needs_project_copy(value: str | None) -> bool:
+    """业务函数：处理 _reference_url_needs_project_copy 对应的业务流程、校验或数据转换。"""
     clean = str(value or "").strip()
     if not clean:
         return False
@@ -106,6 +111,7 @@ def _reference_url_needs_project_copy(value: str | None) -> bool:
 
 
 async def _ensure_project_reference_asset(db: Session, asset: ImageCreationAsset) -> ImageCreationAsset:
+    """业务函数：处理 _ensure_project_reference_asset 对应的业务流程、校验或数据转换。"""
     if not asset.url or not _reference_url_needs_project_copy(asset.url):
         return asset
     from app.domains.image_generation.image_creation_service import _copy_external_image
@@ -134,16 +140,19 @@ async def _ensure_project_reference_asset(db: Session, asset: ImageCreationAsset
 
 
 def _slot_fields(slots: tuple[tuple[str, str], ...]) -> set[str]:
+    """业务函数：处理 _slot_fields 对应的业务流程、校验或数据转换。"""
     return {field for field, _label in slots}
 
 
 def _reference_idempotency_key(destination_role: str, prompt: str, destination_context: dict | None) -> str:
+    """业务函数：处理 _reference_idempotency_key 对应的业务流程、校验或数据转换。"""
     context_hash = hashlib.sha256(repr(sorted((destination_context or {}).items())).encode("utf-8")).hexdigest()
     prompt_hash = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
     return f"reference:{destination_role}:{context_hash[:16]}:{prompt_hash}"
 
 
 def _json_dict(value) -> dict:
+    """业务函数：处理 _json_dict 对应的业务流程、校验或数据转换。"""
     if isinstance(value, dict):
         return value
     if isinstance(value, str) and value.strip():
@@ -156,6 +165,7 @@ def _json_dict(value) -> dict:
 
 
 def _image_task_error(exc: HTTPException, scene_key: str) -> ReferenceAssetError:
+    """业务函数：处理 _image_task_error 对应的业务流程、校验或数据转换。"""
     detail = exc.detail if isinstance(exc.detail, dict) else {"message": str(exc.detail)}
     provider_code = detail.get("error_code") or detail.get("code") or "REFERENCE_PROVIDER_REQUEST_FAILED"
     message = detail.get("message") or "Reference image provider request failed"
@@ -173,6 +183,7 @@ def _image_task_error(exc: HTTPException, scene_key: str) -> ReferenceAssetError
 
 
 def _raise_failed_reference_task(task) -> None:
+    """业务函数：处理 _raise_failed_reference_task 对应的业务流程、校验或数据转换。"""
     if task.status in FAILED_REFERENCE_TASK_STATUSES or task.error_code:
         raise ReferenceAssetError(
             "REFERENCE_PROVIDER_REQUEST_FAILED",
@@ -187,6 +198,7 @@ def _raise_failed_reference_task(task) -> None:
 
 
 def _latest_reference_asset(db: Session, task_id: str) -> ImageCreationAsset | None:
+    """业务函数：处理 _latest_reference_asset 对应的业务流程、校验或数据转换。"""
     assets = (
         db.query(ImageCreationAsset)
         .filter(ImageCreationAsset.task_id == task_id)
@@ -204,6 +216,7 @@ def _task_matches_reference_destination(
     destination_role: str,
     destination_context: dict | None,
 ) -> bool:
+    """业务函数：处理 _task_matches_reference_destination 对应的业务流程、校验或数据转换。"""
     expected = destination_context or {}
     if not expected or task.destination_role != destination_role:
         return False
@@ -215,6 +228,7 @@ def _find_reusable_reference_task(
     destination_role: str,
     destination_context: dict | None,
 ) -> ImageCreationTask | None:
+    """业务函数：处理 _find_reusable_reference_task 对应的业务流程、校验或数据转换。"""
     if not destination_context:
         return None
     candidates = (
@@ -235,6 +249,7 @@ def _find_reusable_reference_task(
 
 
 async def _sync_reference_task_until_asset_ready(db: Session, task, sync_image_task):
+    """业务函数：处理 _sync_reference_task_until_asset_ready 对应的业务流程、校验或数据转换。"""
     for attempt in range(max(1, REFERENCE_SYNC_POLL_ATTEMPTS)):
         task = await sync_image_task(db, task.id)
         _raise_failed_reference_task(task)
@@ -254,6 +269,7 @@ async def generate_reference_url(
     destination_role: str = "style_reference_image",
     destination_context: dict | None = None,
 ) -> str:
+    """业务函数：处理 generate_reference_url 对应的业务流程、校验或数据转换。"""
     from app.domains.image_generation.image_creation_service import create_image_task, sync_image_task
 
     payload = {
@@ -299,6 +315,7 @@ async def generate_reference_url(
 
 
 def _series_text_for_character(db: Session, character_id: str) -> str:
+    """业务函数：处理 _series_text_for_character 对应的业务流程、校验或数据转换。"""
     series = (
         db.query(Series)
         .join(series_characters, Series.id == series_characters.c.series_id)
@@ -312,6 +329,7 @@ def _series_text_for_character(db: Session, character_id: str) -> str:
 
 
 def _series_text_for_scene(db: Session, scene_id: str) -> str:
+    """业务函数：处理 _series_text_for_scene 对应的业务流程、校验或数据转换。"""
     series = (
         db.query(Series)
         .join(series_scenes, Series.id == series_scenes.c.series_id)
@@ -325,6 +343,7 @@ def _series_text_for_scene(db: Session, scene_id: str) -> str:
 
 
 def _character_prompt(character: Character, label: str, visual_style: dict | None = None) -> str:
+    """业务函数：处理 _character_prompt 对应的业务流程、校验或数据转换。"""
     prompt = (
         f"{label}, clear face, hairstyle, outfit, stable identity, consistent series style. "
         f"Name: {character.name}. Role: {character.role_type}. Gender: {character.gender}. "
@@ -335,6 +354,7 @@ def _character_prompt(character: Character, label: str, visual_style: dict | Non
 
 
 def _scene_prompt(scene: Scene, label: str, visual_style: dict | None = None) -> str:
+    """业务函数：处理 _scene_prompt 对应的业务流程、校验或数据转换。"""
     prompt = (
         f"{label}, consistent palette, lighting, environment design, and series style. "
         f"Scene: {scene.name}. Type: {scene.scene_type}. Location: {scene.location_desc or ''}. "
@@ -345,6 +365,7 @@ def _scene_prompt(scene: Scene, label: str, visual_style: dict | None = None) ->
 
 
 def _stored_reference_prompt_matches(row, slot: str, visual_style: dict | None) -> bool:
+    """业务函数：处理 _stored_reference_prompt_matches 对应的业务流程、校验或数据转换。"""
     meta_json = row.meta_json or {}
     reference_generation = meta_json.get("reference_generation") if isinstance(meta_json, dict) else {}
     slot_meta = reference_generation.get(slot) if isinstance(reference_generation, dict) else {}
@@ -353,6 +374,7 @@ def _stored_reference_prompt_matches(row, slot: str, visual_style: dict | None) 
 
 
 def _target_slots(row, requested_slot: str, slots: tuple[tuple[str, str], ...], visual_style: dict | None = None) -> list[tuple[str, str]]:
+    """业务函数：处理 _target_slots 对应的业务流程、校验或数据转换。"""
     if requested_slot == "all":
         return [
             (field, label)
@@ -372,6 +394,7 @@ def _target_slots(row, requested_slot: str, slots: tuple[tuple[str, str], ...], 
 
 
 def _record_generation(row, slot: str, prompt: str, url: str) -> None:
+    """业务函数：处理 _record_generation 对应的业务流程、校验或数据转换。"""
     meta_json = dict(row.meta_json or {})
     reference_generation = dict(meta_json.get("reference_generation") or {})
     reference_generation[slot] = {
@@ -385,10 +408,12 @@ def _record_generation(row, slot: str, prompt: str, url: str) -> None:
 
 
 def _to_dict(row) -> dict:
+    """业务函数：处理 _to_dict 对应的业务流程、校验或数据转换。"""
     return {col.name: getattr(row, col.name) for col in row.__table__.columns}
 
 
 async def generate_character_reference_images(db: Session, character_id: str, slot: str = "all") -> dict:
+    """业务函数：处理 generate_character_reference_images 对应的业务流程、校验或数据转换。"""
     from app.domains.creative_library.anchor_service import AssetAnchorManager
 
     character = db.query(Character).filter(Character.id == character_id).first()
@@ -432,6 +457,7 @@ async def generate_character_reference_images(db: Session, character_id: str, sl
 
 
 async def generate_scene_reference_images(db: Session, scene_id: str, slot: str = "all") -> dict:
+    """业务函数：处理 generate_scene_reference_images 对应的业务流程、校验或数据转换。"""
     from app.domains.creative_library.anchor_service import AssetAnchorManager
 
     scene = db.query(Scene).filter(Scene.id == scene_id).first()

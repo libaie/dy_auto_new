@@ -58,6 +58,7 @@ CREATIVE_PATCH_STAGE_GATES = {
 
 
 def _deferred_stage_gate_timeout_seconds() -> float:
+    """业务函数：处理 _deferred_stage_gate_timeout_seconds 对应的业务流程、校验或数据转换。"""
     try:
         return float(os.getenv("DY_AUTO_DEFERRED_STAGE_GATE_TIMEOUT_SECONDS", DEFERRED_STAGE_GATE_TIMEOUT_SECONDS))
     except (TypeError, ValueError):
@@ -65,10 +66,12 @@ def _deferred_stage_gate_timeout_seconds() -> float:
 
 
 def _pixelle_output_root() -> Path:
+    """业务函数：处理 _pixelle_output_root 对应的业务流程、校验或数据转换。"""
     return Path(PIXELLE_CONFIG_PATH).resolve().parent / "output"
 
 
 async def execute_real_job(db: Session, run: VideoProductionRun, job: ProductionJob) -> ProductionActionResult:
+    """业务函数：处理 execute_real_job 对应的业务流程、校验或数据转换。"""
     if is_agency_repair_stage(job.stage):
         return await execute_repair_job(db, job)
     try:
@@ -91,6 +94,7 @@ async def execute_real_job(db: Session, run: VideoProductionRun, job: Production
 
 
 def _provider_agent_success_has_provider_evidence(parsed: dict) -> bool:
+    """业务函数：处理 _provider_agent_success_has_provider_evidence 对应的业务流程、校验或数据转换。"""
     if not parsed.get("provider_stage_task_id"):
         return False
     raw = parsed.get("raw")
@@ -106,6 +110,7 @@ def _provider_agent_blocked_result(
     job: ProductionJob,
     parsed: dict,
 ) -> ProductionActionResult:
+    """业务函数：处理 _provider_agent_blocked_result 对应的业务流程、校验或数据转换。"""
     code = str(parsed.get("code") or parsed.get("error_code") or "")
     if code in {item.value for item in ProductionErrorCode}:
         affected_ids = parsed.get("affected_ids")
@@ -133,6 +138,7 @@ def _provider_agent_blocked_result(
 
 
 async def execute_provider_job_direct(db: Session, run: VideoProductionRun, job: ProductionJob) -> ProductionActionResult:
+    """业务函数：处理 execute_provider_job_direct 对应的业务流程、校验或数据转换。"""
     job_spec = _job_spec(db, run, job)
     gate_result = await _run_deferred_stage_gates(db, run, job, job_spec)
     if gate_result is not None:
@@ -181,6 +187,7 @@ async def _run_deferred_stage_gates(
     job: ProductionJob,
     job_spec: dict,
 ) -> ProductionActionResult | None:
+    """业务函数：处理 _run_deferred_stage_gates 对应的业务流程、校验或数据转换。"""
     from app.domains.video_production import video_production_service as video_service
     from app.domains.model_configuration.runtime_model_config import RuntimeModelConfigError
 
@@ -274,6 +281,7 @@ async def _run_deferred_stage_gates(
 
 
 def run_real_worker_step(db: Session, run_id: str, *, lease_id: str, batch_size: int = 1) -> dict:
+    """业务函数：处理 run_real_worker_step 对应的业务流程、校验或数据转换。"""
     run = db.query(VideoProductionRun).filter(VideoProductionRun.id == run_id).first()
     if not run:
         raise ValueError("Run not found")
@@ -319,6 +327,7 @@ def run_real_worker_step(db: Session, run_id: str, *, lease_id: str, batch_size:
 
 
 def _worker_capability_from_model_config(model_config: dict | None) -> dict:
+    """业务函数：处理 _worker_capability_from_model_config 对应的业务流程、校验或数据转换。"""
     if not isinstance(model_config, dict):
         return capability_from_model_config(model_config)
     normalized = dict(model_config)
@@ -332,6 +341,7 @@ def _worker_capability_from_model_config(model_config: dict | None) -> dict:
 
 
 def _model_estimated_cost(model_config: dict | None) -> float:
+    """业务函数：处理 _model_estimated_cost 对应的业务流程、校验或数据转换。"""
     if not isinstance(model_config, dict):
         return 0.0
     candidates = [model_config.get("estimated_cost"), model_config.get("cost")]
@@ -352,6 +362,7 @@ def _model_estimated_cost(model_config: dict | None) -> float:
 
 
 def _process_claimed_job(db: Session, run: VideoProductionRun, job: ProductionJob) -> dict:
+    """业务函数：处理 _process_claimed_job 对应的业务流程、校验或数据转换。"""
     try:
         _mark_segment_running_for_job(db, job)
         result = _run_async(execute_real_job(db, run, job))
@@ -416,6 +427,7 @@ def _process_claimed_job(db: Session, run: VideoProductionRun, job: ProductionJo
 
 
 def _run_async(coro):
+    """业务函数：处理 _run_async 对应的业务流程、校验或数据转换。"""
     try:
         asyncio.get_running_loop()
     except RuntimeError:
@@ -424,6 +436,7 @@ def _run_async(coro):
 
 
 def _success_item(result: Any, job: ProductionJob) -> dict:
+    """业务函数：处理 _success_item 对应的业务流程、校验或数据转换。"""
     if isinstance(result, ProductionActionResult):
         payload = result.to_http_detail()
         return {
@@ -443,6 +456,7 @@ def _success_item(result: Any, job: ProductionJob) -> dict:
 
 
 def _result_is_blocked(result: Any) -> bool:
+    """业务函数：处理 _result_is_blocked 对应的业务流程、校验或数据转换。"""
     if isinstance(result, ProductionActionResult):
         return result.status != "success"
     if isinstance(result, dict):
@@ -451,6 +465,7 @@ def _result_is_blocked(result: Any) -> bool:
 
 
 def _record_blocked_result(db: Session, job: ProductionJob, result: Any) -> dict:
+    """业务函数：处理 _record_blocked_result 对应的业务流程、校验或数据转换。"""
     if isinstance(result, ProductionActionResult):
         detail = result.to_http_detail()
         code = detail.get("code") or ProductionErrorCode.PROVIDER_TASK_FAILED.value
@@ -505,6 +520,7 @@ def _failed_job_item(
     message: str,
     detail: dict,
 ) -> dict:
+    """业务函数：处理 _failed_job_item 对应的业务流程、校验或数据转换。"""
     return {
         "ok": False,
         "job_id": failed.id,
@@ -519,6 +535,7 @@ def _failed_job_item(
 
 
 def _fail_or_reload_job(db: Session, job: ProductionJob, code: str, message: str, retryable: bool) -> ProductionJob:
+    """业务函数：处理 _fail_or_reload_job 对应的业务流程、校验或数据转换。"""
     current = db.query(ProductionJob).filter(ProductionJob.id == job.id).first()
     if current and current.status not in {"leased", "running"}:
         return current
@@ -538,12 +555,14 @@ def _fail_or_reload_job(db: Session, job: ProductionJob, code: str, message: str
 
 
 def _segment_for_job(db: Session, job: ProductionJob) -> ProductionSegment | None:
+    """业务函数：处理 _segment_for_job 对应的业务流程、校验或数据转换。"""
     if job.target_type != "production_segment":
         return None
     return db.query(ProductionSegment).filter(ProductionSegment.id == job.target_id).first()
 
 
 def _mark_segment_running_for_job(db: Session, job: ProductionJob) -> None:
+    """业务函数：处理 _mark_segment_running_for_job 对应的业务流程、校验或数据转换。"""
     segment = _segment_for_job(db, job)
     if not segment:
         return
@@ -557,6 +576,7 @@ def _mark_segment_running_for_job(db: Session, job: ProductionJob) -> None:
 
 
 def _mark_segment_failed_for_job(db: Session, job: ProductionJob) -> None:
+    """业务函数：处理 _mark_segment_failed_for_job 对应的业务流程、校验或数据转换。"""
     segment = _segment_for_job(db, job)
     if not segment:
         return
@@ -565,6 +585,7 @@ def _mark_segment_failed_for_job(db: Session, job: ProductionJob) -> None:
 
 
 def _mark_segment_blocked_for_job(db: Session, job: ProductionJob) -> None:
+    """业务函数：处理 _mark_segment_blocked_for_job 对应的业务流程、校验或数据转换。"""
     segment = _segment_for_job(db, job)
     if not segment:
         return
@@ -572,6 +593,7 @@ def _mark_segment_blocked_for_job(db: Session, job: ProductionJob) -> None:
 
 
 def _result_provider_task_id(result: Any) -> str | None:
+    """业务函数：处理 _result_provider_task_id 对应的业务流程、校验或数据转换。"""
     data = None
     if isinstance(result, ProductionActionResult):
         data = result.data
@@ -584,6 +606,7 @@ def _result_provider_task_id(result: Any) -> str | None:
 
 
 def _model_config_body(model_config: dict) -> dict:
+    """业务函数：处理 _model_config_body 对应的业务流程、校验或数据转换。"""
     config = {}
     for key in ("config_json", "config"):
         value = model_config.get(key)
@@ -593,6 +616,7 @@ def _model_config_body(model_config: dict) -> dict:
 
 
 def _image_model_supports_references(model_config: dict) -> bool:
+    """业务函数：处理 _image_model_supports_references 对应的业务流程、校验或数据转换。"""
     config = _model_config_body(model_config)
     capabilities = config.get("capabilities") if isinstance(config.get("capabilities"), dict) else {}
     limits = config.get("limits") if isinstance(config.get("limits"), dict) else {}
@@ -607,12 +631,14 @@ def _image_model_supports_references(model_config: dict) -> bool:
 
 
 def _strip_text_only_image_prompt(prompt: str) -> str:
+    """业务函数：处理 _strip_text_only_image_prompt 对应的业务流程、校验或数据转换。"""
     clean = re.sub(r"@Image\s+\d+\s+locks[^.。]*(?:[.。]\s*)?", "", str(prompt or ""))
     clean = re.sub(r"Style reference images lock[^.。]*(?:[.。]\s*)?", "", clean)
     return " ".join(clean.split())
 
 
 def _image_frame_for_model(frame: dict, model_config: dict) -> dict:
+    """业务函数：处理 _image_frame_for_model 对应的业务流程、校验或数据转换。"""
     if _image_model_supports_references(model_config):
         return frame
     style_constraints = dict(frame.get("style_constraints") or {})
@@ -627,6 +653,7 @@ def _image_frame_for_model(frame: dict, model_config: dict) -> dict:
 
 
 def _storyboard_for_text_only_image_model(storyboard: dict | None) -> dict:
+    """业务函数：处理 _storyboard_for_text_only_image_model 对应的业务流程、校验或数据转换。"""
     sanitized = copy.deepcopy(storyboard or {})
     frames = sanitized.get("frames")
     if isinstance(frames, list):
@@ -644,6 +671,7 @@ def _storyboard_for_text_only_image_model(storyboard: dict | None) -> dict:
 
 
 def _image_stage_context_for_model(context: dict, model_config: dict) -> dict:
+    """业务函数：处理 _image_stage_context_for_model 对应的业务流程、校验或数据转换。"""
     if _image_model_supports_references(model_config):
         return context
     sanitized = copy.deepcopy(context)
@@ -658,6 +686,7 @@ def _image_stage_context_for_model(context: dict, model_config: dict) -> dict:
 
 
 def _job_spec(db: Session, run: VideoProductionRun, job: ProductionJob) -> dict:
+    """业务函数：处理 _job_spec 对应的业务流程、校验或数据转换。"""
     from app.domains.video_production import video_production_service as video_service
 
     _guard_creative_patch_job(db, run, job)
@@ -711,6 +740,7 @@ def _job_spec(db: Session, run: VideoProductionRun, job: ProductionJob) -> dict:
 
 
 def _guard_creative_patch_job(db: Session, run: VideoProductionRun, job: ProductionJob) -> None:
+    """业务函数：处理 _guard_creative_patch_job 对应的业务流程、校验或数据转换。"""
     stage_gate = CREATIVE_PATCH_STAGE_GATES.get(job.stage)
     if not stage_gate:
         return
@@ -729,6 +759,7 @@ def _guard_creative_patch_job(db: Session, run: VideoProductionRun, job: Product
 
 
 def _find_frame(frames: list[dict], target_id: str) -> dict:
+    """业务函数：处理 _find_frame 对应的业务流程、校验或数据转换。"""
     for frame in frames:
         if frame.get("production_segment_id") == target_id or frame.get("frame_id") == target_id:
             return frame
@@ -744,12 +775,15 @@ def _find_frame(frames: list[dict], target_id: str) -> dict:
 
 
 class PixelleStageClientAdapter:
+    """业务类：承载 PixelleStageClientAdapter 相关的数据结构、状态或业务协作。"""
     def __init__(self, db: Session, run: VideoProductionRun, job: ProductionJob):
+        """初始化业务对象依赖，保存后续流程需要的运行上下文。"""
         self.db = db
         self.run = run
         self.job = job
 
     async def submit(self, payload: dict) -> dict:
+        """业务函数：处理 submit 对应的业务流程、校验或数据转换。"""
         from app.domains.video_production import video_production_service as video_service
 
         model_config = payload["model_config"]
@@ -791,6 +825,7 @@ class PixelleStageClientAdapter:
         return {**response, "provider_task_id": stage_task_id}
 
     async def sync(self, provider_task_id: str) -> dict:
+        """业务函数：处理 sync 对应的业务流程、校验或数据转换。"""
         from app.domains.video_production import video_production_service as video_service
 
         status = await video_service.get_stage_task(self.db, provider_task_id)
@@ -798,6 +833,7 @@ class PixelleStageClientAdapter:
 
 
 def _provider_stage_template(payload: dict) -> dict:
+    """业务函数：处理 _provider_stage_template 对应的业务流程、校验或数据转换。"""
     return {
         "external_task_id": payload.get("external_task_id"),
         "provider_stage_task_id": payload.get("provider_stage_task_id"),
@@ -806,6 +842,7 @@ def _provider_stage_template(payload: dict) -> dict:
 
 
 def _callable_accepts_provider_stage_metadata(fn) -> bool:
+    """业务函数：处理 _callable_accepts_provider_stage_metadata 对应的业务流程、校验或数据转换。"""
     try:
         signature = inspect.signature(fn)
     except (TypeError, ValueError):
@@ -821,6 +858,7 @@ def _persist_completed_provider_result(
     job: ProductionJob,
     result: ProductionActionResult,
 ) -> bool:
+    """业务函数：处理 _persist_completed_provider_result 对应的业务流程、校验或数据转换。"""
     from app.domains.video_production import video_production_service as video_service
     from app.domains.video_production.asset_storage_guard import persist_provider_asset
 
@@ -854,10 +892,12 @@ def _persist_completed_provider_result(
 
 
 def _asset_ready_for_review(asset) -> bool:
+    """业务函数：处理 _asset_ready_for_review 对应的业务流程、校验或数据转换。"""
     return bool(asset.copy_status == "persisted" and asset.checksum and asset.storage_path)
 
 
 def _persist_registered_assets(db: Session, assets: list, persist_provider_asset) -> list:
+    """业务函数：处理 _persist_registered_assets 对应的业务流程、校验或数据转换。"""
     persisted = []
     for asset in assets:
         if _asset_ready_for_review(asset):
@@ -878,6 +918,7 @@ def _persist_registered_assets(db: Session, assets: list, persist_provider_asset
 
 
 def _remaining_claimable_jobs(db: Session, plan_id: str) -> int:
+    """业务函数：处理 _remaining_claimable_jobs 对应的业务流程、校验或数据转换。"""
     now = bj_now()
     return db.query(ProductionJob).filter(
         ProductionJob.plan_id == plan_id,
@@ -888,6 +929,7 @@ def _remaining_claimable_jobs(db: Session, plan_id: str) -> int:
 
 
 def _open_stage_jobs(db: Session, plan_id: str, stage: str) -> int:
+    """业务函数：处理 _open_stage_jobs 对应的业务流程、校验或数据转换。"""
     return db.query(ProductionJob).filter(
         ProductionJob.plan_id == plan_id,
         ProductionJob.stage == stage,
@@ -896,6 +938,7 @@ def _open_stage_jobs(db: Session, plan_id: str, stage: str) -> int:
 
 
 def _failed_stage_jobs(db: Session, plan_id: str, stage: str) -> int:
+    """业务函数：处理 _failed_stage_jobs 对应的业务流程、校验或数据转换。"""
     return db.query(ProductionJob).filter(
         ProductionJob.plan_id == plan_id,
         ProductionJob.stage == stage,
@@ -904,6 +947,7 @@ def _failed_stage_jobs(db: Session, plan_id: str, stage: str) -> int:
 
 
 def _blocked_stage_jobs(db: Session, plan_id: str, stage: str) -> int:
+    """业务函数：处理 _blocked_stage_jobs 对应的业务流程、校验或数据转换。"""
     return db.query(ProductionJob).filter(
         ProductionJob.plan_id == plan_id,
         ProductionJob.stage == stage,
@@ -912,6 +956,7 @@ def _blocked_stage_jobs(db: Session, plan_id: str, stage: str) -> int:
 
 
 def _update_run_status_after_stage_job(db: Session, run: VideoProductionRun, stage: str) -> None:
+    """业务函数：处理 _update_run_status_after_stage_job 对应的业务流程、校验或数据转换。"""
     if not run.production_plan_id:
         return
     if stage == "image_generation" and run.status == "image_approved":

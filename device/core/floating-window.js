@@ -19,6 +19,7 @@ function ensureClasses() {
 }
 
 // dp → px
+// 设备业务函数：处理 dpToPx 对应的抖音自动化动作、状态或安全边界。
 function dpToPx(dp) {
   return Math.round(dp * device.density / 160);
 }
@@ -40,6 +41,7 @@ var floatingWindow = {
   _rootPx: 0,
   _ballPx: 0,
 
+  // 设备业务函数：处理 init 对应的抖音自动化动作、状态或安全边界。
   init: function () {
     var self = this;
     ensureClasses();
@@ -173,6 +175,7 @@ var floatingWindow = {
     this._playEdgeBounce(currentX, currentY, targetX, targetY);
   },
 
+  // 设备业务函数：处理 _playEdgeBounce 对应的抖音自动化动作、状态或安全边界。
   _playEdgeBounce: function (startX, startY, endX, endY) {
     var win = this._window;
     var animator = ValueAnimator.ofFloat(0, 1);
@@ -189,6 +192,7 @@ var floatingWindow = {
     ui.run(function () { animator.start(); });
   },
 
+  // 设备业务函数：处理 _playPressAnimation 对应的抖音自动化动作、状态或安全边界。
   _playPressAnimation: function (isPressed) {
     if (!this._window) return;
     var scale = isPressed ? 0.88 : 1.0;
@@ -202,6 +206,7 @@ var floatingWindow = {
     ui.run(function () { set.start(); });
   },
 
+  // 设备业务函数：处理 _playEnterAnimation 对应的抖音自动化动作、状态或安全边界。
   _playEnterAnimation: function () {
     if (!this._window) return;
     var card = this._window.ballCard;
@@ -214,6 +219,7 @@ var floatingWindow = {
     set.start();
   },
 
+  // 设备业务函数：处理 _playClickAnimation 对应的抖音自动化动作、状态或安全边界。
   _playClickAnimation: function () {
     if (!this._window) return;
     var card = this._window.ballCard;
@@ -225,6 +231,7 @@ var floatingWindow = {
     set.start();
   },
 
+  // 设备业务函数：处理 _onButtonClick 对应的抖音自动化动作、状态或安全边界。
   _onButtonClick: function () {
     if (this._isLogVisible) {
       this._hideLogWindow();
@@ -276,6 +283,7 @@ var floatingWindow = {
       });
     }
 
+    // 设备业务函数：处理 this._logListener 对应的抖音自动化动作、状态或安全边界。
     this._logListener = function (level, tag, msg) {
       if (self._logWindow) {
         var now = new Date().toLocaleTimeString();
@@ -322,6 +330,7 @@ var floatingWindow = {
     this._isLogVisible = true;
   },
 
+  // 设备业务函数：处理 _hideLogWindow 对应的抖音自动化动作、状态或安全边界。
   _hideLogWindow: function () {
     if (this._logWindow) {
       if (this._logListener) {
@@ -334,6 +343,7 @@ var floatingWindow = {
     }
   },
 
+  // 设备业务函数：处理 _getLogColor 对应的抖音自动化动作、状态或安全边界。
   _getLogColor: function (level) {
     switch (level) {
       case "error": return "#ff4444";
@@ -344,6 +354,7 @@ var floatingWindow = {
     }
   },
 
+  // 设备业务函数：处理 setStatus 对应的抖音自动化动作、状态或安全边界。
   setStatus: function (status) {
     if (!this._window) return;
     // 美化版的图标指示器
@@ -362,11 +373,13 @@ var floatingWindow = {
     });
   },
 
+  // 设备业务函数：处理 showToast 对应的抖音自动化动作、状态或安全边界。
   showToast: function (msg, duration) {
     duration = duration || 3000;
     toast(msg);
   },
 
+  // 设备业务函数：处理 showPairingUI 对应的抖音自动化动作、状态或安全边界。
   showPairingUI: function (callback) {
     var self = this;
     this._mode = "pair";
@@ -422,6 +435,7 @@ var floatingWindow = {
     });
   },
 
+  // 设备业务函数：处理 updatePairStatus 对应的抖音自动化动作、状态或安全边界。
   updatePairStatus: function (text) {
     if (this._pairWindow && this._pairWindow.statusText) {
       var self = this;
@@ -435,6 +449,7 @@ var floatingWindow = {
     }
   },
 
+  // 设备业务函数：处理 showWaitingUI 对应的抖音自动化动作、状态或安全边界。
   showWaitingUI: function () {
     var self = this;
     this._mode = "waiting";
@@ -478,6 +493,7 @@ var floatingWindow = {
     this.setStatus("running");
   },
 
+  // 设备业务函数：处理 showMainUI 对应的抖音自动化动作、状态或安全边界。
   showMainUI: function () {
     this._mode = "main";
     if (this._pairWindow) {
@@ -493,6 +509,7 @@ var floatingWindow = {
     this.setStatus("idle");
   },
 
+  // 设备业务函数：处理 destroy 对应的抖音自动化动作、状态或安全边界。
   destroy: function () {
     if (this._logListener) {
       logger.removeListener(this._logListener);

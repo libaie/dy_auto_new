@@ -4,6 +4,7 @@ import { ref, reactive } from 'vue'
 /**
  * @param {Object} defaultForm — default values for the form
  */
+// 前端业务函数：协调 useDialog 对应的页面流程、接口调用或状态转换。
 export function useDialog(defaultForm = {}) {
   const isOpen = ref(false)
   const isEditing = ref(false)
@@ -12,6 +13,7 @@ export function useDialog(defaultForm = {}) {
   const editingId = ref(null)
   const form = reactive({ ...defaultForm })
 
+  // 前端业务函数：协调 open 对应的页面流程、接口调用或状态转换。
   function open(data = null) {
     if (data) {
       isEditing.value = true
@@ -26,12 +28,14 @@ export function useDialog(defaultForm = {}) {
     isOpen.value = true
   }
 
+  // 前端业务函数：协调 close 对应的页面流程、接口调用或状态转换。
   function close() {
     isOpen.value = false
     error.value = null
     Object.assign(form, defaultForm)
   }
 
+  // 前端业务函数：协调 reset 对应的页面流程、接口调用或状态转换。
   function reset() {
     Object.assign(form, defaultForm)
     error.value = null

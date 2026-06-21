@@ -1,4 +1,5 @@
 // 前端业务工具：封装 format 相关格式化或轻量转换逻辑。
+// 前端业务函数：协调 formatDate 对应的页面流程、接口调用或状态转换。
 export function formatDate(dateStr) {
   if (!dateStr) return '-'
   const d = new Date(dateStr)

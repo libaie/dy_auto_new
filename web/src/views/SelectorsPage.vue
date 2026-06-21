@@ -173,10 +173,12 @@ const categoryColorMap = {
   collect: 'bg-orange-500/15 text-orange-300 border-orange-500/25',
 }
 
+// 前端业务函数：协调 getCategoryClass 对应的页面流程、接口调用或状态转换。
 function getCategoryClass(cat) {
   return categoryColorMap[cat] || 'bg-cyan-500/15 text-cyan-300 border-cyan-500/25'
 }
 
+// 前端业务函数：协调 _matchVersion 对应的页面流程、接口调用或状态转换。
 function _matchVersion(s) {
   return (s.platform_version || 'default')
 }
@@ -236,6 +238,7 @@ const generatingPrompt = ref(false)
 const regexAiPrompt = useSavedPrompt('selector_regex', '')
 const cleanAiPrompt = useSavedPrompt('selector_clean', '')
 
+// 前端业务函数：协调 generateRegexAI 对应的页面流程、接口调用或状态转换。
 async function generateRegexAI() {
   if (!regexAiPrompt.value.trim()) {
     formError.value = '请输入正则需求描述'
@@ -252,6 +255,7 @@ async function generateRegexAI() {
   }
 }
 
+// 前端业务函数：协调 generateCleanPromptAI 对应的页面流程、接口调用或状态转换。
 async function generateCleanPromptAI() {
   if (!cleanAiPrompt.value.trim()) {
     formError.value = '请输入清洗需求描述'
@@ -276,6 +280,7 @@ const strategyList = ref([])
 
 // Normalize legacy condition types: classNameContains → type:className + match_mode:contains
 // (Chain steps use their own type system — classNameContains is valid there, do NOT touch)
+// 前端业务函数：协调 _normalizeLegacyTypes 对应的页面流程、接口调用或状态转换。
 function _normalizeLegacyTypes(strategies) {
   const MAP = { classNameContains: 'className', idContains: 'id', textContains: 'text', descContains: 'desc' }
   for (const s of strategies) {
@@ -288,6 +293,7 @@ function _normalizeLegacyTypes(strategies) {
   return strategies
 }
 
+// 前端业务函数：协调 syncStrategiesToList 对应的页面流程、接口调用或状态转换。
 function syncStrategiesToList() {
   try {
     strategyList.value = _normalizeLegacyTypes(JSON.parse(form.strategies || '[]'))
@@ -296,20 +302,24 @@ function syncStrategiesToList() {
   }
 }
 
+// 前端业务函数：协调 syncListToStrategies 对应的页面流程、接口调用或状态转换。
 function syncListToStrategies() {
   form.strategies = JSON.stringify(_normalizeLegacyTypes(strategyList.value), null, 2)
 }
 
+// 前端业务函数：协调 addStrategy 对应的页面流程、接口调用或状态转换。
 function addStrategy() {
   strategyList.value.push({ type: 'text', value: '', priority: strategyList.value.length + 1 })
   syncListToStrategies()
 }
 
+// 前端业务函数：协调 updateStrategy 对应的页面流程、接口调用或状态转换。
 function updateStrategy(index, newStrategy) {
   strategyList.value[index] = newStrategy
   syncListToStrategies()
 }
 
+// 前端业务函数：协调 deleteStrategy 对应的页面流程、接口调用或状态转换。
 function deleteStrategy(index) {
   strategyList.value.splice(index, 1)
   // Re-index priorities
@@ -317,6 +327,7 @@ function deleteStrategy(index) {
   syncListToStrategies()
 }
 
+// 前端业务函数：协调 moveStrategy 对应的页面流程、接口调用或状态转换。
 function moveStrategy(index, direction) {
   const target = index + direction
   if (target < 0 || target >= strategyList.value.length) return
@@ -338,6 +349,7 @@ const pageError = ref(null)
 const toast = useToastStore()
 
 // --- WebSocket ---
+// 前端业务函数：协调 wsUrl 对应的页面流程、接口调用或状态转换。
 function wsUrl() {
   const token = localStorage.getItem('token') || ''
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
@@ -350,6 +362,7 @@ useWebSocket(wsUrl, {
 })
 
 // --- Fetch selectors ---
+// 前端业务函数：协调 fetchSelectors 对应的页面流程、接口调用或状态转换。
 async function fetchSelectors() {
   loading.value = true
   try {
@@ -369,6 +382,7 @@ watch(includeDisabled, () => {
 })
 
 // --- Format strategy summary ---
+// 前端业务函数：协调 formatStrategies 对应的页面流程、接口调用或状态转换。
 function formatStrategies(strategies) {
   if (!strategies || strategies.length === 0) return '无策略'
   const parts = strategies.map((s) => {
@@ -412,6 +426,7 @@ function openCreateDialog() {
 }
 
 // --- Open edit dialog ---
+// 前端业务函数：协调 openEditDialog 对应的页面流程、接口调用或状态转换。
 function openEditDialog(sel) {
   isEditing.value = true
   // Snapshot the original composite key — platform_version/resolution_profile
@@ -438,6 +453,7 @@ function openEditDialog(sel) {
 }
 
 // --- Save (create or update) ---
+// 前端业务函数：协调 handleSave 对应的页面流程、接口调用或状态转换。
 async function handleSave() {
   if (!form.action_name.trim()) {
     formError.value = 'action_name 不能为空'
@@ -500,11 +516,13 @@ async function handleSave() {
 }
 
 // --- Delete ---
+// 前端业务函数：协调 openDeleteDialog 对应的页面流程、接口调用或状态转换。
 function openDeleteDialog(sel) {
   deletingSelector.value = sel
   showDeleteDialog.value = true
 }
 
+// 前端业务函数：协调 handleDelete 对应的页面流程、接口调用或状态转换。
 async function handleDelete() {
   if (!deletingSelector.value) return
   deleting.value = true
@@ -521,6 +539,7 @@ async function handleDelete() {
 }
 
 // --- Toggle enabled ---
+// 前端业务函数：协调 handleToggle 对应的页面流程、接口调用或状态转换。
 async function handleToggle(sel, newValue) {
   const previous = sel.enabled
   sel.enabled = newValue

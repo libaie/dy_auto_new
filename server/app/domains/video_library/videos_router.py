@@ -20,6 +20,7 @@ router = APIRouter(prefix="/api/videos", tags=["videos"])
 
 
 class VideoResponse(BaseModel):
+    """业务类：承载 VideoResponse 相关的数据结构、状态或业务协作。"""
     id: str
     task_id: Optional[str] = None
     keyword: str
@@ -35,6 +36,7 @@ class VideoResponse(BaseModel):
 
 
 class VideoListResponse(BaseModel):
+    """业务类：承载 VideoListResponse 相关的数据结构、状态或业务协作。"""
     items: list[VideoResponse]
     total: int
 
@@ -48,6 +50,7 @@ def list_videos(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
+    """业务函数：处理 list_videos 对应的业务流程、校验或数据转换。"""
     limit = min(limit, 100)
     query = db.query(GeneratedVideo)
     if keyword:
@@ -66,6 +69,7 @@ def get_video(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
+    """业务函数：处理 get_video 对应的业务流程、校验或数据转换。"""
     video = db.query(GeneratedVideo).filter(GeneratedVideo.id == video_id).first()
     if not video:
         raise HTTPException(status_code=404, detail="视频不存在")
@@ -80,6 +84,7 @@ def download_video(
     db: Session = Depends(get_db),
 ):
     # Browser-native elements (<video>, <a>) can't set headers — accept query token as fallback
+    """业务函数：处理 download_video 对应的业务流程、校验或数据转换。"""
     username = None
     if authorization and authorization.startswith("Bearer "):
         try:
@@ -112,6 +117,7 @@ def delete_video(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
+    """业务函数：处理 delete_video 对应的业务流程、校验或数据转换。"""
     video = db.query(GeneratedVideo).filter(GeneratedVideo.id == video_id).first()
     if not video:
         raise HTTPException(status_code=404, detail="视频不存在")

@@ -13,6 +13,7 @@ const progress = ref({ percent: 0, message: '' })
 const result = ref(null)
 const videoUrl = ref('')
 
+// 前端业务函数：协调 handleVideo 对应的页面流程、接口调用或状态转换。
 function handleVideo(e) {
   const file = e.target.files?.[0]
   if (file) {
@@ -21,6 +22,7 @@ function handleVideo(e) {
   }
 }
 
+// 前端业务函数：协调 handleGenerate 对应的页面流程、接口调用或状态转换。
 async function handleGenerate() {
   if (!sourceVideo.value) return
   generating.value = true; result.value = null; videoUrl.value = ''

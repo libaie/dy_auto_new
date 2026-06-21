@@ -34,17 +34,21 @@ STORY_PLANNING_JOB_LEASE_SECONDS = 3600
 
 
 class StoryPlanningDomainError(RuntimeError):
+    """业务类：承载 StoryPlanningDomainError 相关的数据结构、状态或业务协作。"""
     def __init__(self, status_code: int, detail: object):
+        """初始化业务对象依赖，保存后续流程需要的运行上下文。"""
         self.status_code = status_code
         self.detail = detail
         super().__init__(str(detail))
 
 
 def _utc_now_iso() -> str:
+    """业务函数：处理 _utc_now_iso 对应的业务流程、校验或数据转换。"""
     return datetime.now(timezone.utc).isoformat()
 
 
 def story_planning_in_progress_error() -> StoryPlanningDomainError:
+    """业务函数：处理 story_planning_in_progress_error 对应的业务流程、校验或数据转换。"""
     return StoryPlanningDomainError(409, {
         "code": "STORY_PLANNING_IN_PROGRESS",
         "message": "Story planning is already running for this series.",
@@ -52,6 +56,7 @@ def story_planning_in_progress_error() -> StoryPlanningDomainError:
 
 
 def active_story_plan_job(db: Session, series_id: str) -> ProductionJob | None:
+    """业务函数：处理 active_story_plan_job 对应的业务流程、校验或数据转换。"""
     return (
         db.query(ProductionJob)
         .filter(ProductionJob.target_type == "series")
@@ -73,6 +78,7 @@ def set_story_planning_state(
     error: str | None = None,
     result: dict | None = None,
 ) -> dict:
+    """业务函数：处理 set_story_planning_state 对应的业务流程、校验或数据转换。"""
     story_bible = dict(series.story_bible_json or {})
     current = dict(story_bible.get("story_planning") or {})
     if version is not None:
@@ -100,6 +106,7 @@ def set_story_planning_state(
 
 
 def enqueue_story_plan_job(db: Session, series: Series, version: int) -> ProductionJob:
+    """业务函数：处理 enqueue_story_plan_job 对应的业务流程、校验或数据转换。"""
     if active_story_plan_job(db, series.id):
         raise story_planning_in_progress_error()
 
@@ -138,6 +145,7 @@ def enqueue_story_plan_job(db: Session, series: Series, version: int) -> Product
 
 
 def start_story_plan(db: Session, series: Series) -> dict:
+    """业务函数：处理 start_story_plan 对应的业务流程、校验或数据转换。"""
     if active_story_plan_job(db, series.id):
         raise story_planning_in_progress_error()
     completed_payload = completed_story_plan_payload(db, series)
@@ -166,6 +174,7 @@ def start_story_plan(db: Session, series: Series) -> dict:
 
 
 async def run_story_plan_job(series_id: str, db: Session | None = None) -> dict:
+    """业务函数：处理 run_story_plan_job 对应的业务流程、校验或数据转换。"""
     owns_session = db is None
     db = db or SessionLocal()
     try:
@@ -207,6 +216,7 @@ async def run_story_plan_job(series_id: str, db: Session | None = None) -> dict:
 
 
 async def run_story_plan_worker_step(db: Session, *, lease_id: str, batch_size: int = 1) -> dict:
+    """业务函数：处理 run_story_plan_worker_step 对应的业务流程、校验或数据转换。"""
     limit = max(1, min(int(batch_size or 1), 20))
     items: list[dict] = []
     for _ in range(limit):

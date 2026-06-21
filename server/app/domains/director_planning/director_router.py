@@ -30,6 +30,7 @@ DIRECTOR_AGENCY_REVIEW_TIMEOUT_SECONDS = float(os.getenv("DY_AUTO_DIRECTOR_AGENC
 
 
 def _missing_agency_trace(stage: str, exc: Exception) -> dict:
+    """业务函数：处理 _missing_agency_trace 对应的业务流程、校验或数据转换。"""
     return {
         "stage": stage,
         "stage_status": "partial",
@@ -41,6 +42,7 @@ def _missing_agency_trace(stage: str, exc: Exception) -> dict:
 
 
 def _timeout_trace(stage: str, error_code: str, timeout_seconds: float) -> dict:
+    """业务函数：处理 _timeout_trace 对应的业务流程、校验或数据转换。"""
     return {
         "stage": stage,
         "stage_status": "partial",
@@ -52,10 +54,12 @@ def _timeout_trace(stage: str, error_code: str, timeout_seconds: float) -> dict:
 
 
 def _agency_trace_blocks(trace: dict | None) -> bool:
+    """业务函数：处理 _agency_trace_blocks 对应的业务流程、校验或数据转换。"""
     return bool(isinstance(trace, dict) and trace.get("stage_status") in {"blocked", "failed"})
 
 
 class DirectorScene(BaseModel):
+    """业务类：承载 DirectorScene 相关的数据结构、状态或业务协作。"""
     narration: str
     image_prompt: str
     shot_type: str = "medium"
@@ -71,6 +75,7 @@ class DirectorScene(BaseModel):
 
 
 class DirectorPlanRequest(BaseModel):
+    """业务类：承载 DirectorPlanRequest 相关的数据结构、状态或业务协作。"""
     series_id: str
     episode_id: str
     scenes: list[DirectorScene]
@@ -79,12 +84,14 @@ class DirectorPlanRequest(BaseModel):
 
 
 class DirectorAutoPlanRequest(BaseModel):
+    """业务类：承载 DirectorAutoPlanRequest 相关的数据结构、状态或业务协作。"""
     series_id: str
     episode_id: str
     target_duration: Optional[int] = None
 
 
 class EpisodeProductionPlanRequest(BaseModel):
+    """业务类：承载 EpisodeProductionPlanRequest 相关的数据结构、状态或业务协作。"""
     series_id: str
     episode_id: str
     target_duration_seconds: Optional[int] = None
@@ -93,15 +100,18 @@ class EpisodeProductionPlanRequest(BaseModel):
 
 
 class EpisodePlanRequest(EpisodeProductionPlanRequest):
+    """业务类：承载 EpisodePlanRequest 相关的数据结构、状态或业务协作。"""
     include_segments: bool = True
 
 
 class ShotSegmentsRequest(BaseModel):
+    """业务类：承载 ShotSegmentsRequest 相关的数据结构、状态或业务协作。"""
     production_episode_id: str
     preferred_segment_seconds: float = 8.0
 
 
 def _parse_frames_json(raw: str) -> dict:
+    """业务函数：处理 _parse_frames_json 对应的业务流程、校验或数据转换。"""
     try:
         return json.loads(raw)
     except json.JSONDecodeError:
@@ -132,15 +142,18 @@ def _parse_frames_json(raw: str) -> dict:
 
 
 def _refs_by_id(items: list[dict]) -> dict[str, list[str]]:
+    """业务函数：处理 _refs_by_id 对应的业务流程、校验或数据转换。"""
     return {item.get("id"): item.get("reference_urls", []) for item in items if item.get("id")}
 
 
 def _dedupe_refs(refs: list[str], limit: int | None = None) -> list[str]:
+    """业务函数：处理 _dedupe_refs 对应的业务流程、校验或数据转换。"""
     deduped = list(dict.fromkeys([ref for ref in refs if ref]))
     return deduped[:limit] if limit else deduped
 
 
 def _duration_chunks(duration: float) -> list[float]:
+    """业务函数：处理 _duration_chunks 对应的业务流程、校验或数据转换。"""
     safe_duration = max(1.0, float(duration or PREFERRED_SEEDANCE_SHOT_SECONDS))
     if safe_duration <= PREFERRED_SEEDANCE_SHOT_SECONDS:
         return [round(safe_duration, 2)]
@@ -152,6 +165,7 @@ def _duration_chunks(duration: float) -> list[float]:
 
 
 def _reference_instructions(character_refs: list[str], style_refs: list[str]) -> str:
+    """业务函数：处理 _reference_instructions 对应的业务流程、校验或数据转换。"""
     instructions = []
     if character_refs:
         instructions.append(
@@ -168,6 +182,7 @@ def _reference_instructions(character_refs: list[str], style_refs: list[str]) ->
 
 
 def _prompt_with_style(frame_prompt: str, visual_style_prompt: str, reference_instructions: str) -> str:
+    """业务函数：处理 _prompt_with_style 对应的业务流程、校验或数据转换。"""
     parts = [part for part in [frame_prompt] if part]
     if visual_style_prompt and visual_style_prompt not in frame_prompt:
         parts.append(f"Visual style: {visual_style_prompt}")
@@ -177,6 +192,7 @@ def _prompt_with_style(frame_prompt: str, visual_style_prompt: str, reference_in
 
 
 def _continuity_notes(base_notes: str, reference_instructions: str, segment_index: int, segment_count: int) -> str:
+    """业务函数：处理 _continuity_notes 对应的业务流程、校验或数据转换。"""
     notes = [base_notes or "Follow the locked character and scene references exactly."]
     if reference_instructions:
         notes.append(reference_instructions)
@@ -188,6 +204,7 @@ def _continuity_notes(base_notes: str, reference_instructions: str, segment_inde
 
 
 def _normalize_auto_frames(raw_frames: list[dict], style_lock: dict, target_duration: int) -> list[dict]:
+    """业务函数：处理 _normalize_auto_frames 对应的业务流程、校验或数据转换。"""
     characters = style_lock.get("characters", [])
     scenes = style_lock.get("scenes", [])
     visual_style = style_lock.get("visual_style", {}) or {}
@@ -263,6 +280,7 @@ def _normalize_auto_frames(raw_frames: list[dict], style_lock: dict, target_dura
 
 
 def _fallback_auto_plan_frames(series: Series, episode: Episode, style_lock: dict, target_duration: int) -> list[dict]:
+    """业务函数：处理 _fallback_auto_plan_frames 对应的业务流程、校验或数据转换。"""
     characters = style_lock.get("characters") or []
     scenes = style_lock.get("scenes") or []
     character_name = (characters[0] or {}).get("name") if characters else "the protagonist"
@@ -298,6 +316,7 @@ def _fallback_auto_plan_frames(series: Series, episode: Episode, style_lock: dic
 
 
 def _storyboard_lines(storyboard: dict[str, Any], key: str) -> list[str]:
+    """业务函数：处理 _storyboard_lines 对应的业务流程、校验或数据转换。"""
     frames = storyboard.get("frames") or []
     if not isinstance(frames, list):
         return []
@@ -315,6 +334,7 @@ def _record_director_storyboard_artifacts(
     storyboard: dict[str, Any],
     prompt: dict[str, Any],
 ) -> None:
+    """业务函数：处理 _record_director_storyboard_artifacts 对应的业务流程、校验或数据转换。"""
     service = AITextArtifactService(db)
     dialogue_lines = _storyboard_lines(storyboard, "narration")
     image_prompts = _storyboard_lines(storyboard, "image_prompt")
@@ -352,6 +372,7 @@ def _record_director_storyboard_artifacts(
 
 
 async def generate_auto_storyboard(db: Session, body: DirectorAutoPlanRequest) -> dict:
+    """业务函数：处理 generate_auto_storyboard 对应的业务流程、校验或数据转换。"""
     series = db.query(Series).filter(Series.id == body.series_id).first()
     if not series:
         raise HTTPException(404, "Series not found")
@@ -463,6 +484,7 @@ async def generate_auto_storyboard(db: Session, body: DirectorAutoPlanRequest) -
 async def auto_plan_episode(body: DirectorAutoPlanRequest,
                             db: Session = Depends(get_db),
                             user = Depends(verify_admin_token)):
+    """业务函数：处理 auto_plan_episode 对应的业务流程、校验或数据转换。"""
     storyboard = await generate_auto_storyboard(db, body)
     return {"ok": True, "storyboard": storyboard}
 
@@ -473,6 +495,7 @@ def create_episode_production_plan_endpoint(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
+    """业务函数：处理 create_episode_production_plan_endpoint 对应的业务流程、校验或数据转换。"""
     from app.domains.video_production.production_plan_service import ensure_episode_production_plan
 
     try:
@@ -505,6 +528,7 @@ def create_episode_plan_endpoint(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
+    """业务函数：处理 create_episode_plan_endpoint 对应的业务流程、校验或数据转换。"""
     from app.db.models import ProductionEpisode
     from app.domains.video_production.production_plan_service import ensure_episode_production_plan, ensure_shot_segments
 
@@ -546,6 +570,7 @@ def create_shot_segments_endpoint(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
+    """业务函数：处理 create_shot_segments_endpoint 对应的业务流程、校验或数据转换。"""
     from app.domains.video_production.production_plan_service import ensure_shot_segments
 
     try:

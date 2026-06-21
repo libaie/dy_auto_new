@@ -14,6 +14,7 @@ from app.models import TaskStatus
 
 
 def _extract_sequence_id(params: Optional[dict]) -> Optional[str]:
+    """业务函数：处理 _extract_sequence_id 对应的业务流程、校验或数据转换。"""
     if not isinstance(params, dict):
         return None
     seq_id = params.get("dm_sequence_id")
@@ -21,6 +22,7 @@ def _extract_sequence_id(params: Optional[dict]) -> Optional[str]:
 
 
 def _task_sequence_ids_for_device(db: Session, device_id: Optional[str]) -> set[str]:
+    """业务函数：处理 _task_sequence_ids_for_device 对应的业务流程、校验或数据转换。"""
     if not device_id:
         return set()
 
@@ -41,6 +43,7 @@ def get_device_visible_dm_sequences(
     device_id: Optional[str],
     extra_sequence_ids: Iterable[str] | None = None,
 ) -> list[DMSequence]:
+    """业务函数：处理 get_device_visible_dm_sequences 对应的业务流程、校验或数据转换。"""
     """Return shared/user-scoped DM sequences plus sequences referenced by this device's tasks."""
     requested_ids = _task_sequence_ids_for_device(db, device_id)
     if extra_sequence_ids:

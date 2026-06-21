@@ -381,17 +381,20 @@ function setMode(nextMode) {
   }
 }
 
+// 前端业务函数：协调 clampRealDuration 对应的页面流程、接口调用或状态转换。
 function clampRealDuration(value) {
   const seconds = Number(value) || 60
   return Math.min(REAL_SHORT_MAX_SECONDS, Math.max(60, seconds))
 }
 
+// 前端业务函数：协调 submitDuration 对应的页面流程、接口调用或状态转换。
 function submitDuration() {
   const seconds = Number(form.target_duration_seconds) || 60
   if (mode.value === 'real_short_e2e') return clampRealDuration(seconds)
   return Math.min(MOCK_SCALE_MAX_SECONDS, Math.max(60, seconds))
 }
 
+// 前端业务函数：协调 isAfterImage 对应的页面流程、接口调用或状态转换。
 function isAfterImage(status) {
   return [
     'image_review_pending',
@@ -407,6 +410,7 @@ function isAfterImage(status) {
   ].includes(status)
 }
 
+// 前端业务函数：协调 isAfterVideo 对应的页面流程、接口调用或状态转换。
 function isAfterVideo(status) {
   return [
     'video_review_pending',
@@ -418,6 +422,7 @@ function isAfterVideo(status) {
   ].includes(status)
 }
 
+// 前端业务函数：协调 stepStatus 对应的页面流程、接口调用或状态转换。
 function stepStatus(key, runStatus) {
   if (runStatus === 'reference_generation_running') {
     if (['prompt', 'series'].includes(key)) return 'done'
@@ -470,10 +475,12 @@ function stepStatus(key, runStatus) {
   return 'waiting'
 }
 
+// 前端业务函数：协调 statusLabel 对应的页面流程、接口调用或状态转换。
 function statusLabel(status) {
   return statusText[status] || status || '-'
 }
 
+// 前端业务函数：协调 stepClass 对应的页面流程、接口调用或状态转换。
 function stepClass(status) {
   if (['done', 'ready'].includes(status)) return 'border-emerald-500/40 bg-emerald-950/30 text-emerald-200'
   if (status === 'running') return 'border-sky-500/40 bg-sky-950/30 text-sky-200'
@@ -481,6 +488,7 @@ function stepClass(status) {
   return 'border-slate-800 bg-slate-900/60 text-slate-400'
 }
 
+// 前端业务函数：协调 normalizeError 对应的页面流程、接口调用或状态转换。
 function normalizeError(e) {
   const detail = e.response?.data?.detail
   if (detail && typeof detail === 'object') {
@@ -495,10 +503,12 @@ function isProviderPendingError(message) {
   return String(message || '').toLowerCase().includes('not complete')
 }
 
+// 前端业务函数：协调 isRealProviderRun 对应的页面流程、接口调用或状态转换。
 function isRealProviderRun() {
   return (result.value?.run?.run_type || mode.value) === 'real_short_e2e'
 }
 
+// 前端业务函数：协调 stopAutopilot 对应的页面流程、接口调用或状态转换。
 function stopAutopilot() {
   if (autopilotTimer) {
     clearInterval(autopilotTimer)
@@ -506,6 +516,7 @@ function stopAutopilot() {
   }
 }
 
+// 前端业务函数：协调 refreshRun 对应的页面流程、接口调用或状态转换。
 async function refreshRun() {
   const runId = result.value?.run?.id
   if (!runId) return
@@ -517,6 +528,7 @@ async function refreshRun() {
   }
 }
 
+// 前端业务函数：协调 driveAutopilotOnce 对应的页面流程、接口调用或状态转换。
 async function driveAutopilotOnce() {
   const runId = result.value?.run?.id
   const status = result.value?.run?.status
@@ -589,12 +601,14 @@ async function driveAutopilotOnce() {
   }
 }
 
+// 前端业务函数：协调 startAutopilot 对应的页面流程、接口调用或状态转换。
 function startAutopilot() {
   stopAutopilot()
   driveAutopilotOnce()
   autopilotTimer = setInterval(driveAutopilotOnce, 10000)
 }
 
+// 前端业务函数：协调 submit 对应的页面流程、接口调用或状态转换。
 async function submit() {
   submitting.value = true
   error.value = ''

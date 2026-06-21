@@ -35,6 +35,7 @@ defineProps({
   stages: { type: Array, default: () => [] },
 })
 
+// 前端业务函数：协调 stageClass 对应的页面流程、接口调用或状态转换。
 function stageClass(status) {
   const normalized = normalizeStatus(status)
   if (['running', 'in_progress', 'image_batch_running', 'video_batch_running', 'composing'].includes(normalized)) return 'border-cyan-400/40 bg-cyan-950/30'
@@ -43,6 +44,7 @@ function stageClass(status) {
   return 'border-white/10 bg-zinc-950/60'
 }
 
+// 前端业务函数：协调 markerClass 对应的页面流程、接口调用或状态转换。
 function markerClass(status) {
   const normalized = normalizeStatus(status)
   if (['running', 'in_progress', 'image_batch_running', 'video_batch_running', 'composing'].includes(normalized)) return 'border-cyan-300/60 bg-cyan-300/10 text-cyan-100'
@@ -51,10 +53,12 @@ function markerClass(status) {
   return 'border-white/10 bg-zinc-800 text-zinc-300'
 }
 
+// 前端业务函数：协调 stageLabel 对应的页面流程、接口调用或状态转换。
 function stageLabel(stage) {
   return phaseLabel(stage.stage, stage.label)
 }
 
+// 前端业务函数：协调 normalizeStatus 对应的页面流程、接口调用或状态转换。
 function normalizeStatus(status) {
   return String(status || '').trim().toLowerCase()
 }

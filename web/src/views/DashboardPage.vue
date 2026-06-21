@@ -22,6 +22,7 @@ const toast = useToastStore()
 let taskChart = null
 let deviceChart = null
 
+// 前端业务函数：协调 fetchDashboardData 对应的页面流程、接口调用或状态转换。
 async function fetchDashboardData() {
   try {
     const [dashRes, rtRes] = await Promise.all([getDashboard(), getRealtimeStats()])
@@ -41,6 +42,7 @@ async function fetchDashboardData() {
   }
 }
 
+// 前端业务函数：协调 createSparkline 对应的页面流程、接口调用或状态转换。
 function createSparkline(canvasId, data, color) {
   const canvas = document.getElementById(canvasId)
   if (!canvas) return null
@@ -71,6 +73,7 @@ function createSparkline(canvasId, data, color) {
   })
 }
 
+// 前端业务函数：协调 updateCharts 对应的页面流程、接口调用或状态转换。
 function updateCharts() {
   // Dummy history — in production, fetch real history from API
   const t = tasks.value

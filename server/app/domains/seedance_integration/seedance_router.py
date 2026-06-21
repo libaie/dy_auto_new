@@ -36,6 +36,7 @@ _client_key: str | None = None
 
 
 def _get_api_key(db: Session | None) -> str:
+    """业务函数：处理 _get_api_key 对应的业务流程、校验或数据转换。"""
     key = os.getenv("SEEDANCE_API_KEY", "")
     if db is not None:
         try:
@@ -51,6 +52,7 @@ def _get_api_key(db: Session | None) -> str:
 
 
 def _get_client(api_key: str) -> httpx.AsyncClient:
+    """业务函数：处理 _get_client 对应的业务流程、校验或数据转换。"""
     global _client, _client_key
     if _client is None or _client_key != api_key or getattr(_client, "is_closed", False):
         if _client and not _client.is_closed:
@@ -73,6 +75,7 @@ api_router = APIRouter(prefix="/api/seedance", tags=["seedance"])
 
 
 class SeedanceGenerateRequest(BaseModel):
+    """业务类：承载 SeedanceGenerateRequest 相关的数据结构、状态或业务协作。"""
     prompt: str = Field(..., min_length=1, max_length=2000)
     aspect_ratio: str = "9:16"
     duration: int = Field(5, ge=1, le=15)
@@ -89,6 +92,7 @@ async def submit_seedance_generation(
     resolution: str,
     image_urls: list[str],
 ) -> dict:
+    """业务函数：处理 submit_seedance_generation 对应的业务流程、校验或数据转换。"""
     """Submit one Seedance video generation task through the provider API."""
     content = [{"type": "text", "text": prompt}]
     for url in image_urls:
@@ -113,6 +117,7 @@ async def submit_seedance_generation(
 
 @tool
 async def query_seedance_task(api_key: str, task_id: str) -> dict:
+    """业务函数：处理 query_seedance_task 对应的业务流程、校验或数据转换。"""
     """Query one Seedance video generation task through the provider API."""
     resp = await _get_client(api_key).get(f"/contents/generations/tasks/{task_id}")
     data = resp.json()
@@ -139,6 +144,7 @@ async def seedance_generate(
     db: Session = Depends(get_db),
     user=Depends(require_role("admin")),
 ):
+    """业务函数：处理 seedance_generate 对应的业务流程、校验或数据转换。"""
     """Submit a Seedance video generation task."""
     del user
     try:
@@ -163,6 +169,7 @@ async def seedance_get_task(
     db: Session = Depends(get_db),
     user=Depends(require_role("admin")),
 ):
+    """业务函数：处理 seedance_get_task 对应的业务流程、校验或数据转换。"""
     """Query a Seedance video generation task."""
     del user
     try:
@@ -179,6 +186,7 @@ PROXY_METHODS = ["GET", "POST", "PUT", "DELETE", "PATCH"]
 
 
 async def _do_proxy(request: Request, db: Session, path: str = "") -> Response:
+    """业务函数：处理 _do_proxy 对应的业务流程、校验或数据转换。"""
     api_key = _get_api_key(db)
     client = _get_client(api_key)
 
@@ -229,6 +237,7 @@ async def proxy_seedance(
     db: Session = Depends(get_db),
     user=Depends(require_role("admin")),
 ):
+    """业务函数：处理 proxy_seedance 对应的业务流程、校验或数据转换。"""
     del user
     return await _do_proxy(request, db, path)
 
@@ -239,5 +248,6 @@ async def proxy_seedance_root(
     db: Session = Depends(get_db),
     user=Depends(require_role("admin")),
 ):
+    """业务函数：处理 proxy_seedance_root 对应的业务流程、校验或数据转换。"""
     del user
     return await _do_proxy(request, db, "")

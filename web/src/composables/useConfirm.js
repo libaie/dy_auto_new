@@ -8,6 +8,7 @@ export function useConfirm() {
   const danger = ref(false)
   const confirmAction = ref(null)
 
+  // 前端业务函数：协调 open 对应的页面流程、接口调用或状态转换。
   function open(opts, action) {
     title.value = opts.title || ''
     message.value = opts.message || ''
@@ -16,6 +17,7 @@ export function useConfirm() {
     isOpen.value = true
   }
 
+  // 前端业务函数：协调 handleConfirm 对应的页面流程、接口调用或状态转换。
   async function handleConfirm() {
     if (confirmAction.value) {
       await confirmAction.value()
@@ -23,6 +25,7 @@ export function useConfirm() {
     isOpen.value = false
   }
 
+  // 前端业务函数：协调 handleCancel 对应的页面流程、接口调用或状态转换。
   function handleCancel() {
     isOpen.value = false
   }

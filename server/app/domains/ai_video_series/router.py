@@ -110,6 +110,7 @@ STORY_PLANNING_JOB_LEASE_SECONDS = story_planning.STORY_PLANNING_JOB_LEASE_SECON
 
 
 def _domain_http_error(exc):
+    """业务函数：处理 _domain_http_error 对应的业务流程、校验或数据转换。"""
     return HTTPException(exc.status_code, exc.detail)
 
 # === AI 自动生成角色 + 场景 ===
@@ -117,6 +118,7 @@ def _domain_http_error(exc):
 @router.post("/{series_id}/auto-generate")
 async def auto_generate_series_assets(series_id: str, db: Session = Depends(get_db),
                                       user = Depends(verify_admin_token)):
+    """业务函数：处理 auto_generate_series_assets 对应的业务流程、校验或数据转换。"""
     series = db.query(Series).filter(Series.id == series_id).first()
     if not series:
         raise HTTPException(404, "Series not found")
@@ -131,6 +133,7 @@ async def auto_generate_series_assets(series_id: str, db: Session = Depends(get_
 @router.get("")
 def list_series(db: Session = Depends(get_db),
                 _: str = Depends(verify_admin_token)):
+    """业务函数：处理 list_series 对应的业务流程、校验或数据转换。"""
     all_series = db.query(Series).order_by(Series.updated_at.desc()).all()
     return {"ok": True, "series": [series_dict(s) for s in all_series]}
 
@@ -138,6 +141,7 @@ def list_series(db: Session = Depends(get_db),
 @router.get("/{series_id}/style-lock")
 def get_style_lock(series_id: str, db: Session = Depends(get_db),
                    _: str = Depends(verify_admin_token)):
+    """业务函数：处理 get_style_lock 对应的业务流程、校验或数据转换。"""
     series = db.query(Series).filter(Series.id == series_id).first()
     if not series:
         raise HTTPException(404, "Series not found")
@@ -145,6 +149,7 @@ def get_style_lock(series_id: str, db: Session = Depends(get_db),
 
 
 def _lifecycle_http_error(exc: AssetLifecycleError) -> HTTPException:
+    """业务函数：处理 _lifecycle_http_error 对应的业务流程、校验或数据转换。"""
     status_code = 404 if exc.code in ("SERIES_NOT_FOUND", "ASSET_NOT_FOUND") else 409
     return HTTPException(status_code, {"code": exc.code, "message": exc.message, "details": exc.details})
 
@@ -152,6 +157,7 @@ def _lifecycle_http_error(exc: AssetLifecycleError) -> HTTPException:
 @router.get("/{series_id}/agency-console")
 def get_agency_console(series_id: str, db: Session = Depends(get_db),
                        _: str = Depends(require_role("admin"))):
+    """业务函数：处理 get_agency_console 对应的业务流程、校验或数据转换。"""
     series = db.query(Series).filter(Series.id == series_id).first()
     if not series:
         raise HTTPException(404, "Series not found")
@@ -165,6 +171,7 @@ async def run_style_lock_worker_step(
     db: Session = Depends(get_db),
     _: str = Depends(require_role("admin")),
 ):
+    """业务函数：处理 run_style_lock_worker_step 对应的业务流程、校验或数据转换。"""
     return await style_lock.run_style_lock_worker_step(db, lease_id=body.lease_id, batch_size=body.batch_size)
 
 
@@ -174,12 +181,14 @@ async def run_story_plan_worker_step(
     db: Session = Depends(get_db),
     _: str = Depends(require_role("admin")),
 ):
+    """业务函数：处理 run_story_plan_worker_step 对应的业务流程、校验或数据转换。"""
     return await story_planning.run_story_plan_worker_step(db, lease_id=body.lease_id, batch_size=body.batch_size)
 
 
 @router.post("/{series_id}/style-lock", response_model=StyleLockResponse)
 async def lock_series_style(series_id: str, db: Session = Depends(get_db),
                             user = Depends(verify_admin_token)):
+    """业务函数：处理 lock_series_style 对应的业务流程、校验或数据转换。"""
     series = db.query(Series).filter(Series.id == series_id).first()
     if not series:
         raise HTTPException(404, "Series not found")
@@ -191,6 +200,7 @@ async def lock_series_style(series_id: str, db: Session = Depends(get_db),
 @router.post("")
 def create_series(body: SeriesCreate, db: Session = Depends(get_db),
                   user = Depends(verify_admin_token)):
+    """业务函数：处理 create_series 对应的业务流程、校验或数据转换。"""
     s = Series(**body.model_dump())
     db.add(s)
     db.flush()  # 确保 s.id 已生成，满足 Episode FK 约束
@@ -202,6 +212,7 @@ def create_series(body: SeriesCreate, db: Session = Depends(get_db),
 @router.get("/{series_id}")
 def get_series(series_id: str, db: Session = Depends(get_db),
                _: str = Depends(verify_admin_token)):
+    """业务函数：处理 get_series 对应的业务流程、校验或数据转换。"""
     s = db.query(Series).filter(Series.id == series_id).first()
     if not s:
         raise HTTPException(404, "Series not found")
@@ -223,6 +234,7 @@ def get_series(series_id: str, db: Session = Depends(get_db),
 @router.post("/{series_id}/ensure-episodes")
 def ensure_series_episodes(series_id: str, db: Session = Depends(get_db),
                            user = Depends(verify_admin_token)):
+    """业务函数：处理 ensure_series_episodes 对应的业务流程、校验或数据转换。"""
     try:
         result = ensure_episode_placeholders(db, series_id)
         continuity = ensure_series_continuity_artifacts(db, series_id)
@@ -244,6 +256,7 @@ def ensure_series_episodes(series_id: str, db: Session = Depends(get_db),
 @router.post("/{series_id}/story-plan")
 async def create_series_story_plan(series_id: str, db: Session = Depends(get_db),
                                    user = Depends(verify_admin_token)):
+    """业务函数：处理 create_series_story_plan 对应的业务流程、校验或数据转换。"""
     series = db.query(Series).filter(Series.id == series_id).first()
     if not series:
         raise HTTPException(404, "Series not found")
@@ -256,6 +269,7 @@ async def create_series_story_plan(series_id: str, db: Session = Depends(get_db)
 @router.put("/{series_id}")
 def update_series(series_id: str, body: SeriesUpdate, db: Session = Depends(get_db),
                   user = Depends(verify_admin_token)):
+    """业务函数：处理 update_series 对应的业务流程、校验或数据转换。"""
     s = db.query(Series).filter(Series.id == series_id).first()
     if not s:
         raise HTTPException(404, "Series not found")
@@ -267,6 +281,7 @@ def update_series(series_id: str, body: SeriesUpdate, db: Session = Depends(get_
 @router.delete("/{series_id}")
 def delete_series(series_id: str, db: Session = Depends(get_db),
                   user = Depends(verify_admin_token)):
+    """业务函数：处理 delete_series 对应的业务流程、校验或数据转换。"""
     try:
         result = delete_or_archive_series(db, series_id)
     except AssetLifecycleError as exc:
@@ -278,6 +293,7 @@ def delete_series(series_id: str, db: Session = Depends(get_db),
 @router.post("/{series_id}/characters/{character_id}")
 def link_character(series_id: str, character_id: str, db: Session = Depends(get_db),
                    user = Depends(verify_admin_token)):
+    """业务函数：处理 link_character 对应的业务流程、校验或数据转换。"""
     s = db.query(Series).filter(Series.id == series_id).first()
     c = db.query(Character).filter(Character.id == character_id).first()
     if not s or not c:
@@ -289,6 +305,7 @@ def link_character(series_id: str, character_id: str, db: Session = Depends(get_
 @router.delete("/{series_id}/characters/{character_id}")
 def unlink_character(series_id: str, character_id: str, db: Session = Depends(get_db),
                      user = Depends(verify_admin_token)):
+    """业务函数：处理 unlink_character 对应的业务流程、校验或数据转换。"""
     try:
         result = unlink_character_from_series(db, series_id, character_id)
     except AssetLifecycleError as exc:
@@ -298,6 +315,7 @@ def unlink_character(series_id: str, character_id: str, db: Session = Depends(ge
 @router.post("/{series_id}/scenes/{scene_id}")
 def link_scene(series_id: str, scene_id: str, db: Session = Depends(get_db),
                user = Depends(verify_admin_token)):
+    """业务函数：处理 link_scene 对应的业务流程、校验或数据转换。"""
     s = db.query(Series).filter(Series.id == series_id).first()
     sc = db.query(Scene).filter(Scene.id == scene_id).first()
     if not s or not sc:
@@ -311,6 +329,7 @@ def link_scene(series_id: str, scene_id: str, db: Session = Depends(get_db),
 @router.delete("/{series_id}/scenes/{scene_id}")
 def unlink_scene(series_id: str, scene_id: str, db: Session = Depends(get_db),
                  user = Depends(verify_admin_token)):
+    """业务函数：处理 unlink_scene 对应的业务流程、校验或数据转换。"""
     try:
         result = unlink_scene_from_series(db, series_id, scene_id)
     except AssetLifecycleError as exc:
@@ -326,6 +345,7 @@ async def generate_episode_script(
     db: Session = Depends(get_db),
     user=Depends(verify_admin_token),
 ):
+    """业务函数：处理 generate_episode_script 对应的业务流程、校验或数据转换。"""
     try:
         result = await generate_episode_script_storyboard(
             db,
@@ -350,6 +370,7 @@ async def generate_episode_script(
 @router.put("/{series_id}/episodes/{episode_id}")
 def update_episode(series_id: str, episode_id: str, body: EpisodeUpdate,
                    db: Session = Depends(get_db), user = Depends(verify_admin_token)):
+    """业务函数：处理 update_episode 对应的业务流程、校验或数据转换。"""
     ep = db.query(Episode).filter(
         Episode.id == episode_id, Episode.series_id == series_id
     ).first()

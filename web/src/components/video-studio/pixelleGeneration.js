@@ -9,6 +9,7 @@ import {
 const COMPLETED_STATUSES = new Set(['completed', 'succeeded', 'success', 'done'])
 const FAILED_STATUSES = new Set(['failed', 'error'])
 
+// 前端业务函数：协调 uploadResponsePath 对应的页面流程、接口调用或状态转换。
 function uploadResponsePath(data) {
   const payload = data?.data && typeof data.data === 'object' ? data.data : data
   if (!payload || typeof payload !== 'object') return ''
@@ -20,6 +21,7 @@ function uploadResponsePath(data) {
   return ''
 }
 
+// 前端业务函数：协调 uploadPixelleFile 对应的页面流程、接口调用或状态转换。
 export async function uploadPixelleFile(file) {
   const formData = new FormData()
   formData.append('file', file)
@@ -37,6 +39,7 @@ export async function uploadPixelleFiles(files) {
   return results
 }
 
+// 前端业务函数：协调 videoUrlFromTask 对应的页面流程、接口调用或状态转换。
 function videoUrlFromTask(data) {
   const direct = data.video_url || data.url
   if (direct) return String(direct)
@@ -44,6 +47,7 @@ function videoUrlFromTask(data) {
   return path ? getVideoFileUrl(path) : ''
 }
 
+// 前端业务函数：协调 taskResult 对应的页面流程、接口调用或状态转换。
 function taskResult(taskId, data) {
   const videoPath = data.video_path || data.final_video_path || data.file_path || data.video_url || data.url || ''
   return {
@@ -57,6 +61,7 @@ function taskResult(taskId, data) {
   }
 }
 
+// 前端业务函数：协调 runPixelleVideoGeneration 对应的页面流程、接口调用或状态转换。
 export async function runPixelleVideoGeneration(payload, options = {}) {
   const {
     intervalMs = 5000,

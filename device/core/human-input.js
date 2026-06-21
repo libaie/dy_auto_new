@@ -1,4 +1,5 @@
 // 真人输入模拟模块，负责把文本输入拆成更接近人工操作的节奏。
+// 设备业务函数：处理 _noop 对应的抖音自动化动作、状态或安全边界。
 function _noop() {}
 
 function _defaultDeps() {
@@ -7,6 +8,7 @@ function _defaultDeps() {
     sleep: typeof sleep === "function" ? sleep : _noop,
     input: typeof input === "function" ? input : null,
     shell: typeof shell === "function" ? shell : null,
+    // 设备业务函数：处理 findFocusedEditText 对应的抖音自动化动作、状态或安全边界。
     findFocusedEditText: function () {
       if (typeof className !== "function") return null;
       var focused = className("EditText").focused(true).findOne(1000);
@@ -16,6 +18,7 @@ function _defaultDeps() {
   };
 }
 
+// 设备业务函数：处理 _mergeDeps 对应的抖音自动化动作、状态或安全边界。
 function _mergeDeps(deps) {
   var merged = _defaultDeps();
   deps = deps || {};
@@ -25,14 +28,17 @@ function _mergeDeps(deps) {
   return merged;
 }
 
+// 设备业务函数：处理 _cleanText 对应的抖音自动化动作、状态或安全边界。
 function _cleanText(text) {
   return String(text == null ? "" : text).replace(/^\s+/, "").replace(/\s+$/, "");
 }
 
+// 设备业务函数：处理 _sleep 对应的抖音自动化动作、状态或安全边界。
 function _sleep(deps, ms) {
   try { deps.sleep(ms); } catch (e) {}
 }
 
+// 设备业务函数：处理 _random 对应的抖音自动化动作、状态或安全边界。
 function _random(deps) {
   var value;
   try { value = deps.random(); } catch (e) { value = Math.random(); }
@@ -40,11 +46,13 @@ function _random(deps) {
   return value;
 }
 
+// 设备业务函数：处理 _chunkSize 对应的抖音自动化动作、状态或安全边界。
 function _chunkSize(deps, remaining) {
   var size = _random(deps) < 0.4 ? 1 : (Math.floor(_random(deps) * 2) + 2);
   return Math.min(size, remaining);
 }
 
+// 设备业务函数：处理 _clearEditText 对应的抖音自动化动作、状态或安全边界。
 function _clearEditText(editText) {
   if (!editText || typeof editText.setText !== "function") return false;
   // 清空输入框是受控输入的第一步，避免上一条私信或评论残留。
@@ -63,6 +71,7 @@ function _readEditText(editText) {
   return null;
 }
 
+// 设备业务函数：处理 _forceEditText 对应的抖音自动化动作、状态或安全边界。
 function _forceEditText(editText, text) {
   if (!editText || typeof editText.setText !== "function") return false;
   try {
@@ -74,6 +83,7 @@ function _forceEditText(editText, text) {
   }
 }
 
+// 设备业务函数：处理 typeFocusedText 对应的抖音自动化动作、状态或安全边界。
 function typeFocusedText(text, deps) {
   deps = _mergeDeps(deps);
   var cleanText = _cleanText(text);

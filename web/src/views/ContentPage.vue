@@ -24,6 +24,7 @@ const pageError = ref(null)
 const toast = useToastStore()
 
 // --- WebSocket ---
+// 前端业务函数：协调 wsUrl 对应的页面流程、接口调用或状态转换。
 function wsUrl() {
   const token = localStorage.getItem('token') || ''
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
@@ -72,6 +73,7 @@ const categoryColors = {
 }
 
 // --- Fetch templates ---
+// 前端业务函数：协调 fetchTemplates 对应的页面流程、接口调用或状态转换。
 async function fetchTemplates() {
   loading.value = true
   try {
@@ -87,6 +89,7 @@ async function fetchTemplates() {
 }
 
 // --- Template CRUD ---
+// 前端业务函数：协调 openCreateDialog 对应的页面流程、接口调用或状态转换。
 function openCreateDialog() {
   isEditing.value = false
   editingId.value = null
@@ -95,6 +98,7 @@ function openCreateDialog() {
   showFormDialog.value = true
 }
 
+// 前端业务函数：协调 openEditDialog 对应的页面流程、接口调用或状态转换。
 function openEditDialog(tpl) {
   isEditing.value = true
   editingId.value = tpl.id
@@ -106,6 +110,7 @@ function openEditDialog(tpl) {
   showFormDialog.value = true
 }
 
+// 前端业务函数：协调 handleSave 对应的页面流程、接口调用或状态转换。
 async function handleSave() {
   if (!form.name.trim()) { formError.value = '名称不能为空'; return }
   if (!form.body.trim()) { formError.value = '模板内容不能为空'; return }
@@ -136,11 +141,13 @@ async function handleSave() {
   }
 }
 
+// 前端业务函数：协调 openDeleteDialog 对应的页面流程、接口调用或状态转换。
 function openDeleteDialog(tpl) {
   deletingTemplate.value = tpl
   showDeleteDialog.value = true
 }
 
+// 前端业务函数：协调 handleDelete 对应的页面流程、接口调用或状态转换。
 async function handleDelete() {
   if (!deletingTemplate.value) return
   deleting.value = true
@@ -157,6 +164,7 @@ async function handleDelete() {
 }
 
 // --- Sensitive words ---
+// 前端业务函数：协调 fetchWords 对应的页面流程、接口调用或状态转换。
 async function fetchWords() {
   wordsLoading.value = true
   try {
@@ -169,6 +177,7 @@ async function fetchWords() {
   }
 }
 
+// 前端业务函数：协调 handleAddWord 对应的页面流程、接口调用或状态转换。
 async function handleAddWord() {
   const w = newWord.value.trim()
   if (!w) return
@@ -184,6 +193,7 @@ async function handleAddWord() {
   }
 }
 
+// 前端业务函数：协调 handleDeleteWord 对应的页面流程、接口调用或状态转换。
 async function handleDeleteWord(word) {
   try {
     await deleteSensitiveWord(word.id)
@@ -204,6 +214,7 @@ function openGenerateDialog(tpl) {
   showGenerateDialog.value = true
 }
 
+// 前端业务函数：协调 handleGenerate 对应的页面流程、接口调用或状态转换。
 async function handleGenerate() {
   generating.value = true
   generateError.value = null
@@ -222,6 +233,7 @@ async function handleGenerate() {
   }
 }
 
+// 前端业务函数：协调 copyResult 对应的页面流程、接口调用或状态转换。
 function copyResult() {
   if (generateResult.value) {
     navigator.clipboard.writeText(generateResult.value)

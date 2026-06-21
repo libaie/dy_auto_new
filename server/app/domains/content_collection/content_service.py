@@ -16,6 +16,7 @@ from app.models import ContentTemplateResponse, SensitiveWordResponse
 
 
 def _build_ac_automaton(words: set[str]) -> list[dict]:
+    """业务函数：处理 _build_ac_automaton 对应的业务流程、校验或数据转换。"""
     """Build Aho-Corasick automaton from a set of patterns.
 
     Returns a list of node dicts, each with:
@@ -65,6 +66,7 @@ def _build_ac_automaton(words: set[str]) -> list[dict]:
 
 
 def _ac_contains(automaton: list[dict], text: str) -> bool:
+    """业务函数：处理 _ac_contains 对应的业务流程、校验或数据转换。"""
     """Scan `text` with Aho-Corasick automaton. Returns True on first match."""
     node = 0
     for ch in text:
@@ -78,6 +80,7 @@ def _ac_contains(automaton: list[dict], text: str) -> bool:
 
 
 def _db_template_to_response(tpl: DBTemplate) -> ContentTemplateResponse:
+    """业务函数：处理 _db_template_to_response 对应的业务流程、校验或数据转换。"""
     return ContentTemplateResponse(
         id=tpl.id,
         name=tpl.name,
@@ -91,6 +94,7 @@ def _db_template_to_response(tpl: DBTemplate) -> ContentTemplateResponse:
 
 
 def _db_word_to_response(word: DBWord) -> SensitiveWordResponse:
+    """业务函数：处理 _db_word_to_response 对应的业务流程、校验或数据转换。"""
     return SensitiveWordResponse(
         id=word.id,
         word=word.word,
@@ -99,14 +103,17 @@ def _db_word_to_response(word: DBWord) -> SensitiveWordResponse:
 
 
 class ContentService:
+    """业务类：承载 ContentService 相关的数据结构、状态或业务协作。"""
     """Content template and sensitive word management."""
 
     def __init__(self):
+        """初始化业务对象依赖，保存后续流程需要的运行上下文。"""
         self._sensitive_words: set[str] = set()
         self._sensitive_fetched_at: float = 0.0
         self._ac_automaton: list[dict] | None = None
 
     def _get_ac_automaton(self, db: Session) -> list[dict]:
+        """业务函数：处理 _get_ac_automaton 对应的业务流程、校验或数据转换。"""
         """Return Aho-Corasick automaton, rebuilt when word cache refreshes."""
         now = time.monotonic()
         if now - self._sensitive_fetched_at > 60 or self._ac_automaton is None:
@@ -122,6 +129,7 @@ class ContentService:
         self, db: Session, name: str, category: str = "comment",
         body: str = "", variables: list[str] | None = None,
     ) -> ContentTemplateResponse:
+        """业务函数：处理 create_template 对应的业务流程、校验或数据转换。"""
         tpl = DBTemplate(
             name=name,
             category=category,
@@ -136,6 +144,7 @@ class ContentService:
     def get_template(
         self, db: Session, template_id: str, check_active: bool = False,
     ) -> Optional[ContentTemplateResponse]:
+        """业务函数：处理 get_template 对应的业务流程、校验或数据转换。"""
         q = db.query(DBTemplate).filter(DBTemplate.id == template_id)
         if check_active:
             q = q.filter(DBTemplate.is_active == True)
@@ -145,6 +154,7 @@ class ContentService:
         return _db_template_to_response(tpl)
 
     def get_template_body(self, db: Session, template_id: str) -> Optional[str]:
+        """业务函数：处理 get_template_body 对应的业务流程、校验或数据转换。"""
         """Get just the body text of a template. Used for sync resolution."""
         tpl = db.query(DBTemplate).filter(
             DBTemplate.id == template_id,
@@ -156,6 +166,7 @@ class ContentService:
         self, db: Session, category: Optional[str] = None,
         skip: int = 0, limit: int = 50,
     ) -> tuple[list[ContentTemplateResponse], int]:
+        """业务函数：处理 list_templates 对应的业务流程、校验或数据转换。"""
         q = db.query(DBTemplate)
         if category:
             q = q.filter(DBTemplate.category == category)
@@ -166,6 +177,7 @@ class ContentService:
     def update_template(
         self, db: Session, template_id: str, **kwargs
     ) -> Optional[ContentTemplateResponse]:
+        """业务函数：处理 update_template 对应的业务流程、校验或数据转换。"""
         """Update template fields. Uses **kwargs for flexibility -- caller (router) passes
         validated data from ContentTemplateUpdate via model_dump(exclude_none=True)."""
         tpl = db.query(DBTemplate).filter(DBTemplate.id == template_id).first()
@@ -179,6 +191,7 @@ class ContentService:
         return _db_template_to_response(tpl)
 
     def delete_template(self, db: Session, template_id: str) -> bool:
+        """业务函数：处理 delete_template 对应的业务流程、校验或数据转换。"""
         tpl = db.query(DBTemplate).filter(DBTemplate.id == template_id).first()
         if not tpl:
             return False
@@ -189,6 +202,7 @@ class ContentService:
     # --- Sensitive Word CRUD ---
 
     def add_sensitive_word(self, db: Session, word: str) -> SensitiveWordResponse:
+        """业务函数：处理 add_sensitive_word 对应的业务流程、校验或数据转换。"""
         existing = db.query(DBWord).filter(DBWord.word == word).first()
         if existing:
             raise ValueError(f"Word '{word}' already exists")
@@ -203,11 +217,13 @@ class ContentService:
     def list_sensitive_words(
         self, db: Session, skip: int = 0, limit: int = 200,
     ) -> tuple[list[SensitiveWordResponse], int]:
+        """业务函数：处理 list_sensitive_words 对应的业务流程、校验或数据转换。"""
         total = db.query(DBWord).count()
         words = db.query(DBWord).order_by(DBWord.created_at.desc()).offset(skip).limit(limit).all()
         return [_db_word_to_response(w) for w in words], total
 
     def delete_sensitive_word(self, db: Session, word_id: str) -> bool:
+        """业务函数：处理 delete_sensitive_word 对应的业务流程、校验或数据转换。"""
         word = db.query(DBWord).filter(DBWord.id == word_id).first()
         if not word:
             return False
@@ -218,6 +234,7 @@ class ContentService:
         return True
 
     def contains_sensitive(self, db: Session, text: str) -> bool:
+        """业务函数：处理 contains_sensitive 对应的业务流程、校验或数据转换。"""
         """Check if text contains any sensitive word.
 
         Uses Aho-Corasick automation for O(N) single-pass multi-pattern matching.
@@ -233,9 +250,11 @@ class ContentService:
 
     @staticmethod
     def substitute_variables(body: str, context: dict[str, str]) -> str:
+        """业务函数：处理 substitute_variables 对应的业务流程、校验或数据转换。"""
         """Replace {variable} placeholders in body with context values.
         Missing variables are left unchanged."""
         def replacer(match):
+            """业务函数：处理 replacer 对应的业务流程、校验或数据转换。"""
             key = match.group(1)
             return context.get(key, match.group(0))
         return re.sub(r"\{(\w+)\}", replacer, body)
@@ -270,6 +289,7 @@ class ContentService:
     async def _generate_content(
         self, db: Session, template_body: str, context: dict[str, str],
     ) -> str:
+        """业务函数：处理 _generate_content 对应的业务流程、校验或数据转换。"""
         """Delegate to the AI generator service."""
         from app.domains.model_configuration.ai_generator import ai_generator
         return await ai_generator.generate(db, template_body, context)
@@ -277,6 +297,7 @@ class ContentService:
     # --- Keyword Matrix Generation ---
 
     async def generate_keyword_matrix(self, keyword: str, count: int = 10, db=None) -> list[str]:
+        """业务函数：处理 generate_keyword_matrix 对应的业务流程、校验或数据转换。"""
         """Generate expanded keyword matrix from a seed keyword using AI."""
         prompt = f"基于关键词「{keyword}」，生成 {count} 个相关的抖音搜索关键词。要求：包含同义词、长尾词、热门话题标签，每个关键词 2-8 个字。只返回 JSON 数组格式。"
 
@@ -317,6 +338,7 @@ class ContentService:
     # --- Regex Generation ---
 
     async def generate_regex(self, db: Session, description: str) -> str:
+        """业务函数：处理 generate_regex 对应的业务流程、校验或数据转换。"""
         """Generate a regex pattern from natural language description."""
         from app.domains.model_configuration.ai_generator import ai_generator
         system_prompt = (
@@ -333,6 +355,7 @@ class ContentService:
     # --- Clean Prompt Generation ---
 
     async def generate_clean_prompt(self, db: Session, description: str) -> str:
+        """业务函数：处理 generate_clean_prompt 对应的业务流程、校验或数据转换。"""
         """Generate an AI cleaning prompt from natural language description."""
         from app.domains.model_configuration.ai_generator import ai_generator
         system_prompt = (

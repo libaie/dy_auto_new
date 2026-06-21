@@ -101,6 +101,7 @@ export const ROUTE_CATEGORY_MAP = {
   '/settings': 'system',
 }
 
+// 前端业务函数：协调 getCategoryByRoute 对应的页面流程、接口调用或状态转换。
 export function getCategoryByRoute(route) {
   // 1. exact path match
   if (ROUTE_CATEGORY_MAP[route.path] != null) {

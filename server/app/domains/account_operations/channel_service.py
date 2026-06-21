@@ -16,6 +16,7 @@ from app.models import TaskStatus
 
 
 def _busy_account_ids(db: Session) -> set[str]:
+    """业务函数：处理 _busy_account_ids 对应的业务流程、校验或数据转换。"""
     """Return account IDs currently locked by any assigned item or running task."""
     busy = set()
     for (aid,) in db.query(ChannelItem.account_id).filter(
@@ -33,6 +34,7 @@ MAX_KEYWORDS = 500
 
 
 def _unique_nonempty(values: list) -> list[str]:
+    """业务函数：处理 _unique_nonempty 对应的业务流程、校验或数据转换。"""
     result = []
     seen = set()
     for value in values:
@@ -47,6 +49,7 @@ def _unique_nonempty(values: list) -> list[str]:
 
 
 def _inject_nurture_keyword_matrix(params: dict, keyword: str) -> dict:
+    """业务函数：处理 _inject_nurture_keyword_matrix 对应的业务流程、校验或数据转换。"""
     if not isinstance(params, dict) or params.get("sub_tasks") is None:
         return params
     matrix = params.get("keyword_matrix") or []
@@ -57,6 +60,7 @@ def _inject_nurture_keyword_matrix(params: dict, keyword: str) -> dict:
 
 
 def _resolve_nurture_subtask_templates(db: Session, params: dict, keyword: str) -> dict:
+    """业务函数：处理 _resolve_nurture_subtask_templates 对应的业务流程、校验或数据转换。"""
     sub_tasks = params.get("sub_tasks")
     if not isinstance(sub_tasks, list):
         return params
@@ -80,6 +84,7 @@ def _resolve_nurture_subtask_templates(db: Session, params: dict, keyword: str) 
 
 
 def _get_active_accounts(db: Session, group_id: str) -> list[Account]:
+    """业务函数：处理 _get_active_accounts 对应的业务流程、校验或数据转换。"""
     """Get active accounts in a group."""
     members = db.query(AccountGroupMember).filter(
         AccountGroupMember.group_id == group_id
@@ -96,6 +101,7 @@ def _get_active_accounts(db: Session, group_id: str) -> list[Account]:
 
 class ChannelService:
 
+    """业务类：承载 ChannelService 相关的数据结构、状态或业务协作。"""
     def create_channel(
         self,
         db: Session,
@@ -109,6 +115,7 @@ class ChannelService:
         delay_range: list[int] = None,
         user_id: Optional[str] = None,
     ) -> Channel:
+        """业务函数：处理 create_channel 对应的业务流程、校验或数据转换。"""
         if len(keywords) > MAX_KEYWORDS:
             raise ValueError(f"关键词最多 {MAX_KEYWORDS} 个，当前 {len(keywords)} 个")
 
@@ -169,6 +176,7 @@ class ChannelService:
     def _round_robin_assign(
         self, db: Session, keywords: list[str], accounts: list[Account]
     ) -> list[str]:
+        """业务函数：处理 _round_robin_assign 对应的业务流程、校验或数据转换。"""
         """Assign accounts to keywords using round-robin, preferring least-used today."""
         if not accounts:
             raise ValueError("无可用账号")
@@ -190,6 +198,7 @@ class ChannelService:
         return result
 
     def claim_channel_item(self, db: Session, device_id: str):
+        """业务函数：处理 claim_channel_item 对应的业务流程、校验或数据转换。"""
         """Claim a pending channel item. Returns (PydanticTask, channel_item_id) or None."""
         from app.domains.task_operations.task_service import _db_task_to_pydantic
         from app.domains.reporting.stats_service import stats_service
@@ -500,6 +509,7 @@ class ChannelService:
         return None
 
     def complete_item(self, db: Session, item_id: str, status: str) -> dict:
+        """业务函数：处理 complete_item 对应的业务流程、校验或数据转换。"""
         """Complete a channel item and check if channel is fully done.
 
         Returns {"channel_id": str, "stats": dict, "channel_completed": bool}
@@ -542,6 +552,7 @@ class ChannelService:
         return {"channel_id": channel_id, "stats": stats, "channel_completed": channel_completed}
 
     def on_risk_control(self, db: Session, account_id: str):
+        """业务函数：处理 on_risk_control 对应的业务流程、校验或数据转换。"""
         """Skip all pending channel items for a risk-controlled account."""
         db.execute(
             update(ChannelItem)
@@ -555,6 +566,7 @@ class ChannelService:
         db.expire_all()
 
     def update_channel_status(self, db: Session, channel_id: str, new_status: str, user_id: Optional[str] = None):
+        """业务函数：处理 update_channel_status 对应的业务流程、校验或数据转换。"""
         """Update channel status with validation.
 
         On cancel: skips pending items AND cancels running tasks for assigned items
@@ -616,6 +628,7 @@ class ChannelService:
         db.commit()
 
     def soft_delete_channel(self, db: Session, channel_id: str, user_id: Optional[str] = None):
+        """业务函数：处理 soft_delete_channel 对应的业务流程、校验或数据转换。"""
         """Soft delete a channel — cancels pending + assigned items."""
         ch = self.get_channel(db, channel_id, user_id=user_id)
         if not ch:
@@ -663,6 +676,7 @@ class ChannelService:
         db.commit()
 
     def append_items(self, db: Session, channel_id: str, keywords: list[str], user_id: Optional[str] = None):
+        """业务函数：处理 append_items 对应的业务流程、校验或数据转换。"""
         """Append new keywords to an active channel."""
         ch = self.get_channel(db, channel_id, user_id=user_id)
         if not ch:
@@ -692,6 +706,7 @@ class ChannelService:
         db.commit()
 
     def _reactivate_channel(self, db: Session, channel_id: str):
+        """业务函数：处理 _reactivate_channel 对应的业务流程、校验或数据转换。"""
         """If channel is completed and has pending items, revert to active.
         cancelled/deleted are terminal — never auto-resurrect."""
         ch = db.query(Channel).filter(Channel.id == channel_id).first()
@@ -712,6 +727,7 @@ class ChannelService:
         sync_to_items: bool = False,
         user_id: Optional[str] = None,
     ) -> Channel:
+        """业务函数：处理 edit_channel 对应的业务流程、校验或数据转换。"""
         """Edit channel metadata. Only active/paused channels allowed."""
         ch = self.get_channel(db, channel_id, user_id=user_id)
         if not ch:
@@ -784,6 +800,7 @@ class ChannelService:
         keyword: Optional[str] = None,
         user_id: Optional[str] = None,
     ) -> ChannelItem:
+        """业务函数：处理 edit_item 对应的业务流程、校验或数据转换。"""
         """Edit a single channel item. Only pending items allowed."""
         item = db.query(ChannelItem).filter(ChannelItem.id == item_id).first()
         if not item:
@@ -835,6 +852,7 @@ class ChannelService:
         assigned_device_id: Optional[str] = None,
         user_id: Optional[str] = None,
     ) -> dict:
+        """业务函数：处理 batch_edit_items 对应的业务流程、校验或数据转换。"""
         """Batch edit items. Failures don't block successes."""
         updated = 0
         skipped = []
@@ -918,6 +936,7 @@ class ChannelService:
         return {"updated": updated, "skipped": skipped, "errors": errors}
 
     def update_item_status(self, db: Session, item_id: str, new_status: str, user_id: Optional[str] = None):
+        """业务函数：处理 update_item_status 对应的业务流程、校验或数据转换。"""
         """Update a single channel item status (skip/requeue)."""
         item = db.query(ChannelItem).filter(ChannelItem.id == item_id).first()
         if not item:
@@ -941,6 +960,7 @@ class ChannelService:
         db.commit()
 
     def get_channel(self, db: Session, channel_id: str, user_id: Optional[str] = None) -> Optional[Channel]:
+        """业务函数：处理 get_channel 对应的业务流程、校验或数据转换。"""
         query = db.query(Channel).filter(
             Channel.id == channel_id,
             Channel.deleted_at.is_(None),
@@ -950,12 +970,14 @@ class ChannelService:
         return query.first()
 
     def list_channels(self, db: Session, user_id: Optional[str] = None) -> list[Channel]:
+        """业务函数：处理 list_channels 对应的业务流程、校验或数据转换。"""
         query = db.query(Channel).filter(Channel.deleted_at.is_(None))
         if user_id:
             query = query.filter(Channel.user_id == user_id)
         return query.order_by(Channel.created_at.desc()).all()
 
     def get_channel_stats(self, db: Session, channel_id: str) -> dict:
+        """业务函数：处理 get_channel_stats 对应的业务流程、校验或数据转换。"""
         items = db.query(ChannelItem).filter(
             ChannelItem.channel_id == channel_id
         ).all()
@@ -973,6 +995,7 @@ class ChannelService:
         return stats
 
     def get_channels_stats_batch(self, db: Session, channel_ids: list[str]) -> dict[str, dict]:
+        """业务函数：处理 get_channels_stats_batch 对应的业务流程、校验或数据转换。"""
         """Batch query stats for multiple channels. Returns {channel_id: stats_dict}."""
         from sqlalchemy import func
         if not channel_ids:

@@ -498,10 +498,12 @@ function flattenSegments(episodes) {
   return rows
 }
 
+// 前端业务函数：协调 stageStatus 对应的页面流程、接口调用或状态转换。
 function stageStatus(statuses) {
   return statuses.includes(run.value?.status) ? run.value.status : 'pending'
 }
 
+// 前端业务函数：协调 stepClass 对应的页面流程、接口调用或状态转换。
 function stepClass(step) {
   if (['passed', 'done', 'completed', 'ready', 'image_approved', 'video_segments_approved'].includes(step.status)) return 'border-emerald-500/40 bg-emerald-950/30 text-emerald-300'
   if (['blocked', 'image_review_pending', 'image_human_review_required', 'video_review_pending', 'video_human_review_required'].includes(step.status)) return 'border-amber-500/40 bg-amber-950/30 text-amber-300'
@@ -509,6 +511,7 @@ function stepClass(step) {
   return 'border-slate-800 bg-slate-950/60 text-slate-500'
 }
 
+// 前端业务函数：协调 statusClass 对应的页面流程、接口调用或状态转换。
 function statusClass(status) {
   if (['approved', 'completed', 'done', 'ready'].includes(status)) return 'text-emerald-300'
   if (['failed', 'rejected'].includes(status)) return 'text-rose-300'
@@ -516,11 +519,13 @@ function statusClass(status) {
   return 'text-slate-400'
 }
 
+// 前端业务函数：协调 formatCost 对应的页面流程、接口调用或状态转换。
 function formatCost(value) {
   if (value === null || value === undefined) return '-'
   return Number(value).toFixed(2)
 }
 
+// 前端业务函数：协调 assetTypeLabel 对应的页面流程、接口调用或状态转换。
 function assetTypeLabel(assetType) {
   return {
     image: '图像',
@@ -541,12 +546,14 @@ function normalizeError(e) {
   }
 }
 
+// 前端业务函数：协调 loadRunSummary 对应的页面流程、接口调用或状态转换。
 async function loadRunSummary() {
   const runResponse = await getVideoProductionRun(runId)
   run.value = runResponse.data.run
   assetSummary.value = runResponse.data.asset_summary || {}
 }
 
+// 前端业务函数：协调 loadReadiness 对应的页面流程、接口调用或状态转换。
 async function loadReadiness() {
   try {
     const readinessResponse = await getRunReadiness(runId)
@@ -556,6 +563,7 @@ async function loadReadiness() {
   }
 }
 
+// 前端业务函数：协调 loadCostSummary 对应的页面流程、接口调用或状态转换。
 async function loadCostSummary() {
   try {
     const costsResponse = await getRunCosts(runId)
@@ -565,6 +573,7 @@ async function loadCostSummary() {
   }
 }
 
+// 前端业务函数：协调 loadProviderStageTasks 对应的页面流程、接口调用或状态转换。
 async function loadProviderStageTasks(params = {}) {
   try {
     const { data } = await getProviderStageTasks(runId, {
@@ -577,6 +586,7 @@ async function loadProviderStageTasks(params = {}) {
   }
 }
 
+// 前端业务函数：协调 loadRepairTasks 对应的页面流程、接口调用或状态转换。
 async function loadRepairTasks() {
   repairLoading.value = true
   repairError.value = ''
@@ -593,6 +603,7 @@ async function loadRepairTasks() {
   }
 }
 
+// 前端业务函数：协调 loadStoryboardImages 对应的页面流程、接口调用或状态转换。
 async function loadStoryboardImages() {
   if (!run.value?.episode_id || !run.value?.series_id) {
     storyboardImageState.value = null
@@ -636,6 +647,7 @@ async function load(options = {}) {
   }
 }
 
+// 前端业务函数：协调 storyboardFrameImageStatusLabel 对应的页面流程、接口调用或状态转换。
 function storyboardFrameImageStatusLabel(status) {
   return {
     approved: '已通过',
@@ -653,10 +665,12 @@ function storyboardFrameImageStatusClass(status) {
   return 'text-slate-500'
 }
 
+// 前端业务函数：协调 canPromoteStoryboardImage 对应的页面流程、接口调用或状态转换。
 function canPromoteStoryboardImage(frame) {
   return Array.isArray(frame?.asset?.allowed_actions) && frame.asset.allowed_actions.includes('promote_to_video_asset')
 }
 
+// 前端业务函数：协调 promoteStoryboardFrameImage 对应的页面流程、接口调用或状态转换。
 async function promoteStoryboardFrameImage(frame) {
   if (!frame?.asset?.id || !run.value?.id || !run.value?.episode_id) return
   storyboardImagePromotingId.value = frame.asset.id
@@ -671,6 +685,7 @@ async function promoteStoryboardFrameImage(frame) {
   storyboardImagePromotingId.value = ''
 }
 
+// 前端业务函数：协调 loadTree 对应的页面流程、接口调用或状态转换。
 async function loadTree(params = {}) {
   treeLoading.value = true
   treeError.value = ''
@@ -698,11 +713,13 @@ async function loadTree(params = {}) {
   }
 }
 
+// 前端业务函数：协调 selectSegment 对应的页面流程、接口调用或状态转换。
 async function selectSegment(segment) {
   selectedSegment.value = segment
   await refreshSelectedSegmentDetail()
 }
 
+// 前端业务函数：协调 refreshSelectedSegmentDetail 对应的页面流程、接口调用或状态转换。
 async function refreshSelectedSegmentDetail(options = {}) {
   if (!selectedSegment.value?.id) return
   const silent = options.silent === true
@@ -717,6 +734,7 @@ async function refreshSelectedSegmentDetail(options = {}) {
   }
 }
 
+// 前端业务函数：协调 act 对应的页面流程、接口调用或状态转换。
 async function act(fn) {
   if (acting.value) return
   clearAutopilotTimer()
@@ -733,6 +751,7 @@ async function act(fn) {
   }
 }
 
+// 前端业务函数：协调 clearAutopilotTimer 对应的页面流程、接口调用或状态转换。
 function clearAutopilotTimer() {
   if (autopilotTimer.value) {
     clearTimeout(autopilotTimer.value)
@@ -740,6 +759,7 @@ function clearAutopilotTimer() {
   }
 }
 
+// 前端业务函数：协调 clearStatusPollTimer 对应的页面流程、接口调用或状态转换。
 function clearStatusPollTimer() {
   if (statusPollTimer.value) {
     clearTimeout(statusPollTimer.value)
@@ -747,6 +767,7 @@ function clearStatusPollTimer() {
   }
 }
 
+// 前端业务函数：协调 shouldPollStatus 对应的页面流程、接口调用或状态转换。
 function shouldPollStatus() {
   return Boolean(
     !autopilotEnabled.value
@@ -755,12 +776,14 @@ function shouldPollStatus() {
   )
 }
 
+// 前端业务函数：协调 scheduleStatusPoll 对应的页面流程、接口调用或状态转换。
 function scheduleStatusPoll(delay = STATUS_POLL_INTERVAL_MS) {
   clearStatusPollTimer()
   if (!shouldPollStatus()) return
   statusPollTimer.value = setTimeout(() => load({ silent: true }), delay)
 }
 
+// 前端业务函数：协调 scheduleAutopilot 对应的页面流程、接口调用或状态转换。
 function scheduleAutopilot(delay = 800) {
   clearAutopilotTimer()
   if (!autopilotEnabled.value || autopilotBusy.value || acting.value) return
@@ -768,6 +791,7 @@ function scheduleAutopilot(delay = 800) {
   autopilotTimer.value = setTimeout(runAutopilotOnce, delay)
 }
 
+// 前端业务函数：协调 runAutopilotOnce 对应的页面流程、接口调用或状态转换。
 async function runAutopilotOnce() {
   if (!autopilotEnabled.value || autopilotBusy.value || acting.value) return
   autopilotBusy.value = true
@@ -797,22 +821,33 @@ async function runAutopilotOnce() {
   }
 }
 
+// 前端业务函数：协调 startImages 对应的页面流程、接口调用或状态转换。
 function startImages() { return act(() => startImageStage(runId)) }
+// 前端业务函数：协调 backfillTextArtifacts 对应的页面流程、接口调用或状态转换。
 function backfillTextArtifacts() { return act(() => backfillRunTextArtifacts(runId)) }
+// 前端业务函数：协调 syncImages 对应的页面流程、接口调用或状态转换。
 function syncImages() { return act(() => syncImageStage(runId)) }
+// 前端业务函数：协调 startVideos 对应的页面流程、接口调用或状态转换。
 function startVideos() { return act(() => startVideoStage(runId)) }
+// 前端业务函数：协调 syncVideos 对应的页面流程、接口调用或状态转换。
 function syncVideos() { return act(() => syncVideoStage(runId)) }
+// 前端业务函数：协调 compose 对应的页面流程、接口调用或状态转换。
 function compose() { return act(() => startComposeStage(runId)) }
+// 前端业务函数：协调 syncCompose 对应的页面流程、接口调用或状态转换。
 function syncCompose() { return act(() => syncComposeStage(runId)) }
+// 前端业务函数：协调 realWorkerStep 对应的页面流程、接口调用或状态转换。
 function realWorkerStep() { return act(() => runRealWorkerStep(runId, { lease_id: 'ui-real-worker', batch_size: 1, async_mode: true })) }
+// 前端业务函数：协调 mockWorkerStep 对应的页面流程、接口调用或状态转换。
 function mockWorkerStep() { return act(() => runMockSchedulerStep(runId, { lease_id: 'ui-worker', batch_size: 1 })) }
 
+// 前端业务函数：协调 openRepairAction 对应的页面流程、接口调用或状态转换。
 function openRepairAction(task) {
   if (task?.repair_route) {
     window.location.href = task.repair_route
   }
 }
 
+// 前端业务函数：协调 retryRepair 对应的页面流程、接口调用或状态转换。
 async function retryRepair(task, authorizationPayload = null) {
   if (!task?.id || repairBusyId.value) return
   repairBusyId.value = task.id
@@ -835,6 +870,7 @@ async function retryRepair(task, authorizationPayload = null) {
   }
 }
 
+// 前端业务函数：协调 previewRetryImpact 对应的页面流程、接口调用或状态转换。
 async function previewRetryImpact() {
   if (acting.value || !selectedSegment.value) return
   try {
@@ -846,6 +882,7 @@ async function previewRetryImpact() {
   }
 }
 
+// 前端业务函数：协调 confirmRetry 对应的页面流程、接口调用或状态转换。
 async function confirmRetry() {
   if (!selectedSegment.value) return
   retryDialogOpen.value = false

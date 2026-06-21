@@ -20,6 +20,7 @@ STAGE_ASSET_TYPES = {
 
 
 def _asset_type_for_stage(stage: str) -> str:
+    """业务函数：处理 _asset_type_for_stage 对应的业务流程、校验或数据转换。"""
     try:
         return STAGE_ASSET_TYPES[stage]
     except KeyError as exc:
@@ -27,6 +28,7 @@ def _asset_type_for_stage(stage: str) -> str:
 
 
 def _required_ids(db: Session, run: VideoProductionRun, asset_type: str) -> list[str]:
+    """业务函数：处理 _required_ids 对应的业务流程、校验或数据转换。"""
     if asset_type == "final_video":
         return ["final"]
     return production_segment_frame_ids(db, run)
@@ -37,6 +39,7 @@ def _latest_assets_by_required_id(
     run: VideoProductionRun,
     asset_type: str,
 ) -> dict[str, VideoProductionAsset]:
+    """业务函数：处理 _latest_assets_by_required_id 对应的业务流程、校验或数据转换。"""
     rows = (
         db.query(VideoProductionAsset)
         .filter(
@@ -55,6 +58,7 @@ def _latest_assets_by_required_id(
 
 
 def _blocked_reason(asset: VideoProductionAsset | None) -> str | None:
+    """业务函数：处理 _blocked_reason 对应的业务流程、校验或数据转换。"""
     if asset is None:
         return "asset_missing"
     if asset.status != "approved":
@@ -65,6 +69,7 @@ def _blocked_reason(asset: VideoProductionAsset | None) -> str | None:
 
 
 def evaluate_stage_gate(db: Session, run_id: str, *, stage: str) -> dict:
+    """业务函数：处理 evaluate_stage_gate 对应的业务流程、校验或数据转换。"""
     run = db.query(VideoProductionRun).filter(VideoProductionRun.id == run_id).one()
     asset_type = _asset_type_for_stage(stage)
     required_ids = _required_ids(db, run, asset_type)

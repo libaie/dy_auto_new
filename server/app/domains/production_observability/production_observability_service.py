@@ -29,10 +29,12 @@ SECRET_KEYS = {
 
 
 def _normalize_key(key: str) -> str:
+    """业务函数：处理 _normalize_key 对应的业务流程、校验或数据转换。"""
     return re.sub(r"[^a-z0-9]", "", key.lower())
 
 
 def _redact(value: Any) -> Any:
+    """业务函数：处理 _redact 对应的业务流程、校验或数据转换。"""
     if isinstance(value, dict):
         return {
             key: "[REDACTED]"
@@ -56,6 +58,7 @@ def record_production_event(
     provider_task_id: str | None = None,
     payload: dict | None = None,
 ) -> ProductionAuditEvent:
+    """业务函数：处理 record_production_event 对应的业务流程、校验或数据转换。"""
     event = ProductionAuditEvent(
         event_type=event_type,
         run_id=run_id,

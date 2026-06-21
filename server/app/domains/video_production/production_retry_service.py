@@ -17,6 +17,7 @@ from app.domains.video_production.production_queue_service import enqueue_job
 
 
 def get_retry_impact(db: Session, segment_id: str) -> dict:
+    """业务函数：处理 get_retry_impact 对应的业务流程、校验或数据转换。"""
     segment = db.query(ProductionSegment).filter(ProductionSegment.id == segment_id).first()
     if not segment:
         raise ValueError("Production segment not found")
@@ -45,6 +46,7 @@ def get_retry_impact(db: Session, segment_id: str) -> dict:
 
 
 def retry_segment_with_impact(db: Session, segment_id: str) -> ProductionSegment:
+    """业务函数：处理 retry_segment_with_impact 对应的业务流程、校验或数据转换。"""
     impact = get_retry_impact(db, segment_id)
     if not impact["allowed"]:
         raise ValueError("Production segment is not retryable")
@@ -84,6 +86,7 @@ def retry_segment_with_impact(db: Session, segment_id: str) -> ProductionSegment
 
 
 def _enqueue_retry_stage_job(db: Session, segment: ProductionSegment) -> None:
+    """业务函数：处理 _enqueue_retry_stage_job 对应的业务流程、校验或数据转换。"""
     run = _run_for_segment(db, segment)
     if not run:
         return
@@ -109,6 +112,7 @@ def _enqueue_retry_stage_job(db: Session, segment: ProductionSegment) -> None:
 
 
 def _run_for_segment(db: Session, segment: ProductionSegment) -> VideoProductionRun | None:
+    """业务函数：处理 _run_for_segment 对应的业务流程、校验或数据转换。"""
     row = (
         db.query(VideoProductionRun)
         .join(ProductionScene, VideoProductionRun.production_episode_id == ProductionScene.episode_plan_id)
@@ -120,5 +124,6 @@ def _run_for_segment(db: Session, segment: ProductionSegment) -> VideoProduction
 
 
 def _retry_stage_for_segment(db: Session, run: VideoProductionRun, segment: ProductionSegment) -> str:
+    """业务函数：处理 _retry_stage_for_segment 对应的业务流程、校验或数据转换。"""
     del db, run, segment
     return "image_generation"

@@ -277,16 +277,19 @@ const sceneReferenceSlotsWithProgress = computed(() => sceneReferenceSlots.value
   progress: referenceProgress(selectedScene.value, slot.key),
 })))
 
+// 前端业务函数：协调 referenceProgress 对应的页面流程、接口调用或状态转换。
 function referenceProgress(scene, slot) {
   return scene?.meta_json?.reference_generation?.[slot] || null
 }
 
+// 前端业务函数：协调 hasActiveReferenceProgress 对应的页面流程、接口调用或状态转换。
 function hasActiveReferenceProgress(items) {
   return items.some((scene) => Object.values(scene?.meta_json?.reference_generation || {}).some((progress) => (
     ['pending', 'generating'].includes(progress?.status)
   )))
 }
 
+// 前端业务函数：协调 scheduleReferencePoll 对应的页面流程、接口调用或状态转换。
 function scheduleReferencePoll() {
   if (referencePollTimer.value) {
     clearTimeout(referencePollTimer.value)
@@ -297,10 +300,12 @@ function scheduleReferencePoll() {
   }
 }
 
+// 前端业务函数：协调 messageFromError 对应的页面流程、接口调用或状态转换。
 function messageFromError(errorValue, fallback) {
   return errorValue?.response?.data?.detail || errorValue?.message || fallback
 }
 
+// 前端业务函数：协调 pickAllowed 对应的页面流程、接口调用或状态转换。
 function pickAllowed(source, fields) {
   return fields.reduce((payload, field) => {
     payload[field] = source?.[field] ?? ''
@@ -308,6 +313,7 @@ function pickAllowed(source, fields) {
   }, {})
 }
 
+// 前端业务函数：协调 pickCandidateFields 对应的页面流程、接口调用或状态转换。
 function pickCandidateFields(candidate, fields) {
   return fields.reduce((payload, field) => {
     if (Object.prototype.hasOwnProperty.call(candidate || {}, field) && candidate[field] !== undefined) {
@@ -317,6 +323,7 @@ function pickCandidateFields(candidate, fields) {
   }, {})
 }
 
+// 前端业务函数：协调 mergeAllowedDraft 对应的页面流程、接口调用或状态转换。
 function mergeAllowedDraft(draft, candidate) {
   return {
     ...pickAllowed(draft, SCENE_EDIT_FIELDS),
@@ -324,6 +331,7 @@ function mergeAllowedDraft(draft, candidate) {
   }
 }
 
+// 前端业务函数：协调 loadOpts 对应的页面流程、接口调用或状态转换。
 async function loadOpts() {
   try {
     const [t, l, m, g] = await Promise.all([
@@ -347,6 +355,7 @@ async function loadOpts() {
   }
 }
 
+// 前端业务函数：协调 load 对应的页面流程、接口调用或状态转换。
 async function load() {
   loading.value = true
   error.value = ''
@@ -362,6 +371,7 @@ async function load() {
   }
 }
 
+// 前端业务函数：协调 syncSelected 对应的页面流程、接口调用或状态转换。
 function syncSelected(id) {
   const fresh = scenes.value.find((s) => s.id === id) || null
   selectedScene.value = fresh
@@ -371,6 +381,7 @@ function syncSelected(id) {
   }
 }
 
+// 前端业务函数：协调 openScene 对应的页面流程、接口调用或状态转换。
 function openScene(scene) {
   drawerError.value = ''
   selectedScene.value = scene
@@ -378,6 +389,7 @@ function openScene(scene) {
   Object.assign(editingScene, { ...scene })
 }
 
+// 前端业务函数：协调 closeScene 对应的页面流程、接口调用或状态转换。
 function closeScene() {
   selectedScene.value = null
   drawerError.value = ''
@@ -385,6 +397,7 @@ function closeScene() {
   rewriteDialogOpen.value = false
 }
 
+// 前端业务函数：协调 saveScene 对应的页面流程、接口调用或状态转换。
 async function saveScene() {
   if (!selectedScene.value) return
   const id = selectedScene.value.id
@@ -401,6 +414,7 @@ async function saveScene() {
   }
 }
 
+// 前端业务函数：协调 regenerateSceneReference 对应的页面流程、接口调用或状态转换。
 async function regenerateSceneReference(slot) {
   if (!selectedScene.value) return
   const id = selectedScene.value.id
@@ -417,6 +431,7 @@ async function regenerateSceneReference(slot) {
   }
 }
 
+// 前端业务函数：协调 replaceSceneReference 对应的页面流程、接口调用或状态转换。
 async function replaceSceneReference(slot, url) {
   if (!selectedScene.value) return
   const id = selectedScene.value.id
@@ -497,6 +512,7 @@ async function doAiGenerate() {
   }
 }
 
+// 前端业务函数：协调 doBatchCreate 对应的页面流程、接口调用或状态转换。
 async function doBatchCreate() {
   const selected = aiResult.value.filter((s) => s._selected)
   if (!selected.length) return
@@ -522,6 +538,7 @@ async function doBatchCreate() {
   }
 }
 
+// 前端业务函数：协调 sceneTypeLabel 对应的页面流程、接口调用或状态转换。
 function sceneTypeLabel(value) {
   return typeOptions.value.find((item) => item.value === value)?.label || value || '未设置'
 }
@@ -530,6 +547,7 @@ function lightingLabel(value) {
   return lightingOptions.value.find((item) => item.value === value)?.label || value || ''
 }
 
+// 前端业务函数：协调 moodLabel 对应的页面流程、接口调用或状态转换。
 function moodLabel(value) {
   return moodOptions.value.find((item) => item.value === value)?.label || value || ''
 }

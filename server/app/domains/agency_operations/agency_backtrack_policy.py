@@ -26,6 +26,7 @@ def trigger_backtrack_if_needed(
     *,
     reason: str,
 ) -> dict[str, Any]:
+    """业务函数：处理 trigger_backtrack_if_needed 对应的业务流程、校验或数据转换。"""
     if not run.production_plan_id:
         return {"triggered": False, "reason": "missing_production_plan"}
     if asset.asset_type not in {"image", "video_segment"}:
@@ -104,6 +105,7 @@ def trigger_backtrack_if_needed(
 
 
 def _failure_count(db: Session, run: VideoProductionRun, asset: VideoProductionAsset) -> int:
+    """业务函数：处理 _failure_count 对应的业务流程、校验或数据转换。"""
     query = (
         db.query(VideoReviewRecord)
         .join(VideoProductionAsset, VideoReviewRecord.asset_id == VideoProductionAsset.id)
@@ -125,18 +127,21 @@ def _failure_count(db: Session, run: VideoProductionRun, asset: VideoProductionA
 
 
 def _target_scope(asset: VideoProductionAsset) -> tuple[str, str]:
+    """业务函数：处理 _target_scope 对应的业务流程、校验或数据转换。"""
     target_type = asset.target_type or ("production_segment" if asset.production_segment_id else "asset")
     target_id = asset.target_id or asset.production_segment_id or asset.id
     return target_type, target_id
 
 
 def _repair_for_asset(asset: VideoProductionAsset) -> tuple[str, str]:
+    """业务函数：处理 _repair_for_asset 对应的业务流程、校验或数据转换。"""
     if asset.asset_type == "video_segment":
         return "video_segment_failed", "image_generation"
     return "image_generation_failed", "storyboard"
 
 
 def _apply_backtrack_run_state(run: VideoProductionRun, backtrack_to: str) -> None:
+    """业务函数：处理 _apply_backtrack_run_state 对应的业务流程、校验或数据转换。"""
     run.current_stage = backtrack_to
     if backtrack_to == "image_generation":
         run.status = "image_batch_running"

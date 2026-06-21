@@ -11,10 +11,12 @@ var flowContext = {
     this._current = state;
   },
 
+  // 设备业务函数：处理 is 对应的抖音自动化动作、状态或安全边界。
   is: function (state) {
     return this._current === state;
   },
 
+  // 设备业务函数：处理 reset 对应的抖音自动化动作、状态或安全边界。
   reset: function () {
     this._current = "idle";
   },

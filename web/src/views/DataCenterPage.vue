@@ -49,6 +49,7 @@ const conversationMessages = ref([])
 const conversationHistoryIncomplete = ref(false)
 const conversationFailedCount = computed(() => conversationMessages.value.filter(m => m.status === 'failed').length)
 
+// 前端业务函数：协调 messageStatusLabel 对应的页面流程、接口调用或状态转换。
 function messageStatusLabel(status) {
   return status === 'failed' ? '失败' : '已发送'
 }
@@ -57,6 +58,7 @@ function messageStatusClass(status) {
   return status === 'failed' ? 'bg-rose-500/15 text-rose-300' : 'bg-emerald-500/15 text-emerald-300'
 }
 
+// 前端业务函数：协调 openConversationDetail 对应的页面流程、接口调用或状态转换。
 async function openConversationDetail(conv) {
   selectedConversation.value = conv
   conversationMessages.value = []
@@ -76,6 +78,7 @@ async function openConversationDetail(conv) {
   }
 }
 
+// 前端业务函数：协调 closeConversationDetail 对应的页面流程、接口调用或状态转换。
 function closeConversationDetail() {
   conversationDetailOpen.value = false
 }
@@ -89,6 +92,7 @@ watch(() => route.query.task_id, (val) => {
   if (val) fetchData()
 })
 
+// 前端业务函数：协调 switchTab 对应的页面流程、接口调用或状态转换。
 function switchTab(key) {
   activeTab.value = key
   page.value = 1
@@ -97,6 +101,7 @@ function switchTab(key) {
   fetchData()
 }
 
+// 前端业务函数：协调 wsUrl 对应的页面流程、接口调用或状态转换。
 function wsUrl() {
   const token = localStorage.getItem('token') || ''
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
@@ -111,6 +116,7 @@ const { connect: wsConnect } = useWebSocket(wsUrl, {
   },
 })
 
+// 前端业务函数：协调 fetchData 对应的页面流程、接口调用或状态转换。
 async function fetchData() {
   loading.value = true
   try {
@@ -133,9 +139,12 @@ async function fetchData() {
   } finally { loading.value = false }
 }
 
+// 前端业务函数：协调 handlePageChange 对应的页面流程、接口调用或状态转换。
 function handlePageChange(p) { page.value = p; fetchData() }
+// 前端业务函数：协调 handleSearch 对应的页面流程、接口调用或状态转换。
 function handleSearch() { page.value = 1; fetchData() }
 
+// 前端业务函数：协调 buildDataParams 对应的页面流程、接口调用或状态转换。
 function buildDataParams({ includePagination = false } = {}) {
   const params = {}
   if (includePagination) {
@@ -164,6 +173,7 @@ function buildDataParams({ includePagination = false } = {}) {
 }
 
 const exporting = ref(false)
+// 前端业务函数：协调 doExport 对应的页面流程、接口调用或状态转换。
 async function doExport(all) {
   exporting.value = true
   try {
@@ -203,6 +213,7 @@ const avatarGradients = [
   'linear-gradient(135deg, #14b8a6, #84cc16)',
   'linear-gradient(135deg, #f43f5e, #a855f7)',
 ]
+// 前端业务函数：协调 avatarGradient 对应的页面流程、接口调用或状态转换。
 function avatarGradient(name) {
   if (!name) return avatarGradients[0]
   let hash = 0

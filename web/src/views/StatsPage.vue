@@ -9,6 +9,7 @@ import { useToastStore } from '../stores/toast.js'
 
 Chart.register(...registerables)
 
+// 前端业务函数：协调 formatDate 对应的页面流程、接口调用或状态转换。
 function formatDate(d) {
   const yyyy = d.getFullYear()
   const mm = String(d.getMonth() + 1).padStart(2, '0')
@@ -71,6 +72,7 @@ const overallLimit = computed(() => {
   }, 0)
 })
 
+// 前端业务函数：协调 pct 对应的页面流程、接口调用或状态转换。
 function pct(used, limit) {
   // -1 = unlimited → 100% as long as something was done
   if (limit === -1) return used > 0 ? 100 : 0
@@ -78,6 +80,7 @@ function pct(used, limit) {
   return Math.min(Math.round((used / limit) * 100), 100)
 }
 
+// 前端业务函数：协调 pctColor 对应的页面流程、接口调用或状态转换。
 function pctColor(pct) {
   if (pct >= 90) return '#f87171'
   if (pct >= 70) return '#fbbf24'
@@ -85,12 +88,14 @@ function pctColor(pct) {
   return '#60a5fa'
 }
 
+// 前端业务函数：协调 ringDash 对应的页面流程、接口调用或状态转换。
 function ringDash(val, r) {
   const circ = 2 * Math.PI * r
   const filled = (val / 100) * circ
   return `${filled} ${circ}`
 }
 
+// 前端业务函数：协调 buildCharts 对应的页面流程、接口调用或状态转换。
 function buildCharts() {
   const accounts = statsData.value?.accounts
   if (!accounts || accounts.length === 0) return
@@ -193,6 +198,7 @@ watch(() => statsData.value, () => {
   if (statsData.value?.accounts?.length) buildCharts()
 })
 
+// 前端业务函数：协调 fetchStats 对应的页面流程、接口调用或状态转换。
 async function fetchStats() {
   loading.value = true
   try {

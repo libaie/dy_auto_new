@@ -31,16 +31,19 @@ const props = defineProps({
 
 defineEmits(['select-scene'])
 
+// 前端业务函数：协调 modelCount 对应的页面流程、接口调用或状态转换。
 function modelCount(key) {
   const scene = props.scenes.find(s => s.key === key)
   if (!scene) return 0
   return props.models.filter(m => m.model_type === scene.model_type).length
 }
 
+// 前端业务函数：协调 statusClass 对应的页面流程、接口调用或状态转换。
 function statusClass(key) {
   return props.sceneStatus[key] || 'red'
 }
 
+// 前端业务函数：协调 statusLabel 对应的页面流程、接口调用或状态转换。
 function statusLabel(key) {
   const map = { green: '就绪', amber: '待配置', red: '未配置' }
   return map[props.sceneStatus[key]] || '未知'

@@ -7,10 +7,12 @@ from app.ws_manager import pair_ws_manager
 
 
 async def broadcast_content_changed():
+    """业务函数：处理 broadcast_content_changed 对应的业务流程、校验或数据转换。"""
     await pair_ws_manager.broadcast_to_admins({"event": "content_changed"})
 
 
 async def broadcast_data_changed(entity_type: str, entity_id):
+    """业务函数：处理 broadcast_data_changed 对应的业务流程、校验或数据转换。"""
     await pair_ws_manager.broadcast_to_admins({
         "event": "data_changed",
         "type": entity_type,

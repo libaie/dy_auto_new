@@ -283,6 +283,7 @@ function errorText(value) {
   return String(value)
 }
 
+// 前端业务函数：协调 roleLabel 对应的页面流程、接口调用或状态转换。
 function roleLabel(role) {
   return roleLabels[role] || role || '未指定'
 }
@@ -297,6 +298,7 @@ function statusClass(status) {
   return 'border-amber-500/40 text-amber-300'
 }
 
+// 前端业务函数：协调 recommendationStatusLabel 对应的页面流程、接口调用或状态转换。
 function recommendationStatusLabel(status) {
   if (status === 'recommended') return '推荐使用'
   if (status === 'cautious') return '谨慎观察'
@@ -315,18 +317,22 @@ function modelOptionLabel(model) {
   return `${model.name || model.id} · ${model.provider || model.model_name || model.id}`
 }
 
+// 前端业务函数：协调 successRateLabel 对应的页面流程、接口调用或状态转换。
 function successRateLabel(metrics) {
   return `${Math.round(((metrics?.success_rate ?? 0) * 100))}%`
 }
 
+// 前端业务函数：协调 costLabel 对应的页面流程、接口调用或状态转换。
 function costLabel(metrics) {
   return `${metrics?.average_cost_amount ?? 0} ${metrics?.currency || 'CNY'}`
 }
 
+// 前端业务函数：协调 latencyLabel 对应的页面流程、接口调用或状态转换。
 function latencyLabel(metrics) {
   return `${metrics?.average_latency_seconds ?? 0}s`
 }
 
+// 前端业务函数：协调 normalizeModels 对应的页面流程、接口调用或状态转换。
 function normalizeModels(response) {
   const data = response?.data?.data || response?.data || response || {}
   if (Array.isArray(data.models)) return data.models
@@ -334,6 +340,7 @@ function normalizeModels(response) {
   return Array.isArray(data) ? data : []
 }
 
+// 前端业务函数：协调 loadStrategies 对应的页面流程、接口调用或状态转换。
 async function loadStrategies() {
   loading.value = true
   error.value = ''
@@ -348,6 +355,7 @@ async function loadStrategies() {
   }
 }
 
+// 前端业务函数：协调 loadImageModels 对应的页面流程、接口调用或状态转换。
 async function loadImageModels() {
   try {
     const response = await listModels({ model_type: 'image', enabled: true })
@@ -357,6 +365,7 @@ async function loadImageModels() {
   }
 }
 
+// 前端业务函数：协调 refreshMetrics 对应的页面流程、接口调用或状态转换。
 async function refreshMetrics() {
   metricsMessage.value = ''
   error.value = ''
@@ -370,6 +379,7 @@ async function refreshMetrics() {
   }
 }
 
+// 前端业务函数：协调 showRecommendation 对应的页面流程、接口调用或状态转换。
 async function showRecommendation(strategyId) {
   const requestId = latestRecommendationRequestId.value + 1
   latestRecommendationRequestId.value = requestId
@@ -390,6 +400,7 @@ async function showRecommendation(strategyId) {
   }
 }
 
+// 前端业务函数：协调 openEditor 对应的页面流程、接口调用或状态转换。
 function openEditor(strategy) {
   editorError.value = ''
   editing.value = strategy
@@ -397,6 +408,7 @@ function openEditor(strategy) {
   editor.fallback_model_ids = [...(strategy.fallback_model_ids || [])]
 }
 
+// 前端业务函数：协调 closeEditor 对应的页面流程、接口调用或状态转换。
 function closeEditor() {
   editorError.value = ''
   editing.value = null
@@ -404,6 +416,7 @@ function closeEditor() {
   editor.fallback_model_ids = []
 }
 
+// 前端业务函数：协调 saveEditor 对应的页面流程、接口调用或状态转换。
 async function saveEditor() {
   if (!editing.value) return
   error.value = ''
@@ -435,6 +448,7 @@ async function saveEditor() {
   }
 }
 
+// 前端业务函数：协调 archive 对应的页面流程、接口调用或状态转换。
 async function archive(id) {
   error.value = ''
   try {

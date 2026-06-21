@@ -27,6 +27,7 @@ def get_settings(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
+    """业务函数：处理 get_settings 对应的业务流程、校验或数据转换。"""
     try:
         rows = db.query(SystemSetting).all()
         result = {}
@@ -47,6 +48,7 @@ def update_settings(
     db: Session = Depends(get_db),
     user = Depends(require_role("admin")),
 ):
+    """业务函数：处理 update_settings 对应的业务流程、校验或数据转换。"""
     for key, value in request.settings.items():
         # Skip masked values — client sent placeholder, don't overwrite real secret
         if value == _MASKED_VALUE and key in _SENSITIVE_KEYS:

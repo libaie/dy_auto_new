@@ -34,11 +34,13 @@ _CONTENT_TYPE_SUFFIXES = {
 
 
 def ensure_storage_dirs() -> None:
+    """业务函数：处理 ensure_storage_dirs 对应的业务流程、校验或数据转换。"""
     for name in ("uploads", "outputs", "thumbs"):
         (IMAGE_CREATION_ROOT / name).mkdir(parents=True, exist_ok=True)
 
 
 def _suffix_for(content_type: str | None, source_url: str = "") -> str:
+    """业务函数：处理 _suffix_for 对应的业务流程、校验或数据转换。"""
     suffix = Path(urlparse(source_url or "").path).suffix.lower()
     if suffix in {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff", ".gif"}:
         return ".jpg" if suffix == ".jpeg" else suffix
@@ -46,6 +48,7 @@ def _suffix_for(content_type: str | None, source_url: str = "") -> str:
 
 
 async def save_upload(file: UploadFile, public_base_url: str) -> dict:
+    """业务函数：处理 save_upload 对应的业务流程、校验或数据转换。"""
     ensure_storage_dirs()
     content = await file.read()
     if file.content_type not in ALLOWED_CONTENT_TYPES:
@@ -69,6 +72,7 @@ async def save_upload(file: UploadFile, public_base_url: str) -> dict:
 
 
 def save_output_bytes(content: bytes, public_base_url: str, content_type: str | None = None, source_url: str = "") -> dict:
+    """业务函数：处理 save_output_bytes 对应的业务流程、校验或数据转换。"""
     ensure_storage_dirs()
     clean_content_type = (content_type or "").split(";")[0].strip().lower()
     if clean_content_type and clean_content_type not in ALLOWED_CONTENT_TYPES and clean_content_type != "application/octet-stream":
@@ -91,4 +95,5 @@ def save_output_bytes(content: bytes, public_base_url: str, content_type: str | 
 
 
 def configured_public_base_url() -> str:
+    """业务函数：处理 configured_public_base_url 对应的业务流程、校验或数据转换。"""
     return os.getenv("DY_AUTO_PUBLIC_BASE_URL", "http://127.0.0.1:8000")

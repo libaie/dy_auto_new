@@ -43,7 +43,9 @@ SCENE_SLOT_REF_MODES = {
 
 
 class AssetAnchorManager:
+    """业务类：承载 AssetAnchorManager 相关的数据结构、状态或业务协作。"""
     def __init__(self, db: Session):
+        """初始化业务对象依赖，保存后续流程需要的运行上下文。"""
         self.db = db
 
     async def ensure_character_anchor(
@@ -54,6 +56,7 @@ class AssetAnchorManager:
         seed: int | None = None,
         force: bool = False,
     ) -> CharacterAnchorRow:
+        """业务函数：处理 ensure_character_anchor 对应的业务流程、校验或数据转换。"""
         _validate_slot(reference_slot, CHARACTER_REFERENCE_SLOTS)
         character = self.db.query(Character).filter(Character.id == character_id).first()
         if not character:
@@ -102,6 +105,7 @@ class AssetAnchorManager:
         seed: int | None = None,
         force: bool = False,
     ) -> SceneAnchorRow:
+        """业务函数：处理 ensure_scene_anchor 对应的业务流程、校验或数据转换。"""
         _validate_slot(reference_slot, SCENE_REFERENCE_SLOTS)
         scene = self.db.query(Scene).filter(Scene.id == scene_id).first()
         if not scene:
@@ -150,6 +154,7 @@ class AssetAnchorManager:
         provider: str,
         provider_options_schema: dict[str, Any] | None = None,
     ) -> AnchorProviderPayload:
+        """业务函数：处理 adapt_provider_parameters 对应的业务流程、校验或数据转换。"""
         references: list[dict[str, Any]] = []
         priority = 1
         seed = None
@@ -198,6 +203,7 @@ class AssetAnchorManager:
         )
 
     def latest_character_anchors(self, character_ids: Sequence[str]) -> list[CharacterAnchorRow]:
+        """业务函数：处理 latest_character_anchors 对应的业务流程、校验或数据转换。"""
         anchors = []
         for character_id in character_ids:
             anchor = (
@@ -212,6 +218,7 @@ class AssetAnchorManager:
         return anchors
 
     def latest_scene_anchor(self, scene_id: str | None) -> SceneAnchorRow | None:
+        """业务函数：处理 latest_scene_anchor 对应的业务流程、校验或数据转换。"""
         if not scene_id:
             return None
         return (
@@ -223,6 +230,7 @@ class AssetAnchorManager:
         )
 
     def _character_anchor(self, character_id: str, reference_slot: str) -> CharacterAnchorRow | None:
+        """业务函数：处理 _character_anchor 对应的业务流程、校验或数据转换。"""
         return (
             self.db.query(CharacterAnchorRow)
             .filter(CharacterAnchorRow.character_id == character_id)
@@ -231,6 +239,7 @@ class AssetAnchorManager:
         )
 
     def _scene_anchor(self, scene_id: str, reference_slot: str) -> SceneAnchorRow | None:
+        """业务函数：处理 _scene_anchor 对应的业务流程、校验或数据转换。"""
         return (
             self.db.query(SceneAnchorRow)
             .filter(SceneAnchorRow.scene_id == scene_id)
@@ -240,12 +249,14 @@ class AssetAnchorManager:
 
 
 def _validate_slot(slot: str, available_slots: tuple[tuple[str, str], ...]) -> None:
+    """业务函数：处理 _validate_slot 对应的业务流程、校验或数据转换。"""
     valid = {field for field, _label in available_slots}
     if slot not in valid:
         raise ValueError(f"Invalid anchor reference slot: {slot}")
 
 
 def _character_base_prompt(character: Character) -> str:
+    """业务函数：处理 _character_base_prompt 对应的业务流程、校验或数据转换。"""
     return " ".join(part for part in [
         f"Character anchor for {character.name}.",
         f"Role: {character.role_type}.",
@@ -259,6 +270,7 @@ def _character_base_prompt(character: Character) -> str:
 
 
 def _scene_environment_prompt(scene: Scene) -> str:
+    """业务函数：处理 _scene_environment_prompt 对应的业务流程、校验或数据转换。"""
     return " ".join(part for part in [
         f"Scene anchor for {scene.name}.",
         f"Type: {scene.scene_type}.",
@@ -270,10 +282,12 @@ def _scene_environment_prompt(scene: Scene) -> str:
 
 
 def _scene_reference_image_prompt(scene: Scene) -> str:
+    """业务函数：处理 _scene_reference_image_prompt 对应的业务流程、校验或数据转换。"""
     return f"{_scene_environment_prompt(scene)} {SCENE_EMPTY_PLATE_INSTRUCTION}"
 
 
 def _resolve_seed(requested: int | None, existing: int | None, stable_key: str) -> int:
+    """业务函数：处理 _resolve_seed 对应的业务流程、校验或数据转换。"""
     for value in (requested, existing):
         if value is not None:
             return _clamp_seed(value)
@@ -282,10 +296,12 @@ def _resolve_seed(requested: int | None, existing: int | None, stable_key: str) 
 
 
 def _clamp_seed(value: int) -> int:
+    """业务函数：处理 _clamp_seed 对应的业务流程、校验或数据转换。"""
     return max(0, min(int(value), MAX_PROVIDER_SEED))
 
 
 def _schema_allows_seed(provider_options_schema: dict[str, Any] | None) -> bool:
+    """业务函数：处理 _schema_allows_seed 对应的业务流程、校验或数据转换。"""
     schema = provider_options_schema or {}
     if "seed" in schema:
         return True
@@ -295,9 +311,11 @@ def _schema_allows_seed(provider_options_schema: dict[str, Any] | None) -> bool:
 
 
 def _usable_anchor_url(value: str | None) -> bool:
+    """业务函数：处理 _usable_anchor_url 对应的业务流程、校验或数据转换。"""
     return reference_url_is_usable(value)
 
 
 def _reference_image(**kwargs) -> dict[str, Any]:
+    """业务函数：处理 _reference_image 对应的业务流程、校验或数据转换。"""
     kwargs["ref_image_url"] = kwargs["url"]
     return AnchorReferenceImage(**kwargs).model_dump(mode="json", exclude_none=True)

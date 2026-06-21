@@ -64,6 +64,7 @@ const pageError = ref(null)
 const toast = useToastStore()
 
 // --- WebSocket ---
+// 前端业务函数：协调 wsUrl 对应的页面流程、接口调用或状态转换。
 function wsUrl() {
   const token = localStorage.getItem('token') || ''
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
@@ -101,12 +102,14 @@ async function fetchGroups() {
   }
 }
 
+// 前端业务函数：协调 handlePageChange 对应的页面流程、接口调用或状态转换。
 function handlePageChange(p) {
   page.value = p
   fetchGroups()
 }
 
 // --- Open create dialog ---
+// 前端业务函数：协调 openCreateDialog 对应的页面流程、接口调用或状态转换。
 function openCreateDialog() {
   isEditing.value = false
   editingId.value = null
@@ -116,6 +119,7 @@ function openCreateDialog() {
 }
 
 // --- Open edit dialog ---
+// 前端业务函数：协调 openEditDialog 对应的页面流程、接口调用或状态转换。
 function openEditDialog(group) {
   isEditing.value = true
   editingId.value = group.id
@@ -126,6 +130,7 @@ function openEditDialog(group) {
 }
 
 // --- Save (create or update) ---
+// 前端业务函数：协调 handleSave 对应的页面流程、接口调用或状态转换。
 async function handleSave() {
   if (!form.name.trim()) {
     formError.value = '分组名称不能为空'
@@ -159,11 +164,13 @@ async function handleSave() {
 }
 
 // --- Delete ---
+// 前端业务函数：协调 openDeleteDialog 对应的页面流程、接口调用或状态转换。
 function openDeleteDialog(group) {
   deletingGroup.value = group
   showDeleteDialog.value = true
 }
 
+// 前端业务函数：协调 handleDelete 对应的页面流程、接口调用或状态转换。
 async function handleDelete() {
   if (!deletingGroup.value) return
   deleting.value = true
@@ -183,6 +190,7 @@ async function handleDelete() {
 }
 
 // --- Member management ---
+// 前端业务函数：协调 openMembersDialog 对应的页面流程、接口调用或状态转换。
 async function openMembersDialog(group) {
   managingGroupId.value = group.id
   managingGroupName.value = group.name
@@ -191,6 +199,7 @@ async function openMembersDialog(group) {
   await Promise.all([fetchMembers(group.id), fetchAllAccounts()])
 }
 
+// 前端业务函数：协调 fetchMembers 对应的页面流程、接口调用或状态转换。
 async function fetchMembers(groupId) {
   membersLoading.value = true
   try {
@@ -204,6 +213,7 @@ async function fetchMembers(groupId) {
   }
 }
 
+// 前端业务函数：协调 fetchAllAccounts 对应的页面流程、接口调用或状态转换。
 async function fetchAllAccounts() {
   try {
     const res = await listAccounts({ limit: 200 })
@@ -217,6 +227,7 @@ async function fetchAllAccounts() {
 // Available accounts = all active accounts not already in the group
 const availableAccounts = ref([])
 
+// 前端业务函数：协调 updateAvailableAccounts 对应的页面流程、接口调用或状态转换。
 function updateAvailableAccounts() {
   const memberIds = new Set(members.value.map(m => m.id))
   availableAccounts.value = allAccounts.value.filter(
@@ -224,6 +235,7 @@ function updateAvailableAccounts() {
   )
 }
 
+// 前端业务函数：协调 handleAddMembers 对应的页面流程、接口调用或状态转换。
 async function handleAddMembers() {
   if (selectedAccountIds.value.length === 0) return
   try {

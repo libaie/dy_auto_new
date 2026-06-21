@@ -11,6 +11,7 @@ from typing import Any
 
 
 def _source_identity(payload: dict[str, Any]) -> dict[str, Any]:
+    """业务函数：处理 _source_identity 对应的业务流程、校验或数据转换。"""
     source = dict(payload.get("source") or {})
     if payload.get("source_url") and not source.get("url"):
         source["url"] = payload["source_url"]
@@ -25,6 +26,7 @@ def _source_identity(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _reference_identities(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """业务函数：处理 _reference_identities 对应的业务流程、校验或数据转换。"""
     items = []
     for raw in payload.get("reference_images") or []:
         item = {"url": raw} if isinstance(raw, str) else dict(raw or {})
@@ -49,6 +51,7 @@ def selection_preview_hash_inputs(
     selected_model_config_version: int | None,
     provider_options: dict[str, Any],
 ) -> dict[str, Any]:
+    """业务函数：处理 selection_preview_hash_inputs 对应的业务流程、校验或数据转换。"""
     return {
         "mode": mode,
         "destination_role": payload.get("_requested_destination_role", destination_role),
@@ -79,5 +82,6 @@ def selection_preview_hash_inputs(
 
 
 def selection_preview_request_hash(hash_inputs: dict[str, Any]) -> str:
+    """业务函数：处理 selection_preview_request_hash 对应的业务流程、校验或数据转换。"""
     stable = json.dumps(hash_inputs, sort_keys=True, ensure_ascii=False, default=str).encode("utf-8")
     return hashlib.sha256(stable).hexdigest()

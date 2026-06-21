@@ -284,16 +284,19 @@ const characterReferenceSlotsWithProgress = computed(() => characterReferenceSlo
   progress: referenceProgress(selectedCharacter.value, slot.key),
 })))
 
+// 前端业务函数：协调 referenceProgress 对应的页面流程、接口调用或状态转换。
 function referenceProgress(character, slot) {
   return character?.meta_json?.reference_generation?.[slot] || null
 }
 
+// 前端业务函数：协调 hasActiveReferenceProgress 对应的页面流程、接口调用或状态转换。
 function hasActiveReferenceProgress(items) {
   return items.some((character) => Object.values(character?.meta_json?.reference_generation || {}).some((progress) => (
     ['pending', 'generating'].includes(progress?.status)
   )))
 }
 
+// 前端业务函数：协调 scheduleReferencePoll 对应的页面流程、接口调用或状态转换。
 function scheduleReferencePoll() {
   if (referencePollTimer.value) {
     clearTimeout(referencePollTimer.value)
@@ -304,10 +307,12 @@ function scheduleReferencePoll() {
   }
 }
 
+// 前端业务函数：协调 messageFromError 对应的页面流程、接口调用或状态转换。
 function messageFromError(errorValue, fallback) {
   return errorValue?.response?.data?.detail || errorValue?.message || fallback
 }
 
+// 前端业务函数：协调 pickAllowed 对应的页面流程、接口调用或状态转换。
 function pickAllowed(source, fields) {
   return fields.reduce((payload, field) => {
     payload[field] = source?.[field] ?? ''
@@ -315,6 +320,7 @@ function pickAllowed(source, fields) {
   }, {})
 }
 
+// 前端业务函数：协调 pickCandidateFields 对应的页面流程、接口调用或状态转换。
 function pickCandidateFields(candidate, fields) {
   return fields.reduce((payload, field) => {
     if (Object.prototype.hasOwnProperty.call(candidate || {}, field) && candidate[field] !== undefined) {
@@ -324,6 +330,7 @@ function pickCandidateFields(candidate, fields) {
   }, {})
 }
 
+// 前端业务函数：协调 mergeAllowedDraft 对应的页面流程、接口调用或状态转换。
 function mergeAllowedDraft(draft, candidate) {
   return {
     ...pickAllowed(draft, CHARACTER_EDIT_FIELDS),
@@ -331,6 +338,7 @@ function mergeAllowedDraft(draft, candidate) {
   }
 }
 
+// 前端业务函数：协调 loadRoles 对应的页面流程、接口调用或状态转换。
 async function loadRoles() {
   try {
     const { data } = await listItems('character_role')
@@ -343,6 +351,7 @@ async function loadRoles() {
   }
 }
 
+// 前端业务函数：协调 loadGenres 对应的页面流程、接口调用或状态转换。
 async function loadGenres() {
   try {
     const { data } = await listItems('series_genre')
@@ -352,6 +361,7 @@ async function loadGenres() {
   }
 }
 
+// 前端业务函数：协调 load 对应的页面流程、接口调用或状态转换。
 async function load() {
   loading.value = true
   error.value = ''
@@ -367,6 +377,7 @@ async function load() {
   }
 }
 
+// 前端业务函数：协调 syncSelected 对应的页面流程、接口调用或状态转换。
 function syncSelected(id) {
   const fresh = characters.value.find((c) => c.id === id) || null
   selectedCharacter.value = fresh
@@ -376,6 +387,7 @@ function syncSelected(id) {
   }
 }
 
+// 前端业务函数：协调 openCharacter 对应的页面流程、接口调用或状态转换。
 function openCharacter(character) {
   drawerError.value = ''
   selectedCharacter.value = character
@@ -383,6 +395,7 @@ function openCharacter(character) {
   Object.assign(editingCharacter, { ...character })
 }
 
+// 前端业务函数：协调 closeCharacter 对应的页面流程、接口调用或状态转换。
 function closeCharacter() {
   selectedCharacter.value = null
   drawerError.value = ''
@@ -390,6 +403,7 @@ function closeCharacter() {
   rewriteDialogOpen.value = false
 }
 
+// 前端业务函数：协调 saveCharacter 对应的页面流程、接口调用或状态转换。
 async function saveCharacter() {
   if (!selectedCharacter.value) return
   const id = selectedCharacter.value.id
@@ -406,6 +420,7 @@ async function saveCharacter() {
   }
 }
 
+// 前端业务函数：协调 regenerateCharacterReference 对应的页面流程、接口调用或状态转换。
 async function regenerateCharacterReference(slot) {
   if (!selectedCharacter.value) return
   const id = selectedCharacter.value.id
@@ -422,6 +437,7 @@ async function regenerateCharacterReference(slot) {
   }
 }
 
+// 前端业务函数：协调 replaceCharacterReference 对应的页面流程、接口调用或状态转换。
 async function replaceCharacterReference(slot, url) {
   if (!selectedCharacter.value) return
   const id = selectedCharacter.value.id
@@ -502,6 +518,7 @@ async function doAiGenerate() {
   }
 }
 
+// 前端业务函数：协调 doBatchCreate 对应的页面流程、接口调用或状态转换。
 async function doBatchCreate() {
   const selected = aiResult.value.filter((c) => c._selected)
   if (!selected.length) return
@@ -530,6 +547,7 @@ async function doBatchCreate() {
   }
 }
 
+// 前端业务函数：协调 roleClass 对应的页面流程、接口调用或状态转换。
 function roleClass(role) {
   return {
     protagonist: 'bg-sky-900/40 text-sky-300',
@@ -539,6 +557,7 @@ function roleClass(role) {
   }[role] || 'bg-slate-800 text-slate-400'
 }
 
+// 前端业务函数：协调 roleLabel 对应的页面流程、接口调用或状态转换。
 function roleLabel(value) {
   return roleOptions.value.find((item) => item.value === value)?.label || value || '未设置'
 }

@@ -24,5 +24,6 @@
 <script setup>
 const props = defineProps({ models: { type: Array, default: () => [] }, selected: { type: String, default: '' } })
 defineEmits(['select'])
+// 前端业务函数：协调 providerColor 对应的页面流程、接口调用或状态转换。
 function providerColor(p) { return { volcengine: 'bg-purple-900/40 text-purple-400', kuaishou: 'bg-emerald-900/40 text-emerald-400', runninghub: 'bg-orange-900/40 text-orange-400' }[p] || 'bg-gray-800 text-slate-400' }
 </script>

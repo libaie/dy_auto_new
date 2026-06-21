@@ -17,19 +17,23 @@ var ReplyCommentHandler = Object.create(CommentBaseHandler);
 
 ReplyCommentHandler._config = { videoTimeoutMs: 120000, interVideoDelay: 2500, defaultVideoCount: 3 };
 
+// 设备业务函数：处理 ReplyCommentHandler._beforeSearch 对应的抖音自动化动作、状态或安全边界。
 ReplyCommentHandler._beforeSearch = function (params) {
   this._dest = aiAnalyzer.resolveDestination(params.keyword);
 };
 
+// 设备业务函数：处理 ReplyCommentHandler._initStats 对应的抖音自动化动作、状态或安全边界。
 ReplyCommentHandler._initStats = function (params) {
   return { videos_processed: 0, success_count: 0, fail_count: 0, skipped: 0,
     follow_count: 0, dm_count: 0, details: [] };
 };
 
+// 设备业务函数：处理 ReplyCommentHandler._onVideoSkipped 对应的抖音自动化动作、状态或安全边界。
 ReplyCommentHandler._onVideoSkipped = function (params, stats, videoIndex) {
   stats.videos_processed++;
 };
 
+// 设备业务函数：处理 ReplyCommentHandler._ensureCommentsOpen 对应的抖音自动化动作、状态或安全边界。
 ReplyCommentHandler._ensureCommentsOpen = function (params, videoIndex) {
   var videoStartTime = Date.now();
   var VIDEO_TIMEOUT = this._config.videoTimeoutMs;
@@ -90,6 +94,7 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
     VIDEO_TIMEOUT = Math.max(VIDEO_TIMEOUT, maxDMsThisTask * dmCooldownMs + 60000);
   }
 
+  // 设备业务函数：处理 _reportProgress 对应的抖音自动化动作、状态或安全边界。
   function _reportProgress(step, detail, prog) {
     if (taskId) { try { apiClient.reportProgress(taskId, step, detail, prog); } catch (e) {} }
   }
@@ -102,11 +107,13 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
     return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate();
   }
 
+  // 设备业务函数：处理 _getDailyDMCount 对应的抖音自动化动作、状态或安全边界。
   function _getDailyDMCount() {
     var dateKey = _getServerDate();
     return ReplyCommentHandler._storageGet("dm_daily_" + dateKey, 0);
   }
 
+  // 设备业务函数：处理 _incrementDailyDMCount 对应的抖音自动化动作、状态或安全边界。
   function _incrementDailyDMCount() {
     var dateKey = _getServerDate();
     var current = ReplyCommentHandler._storageGet("dm_daily_" + dateKey, 0);
@@ -130,11 +137,13 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
   }
 
 
+  // 设备业务函数：处理 _getDailyReplyCount 对应的抖音自动化动作、状态或安全边界。
   function _getDailyReplyCount() {
     var dateKey = _getServerDate();
     return ReplyCommentHandler._storageGet("reply_daily_" + dateKey, 0);
   }
 
+  // 设备业务函数：处理 _incrementDailyReplyCount 对应的抖音自动化动作、状态或安全边界。
   function _incrementDailyReplyCount() {
     var dateKey = _getServerDate();
     var current = ReplyCommentHandler._storageGet("reply_daily_" + dateKey, 0);
@@ -142,11 +151,13 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
     return current + 1;
   }
 
+  // 设备业务函数：处理 _getDailyFollowCount 对应的抖音自动化动作、状态或安全边界。
   function _getDailyFollowCount() {
     var dateKey = _getServerDate();
     return ReplyCommentHandler._storageGet("follow_daily_" + dateKey, 0);
   }
 
+  // 设备业务函数：处理 _incrementDailyFollowCount 对应的抖音自动化动作、状态或安全边界。
   function _incrementDailyFollowCount() {
     var dateKey = _getServerDate();
     var current = ReplyCommentHandler._storageGet("follow_daily_" + dateKey, 0);
@@ -188,6 +199,7 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
   var stopCurrentVideo = false;
   var seenComments = {};
 
+  // 设备业务函数：处理 _commentKey 对应的抖音自动化动作、状态或安全边界。
   function _commentKey(comment) {
     // 只按昵称+内容去重，不参与 time — 同一评论在 RecyclerView 复用/二次解析时
     // 相对时间（如"3小时前"）的 parseTime 依赖 new Date() 会变化，导致同一评论
@@ -197,6 +209,7 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
     return nick + "|" + text;
   }
 
+  // 设备业务函数：处理 _hasCommentEndMarker 对应的抖音自动化动作、状态或安全边界。
   function _hasCommentEndMarker() {
     try {
       if (!selectorLoader._cache || !selectorLoader._cache.is_comment_end) return false;
@@ -206,6 +219,7 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
     }
   }
 
+  // 设备业务函数：处理 _advanceAfterSkip 对应的抖音自动化动作、状态或安全边界。
   function _advanceAfterSkip(reason) {
     var progress = readAllMode
       ? ("已读" + uniqueRead + "/" + count + ", 有效" + processed)

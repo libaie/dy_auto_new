@@ -23,12 +23,14 @@ PROVIDER_RENDERING_REQUIRES_JOB = "Script pipeline provider rendering requires a
 
 
 class PipelineStartRequest(BaseModel):
+    """业务类：承载 PipelineStartRequest 相关的数据结构、状态或业务协作。"""
     series_id: str
     episode_id: str | None = None
     director_plan: dict | None = None
 
 
 def _load_director_plan_from_episode(db: Session, series_id: str, episode_id: str | None) -> dict | None:
+    """业务函数：处理 _load_director_plan_from_episode 对应的业务流程、校验或数据转换。"""
     if not episode_id:
         return None
     episode = db.query(Episode).filter(
@@ -44,6 +46,7 @@ def _load_director_plan_from_episode(db: Session, series_id: str, episode_id: st
 
 
 def _pipeline_trace_status(trace: dict | None) -> str:
+    """业务函数：处理 _pipeline_trace_status 对应的业务流程、校验或数据转换。"""
     if not trace:
         return "missing"
     stage_status = trace.get("stage_status")
@@ -57,6 +60,7 @@ def _pipeline_trace_status(trace: dict | None) -> str:
 
 
 def _layers_agency_trace_status(layers: dict) -> str:
+    """业务函数：处理 _layers_agency_trace_status 对应的业务流程、校验或数据转换。"""
     if not layers:
         return "missing"
     statuses = []
@@ -83,6 +87,7 @@ def _layers_agency_trace_status(layers: dict) -> str:
 
 
 def _serialize_run(run: PipelineRun) -> dict:
+    """业务函数：处理 _serialize_run 对应的业务流程、校验或数据转换。"""
     layers = run.layers_json or {}
     agency_trace_status = _layers_agency_trace_status(layers)
     return {
@@ -112,6 +117,7 @@ def _agency_layer_summary(
     error: str = "",
     agency_trace: dict | None = None,
 ) -> dict:
+    """业务函数：处理 _agency_layer_summary 对应的业务流程、校验或数据转换。"""
     context = build_agency_context(series.story_bible_json if series else {})
     summary = {
         "status": status,
@@ -130,6 +136,7 @@ def _agency_layer_summary(
 
 
 def _missing_pipeline_agency_trace(stage: str, exc: Exception) -> dict:
+    """业务函数：处理 _missing_pipeline_agency_trace 对应的业务流程、校验或数据转换。"""
     return {
         "stage": stage,
         "stage_status": "blocked",
@@ -141,6 +148,7 @@ def _missing_pipeline_agency_trace(stage: str, exc: Exception) -> dict:
 
 
 def _provider_rendering_block_trace() -> dict:
+    """业务函数：处理 _provider_rendering_block_trace 对应的业务流程、校验或数据转换。"""
     return {
         "stage": "provider_rendering",
         "stage_status": "blocked",
@@ -152,10 +160,12 @@ def _provider_rendering_block_trace() -> dict:
 
 
 def _pipeline_trace_blocks(trace: dict | None) -> bool:
+    """业务函数：处理 _pipeline_trace_blocks 对应的业务流程、校验或数据转换。"""
     return _pipeline_trace_status(trace) in {"blocked", "failed"}
 
 
 def _pipeline_block_detail(run: PipelineRun, trace: dict) -> dict:
+    """业务函数：处理 _pipeline_block_detail 对应的业务流程、校验或数据转换。"""
     return {
         "code": trace.get("error_code") or "AGENCY_REVIEW_BLOCKED",
         "message": trace.get("error_message") or "Agency expert review blocked this pipeline stage.",
@@ -178,6 +188,7 @@ def _store_pipeline_stage_trace(
     output_summary: dict | None = None,
     error: str = "",
 ) -> None:
+    """业务函数：处理 _store_pipeline_stage_trace 对应的业务流程、校验或数据转换。"""
     layers = dict(run.layers_json or {})
     layer_key = str(layer)
     current = dict(layers.get(layer_key) or {})
@@ -206,6 +217,7 @@ def _block_pipeline_stage(
     trace: dict,
     series: Series | None,
 ) -> None:
+    """业务函数：处理 _block_pipeline_stage 对应的业务流程、校验或数据转换。"""
     trace_status = _pipeline_trace_status(trace)
     run.status = "failed" if trace_status == "failed" else "blocked"
     run.current_layer = layer
@@ -230,6 +242,7 @@ async def _run_pipeline_agency_stage(
     stage_context: dict,
     episode: Episode | None = None,
 ) -> dict:
+    """业务函数：处理 _run_pipeline_agency_stage 对应的业务流程、校验或数据转换。"""
     try:
         runtime_config = resolve_runtime_model_config(db, "llm_agency_expert_review")
     except RuntimeModelConfigError as exc:
@@ -260,6 +273,7 @@ def _block_provider_rendering_without_job(
     layer: int,
     phase: str = "render",
 ) -> None:
+    """业务函数：处理 _block_provider_rendering_without_job 对应的业务流程、校验或数据转换。"""
     run.status = "blocked"
     run.current_layer = layer
     run.error_log = PROVIDER_RENDERING_REQUIRES_JOB
@@ -280,6 +294,7 @@ def _block_provider_rendering_without_job(
 
 
 async def _run_all_layers(run_id: str) -> None:
+    """业务函数：处理 _run_all_layers 对应的业务流程、校验或数据转换。"""
     db = SessionLocal()
     try:
         run = db.query(PipelineRun).filter(PipelineRun.id == run_id).first()
@@ -398,6 +413,7 @@ async def pipeline_start(
     db: Session = Depends(get_db),
     user = Depends(require_role("admin")),
 ):
+    """业务函数：处理 pipeline_start 对应的业务流程、校验或数据转换。"""
     if not body.director_plan and not body.episode_id:
         run = PipelineRun(
             series_id=body.series_id,
@@ -473,6 +489,7 @@ async def list_pipeline_runs(
     db: Session = Depends(get_db),
     user = Depends(require_role("admin")),
 ):
+    """业务函数：处理 list_pipeline_runs 对应的业务流程、校验或数据转换。"""
     runs = db.query(PipelineRun).filter(
         PipelineRun.series_id == series_id,
     ).order_by(PipelineRun.created_at.desc()).all()
@@ -485,6 +502,7 @@ async def get_pipeline_run_by_id(
     db: Session = Depends(get_db),
     user = Depends(require_role("admin")),
 ):
+    """业务函数：处理 get_pipeline_run_by_id 对应的业务流程、校验或数据转换。"""
     run = db.query(PipelineRun).filter(PipelineRun.id == run_id).first()
     if not run:
         raise HTTPException(404, "Pipeline run not found")
@@ -498,6 +516,7 @@ async def get_pipeline_run(
     db: Session = Depends(get_db),
     user = Depends(require_role("admin")),
 ):
+    """业务函数：处理 get_pipeline_run 对应的业务流程、校验或数据转换。"""
     run = db.query(PipelineRun).filter(
         PipelineRun.id == run_id,
         PipelineRun.series_id == series_id,

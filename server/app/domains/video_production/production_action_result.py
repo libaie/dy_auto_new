@@ -9,6 +9,7 @@ from app.domains.video_production.production_errors import ProductionErrorCode
 
 
 def _serialize_code(code: ProductionErrorCode | str | None) -> str | None:
+    """业务函数：处理 _serialize_code 对应的业务流程、校验或数据转换。"""
     if code is None:
         return None
     if isinstance(code, ProductionErrorCode):
@@ -18,6 +19,7 @@ def _serialize_code(code: ProductionErrorCode | str | None) -> str | None:
 
 @dataclass
 class ProductionActionResult:
+    """业务类：承载 ProductionActionResult 相关的数据结构、状态或业务协作。"""
     status: str
     message: str = ""
     code: ProductionErrorCode | str | None = None
@@ -29,6 +31,7 @@ class ProductionActionResult:
 
     @classmethod
     def success(cls, message: str = "", data: dict | None = None) -> "ProductionActionResult":
+        """业务函数：处理 success 对应的业务流程、校验或数据转换。"""
         return cls(status="success", code="OK", message=message, data=data or {})
 
     @classmethod
@@ -42,6 +45,7 @@ class ProductionActionResult:
         retryable: bool = False,
         data: dict | None = None,
     ) -> "ProductionActionResult":
+        """业务函数：处理 blocked 对应的业务流程、校验或数据转换。"""
         return cls(
             status="blocked",
             code=code,
@@ -54,6 +58,7 @@ class ProductionActionResult:
         )
 
     def to_http_detail(self) -> dict:
+        """业务函数：处理 to_http_detail 对应的业务流程、校验或数据转换。"""
         code = _serialize_code(self.code)
         return {
             "ok": self.status == "success",

@@ -18,6 +18,7 @@ const confirmMessage = ref('')
 const confirmAction = ref(null)
 const confirmDanger = ref(false)
 
+// 前端业务函数：协调 openConfirm 对应的页面流程、接口调用或状态转换。
 function openConfirm(title, message, action, danger) {
   confirmTitle.value = title
   confirmMessage.value = message
@@ -26,12 +27,14 @@ function openConfirm(title, message, action, danger) {
   confirmOpen.value = true
 }
 
+// 前端业务函数：协调 handleConfirm 对应的页面流程、接口调用或状态转换。
 async function handleConfirm() {
   if (confirmAction.value) await confirmAction.value()
   confirmOpen.value = false
   emit('refresh')
 }
 
+// 前端业务函数：协调 pauseChannel 对应的页面流程、接口调用或状态转换。
 async function pauseChannel(ch) {
   openConfirm('暂停通道', '确定暂停此通道？',
     () => updateChannel(ch.id, { status: 'paused' }), false)
@@ -42,6 +45,7 @@ async function resumeChannel(ch) {
   emit('refresh')
 }
 
+// 前端业务函数：协调 cancelChannel 对应的页面流程、接口调用或状态转换。
 async function cancelChannel(ch) {
   openConfirm('取消通道', '确定取消此通道？已分发的任务将继续执行，未分发的关键词将被跳过。',
     () => updateChannel(ch.id, { status: 'cancelled' }), false)

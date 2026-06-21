@@ -130,22 +130,27 @@ var BaseHandler = {
     return selectorResolver.findChildBySelector(parent, actionName);
   },
 
+  // 设备业务函数：处理 _findByStrategyInParent 对应的抖音自动化动作、状态或安全边界。
   _findByStrategyInParent: function (parent, strategy) {
     return selectorResolver.findByStrategyInParent(parent, strategy);
   },
 
+  // 设备业务函数：处理 _findByCondInParent 对应的抖音自动化动作、状态或安全边界。
   _findByCondInParent: function (parent, cond) {
     return selectorResolver.findByCondInParent(parent, cond);
   },
 
+  // 设备业务函数：处理 _findAllByCondInParent 对应的抖音自动化动作、状态或安全边界。
   _findAllByCondInParent: function (parent, cond) {
     return selectorResolver.findAllByCondInParent(parent, cond);
   },
 
+  // 设备业务函数：处理 _findByConditionsInParent 对应的抖音自动化动作、状态或安全边界。
   _findByConditionsInParent: function (parent, strategy) {
     return selectorResolver.findByConditionsInParent(parent, strategy);
   },
 
+  // 设备业务函数：处理 _findByChainInParent 对应的抖音自动化动作、状态或安全边界。
   _findByChainInParent: function (parent, steps) {
     return selectorResolver.findByChainInParent(parent, steps);
   },

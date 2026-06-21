@@ -9,6 +9,7 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue', 'bgm-upload'])
 
+// 前端业务函数：协调 updateField 对应的页面流程、接口调用或状态转换。
 function updateField(key, value) {
   emit('update:modelValue', { ...props.modelValue, [key]: value })
 }
@@ -17,6 +18,7 @@ const isFixedMode = computed(() => props.modelValue.mode === 'fixed')
 
 // BGM preview
 const bgmPreviewUrl = ref('')
+// 前端业务函数：协调 previewBGM 对应的页面流程、接口调用或状态转换。
 function previewBGM() {
   const bgm = props.modelValue.bgmId
   if (bgm) bgmPreviewUrl.value = `/api/pixelle-proxy/api/files/${encodeURIComponent(bgm)}`

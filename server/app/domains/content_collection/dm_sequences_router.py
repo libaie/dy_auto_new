@@ -21,27 +21,32 @@ _ORIGINAL_VARIANT_DELAY_MS = mutations._variant_delay_ms
 
 
 def _variant_delay_ms() -> int:
+    """业务函数：处理 _variant_delay_ms 对应的业务流程、校验或数据转换。"""
     return _ORIGINAL_VARIANT_DELAY_MS()
 
 
 def _sync_legacy_monkeypatch_hooks():
+    """业务函数：处理 _sync_legacy_monkeypatch_hooks 对应的业务流程、校验或数据转换。"""
     mutations.random = random
     mutations._variant_delay_ms = _variant_delay_ms
 
 
 class SequenceMessage(BaseModel):
+    """业务类：承载 SequenceMessage 相关的数据结构、状态或业务协作。"""
     order: int
     content: str = Field(..., min_length=1, max_length=500)
     delay_ms: int = Field(default=0, ge=0, le=60000)
 
 
 class SequenceCreate(BaseModel):
+    """业务类：承载 SequenceCreate 相关的数据结构、状态或业务协作。"""
     name: str = Field(..., min_length=1, max_length=100)
     messages: list[SequenceMessage] = Field(..., min_length=1)
     industry: Optional[str] = None
 
 
 class SequenceUpdate(BaseModel):
+    """业务类：承载 SequenceUpdate 相关的数据结构、状态或业务协作。"""
     name: Optional[str] = Field(default=None, min_length=1, max_length=100)
     messages: Optional[list[SequenceMessage]] = Field(default=None, min_length=1)
     industry: Optional[str] = None
@@ -49,12 +54,14 @@ class SequenceUpdate(BaseModel):
 
 
 class DMSequenceGenerateRequest(BaseModel):
+    """业务类：承载 DMSequenceGenerateRequest 相关的数据结构、状态或业务协作。"""
     industry: str = Field(default="general", description="行业key: health/beauty/education/travel/secondhand/general")
     description: str = Field(..., min_length=5, max_length=500, description="大白话描述")
     link_url: str = Field(..., min_length=5, max_length=500, description="消息2的短链URL")
 
 
 class VariantsGenerateRequest(BaseModel):
+    """业务类：承载 VariantsGenerateRequest 相关的数据结构、状态或业务协作。"""
     count: int = Field(default=3, ge=1, le=20, description="生成变体套数")
 
 
@@ -64,6 +71,7 @@ def list_sequences(
     db: Session = Depends(get_db),
     user: tuple = Depends(verify_admin_token),
 ):
+    """业务函数：处理 list_sequences 对应的业务流程、校验或数据转换。"""
     return mutations.list_dm_sequences(db, user, industry=industry)
 
 
@@ -73,6 +81,7 @@ def create_sequence(
     db: Session = Depends(get_db),
     user: tuple = Depends(require_role("admin")),
 ):
+    """业务函数：处理 create_sequence 对应的业务流程、校验或数据转换。"""
     return mutations.create_dm_sequence(db, user, body)
 
 
@@ -82,6 +91,7 @@ def get_sequence(
     db: Session = Depends(get_db),
     user: tuple = Depends(verify_admin_token),
 ):
+    """业务函数：处理 get_sequence 对应的业务流程、校验或数据转换。"""
     return mutations.get_dm_sequence(db, user, sequence_id)
 
 
@@ -92,6 +102,7 @@ def update_sequence(
     db: Session = Depends(get_db),
     user: tuple = Depends(require_role("admin")),
 ):
+    """业务函数：处理 update_sequence 对应的业务流程、校验或数据转换。"""
     return mutations.update_dm_sequence(db, user, sequence_id, body)
 
 
@@ -101,6 +112,7 @@ def delete_sequence(
     db: Session = Depends(get_db),
     user: tuple = Depends(require_role("admin")),
 ):
+    """业务函数：处理 delete_sequence 对应的业务流程、校验或数据转换。"""
     return mutations.delete_dm_sequence(db, user, sequence_id)
 
 
@@ -110,6 +122,7 @@ async def generate_dm_sequence(
     db: Session = Depends(get_db),
     current_user: tuple = Depends(require_role("admin")),
 ):
+    """业务函数：处理 generate_dm_sequence 对应的业务流程、校验或数据转换。"""
     return StreamingResponse(
         await mutations.generate_dm_sequence_events(db, body),
         media_type="text/event-stream",
@@ -128,6 +141,7 @@ async def generate_variants(
     db: Session = Depends(get_db),
     current_user: tuple = Depends(require_role("admin")),
 ):
+    """业务函数：处理 generate_variants 对应的业务流程、校验或数据转换。"""
     _sync_legacy_monkeypatch_hooks()
     return await mutations.generate_dm_variants(db, seq_id, body)
 
@@ -137,5 +151,6 @@ def device_sync(
     db: Session = Depends(get_db),
     device_id: Optional[str] = Depends(verify_device_secret),
 ):
+    """业务函数：处理 device_sync 对应的业务流程、校验或数据转换。"""
     _sync_legacy_monkeypatch_hooks()
     return mutations.device_sync_dm_sequences(db, device_id)

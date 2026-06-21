@@ -234,14 +234,17 @@ export function isLegacyExpert(id) {
   return LEGACY_EXPERT_IDS.has(id)
 }
 
+// 前端业务函数：协调 isCurrentExpert 对应的页面流程、接口调用或状态转换。
 export function isCurrentExpert(id) {
   return CURRENT_EXPERT_IDS.has(id)
 }
 
+// 前端业务函数：协调 isRawIdentifier 对应的页面流程、接口调用或状态转换。
 export function isRawIdentifier(value) {
   return /^[a-z][a-z0-9_]{2,}$/.test(String(value || ''))
 }
 
+// 前端业务函数：协调 expertName 对应的页面流程、接口调用或状态转换。
 export function expertName(id, fallback = '') {
   const fallbackLabel = localizedText(fallback, '')
   if (fallbackLabel) return fallbackLabel
@@ -288,10 +291,12 @@ export function expertRoleGroup(expert) {
   return 'core'
 }
 
+// 前端业务函数：协调 roleLabel 对应的页面流程、接口调用或状态转换。
 export function roleLabel(role) {
   return ROLE_LABELS[String(role || '').toLowerCase()] || ''
 }
 
+// 前端业务函数：协调 skillText 对应的页面流程、接口调用或状态转换。
 export function skillText(expert) {
   return safeDisplayText(
     expert?.skill_summary || expert?.description || SKILL_TEXT[expert?.expert_id],
@@ -314,6 +319,7 @@ export function safeDisplayText(value, fallback = '已记录专家结论') {
   return text
 }
 
+// 前端业务函数：协调 decisionLogText 对应的页面流程、接口调用或状态转换。
 export function decisionLogText(value, field = 'generic', fallback = '') {
   if (value === null || value === undefined || value === '') return fallback
   const text = String(value).trim()
@@ -333,6 +339,7 @@ export function decisionLogText(value, field = 'generic', fallback = '') {
   return compactChineseText(text) || fallback
 }
 
+// 前端业务函数：协调 localizedText 对应的页面流程、接口调用或状态转换。
 export function localizedText(value, fallback = '') {
   if (value === null || value === undefined || value === '') return fallback
   const text = String(value).trim()
@@ -350,6 +357,7 @@ export function localizedText(value, fallback = '') {
   return text
 }
 
+// 前端业务函数：协调 localizeEmbeddedEnglish 对应的页面流程、接口调用或状态转换。
 export function localizeEmbeddedEnglish(value) {
   const original = String(value || '')
   if (!original || !/[A-Za-z_]/.test(original)) return ''
@@ -382,6 +390,7 @@ export function localizeEmbeddedEnglish(value) {
   return chineseCount >= 4 ? text : ''
 }
 
+// 前端业务函数：协调 decisionDomainText 对应的页面流程、接口调用或状态转换。
 function decisionDomainText(text, field) {
   const lower = text.toLowerCase()
   if (lower.includes('invalid json')) return '\u4e13\u5bb6\u8f93\u51fa\u683c\u5f0f\u65e0\u6548'
@@ -415,6 +424,7 @@ function decisionDomainText(text, field) {
   return ''
 }
 
+// 前端业务函数：协调 translateDetailedEnglishText 对应的页面流程、接口调用或状态转换。
 function translateDetailedEnglishText(text) {
   const clauses = String(text || '')
     .split(/[.;]\s*/)
@@ -427,6 +437,7 @@ function translateDetailedEnglishText(text) {
   return translated.join('\uff1b')
 }
 
+// 前端业务函数：协调 translateEnglishClause 对应的页面流程、接口调用或状态转换。
 function translateEnglishClause(clause) {
   const lower = clause.toLowerCase()
   if (lower.includes('character face consistency') && lower.includes('front/profile')) {
@@ -454,6 +465,7 @@ function translateEnglishClause(clause) {
   return ''
 }
 
+// 前端业务函数：协调 clauseWithKnownTerms 对应的页面流程、接口调用或状态转换。
 function clauseWithKnownTerms(clause, fallback) {
   const terms = []
   const lower = clause.toLowerCase()
@@ -471,6 +483,7 @@ function clauseWithKnownTerms(clause, fallback) {
   return terms.length ? terms.join('\u3001') + fallback : ''
 }
 
+// 前端业务函数：协调 extractParenthesizedChineseList 对应的页面流程、接口调用或状态转换。
 function extractParenthesizedChineseList(text) {
   const match = String(text).match(/[\uff08(]([^()\uff08\uff09]+)[\uff09)]/)
   if (!match) return []
@@ -480,6 +493,7 @@ function extractParenthesizedChineseList(text) {
     .filter(item => /[\u4e00-\u9fff]/.test(item))
 }
 
+// 前端业务函数：协调 compactChineseText 对应的页面流程、接口调用或状态转换。
 function compactChineseText(value) {
   return String(value || '')
     .replace(/\s*第\s*(\d+)\s*帧/g, '第 $1 帧')

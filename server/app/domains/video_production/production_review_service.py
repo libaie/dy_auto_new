@@ -18,6 +18,7 @@ SUPPORTED_BULK_ASSET_TYPES = GATED_ASSET_TYPES
 
 
 def _review_snapshot(asset: VideoProductionAsset) -> dict:
+    """业务函数：处理 _review_snapshot 对应的业务流程、校验或数据转换。"""
     return {
         "target_type": asset.target_type,
         "target_id": asset.target_id,
@@ -28,6 +29,7 @@ def _review_snapshot(asset: VideoProductionAsset) -> dict:
 
 
 def _assert_bulk_approvable(asset: VideoProductionAsset) -> None:
+    """业务函数：处理 _assert_bulk_approvable 对应的业务流程、校验或数据转换。"""
     if not asset_is_reviewable(asset):
         raise ValueError("Bulk approve requires review_pending assets")
     if asset.copy_status != "persisted" or not asset.checksum or not asset.storage_path:
@@ -41,6 +43,7 @@ def apply_bulk_review_action(
     reviewer_user_id: str | None = None,
     comment: str = "",
 ) -> dict:
+    """业务函数：处理 apply_bulk_review_action 对应的业务流程、校验或数据转换。"""
     if action not in SUPPORTED_BULK_REVIEW_ACTIONS:
         raise ValueError(f"Unsupported review action: {action}")
 

@@ -21,6 +21,7 @@ var selectorResolver = {
     return null;
   },
 
+  // 设备业务函数：处理 findByStrategyInParent 对应的抖音自动化动作、状态或安全边界。
   findByStrategyInParent: function (parent, strategy) {
     if (strategy.conditions && strategy.conditions.length > 0) {
       return selectorResolver.findByConditionsInParent(parent, strategy);
@@ -31,6 +32,7 @@ var selectorResolver = {
     return selectorResolver.findByCondInParent(parent, strategy);
   },
 
+  // 设备业务函数：处理 findByCondInParent 对应的抖音自动化动作、状态或安全边界。
   findByCondInParent: function (parent, cond) {
     var matchMode = cond.match_mode || "exact";
     try {
@@ -55,6 +57,7 @@ var selectorResolver = {
     return null;
   },
 
+  // 设备业务函数：处理 findAllByCondInParent 对应的抖音自动化动作、状态或安全边界。
   findAllByCondInParent: function (parent, cond) {
     var matchMode = cond.match_mode || "exact";
     try {
@@ -79,6 +82,7 @@ var selectorResolver = {
     return [];
   },
 
+  // 设备业务函数：处理 findByConditionsInParent 对应的抖音自动化动作、状态或安全边界。
   findByConditionsInParent: function (parent, strategy) {
     var conditions = strategy.conditions;
     var logic = strategy.logic || "and";
@@ -109,6 +113,7 @@ var selectorResolver = {
     return null;
   },
 
+  // 设备业务函数：处理 findByChainInParent 对应的抖音自动化动作、状态或安全边界。
   findByChainInParent: function (parent, steps) {
     if (!steps || steps.length === 0) return null;
 

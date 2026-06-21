@@ -9,6 +9,7 @@ from app.db.models.video_production import ProductionEpisode, ProductionPlan, Pr
 
 
 def _parent_status(child_statuses: list[str]) -> str:
+    """业务函数：处理 _parent_status 对应的业务流程、校验或数据转换。"""
     if not child_statuses:
         return "planned"
     if any(status in {"failed_terminal"} for status in child_statuses):
@@ -27,6 +28,7 @@ def _parent_status(child_statuses: list[str]) -> str:
 
 
 def recompute_from_segment(db: Session, segment_id: str) -> None:
+    """业务函数：处理 recompute_from_segment 对应的业务流程、校验或数据转换。"""
     segment = db.query(ProductionSegment).filter(ProductionSegment.id == segment_id).first()
     if not segment:
         return

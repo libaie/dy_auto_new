@@ -112,6 +112,7 @@ PROTECTED_PROVIDER_OPTION_KEYS = {
 
 
 def _normalized_provider_option_key(key: str) -> str:
+    """业务函数：处理 _normalized_provider_option_key 对应的业务流程、校验或数据转换。"""
     return re.sub(r"[^a-z0-9]", "", key.lower())
 
 
@@ -121,6 +122,7 @@ NORMALIZED_PROTECTED_PROVIDER_OPTION_KEYS = {
 
 
 def contains_protected_provider_option_key(value: Any) -> bool:
+    """业务函数：处理 contains_protected_provider_option_key 对应的业务流程、校验或数据转换。"""
     if isinstance(value, dict):
         for key, item in value.items():
             if isinstance(key, str) and _normalized_provider_option_key(key) in NORMALIZED_PROTECTED_PROVIDER_OPTION_KEYS:
@@ -133,6 +135,7 @@ def contains_protected_provider_option_key(value: Any) -> bool:
 
 
 def normalized_request_hash(payload: dict[str, Any]) -> str:
+    """业务函数：处理 normalized_request_hash 对应的业务流程、校验或数据转换。"""
     clean = {
         key: value
         for key, value in payload.items()
@@ -147,6 +150,7 @@ def _resolve_strategy_snapshot(
     payload: dict[str, Any],
     mode: str,
 ) -> tuple[ImageProductionStrategy | None, dict[str, Any] | None, dict[str, Any]]:
+    """业务函数：处理 _resolve_strategy_snapshot 对应的业务流程、校验或数据转换。"""
     strategy_id = payload.get("strategy_id")
     if not strategy_id:
         return None, None, {}
@@ -224,6 +228,7 @@ def _selection_explanation_from_preview(
     selection_preview: ImageSelectionPreview | None,
     fallback: dict[str, Any] | None,
 ) -> dict[str, Any] | None:
+    """业务函数：处理 _selection_explanation_from_preview 对应的业务流程、校验或数据转换。"""
     explanation = dict(fallback or {})
     if not selection_preview or not isinstance(selection_preview.response_json, dict):
         return explanation or None
@@ -248,6 +253,7 @@ def _selection_explanation_from_resolution(
     requested_model_id: str | None,
     strategy: ImageProductionStrategy | None,
 ) -> dict[str, Any] | None:
+    """业务函数：处理 _selection_explanation_from_resolution 对应的业务流程、校验或数据转换。"""
     explanation = dict(fallback or {})
     selection = resolve_image_model_selection(
         db,
@@ -272,6 +278,7 @@ def _selection_explanation_from_resolution(
 
 
 def _apply_strategy_defaults(payload: dict[str, Any], strategy: ImageProductionStrategy | None) -> None:
+    """业务函数：处理 _apply_strategy_defaults 对应的业务流程、校验或数据转换。"""
     if not strategy:
         return
     if not payload.get("model_id") and strategy.default_model_id:
@@ -289,6 +296,7 @@ def _apply_strategy_defaults(payload: dict[str, Any], strategy: ImageProductionS
 
 
 def _preview_drift_error(preview: ImageSelectionPreview):
+    """业务函数：处理 _preview_drift_error 对应的业务流程、校验或数据转换。"""
     return image_error(
         409,
         "IMAGE_SELECTION_PREVIEW_DRIFT",
@@ -300,6 +308,7 @@ def _preview_drift_error(preview: ImageSelectionPreview):
 
 
 def _get_selection_preview(db: Session, payload: dict[str, Any]) -> ImageSelectionPreview | None:
+    """业务函数：处理 _get_selection_preview 对应的业务流程、校验或数据转换。"""
     preview_id = payload.get("selection_preview_id")
     if not preview_id:
         return None
@@ -318,6 +327,7 @@ def _get_selection_preview(db: Session, payload: dict[str, Any]) -> ImageSelecti
 
 
 def _validate_selection_preview_scope(payload: dict[str, Any], preview: ImageSelectionPreview | None) -> None:
+    """业务函数：处理 _validate_selection_preview_scope 对应的业务流程、校验或数据转换。"""
     if not preview:
         return
     if not payload.get("selection_preview_request_hash") or preview.request_hash != payload["selection_preview_request_hash"]:
@@ -362,6 +372,7 @@ def _validate_selection_preview_resolution(
     model_config: dict[str, Any],
     provider_options: dict[str, Any],
 ) -> None:
+    """业务函数：处理 _validate_selection_preview_resolution 对应的业务流程、校验或数据转换。"""
     if not preview:
         return
     if preview.strategy_id != (strategy.id if strategy else None):
@@ -390,6 +401,7 @@ def _validate_selection_preview_resolution(
 
 
 def _source(payload: dict[str, Any]) -> dict[str, Any]:
+    """业务函数：处理 _source 对应的业务流程、校验或数据转换。"""
     source = dict(payload.get("source") or {})
     if payload.get("source_url") and not source.get("url"):
         source["url"] = payload["source_url"]
@@ -399,17 +411,20 @@ def _source(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _is_usable_public_url(value: str | None) -> bool:
+    """业务函数：处理 _is_usable_public_url 对应的业务流程、校验或数据转换。"""
     if not value:
         return False
     return value.startswith(("http://", "https://", "/static/", "/api/image-creation/pixelle-files/"))
 
 
 def _is_local_image_path(value: str | None) -> bool:
+    """业务函数：处理 _is_local_image_path 对应的业务流程、校验或数据转换。"""
     clean = str(value or "").strip()
     return any(clean.startswith(prefix) for prefix in LOCAL_IMAGE_PATH_PREFIXES)
 
 
 def _is_internal_image_url(value: str | None) -> bool:
+    """业务函数：处理 _is_internal_image_url 对应的业务流程、校验或数据转换。"""
     clean = str(value or "").strip()
     if _is_local_image_path(clean):
         return True
@@ -421,6 +436,7 @@ def _is_internal_image_url(value: str | None) -> bool:
 
 
 def _host_is_unsafe(hostname: str | None) -> bool:
+    """业务函数：处理 _host_is_unsafe 对应的业务流程、校验或数据转换。"""
     host = str(hostname or "").strip().strip("[]").lower().rstrip(".")
     if not host:
         return True
@@ -438,6 +454,7 @@ def _host_is_unsafe(hostname: str | None) -> bool:
 
 
 def _ip_is_unsafe(value: str) -> bool:
+    """业务函数：处理 _ip_is_unsafe 对应的业务流程、校验或数据转换。"""
     try:
         ip = ipaddress.ip_address(str(value).strip().strip("[]"))
     except ValueError:
@@ -453,6 +470,7 @@ def _ip_is_unsafe(value: str) -> bool:
 
 
 def _validate_public_image_url(value: str | None, field_name: str) -> None:
+    """业务函数：处理 _validate_public_image_url 对应的业务流程、校验或数据转换。"""
     clean = str(value or "").strip()
     if not clean:
         return
@@ -478,6 +496,7 @@ def _validate_public_image_url(value: str | None, field_name: str) -> None:
 
 
 def _usable_asset_url(asset: ImageCreationAsset) -> str | None:
+    """业务函数：处理 _usable_asset_url 对应的业务流程、校验或数据转换。"""
     for value in (asset.url, asset.local_path, asset.storage_path):
         if _is_usable_public_url(value):
             return value
@@ -485,12 +504,14 @@ def _usable_asset_url(asset: ImageCreationAsset) -> str | None:
 
 
 def _asset_matches_payload_user(asset: ImageCreationAsset, payload: dict[str, Any]) -> bool:
+    """业务函数：处理 _asset_matches_payload_user 对应的业务流程、校验或数据转换。"""
     if not asset.user_id:
         return True
     return payload.get("user_id") == asset.user_id
 
 
 def _resolve_source_asset(db: Session, payload: dict[str, Any]) -> dict[str, Any]:
+    """业务函数：处理 _resolve_source_asset 对应的业务流程、校验或数据转换。"""
     source = _source(payload)
     asset_id = source.get("asset_id")
     if not asset_id:
@@ -527,6 +548,7 @@ def _resolve_source_asset(db: Session, payload: dict[str, Any]) -> dict[str, Any
 
 
 def _resolve_reference_images(db: Session, payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """业务函数：处理 _resolve_reference_images 对应的业务流程、校验或数据转换。"""
     resolved: list[dict[str, Any]] = []
     for raw in payload.get("reference_images") or []:
         item = {"url": raw} if isinstance(raw, str) else dict(raw or {})
@@ -562,6 +584,7 @@ def _resolve_reference_images(db: Session, payload: dict[str, Any]) -> list[dict
 
 
 def _validate_payload(payload: dict[str, Any]) -> tuple[str, str, str]:
+    """业务函数：处理 _validate_payload 对应的业务流程、校验或数据转换。"""
     mode = payload.get("mode")
     if mode not in MODE_TO_SCENE_CAPABILITY:
         raise image_error(
@@ -586,6 +609,7 @@ def _validate_payload(payload: dict[str, Any]) -> tuple[str, str, str]:
 
 
 def _image_reference_count(payload: dict[str, Any]) -> int:
+    """业务函数：处理 _image_reference_count 对应的业务流程、校验或数据转换。"""
     source = _source(payload)
     count = len(payload.get("reference_images") or [])
     if source.get("url") or source.get("asset_id"):
@@ -594,6 +618,7 @@ def _image_reference_count(payload: dict[str, Any]) -> int:
 
 
 def _limit_int(limits: dict[str, Any], key: str, default: int) -> int:
+    """业务函数：处理 _limit_int 对应的业务流程、校验或数据转换。"""
     try:
         return int(limits.get(key) or default)
     except (TypeError, ValueError):
@@ -601,6 +626,7 @@ def _limit_int(limits: dict[str, Any], key: str, default: int) -> int:
 
 
 def _validate_provider_limits(payload: dict[str, Any], model_config: dict[str, Any]) -> None:
+    """业务函数：处理 _validate_provider_limits 对应的业务流程、校验或数据转换。"""
     mode = payload["mode"]
     source = _source(payload)
     references = payload.get("reference_images") or []
@@ -649,6 +675,7 @@ def _validate_provider_limits(payload: dict[str, Any], model_config: dict[str, A
 
 
 def _validate_provider_options(provider_options: dict[str, Any], model_config: dict[str, Any]) -> dict[str, Any]:
+    """业务函数：处理 _validate_provider_options 对应的业务流程、校验或数据转换。"""
     schema = ((model_config.get("config") or {}).get("provider_options_schema") or {})
     if not isinstance(schema, dict):
         schema = {}
@@ -682,6 +709,7 @@ def _validate_provider_options(provider_options: dict[str, Any], model_config: d
 
 
 def _capacity_block_error(capacity: dict[str, Any], affected_ids: list[str] | None = None):
+    """业务函数：处理 _capacity_block_error 对应的业务流程、校验或数据转换。"""
     return image_error(
         409,
         "IMAGE_CAPACITY_BLOCKED",
@@ -704,6 +732,7 @@ def _request_json_with_trust_fields(
     review_gate: dict[str, Any],
     estimated_cost: dict[str, Any],
 ) -> dict[str, Any]:
+    """业务函数：处理 _request_json_with_trust_fields 对应的业务流程、校验或数据转换。"""
     request_json = dict(payload)
     request_json["capacity"] = capacity
     request_json["review_gate"] = review_gate
@@ -712,6 +741,7 @@ def _request_json_with_trust_fields(
 
 
 def _pixelle_payload_for_task(task: ImageCreationTask) -> dict[str, Any]:
+    """业务函数：处理 _pixelle_payload_for_task 对应的业务流程、校验或数据转换。"""
     return {
         "external_task_id": task.id,
         "mode": task.mode,
@@ -742,6 +772,7 @@ _SECRET_ERROR_PATTERNS = [
 
 
 def _redact_provider_error(value: object) -> str:
+    """业务函数：处理 _redact_provider_error 对应的业务流程、校验或数据转换。"""
     message = str(value or "Provider request failed.")
     for pattern in _SECRET_ERROR_PATTERNS:
         message = pattern.sub("[redacted]", message)
@@ -749,6 +780,7 @@ def _redact_provider_error(value: object) -> str:
 
 
 def _redact_provider_status_payload(value: Any) -> Any:
+    """业务函数：处理 _redact_provider_status_payload 对应的业务流程、校验或数据转换。"""
     if isinstance(value, dict):
         redacted: dict[str, Any] = {}
         for key, item in value.items():
@@ -777,6 +809,7 @@ def _fallback_trace(
     error_code: str,
     message: str,
 ) -> dict[str, Any]:
+    """业务函数：处理 _fallback_trace 对应的业务流程、校验或数据转换。"""
     fallback_candidates: list[dict[str, Any]] = []
     if strategy:
         selection = resolve_image_model_selection(
@@ -803,6 +836,7 @@ def _fallback_trace(
 
 
 def _progress_value(value: Any, fallback: float = 0.0) -> float:
+    """业务函数：处理 _progress_value 对应的业务流程、校验或数据转换。"""
     if isinstance(value, (int, float)):
         return max(0.0, min(float(value), 1.0))
     if isinstance(value, dict):
@@ -827,6 +861,7 @@ def _progress_value(value: Any, fallback: float = 0.0) -> float:
 
 
 def _pixelle_file_path(value: str | None) -> str | None:
+    """业务函数：处理 _pixelle_file_path 对应的业务流程、校验或数据转换。"""
     clean = str(value or "").strip()
     if not clean:
         return None
@@ -841,11 +876,13 @@ def _pixelle_file_path(value: str | None) -> str | None:
 
 
 def _dy_auto_pixelle_file_url(file_path: str) -> str:
+    """业务函数：处理 _dy_auto_pixelle_file_url 对应的业务流程、校验或数据转换。"""
     encoded = quote(file_path.strip("/"), safe="")
     return f"{configured_public_base_url().rstrip('/')}/api/image-creation/pixelle-files/{encoded}"
 
 
 def _normalized_stage_asset_url(item: dict[str, Any]) -> str:
+    """业务函数：处理 _normalized_stage_asset_url 对应的业务流程、校验或数据转换。"""
     raw_url = str(item.get("url") or "").strip()
     file_path = _pixelle_file_path(raw_url) or _pixelle_file_path(item.get("local_path")) or _pixelle_file_path(item.get("storage_path"))
     if file_path:
@@ -854,6 +891,7 @@ def _normalized_stage_asset_url(item: dict[str, Any]) -> str:
 
 
 def _requires_external_copy(value: str | None) -> bool:
+    """业务函数：处理 _requires_external_copy 对应的业务流程、校验或数据转换。"""
     clean = str(value or "").strip()
     if not clean or _is_internal_image_url(clean):
         return False
@@ -862,6 +900,7 @@ def _requires_external_copy(value: str | None) -> bool:
 
 
 def _is_duplicate_image_asset_error(exc: IntegrityError) -> bool:
+    """业务函数：处理 _is_duplicate_image_asset_error 对应的业务流程、校验或数据转换。"""
     text = f"{exc} {getattr(exc, 'orig', '')}"
     return "uq_image_asset" in text or (
         "image_creation_assets" in text and "UNIQUE constraint failed" in text
@@ -875,6 +914,7 @@ def _recover_task_from_existing_assets(
     *,
     failures: int,
 ) -> ImageCreationTask | None:
+    """业务函数：处理 _recover_task_from_existing_assets 对应的业务流程、校验或数据转换。"""
     task = db.query(ImageCreationTask).filter(ImageCreationTask.id == task_id).first()
     if not task:
         return None
@@ -896,6 +936,7 @@ def _recover_task_from_existing_assets(
 
 
 def _ab_hash_cost_confirmed(db: Session, payload: dict[str, Any]) -> bool:
+    """业务函数：处理 _ab_hash_cost_confirmed 对应的业务流程、校验或数据转换。"""
     group_id = payload.get("ab_test_group_id")
     preview_hash = payload.get("selection_preview_request_hash")
     strategy_id = payload.get("strategy_id")
@@ -933,6 +974,7 @@ def _ab_hash_cost_confirmed(db: Session, payload: dict[str, Any]) -> bool:
 
 
 def _task_idempotency_conflict(existing: ImageCreationTask, *, expose_existing_id: bool) -> HTTPException:
+    """业务函数：处理 _task_idempotency_conflict 对应的业务流程、校验或数据转换。"""
     return image_error(
         409,
         "IMAGE_TASK_CONFLICT",
@@ -944,6 +986,7 @@ def _task_idempotency_conflict(existing: ImageCreationTask, *, expose_existing_i
 
 
 def _task_matches_payload_user(existing: ImageCreationTask, payload: dict[str, Any]) -> bool:
+    """业务函数：处理 _task_matches_payload_user 对应的业务流程、校验或数据转换。"""
     return existing.user_id == payload.get("user_id")
 
 
@@ -955,6 +998,7 @@ def _recover_task_idempotency_integrity_error(
     request_hash: str,
     exc: IntegrityError,
 ) -> ImageCreationTask:
+    """业务函数：处理 _recover_task_idempotency_integrity_error 对应的业务流程、校验或数据转换。"""
     db.rollback()
     if idempotency_key:
         existing = db.query(ImageCreationTask).filter(ImageCreationTask.idempotency_key == idempotency_key).first()
@@ -968,6 +1012,7 @@ def _recover_task_idempotency_integrity_error(
 
 
 async def _copy_external_image(value: str) -> dict[str, Any]:
+    """业务函数：处理 _copy_external_image 对应的业务流程、校验或数据转换。"""
     _validate_public_image_url(value, "generated image")
     # 外部素材先复制到项目可控存储，避免生产结果依赖临时链接。
     async with httpx.AsyncClient(timeout=httpx.Timeout(60, connect=5), trust_env=False, follow_redirects=False) as client:
@@ -982,6 +1027,7 @@ async def _copy_external_image(value: str) -> dict[str, Any]:
 
 
 async def create_image_task(db: Session, payload: dict[str, Any]) -> ImageCreationTask:
+    """业务函数：处理 create_image_task 对应的业务流程、校验或数据转换。"""
     payload = dict(payload)
     requested_model_id = payload.get("model_id")
     requested_destination_role = payload.get("destination_role")
@@ -1219,6 +1265,7 @@ async def create_image_task(db: Session, payload: dict[str, Any]) -> ImageCreati
 
 
 async def dispatch_queued_image_task(db: Session, task_id: str) -> ImageCreationTask:
+    """业务函数：处理 dispatch_queued_image_task 对应的业务流程、校验或数据转换。"""
     task = db.query(ImageCreationTask).filter(ImageCreationTask.id == task_id).first()
     if not task:
         raise image_error(
@@ -1335,6 +1382,7 @@ async def dispatch_queued_image_task(db: Session, task_id: str) -> ImageCreation
 
 
 def _task_context(task: ImageCreationTask) -> dict[str, Any]:
+    """业务函数：处理 _task_context 对应的业务流程、校验或数据转换。"""
     return {
         "series_id": task.series_id,
         "episode_id": task.episode_id,
@@ -1345,6 +1393,7 @@ def _task_context(task: ImageCreationTask) -> dict[str, Any]:
 
 
 def _task_timeline(task: ImageCreationTask) -> list[dict[str, Any]]:
+    """业务函数：处理 _task_timeline 对应的业务流程、校验或数据转换。"""
     has_preview = bool(task.selection_preview_id)
     has_snapshot = bool(task.strategy_snapshot_json or task.request_json)
     status = task.status or "queued"
@@ -1362,6 +1411,7 @@ def _task_timeline(task: ImageCreationTask) -> list[dict[str, Any]]:
 
 
 def task_payload(task: ImageCreationTask) -> dict[str, Any]:
+    """业务函数：处理 task_payload 对应的业务流程、校验或数据转换。"""
     return {
         "id": task.id,
         "mode": task.mode,
@@ -1405,6 +1455,7 @@ def task_payload(task: ImageCreationTask) -> dict[str, Any]:
 
 
 def _asset_action_task(asset: ImageCreationAsset, task: ImageCreationTask | None = None) -> ImageCreationTask | None:
+    """业务函数：处理 _asset_action_task 对应的业务流程、校验或数据转换。"""
     if task is not None or not asset.task_id:
         return task
     session = object_session(asset)
@@ -1414,6 +1465,7 @@ def _asset_action_task(asset: ImageCreationAsset, task: ImageCreationTask | None
 
 
 def _asset_allowed_actions(asset: ImageCreationAsset, task: ImageCreationTask | None = None) -> list[str]:
+    """业务函数：处理 _asset_allowed_actions 对应的业务流程、校验或数据转换。"""
     actions = ["copy_as_new_task"]
     if asset.status in {"review_pending", "manual_review_pending"}:
         actions.extend(["approve", "reject", "repaint"])
@@ -1427,6 +1479,7 @@ def _asset_allowed_actions(asset: ImageCreationAsset, task: ImageCreationTask | 
 
 
 def ensure_image_asset_action_allowed(asset: ImageCreationAsset, action: str, asset_version: int | None) -> None:
+    """业务函数：处理 ensure_image_asset_action_allowed 对应的业务流程、校验或数据转换。"""
     if asset_version is None:
         raise image_error(
             422,
@@ -1464,6 +1517,7 @@ def ensure_image_asset_action_allowed(asset: ImageCreationAsset, action: str, as
 
 
 def asset_payload(asset: ImageCreationAsset) -> dict[str, Any]:
+    """业务函数：处理 asset_payload 对应的业务流程、校验或数据转换。"""
     return {
         "id": asset.id,
         "task_id": asset.task_id,
@@ -1502,6 +1556,7 @@ def asset_payload(asset: ImageCreationAsset) -> dict[str, Any]:
 
 
 def review_payload(review: ImageCreationReviewRecord) -> dict[str, Any]:
+    """业务函数：处理 review_payload 对应的业务流程、校验或数据转换。"""
     return {
         "id": review.id,
         "asset_id": review.asset_id,
@@ -1519,6 +1574,7 @@ def review_payload(review: ImageCreationReviewRecord) -> dict[str, Any]:
 
 
 async def sync_image_task(db: Session, task_id: str) -> ImageCreationTask:
+    """业务函数：处理 sync_image_task 对应的业务流程、校验或数据转换。"""
     task = db.query(ImageCreationTask).filter(ImageCreationTask.id == task_id).first()
     if not task:
         raise image_error(404, "IMAGE_TASK_NOT_FOUND", "Image creation task not found.", "Reload the task list.", retryable=False)
@@ -1591,6 +1647,7 @@ async def sync_image_task(db: Session, task_id: str) -> ImageCreationTask:
 
 
 async def _persist_stage_asset(db: Session, task: ImageCreationTask, item: dict[str, Any], index: int) -> bool:
+    """业务函数：处理 _persist_stage_asset 对应的业务流程、校验或数据转换。"""
     metadata = item.get("metadata") or {}
     group_id = metadata.get("group_id") or item.get("group_id") or task.pixelle_task_id
     group_index = metadata.get("group_index")
@@ -1694,6 +1751,7 @@ def list_image_assets(
     page: int = 1,
     page_size: int = 50,
 ) -> tuple[list[ImageCreationAsset], int]:
+    """业务函数：处理 list_image_assets 对应的业务流程、校验或数据转换。"""
     query = db.query(ImageCreationAsset)
     if status:
         query = query.filter(ImageCreationAsset.status == status)
@@ -1724,6 +1782,7 @@ def review_image_asset(
     asset_version: int | None = None,
     report_json: dict[str, Any] | None = None,
 ) -> tuple[ImageCreationAsset, list[ImageCreationReviewRecord]]:
+    """业务函数：处理 review_image_asset 对应的业务流程、校验或数据转换。"""
     asset = db.query(ImageCreationAsset).filter(ImageCreationAsset.id == asset_id).first()
     if not asset:
         raise image_error(404, "SOURCE_ASSET_NOT_FOUND", "Image asset not found.", "Pick another asset.", retryable=False)

@@ -26,6 +26,7 @@ def get_selectors(
     device_id: str = Depends(verify_device_secret),
 ):
 
+    """业务函数：处理 get_selectors 对应的业务流程、校验或数据转换。"""
     current_version, selectors = selector_service.get_all_selectors(db, device_id=device_id)
     if version == current_version:
         return {"version": current_version, "selectors": None, "changed": False}
@@ -43,6 +44,7 @@ def get_prompt_templates(
     db: Session = Depends(get_db),
     _: None = Depends(verify_device_secret),
 ):
+    """业务函数：处理 get_prompt_templates 对应的业务流程、校验或数据转换。"""
     current_version, templates = prompt_template_service.get_all_templates(db)
     if version == current_version:
         return {"version": current_version, "templates": None, "changed": False}
@@ -58,6 +60,7 @@ def get_prompt_templates(
 def script_version(
     _: None = Depends(verify_device_secret),
 ):
+    """业务函数：处理 script_version 对应的业务流程、校验或数据转换。"""
     from app.domains.device_operations.script_service import script_service
     return {"version": script_service.get_version()}
 
@@ -66,6 +69,7 @@ def script_version(
 def script_download(
     _: None = Depends(verify_device_secret),
 ):
+    """业务函数：处理 script_download 对应的业务流程、校验或数据转换。"""
     from app.domains.device_operations.script_service import script_service
     from fastapi.responses import Response
     data = script_service.download_script()
@@ -83,6 +87,7 @@ async def script_upload(
     file: UploadFile = FastAPIFile(...),
     user = Depends(verify_admin_token),
 ):
+    """业务函数：处理 script_upload 对应的业务流程、校验或数据转换。"""
     from app.domains.device_operations.script_service import script_service
     if not file.filename.endswith(".zip"):
         raise HTTPException(status_code=400, detail="Only .zip files accepted")
@@ -99,6 +104,7 @@ def device_list_templates(
     db: Session = Depends(get_db),
     resolution: str = Query(None),
 ):
+    """业务函数：处理 device_list_templates 对应的业务流程、校验或数据转换。"""
     """Return template list with MD5 hashes for incremental sync.
     Filters by device resolution profile when available."""
     from app.db.models.device_operations import Device
@@ -118,6 +124,7 @@ def device_download_template(
     db: Session = Depends(get_db),
     resolution: str = Query(None),
 ):
+    """业务函数：处理 device_download_template 对应的业务流程、校验或数据转换。"""
     """Download a single template image (binary).
     Priority: explicit resolution query param > device resolution > default."""
     from app.db.models.device_operations import Device
@@ -136,12 +143,14 @@ def device_download_template(
 
 
 class CalibrationItem(BaseModel):
+    """业务类：承载 CalibrationItem 相关的数据结构、状态或业务协作。"""
     action_name: str
     filename: str
     data: str  # base64-encoded PNG
 
 
 class CalibrationRequest(BaseModel):
+    """业务类：承载 CalibrationRequest 相关的数据结构、状态或业务协作。"""
     templates: list[CalibrationItem]
     resolution: str = ""
 
@@ -152,6 +161,7 @@ async def device_calibrate(
     db: Session = Depends(get_db),
     device_id: str = Depends(verify_device_secret),
 ):
+    """业务函数：处理 device_calibrate 对应的业务流程、校验或数据转换。"""
     """Device uploads auto-calibrated image templates.
     Saves templates and upserts UISelector rows for this resolution profile."""
     import base64

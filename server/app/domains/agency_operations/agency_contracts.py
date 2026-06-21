@@ -13,12 +13,14 @@ except ImportError:  # pragma: no cover - Python < 3.11 compatibility
     from enum import Enum
 
     class StrEnum(str, Enum):
+        """业务类：承载 StrEnum 相关的数据结构、状态或业务协作。"""
         pass
 
 from pydantic import BaseModel, Field
 
 
 class AgencyExecutionStatus(StrEnum):
+    """业务类：承载 AgencyExecutionStatus 相关的数据结构、状态或业务协作。"""
     queued = "queued"
     running = "running"
     completed = "completed"
@@ -27,6 +29,7 @@ class AgencyExecutionStatus(StrEnum):
 
 
 class AgencyInvocationResultStatus(StrEnum):
+    """业务类：承载 AgencyInvocationResultStatus 相关的数据结构、状态或业务协作。"""
     pending = "pending"
     passed = "passed"
     warn = "warn"
@@ -35,6 +38,7 @@ class AgencyInvocationResultStatus(StrEnum):
 
 
 class AgencyStepStatus(StrEnum):
+    """业务类：承载 AgencyStepStatus 相关的数据结构、状态或业务协作。"""
     pending = "pending"
     running = "running"
     completed = "completed"
@@ -44,6 +48,7 @@ class AgencyStepStatus(StrEnum):
 
 
 class AgencyExpertSummary(BaseModel):
+    """业务类：承载 AgencyExpertSummary 相关的数据结构、状态或业务协作。"""
     expert_id: str
     name: str
     role_type: str
@@ -55,6 +60,7 @@ class AgencyExpertSummary(BaseModel):
 
 
 class AgencyInvocationSummary(BaseModel):
+    """业务类：承载 AgencyInvocationSummary 相关的数据结构、状态或业务协作。"""
     id: str
     stage: str
     expert_id: str
@@ -74,6 +80,7 @@ class AgencyInvocationSummary(BaseModel):
 
 
 class AgencyInvocationDetail(AgencyInvocationSummary):
+    """业务类：承载 AgencyInvocationDetail 相关的数据结构、状态或业务协作。"""
     input_summary: dict[str, Any] = Field(default_factory=dict)
     output_summary: dict[str, Any] = Field(default_factory=dict)
     evidence: list[Any] = Field(default_factory=list)
@@ -91,6 +98,7 @@ class AgencyInvocationDetail(AgencyInvocationSummary):
 
 
 class AgencyDecisionLogItem(BaseModel):
+    """业务类：承载 AgencyDecisionLogItem 相关的数据结构、状态或业务协作。"""
     id: str
     invocation_id: str
     stage: str
@@ -108,6 +116,7 @@ class AgencyDecisionLogItem(BaseModel):
 
 
 class AgencyStageGraphNode(BaseModel):
+    """业务类：承载 AgencyStageGraphNode 相关的数据结构、状态或业务协作。"""
     stage: str
     label: str
     status: AgencyStepStatus
@@ -118,6 +127,7 @@ class AgencyStageGraphNode(BaseModel):
 
 
 class AgencyConsoleResponse(BaseModel):
+    """业务类：承载 AgencyConsoleResponse 相关的数据结构、状态或业务协作。"""
     ok: bool = True
     series: dict[str, Any]
     latest_run: dict[str, Any] | None = None

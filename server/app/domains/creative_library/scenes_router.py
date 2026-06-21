@@ -21,6 +21,7 @@ router = APIRouter(prefix="/api/scenes", tags=["scenes"])
 
 
 class SceneCreate(BaseModel):
+    """业务类：承载 SceneCreate 相关的数据结构、状态或业务协作。"""
     name: str
     scene_type: str = "indoor"
     location_desc: Optional[str] = None
@@ -29,16 +30,19 @@ class SceneCreate(BaseModel):
 
 
 class AutoGenerateInput(BaseModel):
+    """业务类：承载 AutoGenerateInput 相关的数据结构、状态或业务协作。"""
     text: str = Field(..., min_length=10, max_length=5000)
     genre: str = "drama"
     count: int = Field(default=5, ge=1, le=10)
 
 
 class ReferenceGenerateInput(BaseModel):
+    """业务类：承载 ReferenceGenerateInput 相关的数据结构、状态或业务协作。"""
     slot: str = "all"
 
 
 class AiRewriteInput(BaseModel):
+    """业务类：承载 AiRewriteInput 相关的数据结构、状态或业务协作。"""
     instruction: str = ""
 
 SCENE_GEN_SYSTEM = """你是一位资深的电影导演和场景设计师。根据用户提供的故事概要，生成详细的拍摄场景描述。
@@ -55,6 +59,7 @@ SCENE_GEN_SYSTEM = """你是一位资深的电影导演和场景设计师。根�
 def list_scenes(db: Session = Depends(get_db),
                 include_archived: bool = Query(False),
                 _: str = Depends(verify_admin_token)):
+    """业务函数：处理 list_scenes 对应的业务流程、校验或数据转换。"""
     scenes = db.query(Scene).all()
     if not include_archived:
         scenes = [s for s in scenes if not (s.meta_json or {}).get("archived")]
@@ -64,6 +69,7 @@ def list_scenes(db: Session = Depends(get_db),
 @router.post("")
 def create_scene(body: SceneCreate, db: Session = Depends(get_db),
                  user = Depends(verify_admin_token)):
+    """业务函数：处理 create_scene 对应的业务流程、校验或数据转换。"""
     s = Scene(**body.model_dump())
     db.add(s); db.commit(); db.refresh(s)
     return {"ok": True, "scene": _to_dict(s)}
@@ -72,6 +78,7 @@ def create_scene(body: SceneCreate, db: Session = Depends(get_db),
 @router.put("/{scene_id}")
 def update_scene(scene_id: str, body: dict, db: Session = Depends(get_db),
                  user = Depends(verify_admin_token)):
+    """业务函数：处理 update_scene 对应的业务流程、校验或数据转换。"""
     s = db.query(Scene).filter(Scene.id == scene_id).first()
     if not s:
         raise HTTPException(404, "Scene not found")
@@ -85,6 +92,7 @@ def update_scene(scene_id: str, body: dict, db: Session = Depends(get_db),
 @router.delete("/{scene_id}")
 def delete_scene(scene_id: str, db: Session = Depends(get_db),
                  user = Depends(verify_admin_token)):
+    """业务函数：处理 delete_scene 对应的业务流程、校验或数据转换。"""
     try:
         result = archive_character_or_scene(db, "scene", scene_id)
     except AssetLifecycleError as exc:
@@ -94,6 +102,7 @@ def delete_scene(scene_id: str, db: Session = Depends(get_db),
 
 
 def _reference_asset_http_error(exc: ReferenceAssetError) -> HTTPException:
+    """业务函数：处理 _reference_asset_http_error 对应的业务流程、校验或数据转换。"""
     status_code = 400
     if exc.code == "SCENE_NOT_FOUND":
         status_code = 404
@@ -105,6 +114,7 @@ def _reference_asset_http_error(exc: ReferenceAssetError) -> HTTPException:
 
 
 def _ai_rewrite_http_error(exc: AssetAiRewriteError) -> HTTPException:
+    """业务函数：处理 _ai_rewrite_http_error 对应的业务流程、校验或数据转换。"""
     status_code = 409
     if exc.code == "SCENE_NOT_FOUND":
         status_code = 404
@@ -120,6 +130,7 @@ async def generate_scene_reference_images_endpoint(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
+    """业务函数：处理 generate_scene_reference_images_endpoint 对应的业务流程、校验或数据转换。"""
     try:
         return await generate_scene_reference_images(db, scene_id, slot=(body.slot if body else "all"))
     except ReferenceAssetError as exc:
@@ -134,6 +145,7 @@ async def generate_scene_ai_rewrite_endpoint(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
+    """业务函数：处理 generate_scene_ai_rewrite_endpoint 对应的业务流程、校验或数据转换。"""
     try:
         return await generate_scene_rewrite_candidate(
             db, scene_id, instruction=(body.instruction if body else "")
@@ -180,6 +192,7 @@ async def auto_generate_scenes(body: AutoGenerateInput, db: Session = Depends(ge
 
 
 def _parse_scenes_json(raw: str) -> dict:
+    """业务函数：处理 _parse_scenes_json 对应的业务流程、校验或数据转换。"""
     import re
     try:
         return json.loads(raw)
@@ -201,4 +214,5 @@ def _parse_scenes_json(raw: str) -> dict:
 
 
 def _to_dict(s: Scene) -> dict:
+    """业务函数：处理 _to_dict 对应的业务流程、校验或数据转换。"""
     return {col.name: getattr(s, col.name) for col in Scene.__table__.columns}

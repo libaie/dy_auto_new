@@ -23,6 +23,7 @@ const partialGenMsg = ref('')
 const editingVariantIdx = ref(-1)
 const originalVariantsJson = ref('[]')
 
+// 前端业务函数：协调 deleteVariant 对应的页面流程、接口调用或状态转换。
 function deleteVariant(idx) {
   if (!loadedVariants.value) return
   loadedVariants.value.splice(idx, 1)
@@ -31,10 +32,12 @@ function deleteVariant(idx) {
   else if (editingVariantIdx.value > idx) editingVariantIdx.value -= 1
 }
 
+// 前端业务函数：协调 startEditVariant 对应的页面流程、接口调用或状态转换。
 function startEditVariant(idx) {
   editingVariantIdx.value = idx
 }
 
+// 前端业务函数：协调 doneEditVariant 对应的页面流程、接口调用或状态转换。
 function doneEditVariant() {
   editingVariantIdx.value = -1
 }
@@ -47,6 +50,7 @@ const form = reactive({
   messages: [{ order: 1, content: '', delay_ms: 3000 }],
 })
 
+// 前端业务函数：协调 closeEditor 对应的页面流程、接口调用或状态转换。
 function closeEditor() {
   showEditor.value = false
   if (_savedFocusEl && typeof _savedFocusEl.focus === 'function') {
@@ -55,6 +59,7 @@ function closeEditor() {
   _savedFocusEl = null
 }
 
+// 前端业务函数：协调 resetForm 对应的页面流程、接口调用或状态转换。
 function resetForm() {
   form.name = ''
   form.industry = ''
@@ -69,6 +74,7 @@ function resetForm() {
   partialGenMsg.value = ''
 }
 
+// 前端业务函数：协调 addMessage 对应的页面流程、接口调用或状态转换。
 function addMessage() {
   if (form.messages.length >= 10) { toast.error('最多 10 条消息'); return }
   form.messages.push({ order: form.messages.length + 1, content: '', delay_ms: 3000 })
@@ -81,6 +87,7 @@ function removeMessage(idx) {
   form.messages.forEach(function (m, i) { m.order = i + 1 })
 }
 
+// 前端业务函数：协调 moveUp 对应的页面流程、接口调用或状态转换。
 function moveUp(idx) {
   if (idx === 0) return
   var tmp = form.messages[idx - 1]
@@ -89,6 +96,7 @@ function moveUp(idx) {
   form.messages.forEach(function (m, i) { m.order = i + 1 })
 }
 
+// 前端业务函数：协调 moveDown 对应的页面流程、接口调用或状态转换。
 function moveDown(idx) {
   if (idx >= form.messages.length - 1) return
   var tmp = form.messages[idx + 1]
@@ -97,12 +105,14 @@ function moveDown(idx) {
   form.messages.forEach(function (m, i) { m.order = i + 1 })
 }
 
+// 前端业务函数：协调 openCreate 对应的页面流程、接口调用或状态转换。
 function openCreate() {
   _savedFocusEl = document.activeElement
   resetForm()
   showEditor.value = true
 }
 
+// 前端业务函数：协调 openEdit 对应的页面流程、接口调用或状态转换。
 function openEdit(seq) {
   _savedFocusEl = document.activeElement
   form.name = seq.name
@@ -116,6 +126,7 @@ function openEdit(seq) {
   showEditor.value = true
 }
 
+// 前端业务函数：协调 handleSave 对应的页面流程、接口调用或状态转换。
 async function handleSave() {
   var valid = form.messages.filter(function (m) { return m.content.trim() })
   if (!form.name.trim()) { toast.error('请输入模板名称'); return }
@@ -164,6 +175,7 @@ async function fetchData() {
 }
 
 
+// 前端业务函数：协调 generateSequence 对应的页面流程、接口调用或状态转换。
 async function generateSequence() {
   if (!aiDescription.value || !aiLinkUrl.value) return
   generating.value = true

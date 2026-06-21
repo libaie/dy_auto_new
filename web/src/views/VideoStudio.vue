@@ -52,6 +52,7 @@ const sceneList = ref([])
 const selectedCharacterIds = ref([])
 const selectedSceneIds = ref([])
 
+// 前端业务函数：协调 loadAssets 对应的页面流程、接口调用或状态转换。
 async function loadAssets() {
   try {
     const [cRes, sRes] = await Promise.all([
@@ -63,12 +64,14 @@ async function loadAssets() {
   } catch {}
 }
 
+// 前端业务函数：协调 toggleCharacter 对应的页面流程、接口调用或状态转换。
 function toggleCharacter(id) {
   const idx = selectedCharacterIds.value.indexOf(id)
   if (idx >= 0) selectedCharacterIds.value.splice(idx, 1)
   else selectedCharacterIds.value.push(id)
 }
 
+// 前端业务函数：协调 toggleScene 对应的页面流程、接口调用或状态转换。
 function toggleScene(id) {
   const idx = selectedSceneIds.value.indexOf(id)
   if (idx >= 0) selectedSceneIds.value.splice(idx, 1)
@@ -93,6 +96,7 @@ const systemConfig = ref({
   templateBgColor: '#000000',
 })
 
+// 前端业务函数：协调 loadSystemConfig 对应的页面流程、接口调用或状态转换。
 async function loadSystemConfig() {
   try {
     const resp = await getPixelleConfig()
@@ -115,6 +119,7 @@ async function loadSystemConfig() {
   } catch { /* config.yaml may not exist yet */ }
 }
 
+// 前端业务函数：协调 buildPixelleConfigUpdates 对应的页面流程、接口调用或状态转换。
 function buildPixelleConfigUpdates() {
   const cfg = systemConfig.value
   const updates = {
@@ -180,6 +185,7 @@ const ttsWorkflows = ref([])
 const bgmList = ref([])
 const resourcesLoading = ref(false)
 
+// 前端业务函数：协调 fetchResources 对应的页面流程、接口调用或状态转换。
 async function fetchResources() {
   resourcesLoading.value = true
   try {
@@ -216,6 +222,7 @@ let pollTimer = null
 
 // ==================== Actions ====================
 
+// 前端业务函数：协调 handleTestConnection 对应的页面流程、接口调用或状态转换。
 async function handleTestConnection() {
   try {
     const resp = await getOpenAPISpec()
@@ -229,10 +236,12 @@ function handleBgmUpload(event) {
   contentForm.value.customBgmFile = event.target.files?.[0] || null
 }
 
+// 前端业务函数：协调 handleRefAudioUpload 对应的页面流程、接口调用或状态转换。
 function handleRefAudioUpload(event) {
   voiceVisualForm.value.refAudioFile = event.target.files?.[0] || null
 }
 
+// 前端业务函数：协调 handleGenerate 对应的页面流程、接口调用或状态转换。
 async function handleGenerate() {
   const cf = contentForm.value
   if (!cf.text.trim()) { toast.error('请输入视频主题或脚本'); return }
@@ -318,6 +327,7 @@ async function handleGenerate() {
   }
 }
 
+// 前端业务函数：协调 pollTask 对应的页面流程、接口调用或状态转换。
 function pollTask(taskId, videoModel = 'auto') {
   const maxAttempts = videoModel === 'seedance' ? 180 : videoModel === 'kling' ? 120 : 120
   return new Promise((resolve, reject) => {
@@ -366,10 +376,12 @@ function pollTask(taskId, videoModel = 'auto') {
   })
 }
 
+// 前端业务函数：协调 clearPoll 对应的页面流程、接口调用或状态转换。
 function clearPoll() {
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
 }
 
+// 前端业务函数：协调 handleClearResult 对应的页面流程、接口调用或状态转换。
 function handleClearResult() {
   result.value = null
   videoUrl.value = ''

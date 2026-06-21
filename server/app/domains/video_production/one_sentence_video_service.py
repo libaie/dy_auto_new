@@ -81,6 +81,7 @@ ONE_SENTENCE_REFERENCE_BLOCKED_STATUS = "reference_generation_blocked"
 
 
 def _missing_agency_trace(stage: str, exc: Exception) -> dict[str, Any]:
+    """业务函数：处理 _missing_agency_trace 对应的业务流程、校验或数据转换。"""
     return {
         "stage": stage,
         "stage_status": "partial",
@@ -92,6 +93,7 @@ def _missing_agency_trace(stage: str, exc: Exception) -> dict[str, Any]:
 
 
 def _timeout_trace(stage: str, error_code: str, timeout_seconds: float) -> dict[str, Any]:
+    """业务函数：处理 _timeout_trace 对应的业务流程、校验或数据转换。"""
     return {
         "stage": stage,
         "stage_status": "partial",
@@ -103,12 +105,14 @@ def _timeout_trace(stage: str, error_code: str, timeout_seconds: float) -> dict[
 
 
 def _safe_reference_error_details(exc: ReferenceAssetError) -> dict[str, Any]:
+    """业务函数：处理 _safe_reference_error_details 对应的业务流程、校验或数据转换。"""
     allowed_keys = {"image_task_id", "status", "scene_key", "provider_code", "status_code"}
     details = exc.details if isinstance(exc.details, dict) else {}
     return {key: details[key] for key in allowed_keys if details.get(key) is not None}
 
 
 def _reference_deferred_trace(exc: ReferenceAssetError) -> dict[str, Any]:
+    """业务函数：处理 _reference_deferred_trace 对应的业务流程、校验或数据转换。"""
     trace = {
         "stage": "reference_generation",
         "stage_status": "partial",
@@ -126,14 +130,17 @@ def _reference_deferred_trace(exc: ReferenceAssetError) -> dict[str, Any]:
 
 
 def _agency_trace_status(*traces: dict[str, Any] | None) -> str:
+    """业务函数：处理 _agency_trace_status 对应的业务流程、校验或数据转换。"""
     return "complete" if traces and all(trace and not trace.get("error_code") for trace in traces) else "partial"
 
 
 def _dedupe_urls(urls: list[str]) -> list[str]:
+    """业务函数：处理 _dedupe_urls 对应的业务流程、校验或数据转换。"""
     return list(dict.fromkeys(url for url in urls if url))
 
 
 def _reference_urls_from_fields(row: Any, fields: tuple[str, ...]) -> list[str]:
+    """业务函数：处理 _reference_urls_from_fields 对应的业务流程、校验或数据转换。"""
     return _dedupe_urls([
         value
         for field in fields
@@ -142,6 +149,7 @@ def _reference_urls_from_fields(row: Any, fields: tuple[str, ...]) -> list[str]:
 
 
 def _reference_instruction(character_urls: list[str], style_urls: list[str]) -> str:
+    """业务函数：处理 _reference_instruction 对应的业务流程、校验或数据转换。"""
     parts = []
     if character_urls:
         parts.append(
@@ -154,6 +162,7 @@ def _reference_instruction(character_urls: list[str], style_urls: list[str]) -> 
 
 
 def _agency_trace_blocks(trace: dict[str, Any] | None) -> bool:
+    """业务函数：处理 _agency_trace_blocks 对应的业务流程、校验或数据转换。"""
     return bool(trace and trace.get("stage_status") in BLOCKING_AGENCY_STATUSES)
 
 
@@ -162,6 +171,7 @@ def _raise_blocked_agency_gate(
     run: Any,
     *traces: dict[str, Any] | None,
 ) -> None:
+    """业务函数：处理 _raise_blocked_agency_gate 对应的业务流程、校验或数据转换。"""
     blocking_traces = [trace for trace in traces if _agency_trace_blocks(trace)]
     if not blocking_traces:
         return
@@ -196,10 +206,12 @@ def _raise_blocked_agency_gate(
 
 
 def _clean_prompt(prompt: str) -> str:
+    """业务函数：处理 _clean_prompt 对应的业务流程、校验或数据转换。"""
     return " ".join((prompt or "").strip().split())
 
 
 def _story_content_prompt(prompt: str) -> str:
+    """业务函数：处理 _story_content_prompt 对应的业务流程、校验或数据转换。"""
     clean = _clean_prompt(prompt)
     if not clean:
         return clean
@@ -220,10 +232,12 @@ def _story_content_prompt(prompt: str) -> str:
 
 
 def _contains_cjk(text: str) -> bool:
+    """业务函数：处理 _contains_cjk 对应的业务流程、校验或数据转换。"""
     return bool(re.search(r"[\u4e00-\u9fff]", text or ""))
 
 
 def _static_story_prompt(prompt: str) -> str:
+    """业务函数：处理 _static_story_prompt 对应的业务流程、校验或数据转换。"""
     clean = _story_content_prompt(prompt)
     text = re.sub(r"([，,。；;]\s*)?镜头[^，,。；;]*(?:[，,。；;]\s*)?", "，", clean)
     text = re.sub(r"[，,、]+", "，", text)
@@ -232,6 +246,7 @@ def _static_story_prompt(prompt: str) -> str:
 
 
 def _positive_visual_style_prompt(visual_style: dict[str, Any]) -> str:
+    """业务函数：处理 _positive_visual_style_prompt 对应的业务流程、校验或数据转换。"""
     prompt = str((visual_style or {}).get("prompt") or "").strip()
     for phrase in ("no text", "no logo", "no watermark"):
         prompt = re.sub(rf"([,，]\s*)?{re.escape(phrase)}(\s*[,，])?", ", ", prompt, flags=re.IGNORECASE)
@@ -239,6 +254,7 @@ def _positive_visual_style_prompt(visual_style: dict[str, Any]) -> str:
 
 
 def _negative_prompt(visual_style: dict[str, Any]) -> str:
+    """业务函数：处理 _negative_prompt 对应的业务流程、校验或数据转换。"""
     parts = [
         str((visual_style or {}).get("negative_prompt") or ""),
         DEFAULT_NEGATIVE,
@@ -254,6 +270,7 @@ def _negative_prompt(visual_style: dict[str, Any]) -> str:
 
 
 def _title_from_prompt(prompt: str, explicit_title: str | None = None) -> str:
+    """业务函数：处理 _title_from_prompt 对应的业务流程、校验或数据转换。"""
     if explicit_title and explicit_title.strip():
         return explicit_title.strip()[:80]
     clean = _clean_prompt(prompt)
@@ -261,6 +278,7 @@ def _title_from_prompt(prompt: str, explicit_title: str | None = None) -> str:
 
 
 def _segment_durations(total_seconds: int) -> list[int]:
+    """业务函数：处理 _segment_durations 对应的业务流程、校验或数据转换。"""
     frame_count = max(1, ceil(total_seconds / MAX_STORYBOARD_FRAME_SECONDS))
     if total_seconds >= MIN_MULTI_SHOT_SECONDS:
         frame_count = max(MIN_MULTI_SHOT_FRAME_COUNT, frame_count)
@@ -270,6 +288,7 @@ def _segment_durations(total_seconds: int) -> list[int]:
 
 
 def _shot_type(index: int, total: int) -> str:
+    """业务函数：处理 _shot_type 对应的业务流程、校验或数据转换。"""
     if total == 1:
         return "medium"
     sequence = ["wide", "medium", "close_up", "medium"]
@@ -277,6 +296,7 @@ def _shot_type(index: int, total: int) -> str:
 
 
 def _camera_language(shot_type: str) -> str:
+    """业务函数：处理 _camera_language 对应的业务流程、校验或数据转换。"""
     if shot_type == "wide":
         return "35mm lens, wide establishing composition, wet foreground reflections, deep background layers"
     if shot_type == "close_up":
@@ -285,6 +305,7 @@ def _camera_language(shot_type: str) -> str:
 
 
 def _shot_focus(prompt: str, index: int, total: int) -> str:
+    """业务函数：处理 _shot_focus 对应的业务流程、校验或数据转换。"""
     if _contains_cjk(prompt):
         if total <= 1:
             return f"单帧画面聚焦核心剧情瞬间：{prompt}"
@@ -303,6 +324,7 @@ def _shot_focus(prompt: str, index: int, total: int) -> str:
 
 
 def _video_motion(prompt: str, index: int, total: int, duration_seconds: int | float = 5) -> str:
+    """业务函数：处理 _video_motion 对应的业务流程、校验或数据转换。"""
     duration_label = f"{duration_seconds:g}" if float(duration_seconds).is_integer() else f"{duration_seconds:.2f}".rstrip("0").rstrip(".")
     if _contains_cjk(prompt):
         if total <= 1:
@@ -322,6 +344,7 @@ def _video_motion(prompt: str, index: int, total: int, duration_seconds: int | f
 
 
 def _narration_line(prompt: str, index: int, total: int) -> str:
+    """业务函数：处理 _narration_line 对应的业务流程、校验或数据转换。"""
     if _contains_cjk(prompt):
         if total <= 1:
             return prompt
@@ -340,6 +363,7 @@ def _narration_line(prompt: str, index: int, total: int) -> str:
 
 
 def _scene_location_from_prompt(prompt: str) -> str:
+    """业务函数：处理 _scene_location_from_prompt 对应的业务流程、校验或数据转换。"""
     lowered = prompt.lower()
     details = []
     if "雨" in prompt or "rain" in lowered:
@@ -356,6 +380,7 @@ def _scene_location_from_prompt(prompt: str) -> str:
 
 
 def _shot_beat(prompt: str, index: int, total: int, duration_seconds: int | float = 5) -> dict[str, str]:
+    """业务函数：处理 _shot_beat 对应的业务流程、校验或数据转换。"""
     shot_type = _shot_type(index, total)
     if total <= 1:
         return {
@@ -395,6 +420,7 @@ def _shot_beat(prompt: str, index: int, total: int, duration_seconds: int | floa
 
 
 def _build_style_lock(series: Series, character: Character, scene: Scene, prompt: str) -> dict[str, Any]:
+    """业务函数：处理 _build_style_lock 对应的业务流程、校验或数据转换。"""
     character_reference_urls = _reference_urls_from_fields(character, CHARACTER_REFERENCE_FIELDS)
     scene_reference_urls = _reference_urls_from_fields(scene, SCENE_REFERENCE_FIELDS)
     inferred_visual_style = infer_visual_style_from_story(
@@ -461,6 +487,7 @@ def _build_style_lock(series: Series, character: Character, scene: Scene, prompt
 
 
 def _storyboard_frame_values(storyboard: dict[str, Any], key: str) -> list[str]:
+    """业务函数：处理 _storyboard_frame_values 对应的业务流程、校验或数据转换。"""
     return [
         str(frame.get(key) or "").strip()
         for frame in storyboard.get("frames", [])
@@ -478,6 +505,7 @@ def _record_one_sentence_text_artifacts(
     story_bible: dict[str, Any],
     storyboard: dict[str, Any],
 ) -> None:
+    """业务函数：处理 _record_one_sentence_text_artifacts 对应的业务流程、校验或数据转换。"""
     service = AITextArtifactService(db)
     frame_narration = _storyboard_frame_values(storyboard, "narration")
     image_prompts = _storyboard_frame_values(storyboard, "image_prompt")
@@ -700,6 +728,7 @@ def _build_one_sentence_episode_outline(
     character_ids: list[str],
     scene_ids: list[str],
 ) -> dict[str, Any]:
+    """业务函数：处理 _build_one_sentence_episode_outline 对应的业务流程、校验或数据转换。"""
     if episode_number == 1:
         previous_handoff = ""
         episode_goal = f"建立主线悬念：{prompt}"
@@ -742,12 +771,14 @@ def _build_one_sentence_episode_outline(
 
 
 def _without_agency_trace(value: dict[str, Any]) -> dict[str, Any]:
+    """业务函数：处理 _without_agency_trace 对应的业务流程、校验或数据转换。"""
     clean = dict(value or {})
     clean.pop("agency_trace", None)
     return clean
 
 
 def _first_linked_character_and_scene(db: Session, series: Series) -> tuple[Character | None, Scene | None]:
+    """业务函数：处理 _first_linked_character_and_scene 对应的业务流程、校验或数据转换。"""
     character = series.characters[0] if series.characters else None
     scene = series.scenes[0] if series.scenes else None
     if character and scene:
@@ -765,6 +796,7 @@ def _set_run_reference_generation_state(
     trace: dict[str, Any],
     autostart_images: bool,
 ) -> None:
+    """业务函数：处理 _set_run_reference_generation_state 对应的业务流程、校验或数据转换。"""
     model_trace = dict(run.model_trace_json or {})
     one_sentence = dict(model_trace.get("one_sentence") or {})
     one_sentence["reference_generation"] = trace
@@ -780,6 +812,7 @@ def _set_run_reference_generation_state(
 
 
 def _mark_storyboard_ready_for_image_start(db: Session, run: VideoProductionRun) -> VideoProductionRun:
+    """业务函数：处理 _mark_storyboard_ready_for_image_start 对应的业务流程、校验或数据转换。"""
     run.status = "storyboard_ready"
     run.current_stage = "storyboard_ready"
     run.error_message = None
@@ -790,6 +823,7 @@ def _mark_storyboard_ready_for_image_start(db: Session, run: VideoProductionRun)
 
 
 def _is_past_one_sentence_reference_generation(run: VideoProductionRun) -> bool:
+    """业务函数：处理 _is_past_one_sentence_reference_generation 对应的业务流程、校验或数据转换。"""
     return run.status not in {
         "draft",
         ONE_SENTENCE_REFERENCE_RUNNING_STATUS,
@@ -798,6 +832,7 @@ def _is_past_one_sentence_reference_generation(run: VideoProductionRun) -> bool:
 
 
 def _storyboard_frames_by_id(storyboard: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """业务函数：处理 _storyboard_frames_by_id 对应的业务流程、校验或数据转换。"""
     return {
         str(frame.get("frame_id")): frame
         for frame in (storyboard.get("frames") or [])
@@ -811,6 +846,7 @@ def _refresh_segment_references_from_storyboard(
     storyboard: dict[str, Any],
     style_lock: dict[str, Any],
 ) -> None:
+    """业务函数：处理 _refresh_segment_references_from_storyboard 对应的业务流程、校验或数据转换。"""
     if not run.production_episode_id:
         return
     frames = _storyboard_frames_by_id(storyboard)
@@ -851,6 +887,7 @@ async def _run_one_sentence_expert_reviews(
     story_bible: dict[str, Any],
     storyboard: dict[str, Any],
 ) -> tuple[dict[str, Any], dict[str, Any]]:
+    """业务函数：处理 _run_one_sentence_expert_reviews 对应的业务流程、校验或数据转换。"""
     try:
         runtime_config = resolve_runtime_model_config(db, "llm_agency_expert_review")
     except RuntimeModelConfigError as exc:
@@ -911,6 +948,7 @@ def _build_storyboard(
     prompt: str,
     target_duration_seconds: int,
 ) -> dict[str, Any]:
+    """业务函数：处理 _build_storyboard 对应的业务流程、校验或数据转换。"""
     durations = _segment_durations(target_duration_seconds)
     total_frame_count = len(durations)
     story_prompt = _static_story_prompt(prompt)
@@ -999,6 +1037,7 @@ def _build_storyboard(
 
 
 def _steps(run_status: str, autostart_images: bool, frame_count: int) -> list[dict[str, Any]]:
+    """业务函数：处理 _steps 对应的业务流程、校验或数据转换。"""
     if run_status == ONE_SENTENCE_REFERENCE_RUNNING_STATUS:
         return [
             {"key": "prompt", "label": "提示词已接收", "status": "done"},
@@ -1033,6 +1072,7 @@ def _steps(run_status: str, autostart_images: bool, frame_count: int) -> list[di
 
 
 def _invalid_run_type(run_type: str, message: str) -> ProductionRepairableError:
+    """业务函数：处理 _invalid_run_type 对应的业务流程、校验或数据转换。"""
     return ProductionRepairableError(
         code=ProductionErrorCode.INVALID_RUN_TYPE,
         message=message,
@@ -1044,6 +1084,7 @@ def _invalid_run_type(run_type: str, message: str) -> ProductionRepairableError:
 
 
 def _validate_one_sentence_run_type(run_type: str | None) -> str:
+    """业务函数：处理 _validate_one_sentence_run_type 对应的业务流程、校验或数据转换。"""
     try:
         validated = validate_run_type(run_type or REAL_SHORT_E2E)
     except ValueError as exc:
@@ -1052,6 +1093,7 @@ def _validate_one_sentence_run_type(run_type: str | None) -> str:
 
 
 def _validate_real_short_duration(run_type: str, target_duration_seconds: int) -> None:
+    """业务函数：处理 _validate_real_short_duration 对应的业务流程、校验或数据转换。"""
     if run_type != REAL_SHORT_E2E:
         return
     if not REAL_SHORT_MIN_SECONDS <= target_duration_seconds <= REAL_SHORT_MAX_SECONDS:
@@ -1067,6 +1109,7 @@ def _validate_real_short_duration(run_type: str, target_duration_seconds: int) -
 
 
 def _assert_budget_allows_real_short(run_type: str, budget_limit: float | None) -> None:
+    """业务函数：处理 _assert_budget_allows_real_short 对应的业务流程、校验或数据转换。"""
     if run_type == REAL_SHORT_E2E and (budget_limit is None or float(budget_limit) <= 0):
         raise ProductionRepairableError(
             code=ProductionErrorCode.BUDGET_EXCEEDED,
@@ -1079,11 +1122,13 @@ def _assert_budget_allows_real_short(run_type: str, budget_limit: float | None) 
 
 
 async def _generate_required_reference_images(db: Session, character: Character, scene: Scene) -> None:
+    """业务函数：处理 _generate_required_reference_images 对应的业务流程、校验或数据转换。"""
     await reference_asset_service.generate_character_reference_images(db, character.id, slot="all")
     await reference_asset_service.generate_scene_reference_images(db, scene.id, slot="all")
 
 
 async def _generate_required_references(db: Session, character: Character, scene: Scene) -> dict[str, Any]:
+    """业务函数：处理 _generate_required_references 对应的业务流程、校验或数据转换。"""
     try:
         await asyncio.wait_for(
             _generate_required_reference_images(db, character, scene),
@@ -1137,6 +1182,7 @@ async def complete_one_sentence_reference_generation(
     *,
     autostart_images: bool | None = None,
 ) -> VideoProductionRun:
+    """业务函数：处理 complete_one_sentence_reference_generation 对应的业务流程、校验或数据转换。"""
     run = db.query(VideoProductionRun).filter(VideoProductionRun.id == run_id).first()
     if not run:
         raise VideoProductionError("Run not found")
@@ -1294,6 +1340,7 @@ async def create_one_sentence_video(
     run_type: str | None = REAL_SHORT_E2E,
     auto_repair_policy: dict | None = None,
 ) -> dict[str, Any]:
+    """业务函数：处理 create_one_sentence_video 对应的业务流程、校验或数据转换。"""
     run_type = _validate_one_sentence_run_type(run_type)
     clean_prompt = _clean_prompt(prompt)
     title_value = _title_from_prompt(clean_prompt, title)

@@ -180,6 +180,7 @@ var selectorLoader = global.__selectorLoader || {
     }
     var devAR = _aspectTag(devRes);
 
+    // 设备业务函数：处理 _priority 对应的抖音自动化动作、状态或安全边界。
     function _priority(platformVer) {
       // exact match: 3, specific version (e.g. "38.6.0"): 2, default/empty: 1
       if (platformVer === douyinVersion) return 3;
@@ -187,6 +188,7 @@ var selectorLoader = global.__selectorLoader || {
       return 2;
     }
 
+    // 设备业务函数：处理 _resProfileScore 对应的抖音自动化动作、状态或安全边界。
     function _resProfileScore(sel) {
       var rp = sel.resolution_profile || "default";
       if (!rp || rp === "default") return 1;
@@ -195,6 +197,7 @@ var selectorLoader = global.__selectorLoader || {
       return 0;
     }
 
+    // 设备业务函数：处理 _versionDist 对应的抖音自动化动作、状态或安全边界。
     function _versionDist(v1, v2) {
       if (!v1 || !v2 || v1 === "default" || v2 === "default") return 999999999;
       var p1 = String(v1).split("."), p2 = String(v2).split(".");
@@ -206,6 +209,7 @@ var selectorLoader = global.__selectorLoader || {
       return dist;
     }
 
+    // 设备业务函数：处理 _versionCompare 对应的抖音自动化动作、状态或安全边界。
     function _versionCompare(v1, v2) {
       var p1 = String(v1 || "").split(".");
       var p2 = String(v2 || "").split(".");
@@ -218,6 +222,7 @@ var selectorLoader = global.__selectorLoader || {
       return 0;
     }
 
+    // 设备业务函数：处理 _prefersNotFutureVersion 对应的抖音自动化动作、状态或安全边界。
     function _prefersNotFutureVersion(v1, v2, target) {
       var v1Future = _versionCompare(v1, target) > 0;
       var v2Future = _versionCompare(v2, target) > 0;
@@ -225,6 +230,7 @@ var selectorLoader = global.__selectorLoader || {
       return false;
     }
 
+    // 设备业务函数：处理 _aspectTag 对应的抖音自动化动作、状态或安全边界。
     function _aspectTag(resolution) {
       if (!resolution) return "unknown";
       var parts = resolution.split("x");
@@ -236,6 +242,7 @@ var selectorLoader = global.__selectorLoader || {
       return (w / a) + ":" + (h / a);
     }
 
+    // 设备业务函数：处理 _isBetter 对应的抖音自动化动作、状态或安全边界。
     function _isBetter(s, existing) {
       var p = _priority(s.platform_version);
       var ep = _priority(existing.platform_version);

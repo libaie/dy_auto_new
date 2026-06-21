@@ -23,6 +23,7 @@ async def create_template(
     db: Session = Depends(get_db),
     user = Depends(require_role("admin")),
 ):
+    """业务函数：处理 create_template 对应的业务流程、校验或数据转换。"""
     user_id, _ = user
     try:
         template = chain_use_cases.create_template(db, request, user_id)
@@ -39,6 +40,7 @@ def list_templates(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
+    """业务函数：处理 list_templates 对应的业务流程、校验或数据转换。"""
     return chain_use_cases.list_templates(db, skip, limit, user)
 
 
@@ -48,6 +50,7 @@ def get_template(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
+    """业务函数：处理 get_template 对应的业务流程、校验或数据转换。"""
     try:
         return chain_use_cases.get_template(db, template_id, user)
     except LookupError:
@@ -61,6 +64,7 @@ async def update_template(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
+    """业务函数：处理 update_template 对应的业务流程、校验或数据转换。"""
     try:
         template = chain_use_cases.update_template(db, template_id, request, user)
     except LookupError:
@@ -79,6 +83,7 @@ async def delete_template(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
+    """业务函数：处理 delete_template 对应的业务流程、校验或数据转换。"""
     try:
         result = chain_use_cases.delete_template(db, template_id, user)
     except LookupError:
@@ -95,6 +100,7 @@ async def create_instances(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
+    """业务函数：处理 create_instances 对应的业务流程、校验或数据转换。"""
     try:
         result = chain_use_cases.create_instances(db, request, user)
     except chain_use_cases.NoAccountsError as error:
@@ -115,6 +121,7 @@ def list_instances(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
+    """业务函数：处理 list_instances 对应的业务流程、校验或数据转换。"""
     return chain_use_cases.list_instances(db, template_id, account_id, status, skip, limit, user)
 
 
@@ -124,6 +131,7 @@ def get_instance(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
+    """业务函数：处理 get_instance 对应的业务流程、校验或数据转换。"""
     try:
         return chain_use_cases.get_instance(db, instance_id, user)
     except LookupError:
@@ -136,6 +144,7 @@ async def cancel_instance(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
+    """业务函数：处理 cancel_instance 对应的业务流程、校验或数据转换。"""
     try:
         result, notifications = chain_use_cases.cancel_instance(db, instance_id, user)
     except LookupError:
@@ -156,6 +165,7 @@ async def retry_instance(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
+    """业务函数：处理 retry_instance 对应的业务流程、校验或数据转换。"""
     try:
         result = chain_use_cases.retry_instance(db, instance_id, user)
     except LookupError:

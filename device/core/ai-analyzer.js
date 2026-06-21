@@ -58,6 +58,7 @@ var aiAnalyzer = {
 
   _destCache: {},
 
+  // 设备业务函数：处理 resolveDestination 对应的抖音自动化动作、状态或安全边界。
   resolveDestination: function (keyword) {
     if (promptsConfig.industry !== "travel") return null;
     if (!keyword) return null;

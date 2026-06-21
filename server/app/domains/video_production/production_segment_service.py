@@ -10,4 +10,5 @@ from app.domains.video_production.production_retry_service import retry_segment_
 
 
 def retry_segment(db: Session, segment_id: str) -> ProductionSegment:
+    """业务函数：处理 retry_segment 对应的业务流程、校验或数据转换。"""
     return retry_segment_with_impact(db, segment_id)

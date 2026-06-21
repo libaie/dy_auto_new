@@ -121,14 +121,17 @@ const expertNames = computed(() => Object.fromEntries(
   props.expertTeam.map(item => [item.expert_id, item.name]).filter(([id]) => id)
 ))
 
+// 前端业务函数：协调 stageLabel 对应的页面流程、接口调用或状态转换。
 function stageLabel(stage) {
   return phaseLabel(stage.stage, stage.label)
 }
 
+// 前端业务函数：协调 expertName 对应的页面流程、接口调用或状态转换。
 function expertName(id) {
   return knownExpertName(id, expertNames.value[id])
 }
 
+// 前端业务函数：协调 normalizeIds 对应的页面流程、接口调用或状态转换。
 function normalizeIds(value) {
   if (!value) return []
   if (Array.isArray(value)) return value.flatMap(normalizeIds)
@@ -136,18 +139,22 @@ function normalizeIds(value) {
   return [String(value)].filter(Boolean)
 }
 
+// 前端业务函数：协调 isCurrentId 对应的页面流程、接口调用或状态转换。
 function isCurrentId(id) {
   return Boolean(id && isCurrentExpert(id) && !isLegacyExpert(id))
 }
 
+// 前端业务函数：协调 currentIds 对应的页面流程、接口调用或状态转换。
 function currentIds(value) {
   return normalizeIds(value).filter(isCurrentId)
 }
 
+// 前端业务函数：协调 stageInvocations 对应的页面流程、接口调用或状态转换。
 function stageInvocations(stage) {
   return props.invocations.filter(item => item.stage === stage.stage && isCurrentId(item.expert_id))
 }
 
+// 前端业务函数：协调 invocationCount 对应的页面流程、接口调用或状态转换。
 function invocationCount(stage) {
   const count = stageInvocations(stage).length
   return count ? `${count} 条调用记录` : '未记录调用'

@@ -58,6 +58,7 @@ MOCK_RUNTIME_CONFIG = {"provider": "mock", "model": "mock", "api_key": "test", "
 
 @dataclass(frozen=True)
 class PromptPayload:
+    """业务类：承载 PromptPayload 相关的数据结构、状态或业务协作。"""
     system_prompt: str
     user_prompt: str
 
@@ -89,7 +90,9 @@ TEMPLATE_NAMES = {
 
 
 class DynamicPromptBuilder:
+    """业务类：承载 DynamicPromptBuilder 相关的数据结构、状态或业务协作。"""
     def __init__(self, template_dir: Path = TEMPLATE_DIR):
+        """初始化业务对象依赖，保存后续流程需要的运行上下文。"""
         self.template_dir = template_dir
 
     def build(
@@ -102,6 +105,7 @@ class DynamicPromptBuilder:
         beat_types: list[DramaticBeatType] | None = None,
         previous_outputs: dict[str, Any] | None = None,
     ) -> PromptPayload:
+        """业务函数：处理 build 对应的业务流程、校验或数据转换。"""
         template = self._read_template(stage)
         system_prompt, user_prompt = self._split_template(template)
         rendered_user = self._render(
@@ -115,9 +119,11 @@ class DynamicPromptBuilder:
         return PromptPayload(system_prompt=system_prompt.strip(), user_prompt=rendered_user.strip())
 
     def _read_template(self, stage: PipelineStage) -> str:
+        """业务函数：处理 _read_template 对应的业务流程、校验或数据转换。"""
         return (self.template_dir / TEMPLATE_NAMES[stage]).read_text(encoding="utf-8")
 
     def _split_template(self, template: str) -> tuple[str, str]:
+        """业务函数：处理 _split_template 对应的业务流程、校验或数据转换。"""
         system_marker = "## SYSTEM"
         user_marker = "## USER"
         if system_marker not in template or user_marker not in template:
@@ -126,12 +132,14 @@ class DynamicPromptBuilder:
         return system_part.replace(system_marker, "", 1), user_part
 
     def _render(self, template: str, **values: str) -> str:
+        """业务函数：处理 _render 对应的业务流程、校验或数据转换。"""
         rendered = template
         for key, value in values.items():
             rendered = rendered.replace("{{" + key + "}}", value)
         return rendered
 
     def _constraints(self, tags: list[str], beat_types: list[DramaticBeatType]) -> list[str]:
+        """业务函数：处理 _constraints 对应的业务流程、校验或数据转换。"""
         constraints: list[str] = []
         for beat_type in beat_types:
             constraints.extend(BEAT_CONSTRAINTS.get(beat_type, []))
@@ -141,6 +149,7 @@ class DynamicPromptBuilder:
 
 
 class ScriptGenerationError(RuntimeError):
+    """业务类：承载 ScriptGenerationError 相关的数据结构、状态或业务协作。"""
     def __init__(
         self,
         message: str,
@@ -151,6 +160,7 @@ class ScriptGenerationError(RuntimeError):
         error_code: str,
         human_intervention_required: bool = True,
     ):
+        """初始化业务对象依赖，保存后续流程需要的运行上下文。"""
         super().__init__(message)
         self.stage = stage
         self.pipeline_run_id = pipeline_run_id
@@ -160,6 +170,7 @@ class ScriptGenerationError(RuntimeError):
 
 
 def _load_json_object(raw: Any) -> dict[str, Any]:
+    """业务函数：处理 _load_json_object 对应的业务流程、校验或数据转换。"""
     if isinstance(raw, dict):
         return raw
     if not isinstance(raw, str):
@@ -176,6 +187,7 @@ async def default_script_model_client(
     user_prompt: str,
     runtime_config: dict[str, Any],
 ) -> Any:
+    """业务函数：处理 default_script_model_client 对应的业务流程、校验或数据转换。"""
     return await LangChainAgentRunner().run_json(
         system_prompt=system_prompt,
         user_prompt=user_prompt,
@@ -194,6 +206,7 @@ async def default_gate_runner(
     stage_context: dict[str, Any],
     runtime_config: dict[str, Any],
 ) -> dict[str, Any]:
+    """业务函数：处理 default_gate_runner 对应的业务流程、校验或数据转换。"""
     orchestrator = AgencyOrchestrator()
     if gate_name in {PipelineStage.DRAMATIC_BEATS.value, PipelineStage.SCENE_OUTLINES.value}:
         return await orchestrator.run_story_planning_review(
@@ -224,6 +237,7 @@ def _input_hash(
     target_duration_seconds: int,
     previous_outputs: dict[str, Any],
 ) -> str:
+    """业务函数：处理 _input_hash 对应的业务流程、校验或数据转换。"""
     payload = {
         "stage": stage.value,
         "source_prompt": source_prompt,
@@ -235,6 +249,7 @@ def _input_hash(
 
 
 def _script_state(run: PipelineRun) -> dict[str, Any]:
+    """业务函数：处理 _script_state 对应的业务流程、校验或数据转换。"""
     layers = dict(run.layers_json or {})
     state = dict(layers.get(SCRIPT_STATE_KEY) or {})
     state.setdefault("current_stage", PipelineStage.DRAMATIC_BEATS.value)
@@ -246,6 +261,7 @@ def _script_state(run: PipelineRun) -> dict[str, Any]:
 
 
 def _persist_run_state(db: Session, run: PipelineRun) -> None:
+    """业务函数：处理 _persist_run_state 对应的业务流程、校验或数据转换。"""
     flag_modified(run, "layers_json")
     db.add(run)
     db.commit()
@@ -253,6 +269,7 @@ def _persist_run_state(db: Session, run: PipelineRun) -> None:
 
 
 class ScriptGenerationPipeline:
+    """业务类：承载 ScriptGenerationPipeline 相关的数据结构、状态或业务协作。"""
     def __init__(
         self,
         *,
@@ -260,6 +277,7 @@ class ScriptGenerationPipeline:
         gate_runner=default_gate_runner,
         prompt_builder: DynamicPromptBuilder | None = None,
     ):
+        """初始化业务对象依赖，保存后续流程需要的运行上下文。"""
         self.model_client = model_client
         self.gate_runner = gate_runner
         self.prompt_builder = prompt_builder or DynamicPromptBuilder()
@@ -276,6 +294,7 @@ class ScriptGenerationPipeline:
         previous_outputs: dict[str, Any],
         runtime_config: dict[str, Any],
     ) -> DramaticBeatList | SceneOutlineList | VisualShotList:
+        """业务函数：处理 generate_stage 对应的业务流程、校验或数据转换。"""
         beat_types = self._beat_types(stage, previous_outputs)
         payload = self.prompt_builder.build(
             stage=stage,
@@ -298,6 +317,7 @@ class ScriptGenerationPipeline:
         stage: PipelineStage,
         data: dict[str, Any],
     ) -> DramaticBeatList | SceneOutlineList | VisualShotList:
+        """业务函数：处理 _validate_stage_output 对应的业务流程、校验或数据转换。"""
         if stage == PipelineStage.DRAMATIC_BEATS:
             return DramaticBeatList.model_validate(data)
         if stage == PipelineStage.SCENE_OUTLINES:
@@ -305,6 +325,7 @@ class ScriptGenerationPipeline:
         return VisualShotList.model_validate(data)
 
     def _beat_types(self, stage: PipelineStage, previous_outputs: dict[str, Any]) -> list[DramaticBeatType]:
+        """业务函数：处理 _beat_types 对应的业务流程、校验或数据转换。"""
         if stage == PipelineStage.DRAMATIC_BEATS:
             return [DramaticBeatType.HOOK, DramaticBeatType.CLIMAX]
         beats = (previous_outputs.get(PipelineStage.DRAMATIC_BEATS.value) or {}).get("beats") or []
@@ -318,10 +339,13 @@ class ScriptGenerationPipeline:
 
 
 class PipelineManager:
+    """业务类：承载 PipelineManager 相关的数据结构、状态或业务协作。"""
     def __init__(self, *, pipeline: ScriptGenerationPipeline | None = None):
+        """初始化业务对象依赖，保存后续流程需要的运行上下文。"""
         self.pipeline = pipeline or ScriptGenerationPipeline()
 
     def get_or_create_run(self, db: Session, *, series_id: str, episode_id: str) -> PipelineRun:
+        """业务函数：处理 get_or_create_run 对应的业务流程、校验或数据转换。"""
         run = (
             db.query(PipelineRun)
             .filter(
@@ -358,6 +382,7 @@ class PipelineManager:
         explicit_model_id: str | None = None,
         episode_asset_scope: dict[str, Any] | None = None,
     ) -> EpisodeScript:
+        """业务函数：处理 start_or_resume 对应的业务流程、校验或数据转换。"""
         run = self.get_or_create_run(db, series_id=series_id, episode_id=episode_id)
         runtime_config = self._runtime_config(db, "script_generation", explicit_model_id, self.pipeline.uses_default_model_client)
         gate_runtime_config = self._runtime_config(db, "llm_agency_expert_review", None, self.pipeline.uses_default_gate_runner)
@@ -424,6 +449,7 @@ class PipelineManager:
         explicit_model_id: str | None,
         needs_real_config: bool,
     ) -> dict[str, Any]:
+        """业务函数：处理 _runtime_config 对应的业务流程、校验或数据转换。"""
         if not needs_real_config:
             return dict(MOCK_RUNTIME_CONFIG)
         return resolve_runtime_model_config(db, scene_key, explicit_model_id)
@@ -439,6 +465,7 @@ class PipelineManager:
         previous_outputs: dict[str, Any],
         runtime_config: dict[str, Any],
     ) -> DramaticBeatList | SceneOutlineList | VisualShotList:
+        """业务函数：处理 _run_stage 对应的业务流程、校验或数据转换。"""
         state = _script_state(run)
         stages = state["stages"]
         input_hash = _input_hash(
@@ -522,6 +549,7 @@ class PipelineManager:
         stage_context: dict[str, Any],
         runtime_config: dict[str, Any],
     ) -> dict[str, Any]:
+        """业务函数：处理 _run_gate 对应的业务流程、校验或数据转换。"""
         state = _script_state(run)
         record = state["stages"].setdefault(stage.value, {})
         gate_trace = record.get("gate_trace") or {}
@@ -550,11 +578,13 @@ class PipelineManager:
         return trace
 
     def _invalidate_from_stage(self, state: dict[str, Any], stage: PipelineStage) -> None:
+        """业务函数：处理 _invalidate_from_stage 对应的业务流程、校验或数据转换。"""
         start = STAGE_ORDER.index(stage)
         for invalid_stage in STAGE_ORDER[start:]:
             state["stages"].pop(invalid_stage.value, None)
 
     def _agency_trace(self, run: PipelineRun) -> dict[str, Any]:
+        """业务函数：处理 _agency_trace 对应的业务流程、校验或数据转换。"""
         state = _script_state(run)
         traces = {}
         for stage_name, record in state.get("stages", {}).items():
@@ -563,6 +593,7 @@ class PipelineManager:
         return traces
 
     def _write_snapshots(self, db: Session, run: PipelineRun, script: EpisodeScript) -> None:
+        """业务函数：处理 _write_snapshots 对应的业务流程、校验或数据转换。"""
         db_script = (
             db.query(DbEpisodeScript)
             .filter(
@@ -644,6 +675,7 @@ class PipelineManager:
         episode: Episode,
         script: EpisodeScript,
     ) -> None:
+        """业务函数：处理 _write_ai_text_artifacts 对应的业务流程、校验或数据转换。"""
         service = AITextArtifactService(db)
         script_json = episode.script_json if isinstance(episode.script_json, dict) else {}
         storyboard_json = episode.storyboard_json if isinstance(episode.storyboard_json, dict) else {}
@@ -687,6 +719,7 @@ class PipelineManager:
             service.approve_artifact(artifact.id, actor_user_id="script_pipeline")
 
     def _script_snapshot(self, script: EpisodeScript, db_script_id: str) -> dict[str, Any]:
+        """业务函数：处理 _script_snapshot 对应的业务流程、校验或数据转换。"""
         return {
             "source": "dramatic_script_pipeline",
             "script_id": db_script_id,
@@ -701,6 +734,7 @@ class PipelineManager:
         }
 
     def _frame_asset_ids(self, script: EpisodeScript, shot: VisualShot) -> tuple[str, list[str]]:
+        """业务函数：处理 _frame_asset_ids 对应的业务流程、校验或数据转换。"""
         scope = script.episode_asset_scope if isinstance(script.episode_asset_scope, dict) else {}
         scene_ids = [str(value) for value in (scope.get("scene_ids") or []) if value]
         character_ids = [str(value) for value in (scope.get("character_ids") or []) if value]
@@ -725,6 +759,7 @@ class PipelineManager:
         return str(mapped_scene_id or scene_ids[0]), list(dict.fromkeys(character_ids))
 
     def _storyboard_snapshot(self, script: EpisodeScript) -> dict[str, Any]:
+        """业务函数：处理 _storyboard_snapshot 对应的业务流程、校验或数据转换。"""
         frames = []
         for shot in script.visual_shots.shots:
             scene_id, character_ids = self._frame_asset_ids(script, shot)
@@ -816,6 +851,7 @@ class PipelineManager:
         output: dict[str, Any],
         gate_trace: dict[str, Any] | None = None,
     ) -> None:
+        """业务函数：处理 mark_stage_completed_for_test 对应的业务流程、校验或数据转换。"""
         stage = PipelineStage(stage_name)
         state = _script_state(run)
         state["stages"][stage.value] = {

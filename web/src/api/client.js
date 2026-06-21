@@ -24,6 +24,7 @@ client.interceptors.request.use(
 let _authHandler = null
 let _toastHandler = null
 
+// 前端业务函数：协调 handleUnauthorizedResponse 对应的页面流程、接口调用或状态转换。
 export function handleUnauthorizedResponse() {
   if (_authHandler) {
     _authHandler()
@@ -62,6 +63,7 @@ client.interceptors.response.use(
  * Call this after router and pinia are initialized.
  * Sets up the 401 handler to properly log out via the store and redirect via the router.
  */
+// 前端业务函数：协调 setupAuthInterceptor 对应的页面流程、接口调用或状态转换。
 export function setupAuthInterceptor(authStore, router) {
   _authHandler = () => {
     authStore.logout()
@@ -73,6 +75,7 @@ export function setupAuthInterceptor(authStore, router) {
  * Call this after pinia is initialized.
  * Sets up the global toast handler for all non-401 errors.
  */
+// 前端业务函数：协调 setupToastInterceptor 对应的页面流程、接口调用或状态转换。
 export function setupToastInterceptor(toastStore) {
   _toastHandler = (message) => {
     toastStore.error(message)

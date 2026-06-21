@@ -12,6 +12,7 @@ export const useAuthStore = defineStore('auth', () => {
   const isLoggedIn = computed(() => !!token.value)
   const isAdmin = computed(() => role.value === 'admin')
 
+  // 前端业务函数：协调 login 对应的页面流程、接口调用或状态转换。
   async function login(user, password) {
     const response = await loginApi(user, password)
     const data = response.data
@@ -25,6 +26,7 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.setItem('role', data.role || 'operator')
   }
 
+  // 前端业务函数：协调 logout 对应的页面流程、接口调用或状态转换。
   function logout() {
     token.value = ''
     username.value = ''

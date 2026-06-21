@@ -51,10 +51,12 @@ MOCK_ASSET_URL_PREFIX = "mock://provider-free"
 
 
 def _clean_prompt(prompt: str) -> str:
+    """业务函数：处理 _clean_prompt 对应的业务流程、校验或数据转换。"""
     return " ".join((prompt or "").strip().split())
 
 
 def _title_from_prompt(prompt: str, title: str | None) -> str:
+    """业务函数：处理 _title_from_prompt 对应的业务流程、校验或数据转换。"""
     if title and title.strip():
         return title.strip()[:200]
     clean = _clean_prompt(prompt)
@@ -62,6 +64,7 @@ def _title_from_prompt(prompt: str, title: str | None) -> str:
 
 
 def _target_duration(value: int | None) -> int:
+    """业务函数：处理 _target_duration 对应的业务流程、校验或数据转换。"""
     duration = int(value or DEFAULT_TARGET_DURATION_SECONDS)
     if duration <= 0:
         raise ValueError("target_duration_seconds must be positive")
@@ -71,6 +74,7 @@ def _target_duration(value: int | None) -> int:
 
 
 def _segment_durations(total_seconds: int) -> list[int]:
+    """业务函数：处理 _segment_durations 对应的业务流程、校验或数据转换。"""
     count = max(1, ceil(total_seconds / MOCK_SEGMENT_SECONDS))
     base = total_seconds // count
     remainder = total_seconds % count
@@ -78,6 +82,7 @@ def _segment_durations(total_seconds: int) -> list[int]:
 
 
 def _storyboard_frames(prompt: str, durations: list[int]) -> list[dict[str, Any]]:
+    """业务函数：处理 _storyboard_frames 对应的业务流程、校验或数据转换。"""
     frames = []
     for index, duration in enumerate(durations, start=1):
         frames.append({
@@ -96,6 +101,7 @@ def _storyboard_frames(prompt: str, durations: list[int]) -> list[dict[str, Any]
 
 
 def _create_series_episode(db: Session, prompt: str, title: str, target_duration_seconds: int) -> tuple[Series, Episode, list[int]]:
+    """业务函数：处理 _create_series_episode 对应的业务流程、校验或数据转换。"""
     durations = _segment_durations(target_duration_seconds)
     frames = _storyboard_frames(prompt, durations)
     series = Series(
@@ -148,6 +154,7 @@ def _create_plan_tree(
     target_duration_seconds: int,
     budget_limit: float | None,
 ) -> tuple[ProductionPlan, ProductionEpisode, int]:
+    """业务函数：处理 _create_plan_tree 对应的业务流程、校验或数据转换。"""
     plan = ProductionPlan(
         series_id=series.id,
         status=PLAN_READY,
@@ -251,6 +258,7 @@ def create_mock_scale_run(
     target_duration_seconds: int | None = None,
     budget_limit: float | None = None,
 ) -> dict[str, Any]:
+    """业务函数：处理 create_mock_scale_run 对应的业务流程、校验或数据转换。"""
     clean_prompt = _clean_prompt(prompt)
     duration = _target_duration(target_duration_seconds)
     series, episode, durations = _create_series_episode(
@@ -321,6 +329,7 @@ def create_mock_scale_run(
 
 
 def _next_mock_asset_version(db: Session, run_id: str, segment_id: str) -> int:
+    """业务函数：处理 _next_mock_asset_version 对应的业务流程、校验或数据转换。"""
     latest = (
         db.query(VideoProductionAsset.version)
         .filter(
@@ -342,6 +351,7 @@ def _register_mock_segment_asset(
     job: ProductionJob,
     now,
 ) -> VideoProductionAsset:
+    """业务函数：处理 _register_mock_segment_asset 对应的业务流程、校验或数据转换。"""
     existing = (
         db.query(VideoProductionAsset)
         .filter(
@@ -392,6 +402,7 @@ def _register_mock_segment_asset(
 
 
 def advance_mock_scheduler(db: Session, run_id: str, limit: int = 25, lease_id: str = "mock-worker") -> dict[str, Any]:
+    """业务函数：处理 advance_mock_scheduler 对应的业务流程、校验或数据转换。"""
     run = db.query(VideoProductionRun).filter(VideoProductionRun.id == run_id).first()
     if not run:
         raise ValueError("Video production run not found")

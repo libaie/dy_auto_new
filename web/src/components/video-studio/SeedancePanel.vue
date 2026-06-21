@@ -29,6 +29,7 @@ function imageUrls() {
     .filter(Boolean)
 }
 
+// 前端业务函数：协调 handleGenerate 对应的页面流程、接口调用或状态转换。
 async function handleGenerate() {
   if (!prompt.value.trim()) return
 

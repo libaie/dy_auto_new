@@ -48,6 +48,7 @@ READY_RUN_STATUS_TO_PRODUCTION_STATUS = {
 
 
 def build_episode_status_matrix(db: Session, series_id: str) -> dict[str, dict]:
+    """业务函数：处理 build_episode_status_matrix 对应的业务流程、校验或数据转换。"""
     episodes = (
         db.query(Episode)
         .filter(Episode.series_id == series_id)
@@ -78,6 +79,7 @@ def build_episode_status_matrix(db: Session, series_id: str) -> dict[str, dict]:
 
 
 def _latest_runs_by_episode(db: Session, episode_ids: list[str]) -> dict[str, VideoProductionRun]:
+    """业务函数：处理 _latest_runs_by_episode 对应的业务流程、校验或数据转换。"""
     if not episode_ids:
         return {}
     runs = (
@@ -97,6 +99,7 @@ def _active_jobs_by_run(
     runs: list[VideoProductionRun],
     production_scope: dict[str, dict[str, set[str]]],
 ) -> dict[str, list[ProductionJob]]:
+    """业务函数：处理 _active_jobs_by_run 对应的业务流程、校验或数据转换。"""
     if not runs:
         return {}
     grouped = defaultdict(list)
@@ -137,6 +140,7 @@ def _audit_events_by_run(
     runs: list[VideoProductionRun],
     production_scope: dict[str, dict[str, set[str]]],
 ) -> dict[str, list[ProductionAuditEvent]]:
+    """业务函数：处理 _audit_events_by_run 对应的业务流程、校验或数据转换。"""
     if not runs:
         return {}
     run_ids = [run.id for run in runs]
@@ -181,6 +185,7 @@ def _audit_events_by_run(
 
 
 def _production_scope_by_run(db: Session, runs: list[VideoProductionRun]) -> dict[str, dict[str, set[str]]]:
+    """业务函数：处理 _production_scope_by_run 对应的业务流程、校验或数据转换。"""
     scope = {
         run.id: {
             "episode": {run.episode_id} if run.episode_id else set(),
@@ -244,6 +249,7 @@ def _target_to_run_id(
     runs: list[VideoProductionRun],
     production_scope: dict[str, dict[str, set[str]]],
 ) -> dict[tuple[str, str], str]:
+    """业务函数：处理 _target_to_run_id 对应的业务流程、校验或数据转换。"""
     target_to_run = {}
     for run in runs:
         for target_type, target_ids in production_scope.get(run.id, {}).items():
@@ -253,6 +259,7 @@ def _target_to_run_id(
 
 
 def _artifact_types_by_episode(db: Session, episode_ids: list[str]) -> dict[str, set[str]]:
+    """业务函数：处理 _artifact_types_by_episode 对应的业务流程、校验或数据转换。"""
     if not episode_ids:
         return {}
     rows = (
@@ -275,6 +282,7 @@ def _episode_status_payload(
     audit_events: list[ProductionAuditEvent],
     artifact_types: set[str],
 ) -> dict:
+    """业务函数：处理 _episode_status_payload 对应的业务流程、校验或数据转换。"""
     has_script = "episode_script" in artifact_types or bool(episode.script_json)
     has_storyboard = "storyboard" in artifact_types or bool(episode.storyboard_json)
     payload = {

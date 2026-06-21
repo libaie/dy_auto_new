@@ -67,6 +67,7 @@ const pageError = ref(null)
 const toast = useToastStore()
 
 // --- WebSocket ---
+// 前端业务函数：协调 wsUrl 对应的页面流程、接口调用或状态转换。
 function wsUrl() {
   const token = localStorage.getItem('token') || ''
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
@@ -112,12 +113,14 @@ async function fetchAccounts() {
   }
 }
 
+// 前端业务函数：协调 handlePageChange 对应的页面流程、接口调用或状态转换。
 function handlePageChange(p) {
   page.value = p
   fetchAccounts()
 }
 
 // --- Open create dialog ---
+// 前端业务函数：协调 openCreateDialog 对应的页面流程、接口调用或状态转换。
 function openCreateDialog() {
   isEditing.value = false
   editingId.value = null
@@ -129,6 +132,7 @@ function openCreateDialog() {
 }
 
 // --- Open edit dialog ---
+// 前端业务函数：协调 openEditDialog 对应的页面流程、接口调用或状态转换。
 function openEditDialog(account) {
   isEditing.value = true
   editingId.value = account.id
@@ -155,6 +159,7 @@ function openEditDialog(account) {
 }
 
 // --- Save (create or update) ---
+// 前端业务函数：协调 handleSave 对应的页面流程、接口调用或状态转换。
 async function handleSave() {
   if (!form.nickname.trim()) {
     formError.value = '昵称不能为空'
@@ -191,11 +196,13 @@ async function handleSave() {
 }
 
 // --- Delete ---
+// 前端业务函数：协调 openDeleteDialog 对应的页面流程、接口调用或状态转换。
 function openDeleteDialog(account) {
   deletingAccount.value = account
   showDeleteDialog.value = true
 }
 
+// 前端业务函数：协调 handleDelete 对应的页面流程、接口调用或状态转换。
 async function handleDelete() {
   if (!deletingAccount.value) return
   deleting.value = true

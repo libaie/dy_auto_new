@@ -23,10 +23,12 @@ router = APIRouter(prefix="/api/storyboard-images", tags=["storyboard-images"])
 
 
 def _auth_user_id(user) -> str | None:
+    """业务函数：处理 _auth_user_id 对应的业务流程、校验或数据转换。"""
     return user[0] if isinstance(user, tuple) else None
 
 
 class StoryboardImageTaskRequest(BaseModel):
+    """业务类：承载 StoryboardImageTaskRequest 相关的数据结构、状态或业务协作。"""
     series_id: str
     run_id: str | None = None
     force: bool = False
@@ -35,6 +37,7 @@ class StoryboardImageTaskRequest(BaseModel):
 
 
 class PromoteStoryboardImageRequest(BaseModel):
+    """业务类：承载 PromoteStoryboardImageRequest 相关的数据结构、状态或业务协作。"""
     run_id: str
     frame_id: str
     episode_id: str | None = None
@@ -49,6 +52,7 @@ async def create_frame_task(
     db: Session = Depends(get_db),
     user=Depends(require_role("admin")),
 ):
+    """业务函数：处理 create_frame_task 对应的业务流程、校验或数据转换。"""
     return await create_storyboard_frame_image_task(
         db,
         series_id=body.series_id,
@@ -69,6 +73,7 @@ async def create_missing_tasks(
     db: Session = Depends(get_db),
     user=Depends(require_role("admin")),
 ):
+    """业务函数：处理 create_missing_tasks 对应的业务流程、校验或数据转换。"""
     return await create_missing_storyboard_image_tasks(
         db,
         series_id=body.series_id,
@@ -89,6 +94,7 @@ def read_storyboard_images(
     db: Session = Depends(get_db),
     _=Depends(require_role("admin")),
 ):
+    """业务函数：处理 read_storyboard_images 对应的业务流程、校验或数据转换。"""
     return list_storyboard_image_state(db, series_id=series_id, episode_id=episode_id, run_id=run_id)
 
 
@@ -99,6 +105,7 @@ def promote_asset(
     db: Session = Depends(get_db),
     user=Depends(require_role("admin")),
 ):
+    """业务函数：处理 promote_asset 对应的业务流程、校验或数据转换。"""
     return promote_storyboard_image_asset(
         db,
         asset_id=asset_id,

@@ -14,6 +14,7 @@ ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg"}
 
 
 def _aspect_tag(resolution: str) -> str:
+    """业务函数：处理 _aspect_tag 对应的业务流程、校验或数据转换。"""
     """Compute aspect-ratio tag from 'WxH' string, e.g. '1080x2400' → '9:20'."""
     try:
         w, h = resolution.split("x")
@@ -30,6 +31,7 @@ def _aspect_tag(resolution: str) -> str:
 
 
 def _same_aspect_dirs(resolution: str) -> list[Path]:
+    """业务函数：处理 _same_aspect_dirs 对应的业务流程、校验或数据转换。"""
     """Return all resolution subdirectories with the same aspect ratio as `resolution`."""
     target_ar = _aspect_tag(resolution)
     if target_ar == "unknown":
@@ -46,6 +48,7 @@ def _same_aspect_dirs(resolution: str) -> list[Path]:
 
 
 def _ensure_resolution_dir(resolution: str) -> Path:
+    """业务函数：处理 _ensure_resolution_dir 对应的业务流程、校验或数据转换。"""
     """Ensure a resolution subdirectory exists."""
     d = TEMPLATE_DIR / resolution
     d.mkdir(exist_ok=True)
@@ -53,6 +56,7 @@ def _ensure_resolution_dir(resolution: str) -> Path:
 
 
 def _safe_resolve(path: Path, parent: Path) -> bool:
+    """业务函数：处理 _safe_resolve 对应的业务流程、校验或数据转换。"""
     """Check that resolved path is within parent directory."""
     try:
         return path.resolve().parent == parent.resolve()
@@ -61,13 +65,16 @@ def _safe_resolve(path: Path, parent: Path) -> bool:
 
 
 class TemplateService:
+    """业务类：承载 TemplateService 相关的数据结构、状态或业务协作。"""
     """Template image management with MD5 caching and resolution subdirectories."""
 
     def __init__(self):
         # cache key: "resolution/filename" → { md5, mtime, size }
+        """初始化业务对象依赖，保存后续流程需要的运行上下文。"""
         self._md5_cache: dict[str, dict] = {}
 
     def _iter_templates(self, resolution: str = None):
+        """业务函数：处理 _iter_templates 对应的业务流程、校验或数据转换。"""
         """Iterate template files. If resolution given, includes that subdirectory,
         same-aspect-ratio directories, plus 'default' as fallback.
         Otherwise iterates all resolution subdirectories."""
@@ -88,6 +95,7 @@ class TemplateService:
                         yield f, subdir.name
 
     def list_templates(self, resolution: str = None) -> list[dict]:
+        """业务函数：处理 list_templates 对应的业务流程、校验或数据转换。"""
         """List template images with metadata. Optionally filter by resolution."""
         templates = []
         for f, res in self._iter_templates(resolution):
@@ -112,6 +120,7 @@ class TemplateService:
         return templates
 
     def get_template_path(self, filename: str, resolution: str = "default") -> Optional[Path]:
+        """业务函数：处理 get_template_path 对应的业务流程、校验或数据转换。"""
         """Get template file path. Looks in resolution subdirectory first, then 'default' fallback."""
         # Try resolution-specific first
         if resolution:
@@ -125,6 +134,7 @@ class TemplateService:
         return None
 
     def delete_template(self, filename: str, resolution: str = "default") -> bool:
+        """业务函数：处理 delete_template 对应的业务流程、校验或数据转换。"""
         """Delete a template file."""
         filepath = TEMPLATE_DIR / resolution / filename
         if not filepath.exists():
@@ -136,6 +146,7 @@ class TemplateService:
         return True
 
     def save_template(self, filename: str, content: bytes, resolution: str = "default") -> Path:
+        """业务函数：处理 save_template 对应的业务流程、校验或数据转换。"""
         """Save template to resolution subdirectory."""
         _ensure_resolution_dir(resolution)
         dest = TEMPLATE_DIR / resolution / filename

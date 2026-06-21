@@ -38,6 +38,7 @@ def _policy_snapshot(
     policy_type: str,
     default_snapshot: dict[str, Any],
 ) -> tuple[dict[str, Any], str | None]:
+    """业务函数：处理 _policy_snapshot 对应的业务流程、校验或数据转换。"""
     if not policy_id:
         return dict(default_snapshot), None
     row = (
@@ -54,6 +55,7 @@ def _policy_snapshot(
 
 
 def _count_images(payload: dict[str, Any]) -> int:
+    """业务函数：处理 _count_images 对应的业务流程、校验或数据转换。"""
     try:
         return max(1, int(payload.get("count") or 1))
     except (TypeError, ValueError):
@@ -66,6 +68,7 @@ def estimate_image_cost(
     strategy: ImageProductionStrategy | None,
     model_config: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    """业务函数：处理 estimate_image_cost 对应的业务流程、校验或数据转换。"""
     policy, policy_id = _policy_snapshot(
         db,
         strategy.cost_policy_version_id if strategy else None,
@@ -102,6 +105,7 @@ def preview_image_capacity(
     strategy: ImageProductionStrategy | None,
     model_id: str | None,
 ) -> dict[str, Any]:
+    """业务函数：处理 preview_image_capacity 对应的业务流程、校验或数据转换。"""
     policy, policy_id = _policy_snapshot(
         db,
         strategy.capacity_policy_version_id if strategy else None,
@@ -171,6 +175,7 @@ def preview_review_gate(
     strategy: ImageProductionStrategy | None,
     destination_role: str | None,
 ) -> dict[str, Any]:
+    """业务函数：处理 preview_review_gate 对应的业务流程、校验或数据转换。"""
     policy, policy_id = _policy_snapshot(
         db,
         strategy.review_policy_version_id if strategy else None,

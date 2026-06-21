@@ -33,10 +33,13 @@ _NURTURE_TYPE_TO_COLUMN = {
 
 
 class StatsService:
+    """业务类：承载 StatsService 相关的数据结构、状态或业务协作。"""
     def _today(self) -> str:
+        """业务函数：处理 _today 对应的业务流程、校验或数据转换。"""
         return bj_now().strftime("%Y-%m-%d")
 
     def _get_or_create(self, db: Session, account_id: str, date: str) -> DailyStats:
+        """业务函数：处理 _get_or_create 对应的业务流程、校验或数据转换。"""
         """Get or create daily stats row for an account+date."""
         stats = db.query(DailyStats).filter(
             and_(DailyStats.account_id == account_id, DailyStats.date == date)
@@ -48,6 +51,7 @@ class StatsService:
         return stats
 
     def increment(self, db: Session, account_id: str, task_type: str, count: int = 1) -> None:
+        """业务函数：处理 increment 对应的业务流程、校验或数据转换。"""
         """Increment operation count for a task type. Only flushes — caller must commit."""
         column = _TASK_TYPE_TO_COLUMN.get(task_type)
         if not column:
@@ -59,6 +63,7 @@ class StatsService:
         db.flush()
 
     def get_today_counts(self, db: Session, account_id: str) -> dict[str, int]:
+        """业务函数：处理 get_today_counts 对应的业务流程、校验或数据转换。"""
         """Get today's operation counts for an account."""
         date = self._today()
         stats = self._get_or_create(db, account_id, date)
@@ -73,6 +78,7 @@ class StatsService:
         }
 
     def _get_limits(self, db: Session, account_id: str) -> dict[str, int]:
+        """业务函数：处理 _get_limits 对应的业务流程、校验或数据转换。"""
         """Get the daily limits for an account."""
         account = db.query(Account).filter(Account.id == account_id).first()
         if not account or not account.daily_limits:
@@ -80,11 +86,13 @@ class StatsService:
         return dict(account.daily_limits)
 
     def _limit_for_column(self, limits: dict, column_key: str, default: int = 999) -> int:
+        """业务函数：处理 _limit_for_column 对应的业务流程、校验或数据转换。"""
         if column_key == "nurture_likes":
             return limits.get("nurture_likes", limits.get("likes", default))
         return limits.get(column_key, default)
 
     def _nurture_quota_columns(self, params: Optional[dict]) -> set[str]:
+        """业务函数：处理 _nurture_quota_columns 对应的业务流程、校验或数据转换。"""
         if not isinstance(params, dict):
             return {"nurture_likes"}
         action_types: set[str] = set()
@@ -109,6 +117,7 @@ class StatsService:
         return columns or {"nurture_likes"}
 
     def check_quota(self, db: Session, account_id: str, task_type: str, params: Optional[dict] = None) -> bool:
+        """业务函数：处理 check_quota 对应的业务流程、校验或数据转换。"""
         """Check if account has remaining quota for this task type today.
 
         Returns True if quota is available, False if limit reached.
@@ -122,6 +131,7 @@ class StatsService:
         counts = self.get_today_counts(db, account_id)
 
         def _check_limit(column_key: str, default: int = 999) -> bool:
+            """业务函数：处理 _check_limit 对应的业务流程、校验或数据转换。"""
             limit = self._limit_for_column(limits, column_key, default)
             if limit == -1:
                 return True
@@ -146,6 +156,7 @@ class StatsService:
         return _check_limit(column, 999)
 
     def get_remaining_quotas(self, db: Session, account_id: str) -> dict[str, int]:
+        """业务函数：处理 get_remaining_quotas 对应的业务流程、校验或数据转换。"""
         """Get remaining quotas for all operation types."""
         account = db.query(Account).filter(Account.id == account_id).first()
         if not account:
@@ -165,6 +176,7 @@ class StatsService:
         return remaining
 
     def inject_task_quota_params(self, db: Session, account_id: str, task_type: str, params: dict) -> dict:
+        """业务函数：处理 inject_task_quota_params 对应的业务流程、校验或数据转换。"""
         params = dict(params or {})
         if task_type != "nurture":
             return params

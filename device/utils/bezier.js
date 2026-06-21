@@ -8,6 +8,7 @@ function factorial(n) {
   return result;
 }
 
+// 设备业务函数：处理 bernstein 对应的抖音自动化动作、状态或安全边界。
 function bernstein(t, i, n) {
   return (
     (factorial(n) / (factorial(i) * factorial(n - i))) *

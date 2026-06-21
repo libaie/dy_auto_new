@@ -19,6 +19,7 @@ const previewSlot = ref(null)
 const MANAGED_IMAGE_PREFIXES = ['/static/', '/api/image-creation/pixelle-files/']
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]', '::1'])
 
+// 前端业务函数：协调 clearEditing 对应的页面流程、接口调用或状态转换。
 function clearEditing() {
   Object.keys(editing).forEach((key) => {
     delete editing[key]
@@ -34,32 +35,39 @@ watch(
   { deep: true },
 )
 
+// 前端业务函数：协调 startEdit 对应的页面流程、接口调用或状态转换。
 function startEdit(slot) {
   editing[slot.key] = slot.url || ''
 }
 
+// 前端业务函数：协调 cancelEdit 对应的页面流程、接口调用或状态转换。
 function cancelEdit(slotKey) {
   delete editing[slotKey]
 }
 
+// 前端业务函数：协调 saveUrl 对应的页面流程、接口调用或状态转换。
 function saveUrl(slotKey) {
   emit('replace-url', slotKey, (editing[slotKey] || '').trim())
   delete editing[slotKey]
 }
 
+// 前端业务函数：协调 regenerateAll 对应的页面流程、接口调用或状态转换。
 function regenerateAll() {
   props.slots.forEach((slot) => emit('regenerate', slot.key))
 }
 
+// 前端业务函数：协调 copyUrl 对应的页面流程、接口调用或状态转换。
 async function copyUrl(url) {
   if (!url) return
   await navigator.clipboard?.writeText(url)
 }
 
+// 前端业务函数：协调 isManagedPath 对应的页面流程、接口调用或状态转换。
 function isManagedPath(path) {
   return MANAGED_IMAGE_PREFIXES.some((prefix) => String(path || '').startsWith(prefix))
 }
 
+// 前端业务函数：协调 normalizeImageUrl 对应的页面流程、接口调用或状态转换。
 function normalizeImageUrl(url) {
   const clean = String(url || '').trim()
   if (!clean) return ''
@@ -78,6 +86,7 @@ function normalizeImageUrl(url) {
   return ''
 }
 
+// 前端业务函数：协调 tosSignedUrlExpired 对应的页面流程、接口调用或状态转换。
 function tosSignedUrlExpired(url) {
   const clean = String(url || '').trim()
   if (!clean) return false
@@ -96,15 +105,18 @@ function tosSignedUrlExpired(url) {
   return Date.now() >= issuedAt + expires * 1000
 }
 
+// 前端业务函数：协调 slotImageSrc 对应的页面流程、接口调用或状态转换。
 function slotImageSrc(slot) {
   if (!slot?.url || tosSignedUrlExpired(slot.url)) return ''
   return normalizeImageUrl(slot.url)
 }
 
+// 前端业务函数：协调 slotProgress 对应的页面流程、接口调用或状态转换。
 function slotProgress(slot) {
   return slot?.progress || {}
 }
 
+// 前端业务函数：协调 slotStatusText 对应的页面流程、接口调用或状态转换。
 function slotStatusText(slot) {
   const progress = slotProgress(slot)
   if (progress.status === 'generating') return '风格锁定生成中'
@@ -124,12 +136,14 @@ function progressClass(slot) {
   return 'border-slate-700 bg-slate-800/60 text-slate-300'
 }
 
+// 前端业务函数：协调 openOriginal 对应的页面流程、接口调用或状态转换。
 function openOriginal(slot) {
   const src = slotImageSrc(slot)
   if (!src) return
   previewSlot.value = { ...slot, src }
 }
 
+// 前端业务函数：协调 closeOriginal 对应的页面流程、接口调用或状态转换。
 function closeOriginal() {
   previewSlot.value = null
 }

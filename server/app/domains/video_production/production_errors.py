@@ -8,6 +8,7 @@ from enum import Enum
 
 
 class ProductionErrorCode(str, Enum):
+    """业务类：承载 ProductionErrorCode 相关的数据结构、状态或业务协作。"""
     INVALID_RUN_TYPE = "INVALID_RUN_TYPE"
     RUN_NOT_FOUND = "RUN_NOT_FOUND"
     STYLE_LOCK_MISSING = "STYLE_LOCK_MISSING"
@@ -39,6 +40,7 @@ class ProductionErrorCode(str, Enum):
 
 @dataclass
 class ProductionRepairableError(ValueError):
+    """业务类：承载 ProductionRepairableError 相关的数据结构、状态或业务协作。"""
     code: ProductionErrorCode
     message: str
     repair_action: str
@@ -49,6 +51,7 @@ class ProductionRepairableError(ValueError):
 
 
 def to_http_detail(error: ProductionRepairableError) -> dict:
+    """业务函数：处理 to_http_detail 对应的业务流程、校验或数据转换。"""
     return {
         "code": error.code.value,
         "error_code": error.code.value,

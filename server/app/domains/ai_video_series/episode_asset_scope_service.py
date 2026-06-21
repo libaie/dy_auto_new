@@ -19,11 +19,13 @@ GENERATED_ASSET_SOURCE = "episode_story_planning"
 
 @dataclass
 class EpisodeAssetScopeError(ValueError):
+    """业务类：承载 EpisodeAssetScopeError 相关的数据结构、状态或业务协作。"""
     code: str
     message: str
     details: dict[str, Any] = field(default_factory=dict)
 
     def __str__(self) -> str:
+        """业务函数：处理 __str__ 对应的业务流程、校验或数据转换。"""
         return self.message
 
 
@@ -35,6 +37,7 @@ def normalize_episode_asset_scope(
     *,
     fallback_source: str = "episode_outline",
 ) -> dict[str, Any]:
+    """业务函数：处理 normalize_episode_asset_scope 对应的业务流程、校验或数据转换。"""
     normalized = dict(outline or {})
     generated_assets = normalized.get("generated_assets")
     if not isinstance(generated_assets, dict):
@@ -114,6 +117,7 @@ def normalize_episode_asset_scope(
 
 
 def _dedupe_strings(value: Any) -> list[str]:
+    """业务函数：处理 _dedupe_strings 对应的业务流程、校验或数据转换。"""
     if isinstance(value, str):
         values = [value]
     elif isinstance(value, list):
@@ -124,6 +128,7 @@ def _dedupe_strings(value: Any) -> list[str]:
 
 
 def _usage_by_id(asset_usage: Any, key: str) -> dict[str, str]:
+    """业务函数：处理 _usage_by_id 对应的业务流程、校验或数据转换。"""
     if not isinstance(asset_usage, dict):
         return {}
     values = asset_usage.get(key)
@@ -141,14 +146,17 @@ def _usage_by_id(asset_usage: Any, key: str) -> dict[str, str]:
 
 
 def _series_characters(series: Series) -> list[Character]:
+    """业务函数：处理 _series_characters 对应的业务流程、校验或数据转换。"""
     return list(series.characters or [])
 
 
 def _series_scenes(series: Series) -> list[Scene]:
+    """业务函数：处理 _series_scenes 对应的业务流程、校验或数据转换。"""
     return list(series.scenes or [])
 
 
 def _find_series_character_by_name(series: Series, name: str) -> Character | None:
+    """业务函数：处理 _find_series_character_by_name 对应的业务流程、校验或数据转换。"""
     normalized_name = name.strip().casefold()
     if not normalized_name:
         return None
@@ -159,6 +167,7 @@ def _find_series_character_by_name(series: Series, name: str) -> Character | Non
 
 
 def _find_series_scene_by_name(series: Series, name: str) -> Scene | None:
+    """业务函数：处理 _find_series_scene_by_name 对应的业务流程、校验或数据转换。"""
     normalized_name = name.strip().casefold()
     if not normalized_name:
         return None
@@ -176,6 +185,7 @@ def _create_generated_characters(
     usage_by_id: dict[str, str],
     source_by_id: dict[str, str],
 ) -> list[str]:
+    """业务函数：处理 _create_generated_characters 对应的业务流程、校验或数据转换。"""
     ids: list[str] = []
     for spec in specs:
         if not isinstance(spec, dict):
@@ -214,6 +224,7 @@ def _create_generated_scenes(
     usage_by_id: dict[str, str],
     source_by_id: dict[str, str],
 ) -> list[str]:
+    """业务函数：处理 _create_generated_scenes 对应的业务流程、校验或数据转换。"""
     ids: list[str] = []
     for spec in specs:
         if not isinstance(spec, dict):
@@ -243,6 +254,7 @@ def _create_generated_scenes(
 
 
 def _generated_meta(episode: Episode) -> dict[str, str]:
+    """业务函数：处理 _generated_meta 对应的业务流程、校验或数据转换。"""
     return {
         "source": GENERATED_ASSET_SOURCE,
         "generated_for_episode_id": episode.id,
@@ -250,6 +262,7 @@ def _generated_meta(episode: Episode) -> dict[str, str]:
 
 
 def _fallback_character(db: Session, series: Series, episode: Episode) -> Character:
+    """业务函数：处理 _fallback_character 对应的业务流程、校验或数据转换。"""
     existing = _series_characters(series)
     if existing:
         return sorted(
@@ -277,6 +290,7 @@ def _fallback_character(db: Session, series: Series, episode: Episode) -> Charac
 
 
 def _fallback_scene(db: Session, series: Series, episode: Episode) -> Scene:
+    """业务函数：处理 _fallback_scene 对应的业务流程、校验或数据转换。"""
     existing = _series_scenes(series)
     if existing:
         return sorted(
@@ -301,6 +315,7 @@ def _fallback_scene(db: Session, series: Series, episode: Episode) -> Scene:
 
 
 def _validate_characters(db: Session, series: Series, ids: list[str]) -> list[Character]:
+    """业务函数：处理 _validate_characters 对应的业务流程、校验或数据转换。"""
     linked_ids = {character.id for character in _series_characters(series)}
     found = {character.id: character for character in db.query(Character).filter(Character.id.in_(ids)).all()}
     invalid_ids = [asset_id for asset_id in ids if asset_id not in found or asset_id not in linked_ids]
@@ -314,6 +329,7 @@ def _validate_characters(db: Session, series: Series, ids: list[str]) -> list[Ch
 
 
 def _validate_scenes(db: Session, series: Series, ids: list[str]) -> list[Scene]:
+    """业务函数：处理 _validate_scenes 对应的业务流程、校验或数据转换。"""
     linked_ids = {scene.id for scene in _series_scenes(series)}
     found = {scene.id: scene for scene in db.query(Scene).filter(Scene.id.in_(ids)).all()}
     invalid_ids = [asset_id for asset_id in ids if asset_id not in found or asset_id not in linked_ids]
@@ -332,6 +348,7 @@ def _character_usage(
     usage: str | None,
     fallback_source: str,
 ) -> dict[str, str]:
+    """业务函数：处理 _character_usage 对应的业务流程、校验或数据转换。"""
     return {
         "id": character.id,
         "name": character.name,
@@ -346,6 +363,7 @@ def _scene_usage(
     usage: str | None,
     fallback_source: str,
 ) -> dict[str, str]:
+    """业务函数：处理 _scene_usage 对应的业务流程、校验或数据转换。"""
     return {
         "id": scene.id,
         "name": scene.name,
@@ -355,4 +373,5 @@ def _scene_usage(
 
 
 def _default_usage(name: str, fallback_source: str) -> str:
+    """业务函数：处理 _default_usage 对应的业务流程、校验或数据转换。"""
     return f"{name} 由 {fallback_source} 纳入本集资产作用域。"

@@ -23,16 +23,19 @@ SUCCESS_TASK_STATUSES = {"completed", "completed_with_warnings"}
 
 
 def _avg(values: list[float]) -> float:
+    """业务函数：处理 _avg 对应的业务流程、校验或数据转换。"""
     return round(sum(values) / len(values), 4) if values else 0.0
 
 
 def _latency_seconds(task: ImageCreationTask) -> float | None:
+    """业务函数：处理 _latency_seconds 对应的业务流程、校验或数据转换。"""
     if task.created_at and task.completed_at:
         return max(0.0, (task.completed_at - task.created_at).total_seconds())
     return None
 
 
 def _actual_costs(db: Session, task_ids: list[str]) -> tuple[list[float], str]:
+    """业务函数：处理 _actual_costs 对应的业务流程、校验或数据转换。"""
     if not task_ids:
         return [], "CNY"
 
@@ -57,10 +60,12 @@ def _actual_costs(db: Session, task_ids: list[str]) -> tuple[list[float], str]:
 
 
 def _is_human_review(review: ImageCreationReviewRecord) -> bool:
+    """业务函数：处理 _is_human_review 对应的业务流程、校验或数据转换。"""
     return review.review_type in {"human", "manual"} or review.reviewer_type == "human"
 
 
 def _is_approved_review(review: ImageCreationReviewRecord) -> bool:
+    """业务函数：处理 _is_approved_review 对应的业务流程、校验或数据转换。"""
     return review.action == "approve" or review.status == "approved"
 
 
@@ -70,6 +75,7 @@ def refresh_image_strategy_metrics(
     strategy_version: int,
     model_id: str | None,
 ) -> ImageProductionMetric:
+    """业务函数：处理 refresh_image_strategy_metrics 对应的业务流程、校验或数据转换。"""
     task_query = (
         db.query(ImageCreationTask)
         .filter(ImageCreationTask.strategy_id == strategy_id)
@@ -145,6 +151,7 @@ def refresh_image_strategy_metrics(
 
 
 def _weighted_average(metrics: list[ImageProductionMetric], field: str) -> float:
+    """业务函数：处理 _weighted_average 对应的业务流程、校验或数据转换。"""
     total_attempts = sum(max(metric.attempt_count or 0, 0) for metric in metrics)
     if total_attempts == 0:
         return 0
@@ -153,6 +160,7 @@ def _weighted_average(metrics: list[ImageProductionMetric], field: str) -> float
 
 
 def aggregate_strategy_metrics_payload(metrics: list[ImageProductionMetric]) -> dict[str, Any]:
+    """业务函数：处理 aggregate_strategy_metrics_payload 对应的业务流程、校验或数据转换。"""
     attempt_count = sum(metric.attempt_count or 0 for metric in metrics)
     success_count = sum(metric.success_count or 0 for metric in metrics)
     failure_count = sum(metric.failure_count or 0 for metric in metrics)
@@ -183,6 +191,7 @@ def refresh_all_image_strategy_metrics(
     strategy_id: str | None = None,
     strategy_version: int | None = None,
 ) -> dict[str, Any]:
+    """业务函数：处理 refresh_all_image_strategy_metrics 对应的业务流程、校验或数据转换。"""
     query = (
         db.query(
             ImageCreationTask.strategy_id,
@@ -226,6 +235,7 @@ def refresh_all_image_strategy_metrics(
 
 
 def strategy_metrics_payload(metric: ImageProductionMetric | None) -> dict[str, Any]:
+    """业务函数：处理 strategy_metrics_payload 对应的业务流程、校验或数据转换。"""
     if metric is None:
         return {
             "attempt_count": 0,

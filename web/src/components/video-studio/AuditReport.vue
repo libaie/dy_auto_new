@@ -24,5 +24,6 @@
 
 <script setup>
 const props = defineProps({ score: { type: Number, default: 0 }, pass_fail: { type: Boolean, default: false }, issues: { type: Array, default: () => [] }, auditor_model: { type: String, default: 'gemini-2.5-pro' } })
+// 前端业务函数：协调 scoreColor 对应的页面流程、接口调用或状态转换。
 function scoreColor(s) { if (s >= 85) return 'text-emerald-400'; if (s >= 70) return 'text-yellow-400'; return 'text-red-400' }
 </script>

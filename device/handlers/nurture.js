@@ -33,6 +33,7 @@ NurtureHandler.execute = function (params) {
   return this._legacyExecute(params);
 };
 
+// 设备业务函数：处理 NurtureHandler._executeV2 对应的抖音自动化动作、状态或安全边界。
 NurtureHandler._executeV2 = function (params) {
   var subTasks = params.sub_tasks;
   var completionMode = params.completion_mode || "all";
@@ -137,6 +138,7 @@ NurtureHandler._initNurtureRuntime = function (params) {
   };
 };
 
+// 设备业务函数：处理 NurtureHandler._quotaValue 对应的抖音自动化动作、状态或安全边界。
 NurtureHandler._quotaValue = function (value) {
   if (value === null || value === undefined || value === "") return null;
   var n = Number(value);
@@ -144,18 +146,21 @@ NurtureHandler._quotaValue = function (value) {
   return n;
 };
 
+// 设备业务函数：处理 NurtureHandler._hasNurtureQuota 对应的抖音自动化动作、状态或安全边界。
 NurtureHandler._hasNurtureQuota = function (type) {
   if (!this._nurtureQuota) return true;
   var remaining = this._nurtureQuota[type];
   return remaining === null || remaining > 0;
 };
 
+// 设备业务函数：处理 NurtureHandler._consumeNurtureQuota 对应的抖音自动化动作、状态或安全边界。
 NurtureHandler._consumeNurtureQuota = function (type) {
   if (!this._nurtureQuota) return;
   var remaining = this._nurtureQuota[type];
   if (remaining !== null && remaining > 0) this._nurtureQuota[type] = remaining - 1;
 };
 
+// 设备业务函数：处理 NurtureHandler._recordNurtureAction 对应的抖音自动化动作、状态或安全边界。
 NurtureHandler._recordNurtureAction = function (type, accountId) {
   var taskType = null;
   if (type === "like") taskType = "nurture";
@@ -187,6 +192,7 @@ NurtureHandler._executeSubTask = function (task) {
   }
 };
 
+// 设备业务函数：处理 NurtureHandler._browseFeed 对应的抖音自动化动作、状态或安全边界。
 NurtureHandler._browseFeed = function () {
   this._ensureOnFeed();
   // 浏览推荐页：快速扫一眼，大部分 2-5 秒，偶尔多停一会
@@ -524,6 +530,7 @@ NurtureHandler._commentOnVideo = function (templateId, templateContent) {
   return true;
 };
 
+// 设备业务函数：处理 NurtureHandler._followCurrentUser 对应的抖音自动化动作、状态或安全边界。
 NurtureHandler._followCurrentUser = function () {
   if (this._isAdContent()) {
     logger.info(TAG, "广告内容，跳过关注");
@@ -546,6 +553,7 @@ NurtureHandler._followCurrentUser = function () {
 };
 
 // --- Legacy support ---
+// 设备业务函数：处理 NurtureHandler._legacyExecute 对应的抖音自动化动作、状态或安全边界。
 NurtureHandler._legacyExecute = function (params) {
   var duration = params.duration || 30;
   var actions = params.actions || [

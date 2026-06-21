@@ -7,6 +7,7 @@ import { ref, watch } from 'vue'
  * @param {number} [options.pageSize=10]
  * @param {Object} [options.filters] — reactive filters object (e.g. { status, type, search })
  */
+// 前端业务函数：协调 usePagination 对应的页面流程、接口调用或状态转换。
 export function usePagination(fetchFn, { pageSize = 10, filters = {} } = {}) {
   const data = ref([])
   const total = ref(0)
@@ -14,6 +15,7 @@ export function usePagination(fetchFn, { pageSize = 10, filters = {} } = {}) {
   const loading = ref(false)
   const error = ref(null)
 
+  // 前端业务函数：协调 fetch 对应的页面流程、接口调用或状态转换。
   async function fetch(resetPage = false) {
     if (resetPage) page.value = 1
     loading.value = true
@@ -32,12 +34,14 @@ export function usePagination(fetchFn, { pageSize = 10, filters = {} } = {}) {
     }
   }
 
+  // 前端业务函数：协调 goToPage 对应的页面流程、接口调用或状态转换。
   function goToPage(p) {
     if (p < 1 || p > totalPages.value) return
     page.value = p
     fetch()
   }
 
+  // 前端业务函数：协调 reset 对应的页面流程、接口调用或状态转换。
   function reset() {
     page.value = 1
     data.value = []

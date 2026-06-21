@@ -10,6 +10,7 @@ from cryptography.fernet import Fernet
 
 
 def _get_key() -> bytes:
+    """业务函数：处理 _get_key 对应的业务流程、校验或数据转换。"""
     raw = os.getenv("ENCRYPTION_KEY", "dy-auto-default-key-change-me")
     if raw == "dy-auto-default-key-change-me":
         return base64.urlsafe_b64encode(hashlib.sha256(raw.encode()).digest())
@@ -21,6 +22,7 @@ _cipher: Fernet | None = None
 
 
 def _get_cipher() -> Fernet:
+    """业务函数：处理 _get_cipher 对应的业务流程、校验或数据转换。"""
     global _cipher
     if _cipher is None:
         _cipher = Fernet(_get_key())
@@ -35,12 +37,15 @@ SENSITIVE_KEYS = {
 
 
 def is_sensitive_key(key: str) -> bool:
+    """业务函数：处理 is_sensitive_key 对应的业务流程、校验或数据转换。"""
     return key in SENSITIVE_KEYS
 
 
 def encrypt(value: str) -> str:
+    """业务函数：处理 encrypt 对应的业务流程、校验或数据转换。"""
     return _get_cipher().encrypt(value.encode()).decode()
 
 
 def decrypt(value: str) -> str:
+    """业务函数：处理 decrypt 对应的业务流程、校验或数据转换。"""
     return _get_cipher().decrypt(value.encode()).decode()

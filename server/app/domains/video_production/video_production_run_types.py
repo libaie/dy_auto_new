@@ -16,6 +16,7 @@ MOCK_RUN_TYPES = {MOCK_SERIES_SCALE}
 
 
 def validate_run_type(run_type: str | None) -> str:
+    """业务函数：处理 validate_run_type 对应的业务流程、校验或数据转换。"""
     if not run_type:
         return LEGACY_EPISODE_RUN
     if run_type not in ALLOWED_RUN_TYPES:
@@ -24,16 +25,19 @@ def validate_run_type(run_type: str | None) -> str:
 
 
 def get_run_type(run) -> str:
+    """业务函数：处理 get_run_type 对应的业务流程、校验或数据转换。"""
     if not hasattr(run, "run_type"):
         raise ValueError("Video production run object is missing run_type")
     return validate_run_type(run.run_type)
 
 
 def set_run_type(run, run_type: str) -> None:
+    """业务函数：处理 set_run_type 对应的业务流程、校验或数据转换。"""
     run.run_type = validate_run_type(run_type)
 
 
 def assert_run_type(run, allowed: Iterable[str]) -> None:
+    """业务函数：处理 assert_run_type 对应的业务流程、校验或数据转换。"""
     current = get_run_type(run)
     allowed_types = list(allowed)
     if current not in allowed_types:
@@ -43,8 +47,10 @@ def assert_run_type(run, allowed: Iterable[str]) -> None:
 
 
 def is_real_provider_run(run) -> bool:
+    """业务函数：处理 is_real_provider_run 对应的业务流程、校验或数据转换。"""
     return get_run_type(run) in REAL_PROVIDER_RUN_TYPES
 
 
 def is_mock_scale_run(run) -> bool:
+    """业务函数：处理 is_mock_scale_run 对应的业务流程、校验或数据转换。"""
     return get_run_type(run) in MOCK_RUN_TYPES

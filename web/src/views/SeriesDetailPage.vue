@@ -484,18 +484,23 @@ const activeVideoRunStatuses = new Set([
   'composing',
   'composition',
 ])
+// 前端业务函数：协调 episodeHasActiveVideoRun 对应的页面流程、接口调用或状态转换。
 function episodeHasActiveVideoRun(ep) {
   return Boolean(ep.active_video_run_id) || activeVideoRunStatuses.has(ep.video_run_status)
 }
+// 前端业务函数：协调 episodeHasProducingVideoRun 对应的页面流程、接口调用或状态转换。
 function episodeHasProducingVideoRun(ep) {
   return activeVideoRunStatuses.has(ep.video_run_status) && !plannedVideoRunStatuses.has(ep.video_run_status)
 }
+// 前端业务函数：协调 episodeIsBusy 对应的页面流程、接口调用或状态转换。
 function episodeIsBusy(ep) {
   return busyEpisodeStatuses.has(ep.status) || episodeHasActiveVideoRun(ep)
 }
+// 前端业务函数：协调 episodeVideoRunRoute 对应的页面流程、接口调用或状态转换。
 function episodeVideoRunRoute(ep) {
   return ep?.video_run_route || (ep?.active_video_run_id ? `/video-production/${ep.active_video_run_id}` : '')
 }
+// 前端业务函数：协调 episodeStoryboardImageParams 对应的页面流程、接口调用或状态转换。
 function episodeStoryboardImageParams(ep) {
   const params = { series_id: series.value.id }
   if (ep?.active_video_run_id) params.run_id = ep.active_video_run_id
@@ -593,6 +598,7 @@ async function load() {
 function nextEpisode() {
   return runnableEpisode.value
 }
+// 前端业务函数：协调 beginEditSeries 对应的页面流程、接口调用或状态转换。
 function beginEditSeries() {
   Object.assign(seriesForm, {
     title: series.value?.title || '',
@@ -605,13 +611,16 @@ function beginEditSeries() {
   saveError.value = ''
   editingSeries.value = true
 }
+// 前端业务函数：协调 errorMessage 对应的页面流程、接口调用或状态转换。
 function errorMessage(e, fallback) {
   const detail = e.response?.data?.detail
   return detail?.message || detail || e.message || fallback
 }
+// 前端业务函数：协调 isManagedImagePath 对应的页面流程、接口调用或状态转换。
 function isManagedImagePath(path) {
   return MANAGED_IMAGE_PREFIXES.some((prefix) => String(path || '').startsWith(prefix))
 }
+// 前端业务函数：协调 tosSignedUrlExpired 对应的页面流程、接口调用或状态转换。
 function tosSignedUrlExpired(value) {
   const trimmed = String(value || '').trim()
   if (!trimmed) return false
@@ -629,6 +638,7 @@ function tosSignedUrlExpired(value) {
   const issuedAt = Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second))
   return Date.now() >= issuedAt + expires * 1000
 }
+// 前端业务函数：协调 safeReferenceUrl 对应的页面流程、接口调用或状态转换。
 function safeReferenceUrl(value) {
   if (typeof value !== 'string') return ''
   const trimmed = value.trim()
@@ -644,25 +654,31 @@ function safeReferenceUrl(value) {
     return ''
   }
 }
+// 前端业务函数：协调 linkedReferences 对应的页面流程、接口调用或状态转换。
 function linkedReferences(item, slotDefs) {
   return slotDefs
     .map((slot) => ({ ...slot, url: item?.[slot.key] || '', src: safeReferenceUrl(item?.[slot.key]) }))
     .filter((slot) => slot.src)
 }
+// 前端业务函数：协调 linkedCharacterReferences 对应的页面流程、接口调用或状态转换。
 function linkedCharacterReferences(character) {
   return linkedReferences(character, CHARACTER_REFERENCE_SLOT_DEFS)
 }
+// 前端业务函数：协调 linkedSceneReferences 对应的页面流程、接口调用或状态转换。
 function linkedSceneReferences(scene) {
   return linkedReferences(scene, SCENE_REFERENCE_SLOT_DEFS)
 }
+// 前端业务函数：协调 hasRawReference 对应的页面流程、接口调用或状态转换。
 function hasRawReference(item, slotDefs) {
   return slotDefs.some((slot) => Boolean(String(item?.[slot.key] || '').trim()))
 }
+// 前端业务函数：协调 validProgressSlot 对应的页面流程、接口调用或状态转换。
 function validProgressSlot(assetType, slot) {
   if (assetType === 'character') return CHARACTER_REFERENCE_SLOT_KEYS.has(slot)
   if (assetType === 'scene') return SCENE_REFERENCE_SLOT_KEYS.has(slot)
   return false
 }
+// 前端业务函数：协调 progressReferencePatch 对应的页面流程、接口调用或状态转换。
 function progressReferencePatch(item) {
   const patch = {
     status: item.status,
@@ -673,6 +689,7 @@ function progressReferencePatch(item) {
   if (item.updated_at) patch.updated_at = item.updated_at
   return patch
 }
+// 前端业务函数：协调 toggleEpisodeText 对应的页面流程、接口调用或状态转换。
 async function toggleEpisodeText(episodeId) {
   expandedEpisodeId.value = expandedEpisodeId.value === episodeId ? '' : episodeId
   if (expandedEpisodeId.value) {
@@ -680,6 +697,7 @@ async function toggleEpisodeText(episodeId) {
     if (ep) await loadStoryboardImages(ep)
   }
 }
+// 前端业务函数：协调 refreshEpisodeTextArtifacts 对应的页面流程、接口调用或状态转换。
 async function refreshEpisodeTextArtifacts() {
   try {
     const { data } = await listAITextArtifacts({ series_id: route.params.id }, { silent: true })
@@ -693,36 +711,45 @@ async function refreshEpisodeTextArtifacts() {
 function isNonEmptyObject(value) {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length)
 }
+// 前端业务函数：协调 isNonEmptyArray 对应的页面流程、接口调用或状态转换。
 function isNonEmptyArray(value) {
   return Array.isArray(value) && value.length > 0
 }
+// 前端业务函数：协调 artifactTimestamp 对应的页面流程、接口调用或状态转换。
 function artifactTimestamp(artifact) {
   return Date.parse(artifact?.approved_at || artifact?.created_at || '') || 0
 }
+// 前端业务函数：协调 latestEpisodeArtifact 对应的页面流程、接口调用或状态转换。
 function latestEpisodeArtifact(ep, artifactType) {
   return [...aiTextArtifacts.value]
     .filter(item => item?.episode_id === ep.id && item.artifact_type === artifactType && item.status === 'approved')
     .sort((a, b) => artifactTimestamp(b) - artifactTimestamp(a) || Number(b.version || 0) - Number(a.version || 0))[0] || null
 }
+// 前端业务函数：协调 latestSeriesArtifact 对应的页面流程、接口调用或状态转换。
 function latestSeriesArtifact(artifactType) {
   return [...aiTextArtifacts.value]
     .filter(item => item?.target_type === 'series' && item.artifact_type === artifactType && item.status === 'approved')
     .sort((a, b) => artifactTimestamp(b) - artifactTimestamp(a) || Number(b.version || 0) - Number(a.version || 0))[0] || null
 }
+// 前端业务函数：协调 artifactContent 对应的页面流程、接口调用或状态转换。
 function artifactContent(artifact) {
   if (!artifact) return null
   if (isNonEmptyObject(artifact.content_json) || isNonEmptyArray(artifact.content_json)) return artifact.content_json
   return artifact.content_text || null
 }
+// 前端业务函数：协调 scriptSource 对应的页面流程、接口调用或状态转换。
 function scriptSource(ep) {
   return artifactContent(latestEpisodeArtifact(ep, 'episode_script')) || (isNonEmptyObject(ep?.script_json) ? ep.script_json : null)
 }
+// 前端业务函数：协调 storyboardSource 对应的页面流程、接口调用或状态转换。
 function storyboardSource(ep) {
   return artifactContent(latestEpisodeArtifact(ep, 'storyboard')) || (isNonEmptyObject(ep?.storyboard_json) ? ep.storyboard_json : null)
 }
+// 前端业务函数：协调 outlineSource 对应的页面流程、接口调用或状态转换。
 function outlineSource(ep) {
   return artifactContent(latestEpisodeArtifact(ep, 'episode_outline'))
 }
+// 前端业务函数：协调 formatContent 对应的页面流程、接口调用或状态转换。
 function formatContent(value) {
   if (!value) return ''
   if (typeof value === 'string') return value
@@ -730,28 +757,35 @@ function formatContent(value) {
   if (typeof value !== 'object') return String(value)
   return JSON.stringify(value, null, 2)
 }
+// 前端业务函数：协调 episodeScriptText 对应的页面流程、接口调用或状态转换。
 function episodeScriptText(ep) {
   return formatContent(scriptSource(ep))
 }
+// 前端业务函数：协调 episodeOutlineText 对应的页面流程、接口调用或状态转换。
 function episodeOutlineText(ep) {
   return formatContent(outlineSource(ep))
 }
+// 前端业务函数：协调 episodeAssetScope 对应的页面流程、接口调用或状态转换。
 function episodeAssetScope(ep) {
   return ep?.asset_scope && typeof ep.asset_scope === 'object' ? ep.asset_scope : {}
 }
+// 前端业务函数：协调 episodeAssetCharacters 对应的页面流程、接口调用或状态转换。
 function episodeAssetCharacters(ep) {
   const scope = episodeAssetScope(ep)
   if (Array.isArray(scope.characters) && scope.characters.length) return scope.characters
   return Array.isArray(scope.character_ids) ? scope.character_ids.map(id => ({ id, name: id, source: 'existing' })) : []
 }
+// 前端业务函数：协调 episodeAssetScenes 对应的页面流程、接口调用或状态转换。
 function episodeAssetScenes(ep) {
   const scope = episodeAssetScope(ep)
   if (Array.isArray(scope.scenes) && scope.scenes.length) return scope.scenes
   return Array.isArray(scope.scene_ids) ? scope.scene_ids.map(id => ({ id, name: id, source: 'existing' })) : []
 }
+// 前端业务函数：协调 episodeAssetMissing 对应的页面流程、接口调用或状态转换。
 function episodeAssetMissing(ep) {
   return !episodeAssetCharacters(ep).length || !episodeAssetScenes(ep).length
 }
+// 前端业务函数：协调 episodeGeneratedAssets 对应的页面流程、接口调用或状态转换。
 function episodeGeneratedAssets(ep) {
   const generated = []
   for (const item of [...episodeAssetCharacters(ep), ...episodeAssetScenes(ep)]) {
@@ -759,22 +793,27 @@ function episodeGeneratedAssets(ep) {
   }
   return [...new Set(generated)]
 }
+// 前端业务函数：协调 storyboardFrames 对应的页面流程、接口调用或状态转换。
 function storyboardFrames(ep) {
   const storyboard = storyboardSource(ep)
   return Array.isArray(storyboard?.frames) ? storyboard.frames : []
 }
+// 前端业务函数：协调 storyboardFrameIdentity 对应的页面流程、接口调用或状态转换。
 function storyboardFrameIdentity(frame, index) {
   return frame?.frame_id || frame?.shot_id || frame?.id || `frame-${String(index + 1).padStart(3, '0')}`
 }
+// 前端业务函数：协调 storyboardImageForFrame 对应的页面流程、接口调用或状态转换。
 function storyboardImageForFrame(ep, frame, index) {
   const state = storyboardImageState.value[ep.id] || {}
   const frameId = storyboardFrameIdentity(frame, index)
   return state.frames_by_id?.[frameId] || null
 }
+// 前端业务函数：协调 storyboardImageUrl 对应的页面流程、接口调用或状态转换。
 function storyboardImageUrl(ep, frame, index) {
   const item = storyboardImageForFrame(ep, frame, index)
   return safeReferenceUrl(item?.asset?.thumbnail_url) || safeReferenceUrl(item?.asset?.url)
 }
+// 前端业务函数：协调 storyboardImageStatusLabel 对应的页面流程、接口调用或状态转换。
 function storyboardImageStatusLabel(status) {
   return {
     approved: '已通过',
@@ -790,6 +829,7 @@ function storyboardImageStatusClass(status) {
   if (status === 'blocked') return 'text-rose-300'
   return 'text-slate-500'
 }
+// 前端业务函数：协调 loadStoryboardImages 对应的页面流程、接口调用或状态转换。
 async function loadStoryboardImages(ep) {
   if (!ep?.id || !series.value?.id) return
   try {
@@ -848,15 +888,19 @@ async function generateScriptForEpisode(ep) {
 function storyboardFrameCount(ep) {
   return storyboardFrames(ep).length
 }
+// 前端业务函数：协调 episodeStoryboardText 对应的页面流程、接口调用或状态转换。
 function episodeStoryboardText(ep) {
   return formatContent(storyboardSource(ep))
 }
+// 前端业务函数：协调 hasEpisodeScript 对应的页面流程、接口调用或状态转换。
 function hasEpisodeScript(ep) {
   return Boolean(episodeScriptText(ep))
 }
+// 前端业务函数：协调 episodeTextReady 对应的页面流程、接口调用或状态转换。
 function episodeTextReady(ep) {
   return hasEpisodeScript(ep) && storyboardFrameCount(ep) > 0
 }
+// 前端业务函数：协调 applyStyleLockReferenceProgress 对应的页面流程、接口调用或状态转换。
 function applyStyleLockReferenceProgress(lock) {
   if (!series.value || !Array.isArray(lock?.reference_progress)) return
   const characters = Array.isArray(series.value.characters) ? [...series.value.characters] : []
@@ -900,6 +944,7 @@ function applyStyleLockReferenceProgress(lock) {
     }
   }
 }
+// 前端业务函数：协调 saveSeries 对应的页面流程、接口调用或状态转换。
 async function saveSeries() {
   savingSeries.value = true; saveError.value = ''
   try {
@@ -997,6 +1042,7 @@ async function refreshStyleLock() {
   }
   scheduleStyleLockPoll()
 }
+// 前端业务函数：协调 scheduleStyleLockPoll 对应的页面流程、接口调用或状态转换。
 function scheduleStyleLockPoll() {
   if (styleLockPollTimer.value) {
     clearTimeout(styleLockPollTimer.value)
@@ -1006,6 +1052,7 @@ function scheduleStyleLockPoll() {
     styleLockPollTimer.value = setTimeout(refreshStyleLock, 5000)
   }
 }
+// 前端业务函数：协调 refreshStoryPlan 对应的页面流程、接口调用或状态转换。
 async function refreshStoryPlan() {
   try {
     await load()
@@ -1016,6 +1063,7 @@ async function refreshStoryPlan() {
     scheduleStoryPlanPoll()
   }
 }
+// 前端业务函数：协调 scheduleStoryPlanPoll 对应的页面流程、接口调用或状态转换。
 function scheduleStoryPlanPoll() {
   if (storyPlanPollTimer.value) {
     clearTimeout(storyPlanPollTimer.value)
@@ -1029,6 +1077,7 @@ onBeforeUnmount(() => {
   if (styleLockPollTimer.value) clearTimeout(styleLockPollTimer.value)
   if (storyPlanPollTimer.value) clearTimeout(storyPlanPollTimer.value)
 })
+// 前端业务函数：协调 startPipelineRun 对应的页面流程、接口调用或状态转换。
 async function startPipelineRun() {
   if (!runnableEpisode.value && activeProductionRoute.value) {
     router.push(activeProductionRoute.value)
@@ -1095,6 +1144,7 @@ async function maybeAutostartProduction() {
     autostartRunning.value = false
   }
 }
+// 前端业务函数：协调 autoGenerate 对应的页面流程、接口调用或状态转换。
 async function autoGenerate() {
   autoGenerating.value = true; autoGenResult.value = null; error.value = ''
   try {

@@ -367,10 +367,12 @@ const providerOptions = computed(() => {
   return uniqueProviders.length ? uniqueProviders : (PROVIDERS[form.model_type] || [])
 })
 
+// 前端业务函数：协调 providerLabel 对应的页面流程、接口调用或状态转换。
 function providerLabel(providerKey) {
   return schema.value.providers?.[providerKey]?.label || providerKey
 }
 
+// 前端业务函数：协调 sceneDefaultConfig 对应的页面流程、接口调用或状态转换。
 function sceneDefaultConfig(scene) {
   const defaults = { ...(DEFAULT_CONFIG[scene?.model_type] || {}) }
   for (const field of scene?.fields || []) {
@@ -381,14 +383,17 @@ function sceneDefaultConfig(scene) {
   return defaults
 }
 
+// 前端业务函数：协调 modelTypeDefaultConfig 对应的页面流程、接口调用或状态转换。
 function modelTypeDefaultConfig(modelType) {
   return { ...(DEFAULT_CONFIG[modelType] || {}) }
 }
 
+// 前端业务函数：协调 defaultSceneForModelType 对应的页面流程、接口调用或状态转换。
 function defaultSceneForModelType(modelType) {
   return sceneOptions.value.find(scene => scene.model_type === modelType) || null
 }
 
+// 前端业务函数：协调 applyScene 对应的页面流程、接口调用或状态转换。
 function applyScene(sceneKey) {
   const scene = sceneOptions.value.find(item => item.key === sceneKey)
   if (!scene) {
@@ -483,10 +488,12 @@ watch(() => form.model_type, (mt) => {
   }
 })
 
+// 前端业务函数：协调 onSceneChange 对应的页面流程、接口调用或状态转换。
 function onSceneChange() {
   applyScene(form.scene_key)
 }
 
+// 前端业务函数：协调 startCreate 对应的页面流程、接口调用或状态转换。
 function startCreate() {
   const id = '__new__' + Date.now()
   const scene = defaultSceneForModelType('llm')
@@ -502,10 +509,12 @@ function startCreate() {
   selectedId.value = id
 }
 
+// 前端业务函数：协调 selectModel 对应的页面流程、接口调用或状态转换。
 function selectModel(id) {
   selectedId.value = id
 }
 
+// 前端业务函数：协调 toggleEnabled 对应的页面流程、接口调用或状态转换。
 async function toggleEnabled() {
   if (isNew.value) return
   const newEnabled = !form.enabled
@@ -572,6 +581,7 @@ async function save() {
   }
 }
 
+// 前端业务函数：协调 testConnection 对应的页面流程、接口调用或状态转换。
 async function testConnection() {
   if (isNew.value) return
   testing.value = true
@@ -586,10 +596,12 @@ async function testConnection() {
   }
 }
 
+// 前端业务函数：协调 confirmDelete 对应的页面流程、接口调用或状态转换。
 function confirmDelete() {
   showDeleteConfirm.value = true
 }
 
+// 前端业务函数：协调 doDelete 对应的页面流程、接口调用或状态转换。
 async function doDelete() {
   saving.value = true
   try {

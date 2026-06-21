@@ -136,10 +136,12 @@ function stageName(stage) {
   return phaseLabel(stage, stageNames.value[stage])
 }
 
+// 前端业务函数：协调 expertName 对应的页面流程、接口调用或状态转换。
 function expertName(id, fallback = '') {
   return knownExpertName(id, expertNames.value[id] || fallback)
 }
 
+// 前端业务函数：协调 decisionText 对应的页面流程、接口调用或状态转换。
 function decisionText(value) {
   const key = String(value || '').toLowerCase()
   if (DECISION_TEXT[key]) return DECISION_TEXT[key]
@@ -150,6 +152,7 @@ function cleanText(value, field, fallback) {
   return decisionLogText(value, field, fallback)
 }
 
+// 前端业务函数：协调 listText 对应的页面流程、接口调用或状态转换。
 function listText(value, fallback = '', field = 'generic') {
   if (!value) return ''
   const values = Array.isArray(value) ? value : [value]
@@ -165,10 +168,12 @@ function listText(value, fallback = '', field = 'generic') {
   return labels.length ? labels.join('；') : fallback
 }
 
+// 前端业务函数：协调 repairTasks 对应的页面流程、接口调用或状态转换。
 function repairTasks(item) {
   return item?.repair_tasks || item?.output_summary_json?.repair_tasks || []
 }
 
+// 前端业务函数：协调 isHistorical 对应的页面流程、接口调用或状态转换。
 function isHistorical(item) {
   return Boolean(item?.legacy || item?.display_scope === 'historical_audit' || isLegacyExpert(item?.expert_id))
 }

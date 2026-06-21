@@ -66,6 +66,7 @@ MIN_SECRET_VALUE_LENGTH = 4
 
 @dataclass(frozen=True)
 class AgencyRuntimeResult:
+    """业务类：承载 AgencyRuntimeResult 相关的数据结构、状态或业务协作。"""
     result_status: str
     output_summary: dict[str, Any]
     evidence: list[Any]
@@ -79,10 +80,12 @@ ModelClient = Callable[[str, MessageContent, dict[str, Any]], Awaitable[ModelCli
 
 
 def _normalize_key(key: str) -> str:
+    """业务函数：处理 _normalize_key 对应的业务流程、校验或数据转换。"""
     return re.sub(r"[^a-z0-9]", "", key.lower())
 
 
 def _collect_secret_values(value: Any) -> set[str]:
+    """业务函数：处理 _collect_secret_values 对应的业务流程、校验或数据转换。"""
     secrets: set[str] = set()
 
     if isinstance(value, dict):
@@ -101,6 +104,7 @@ def _collect_secret_values(value: Any) -> set[str]:
 
 
 def _redact_secrets(value: Any, secret_values: set[str] | None = None) -> Any:
+    """业务函数：处理 _redact_secrets 对应的业务流程、校验或数据转换。"""
     secret_values = secret_values or set()
     if isinstance(value, dict):
         redacted = {}
@@ -129,6 +133,7 @@ async def _default_model_client(
     config: dict[str, Any],
     agent_runner: Any | None = None,
 ) -> ModelClientResponse:
+    """业务函数：处理 _default_model_client 对应的业务流程、校验或数据转换。"""
     parsed = await (agent_runner or LangChainAgentRunner()).run_json(
         system_prompt=system_prompt,
         user_prompt=user_prompt,
@@ -142,6 +147,7 @@ async def _default_model_client(
 
 
 def _split_model_response(response: ModelClientResponse) -> tuple[str, dict[str, Any]]:
+    """业务函数：处理 _split_model_response 对应的业务流程、校验或数据转换。"""
     if isinstance(response, str):
         return response, {}
     if isinstance(response, dict):
@@ -156,6 +162,7 @@ def _split_model_response(response: ModelClientResponse) -> tuple[str, dict[str,
 
 
 def _load_expert_json(raw: str) -> Any:
+    """业务函数：处理 _load_expert_json 对应的业务流程、校验或数据转换。"""
     try:
         return json.loads(raw)
     except json.JSONDecodeError:
@@ -173,6 +180,7 @@ def _load_expert_json(raw: str) -> Any:
 
 
 def _parse_expert_output(raw: str) -> dict[str, Any]:
+    """业务函数：处理 _parse_expert_output 对应的业务流程、校验或数据转换。"""
     parsed = _load_expert_json(raw)
     if not isinstance(parsed, dict):
         raise AgencyRuntimeError(
@@ -195,11 +203,13 @@ def _parse_expert_output(raw: str) -> dict[str, Any]:
 
 
 class AgencySkillRuntime:
+    """业务类：承载 AgencySkillRuntime 相关的数据结构、状态或业务协作。"""
     def __init__(
         self,
         model_client: ModelClient | None = None,
         agent_runner: Any | None = None,
     ):
+        """初始化业务对象依赖，保存后续流程需要的运行上下文。"""
         if model_client is not None:
             self.model_client = model_client
         else:
@@ -210,6 +220,7 @@ class AgencySkillRuntime:
                 user_prompt: MessageContent,
                 config: dict[str, Any],
             ) -> ModelClientResponse:
+                """业务函数：处理 default_client 对应的业务流程、校验或数据转换。"""
                 return await _default_model_client(
                     system_prompt,
                     user_prompt,
@@ -229,6 +240,7 @@ class AgencySkillRuntime:
         stage_context: dict[str, Any],
         runtime_config: dict[str, Any],
     ) -> AgencyRuntimeResult:
+        """业务函数：处理 invoke 对应的业务流程、校验或数据转换。"""
         _ = db
         get_expert(expert_id)
         expert_markdown = read_expert_markdown(expert_id)

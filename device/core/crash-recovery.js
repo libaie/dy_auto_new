@@ -14,6 +14,7 @@ var crashRecovery = {
     this._currentAccountId = accountId;
   },
 
+  // 设备业务函数：处理 ensureAppRunning 对应的抖音自动化动作、状态或安全边界。
   ensureAppRunning: function () {
     if (currentPackage() === "com.ss.android.ugc.aweme") {
       this._consecutiveFailures = 0;
@@ -54,6 +55,7 @@ var crashRecovery = {
     return false;
   },
 
+  // 设备业务函数：处理 handleDialogs 对应的抖音自动化动作、状态或安全边界。
   handleDialogs: function () {
     var dialogButtons = [
       "知道了", "确定", "关闭", "重试",
@@ -110,6 +112,7 @@ var crashRecovery = {
     return false;
   },
 
+  // 设备业务函数：处理 checkANR 对应的抖音自动化动作、状态或安全边界。
   checkANR: function () {
     try {
       var anrBtn = text("等待").findOne(2000);
@@ -123,6 +126,7 @@ var crashRecovery = {
     return false;
   },
 
+  // 设备业务函数：处理 healthCheck 对应的抖音自动化动作、状态或安全边界。
   healthCheck: function () {
     if (this.checkANR()) {
       logger.warn(TAG, "ANR handled, waiting for recovery...");

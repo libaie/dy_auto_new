@@ -30,6 +30,7 @@ function formatDuration(seconds) {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
+// 前端业务函数：协调 formatFileSize 对应的页面流程、接口调用或状态转换。
 function formatFileSize(bytes) {
   if (!bytes) return '-'
   if (bytes < 1024) return `${bytes} B`

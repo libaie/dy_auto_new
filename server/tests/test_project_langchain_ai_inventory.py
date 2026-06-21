@@ -64,3 +64,15 @@ def test_gemini_audit_http_is_behind_langchain_tool():
     assert "gemini_audit_request.invoke" in text
     gemini_body = text.split("def _audit_gemini", 1)[1]
     assert "httpx.post(" not in gemini_body
+
+def test_seedance_submit_and_query_routes_use_langchain_tools():
+    text = (DOMAINS / "seedance_integration/seedance_router.py").read_text(encoding="utf-8")
+
+    assert "@tool\nasync def submit_seedance_generation" in text
+    assert "@tool\nasync def query_seedance_task" in text
+    generate_body = text.split('async def seedance_generate', 1)[1].split('async def seedance_get_task', 1)[0]
+    query_body = text.split('async def seedance_get_task', 1)[1].split('proxy_router =', 1)[0]
+    assert "submit_seedance_generation.ainvoke" in generate_body
+    assert "query_seedance_task.ainvoke" in query_body
+    assert "client.post(" not in generate_body
+    assert "client.get(" not in query_body

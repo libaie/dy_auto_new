@@ -63,6 +63,18 @@ def test_seedance_generate_route_is_registered_and_uses_configured_key(db, monke
     assert {"type": "image_url", "image_url": {"url": "https://cdn.test/ref.png"}} in captured["post_json"]["content"]
 
 
+def test_seedance_task_route_uses_tool_query(db, monkeypatch):
+    captured = {}
+    db.add(SystemSetting(key="seedance_api_key", value="seedance-key"))
+    db.commit()
+    _install_fake_seedance_client(monkeypatch, captured)
+
+    response = client.get("/api/seedance/task/seedance-task-1")
+
+    assert response.status_code == 200
+    assert response.json()["video_url"] == "https://cdn.test/final.mp4"
+    assert captured["get_path"] == "/contents/generations/tasks/seedance-task-1"
+
 def test_pixelle_proxy_forwards_api_key_from_system_settings(db, monkeypatch):
     captured = {}
     db.add(SystemSetting(key="pixelle_api_key", value="db-pixelle-key"))

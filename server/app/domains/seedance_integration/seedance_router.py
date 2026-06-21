@@ -4,6 +4,7 @@ import logging
 import os
 
 import httpx
+from langchain_core.tools import tool
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
@@ -74,6 +75,59 @@ class SeedanceGenerateRequest(BaseModel):
     image_urls: list[str] = Field(default_factory=list)
 
 
+@tool
+async def submit_seedance_generation(
+    api_key: str,
+    prompt: str,
+    aspect_ratio: str,
+    duration: int,
+    resolution: str,
+    image_urls: list[str],
+) -> dict:
+    """Submit one Seedance video generation task through the provider API."""
+    content = [{"type": "text", "text": prompt}]
+    for url in image_urls:
+        clean = str(url).strip()
+        if clean:
+            content.append({"type": "image_url", "image_url": {"url": clean}})
+    payload = {
+        "model": SEEDANCE_MODEL_ID,
+        "content": content,
+        "parameters": {
+            "aspect_ratio": aspect_ratio,
+            "duration": duration,
+            "resolution": resolution,
+        },
+    }
+    resp = await _get_client(api_key).post("/contents/generations/tasks", json=payload)
+    data = resp.json()
+    if resp.is_success:
+        return {"ok": True, "task_id": data.get("id") or data.get("task_id")}
+    return {"ok": False, "error": data.get("error", {}).get("message", str(data))}
+
+
+@tool
+async def query_seedance_task(api_key: str, task_id: str) -> dict:
+    """Query one Seedance video generation task through the provider API."""
+    resp = await _get_client(api_key).get(f"/contents/generations/tasks/{task_id}")
+    data = resp.json()
+    if not resp.is_success:
+        return {"ok": False, "error": data.get("error", {}).get("message", "查询失败")}
+
+    status = data.get("status", "unknown")
+    result = {"ok": True, "task_id": task_id, "status": status}
+    if status == "succeeded":
+        videos = (data.get("output") or {}).get("videos", [])
+        if videos:
+            result["video_url"] = videos[0].get("url", "")
+        result["progress"] = 100
+    elif status == "failed":
+        result["error"] = data.get("error", {}).get("message", "任务失败")
+    else:
+        result["progress"] = data.get("progress", 0)
+    return result
+
+
 @api_router.post("/generate")
 async def seedance_generate(
     body: SeedanceGenerateRequest,
@@ -82,31 +136,15 @@ async def seedance_generate(
 ):
     """Submit a Seedance video generation task."""
     del user
-    api_key = _get_api_key(db)
-    client = _get_client(api_key)
-
-    content = [{"type": "text", "text": body.prompt}]
-    for url in body.image_urls:
-        clean = str(url).strip()
-        if clean:
-            content.append({"type": "image_url", "image_url": {"url": clean}})
-
-    payload = {
-        "model": SEEDANCE_MODEL_ID,
-        "content": content,
-        "parameters": {
+    try:
+        return await submit_seedance_generation.ainvoke({
+            "api_key": _get_api_key(db),
+            "prompt": body.prompt,
             "aspect_ratio": body.aspect_ratio,
             "duration": body.duration,
             "resolution": body.resolution,
-        },
-    }
-
-    try:
-        resp = await client.post("/contents/generations/tasks", json=payload)
-        data = resp.json()
-        if resp.is_success:
-            return {"ok": True, "task_id": data.get("id") or data.get("task_id")}
-        return {"ok": False, "error": data.get("error", {}).get("message", str(data))}
+            "image_urls": body.image_urls,
+        })
     except HTTPException:
         raise
     except Exception as exc:
@@ -122,28 +160,8 @@ async def seedance_get_task(
 ):
     """Query a Seedance video generation task."""
     del user
-    api_key = _get_api_key(db)
-    client = _get_client(api_key)
-
     try:
-        resp = await client.get(f"/contents/generations/tasks/{task_id}")
-        data = resp.json()
-        if not resp.is_success:
-            return {"ok": False, "error": data.get("error", {}).get("message", "查询失败")}
-
-        status = data.get("status", "unknown")
-        result = {"ok": True, "task_id": task_id, "status": status}
-        if status == "succeeded":
-            output = data.get("output", {})
-            videos = output.get("videos", [])
-            if videos:
-                result["video_url"] = videos[0].get("url", "")
-            result["progress"] = 100
-        elif status == "failed":
-            result["error"] = data.get("error", {}).get("message", "任务失败")
-        else:
-            result["progress"] = data.get("progress", 0)
-        return result
+        return await query_seedance_task.ainvoke({"api_key": _get_api_key(db), "task_id": task_id})
     except HTTPException:
         raise
     except Exception as exc:

@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 import httpx
+from langchain_core.tools import tool
 from app.database import get_db
 from app.deps import verify_admin_token, require_role
 from app.db.models.model_configuration import AIModel
@@ -252,6 +253,15 @@ def _build_auth_headers(provider: str, api_key: str) -> dict:
 
 # ==== Test connection ====
 
+@tool
+def model_connection_check(test_url: str, headers: dict, strategy: str) -> dict:
+    """Run one model-provider connection check."""
+    resp = httpx.get(test_url, headers=headers, timeout=httpx.Timeout(10, connect=5))
+    if resp.is_success:
+        return {"ok": True, "status_code": resp.status_code, "strategy": strategy}
+    return {"ok": False, "error": f"HTTP {resp.status_code}: {resp.text[:200]}", "strategy": strategy}
+
+
 @router.post("/{model_id}/test")
 def test_connection(model_id: str, db: Session = Depends(get_db),
                      _ = Depends(require_role("admin"))):
@@ -292,11 +302,7 @@ def test_connection(model_id: str, db: Session = Depends(get_db),
         test_url = m.base_url.rstrip("/") + "/models"
 
     try:
-        resp = httpx.get(test_url, headers=headers, timeout=httpx.Timeout(10, connect=5))
-        if resp.is_success:
-            return {"ok": True, "status_code": resp.status_code, "strategy": strategy}
-        return {"ok": False, "error": f"HTTP {resp.status_code}: {resp.text[:200]}",
-                "strategy": strategy}
+        return model_connection_check.invoke({"test_url": test_url, "headers": headers, "strategy": strategy})
     except httpx.ConnectError:
         return {"ok": False, "error": "连接失败 — 检查 Base URL"}
     except httpx.TimeoutException:

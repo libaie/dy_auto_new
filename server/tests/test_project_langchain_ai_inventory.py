@@ -65,6 +65,15 @@ def test_gemini_audit_http_is_behind_langchain_tool():
     gemini_body = text.split("def _audit_gemini", 1)[1]
     assert "httpx.post(" not in gemini_body
 
+def test_model_connection_check_uses_langchain_tool():
+    text = (DOMAINS / "model_configuration/ai_models_router.py").read_text(encoding="utf-8")
+
+    assert "@tool\ndef model_connection_check" in text
+    route_body = text.split("def test_connection", 1)[1]
+    assert "model_connection_check.invoke" in route_body
+    assert "httpx.get(" not in route_body
+
+
 def test_seedance_submit_and_query_routes_use_langchain_tools():
     text = (DOMAINS / "seedance_integration/seedance_router.py").read_text(encoding="utf-8")
 

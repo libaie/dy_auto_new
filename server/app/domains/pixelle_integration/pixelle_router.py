@@ -5,6 +5,7 @@ from pathlib import Path
 
 import httpx
 import yaml
+from langchain_core.tools import tool
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
@@ -58,6 +59,33 @@ def _pixelle_headers(db: Session | None = None) -> dict:
     if api_key:
         h["X-API-Key"] = api_key
     return h
+
+
+@tool
+async def reload_pixelle_config(base_url: str, headers: dict) -> bool:
+    """Ask Pixelle-Video to reload its config."""
+    async with httpx.AsyncClient(
+        trust_env=False,
+        base_url=base_url,
+        timeout=httpx.Timeout(5, connect=3),
+        headers=headers,
+    ) as client:
+        resp = await client.post("/api/admin/reload")
+        return resp.is_success
+
+
+@tool
+async def pixelle_openapi_probe(base_url: str, headers: dict) -> dict:
+    """Read Pixelle-Video OpenAPI metadata for a connectivity check."""
+    async with httpx.AsyncClient(
+        trust_env=False,
+        base_url=base_url,
+        timeout=httpx.Timeout(10, connect=5),
+        headers=headers,
+    ) as client:
+        resp = await client.get("/openapi.json")
+        data = resp.json()
+        return {"ok": True, "version": data.get("info", {}).get("version", "unknown")}
 
 
 def _redact_api_key(key: str) -> str:
@@ -154,13 +182,7 @@ async def update_pixelle_config(
     cfg = _resolve_pixelle_config(db)
     reload_ok = False
     try:
-        async with httpx.AsyncClient(trust_env=False,
-            base_url=cfg["url"],
-            timeout=httpx.Timeout(5, connect=3),
-            headers=_pixelle_headers(db),
-        ) as client:
-            resp = await client.post("/api/admin/reload")
-            reload_ok = resp.is_success
+        reload_ok = await reload_pixelle_config.ainvoke({"base_url": cfg["url"], "headers": _pixelle_headers(db)})
     except Exception as e:
         logger.warning("Pixelle-Video config reload failed: %s (restart Pixelle-Video to apply)", e)
 
@@ -220,14 +242,7 @@ async def test_connection(
     """Test connectivity to Pixelle-Video."""
     cfg = _resolve_pixelle_config(db)
     try:
-        async with httpx.AsyncClient(trust_env=False,
-            base_url=cfg["url"],
-            timeout=httpx.Timeout(10, connect=5),
-            headers=_pixelle_headers(db),
-        ) as client:
-            resp = await client.get("/openapi.json")
-            data = resp.json()
-            return {"ok": True, "version": data.get("info", {}).get("version", "unknown")}
+        return await pixelle_openapi_probe.ainvoke({"base_url": cfg["url"], "headers": _pixelle_headers(db)})
     except Exception as e:
         return {"ok": False, "error": str(e)}
 

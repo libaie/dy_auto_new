@@ -86,6 +86,20 @@ def test_seedance_submit_and_query_routes_use_langchain_tools():
     assert "client.post(" not in generate_body
     assert "client.get(" not in query_body
 
+
+def test_pixelle_router_provider_actions_use_langchain_tools():
+    text = (DOMAINS / "pixelle_integration/pixelle_router.py").read_text(encoding="utf-8")
+
+    assert "@tool\nasync def reload_pixelle_config" in text
+    assert "@tool\nasync def pixelle_openapi_probe" in text
+    update_body = text.split("async def update_pixelle_config", 1)[1].split("# ---- Template", 1)[0]
+    test_body = text.split("async def test_connection", 1)[1].split("# ---- 透明代理", 1)[0]
+    assert "reload_pixelle_config.ainvoke" in update_body
+    assert "pixelle_openapi_probe.ainvoke" in test_body
+    assert "client.post(" not in update_body
+    assert "client.get(" not in test_body
+
+
 def test_pixelle_unified_request_uses_langchain_tool_boundary():
     text = (DOMAINS / "pixelle_integration/pixelle_client.py").read_text(encoding="utf-8")
 

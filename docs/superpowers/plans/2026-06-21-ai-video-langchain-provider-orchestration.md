@@ -112,6 +112,30 @@ async def test_submit_video_generation_rejects_wrong_stage(monkeypatch, db):
         await _tool(tools, "submit_video_generation").ainvoke({"run_id": "run-1", "job_id": "image-job"})
 
 
+@pytest.mark.asyncio
+async def test_submit_compose_accepts_real_compose_job_stages(monkeypatch, db):
+    calls = []
+
+    async def fake_execute_provider_job(db_arg, run, job):
+        calls.append(job.stage)
+        return FakeResult(data={"provider_result": {"status": "submitted", "assets": []}})
+
+    monkeypatch.setattr(provider_tools, "_execute_provider_job", fake_execute_provider_job)
+
+    tools = provider_tools.build_provider_tools(db, allowed_tools=["submit_compose"])
+    submit_compose = _tool(tools, "submit_compose")
+    for stage in ("episode_compose", "composition"):
+        run = type("Run", (), {"id": f"run-{stage}", "production_plan_id": "plan-1"})()
+        job = type("Job", (), {"id": f"job-{stage}", "stage": stage, "plan_id": "plan-1"})()
+        monkeypatch.setattr(provider_tools, "_load_run_and_job", lambda db_arg, run_id, job_id, run=run, job=job: (run, job))
+
+        result = await submit_compose.ainvoke({"run_id": run.id, "job_id": job.id})
+
+        assert result["status"] == "success"
+
+    assert calls == ["episode_compose", "composition"]
+
+
 def test_provider_tools_import_has_no_config_side_effects_under_production_debug():
     import os
     import subprocess
@@ -199,12 +223,19 @@ async def _execute_provider_job(db: Session, run: Any, job: Any) -> Any:
     return await execute_real_job(db, run, job)
 
 
-async def _run_provider_job(db: Session | None, *, run_id: str, job_id: str, expected_stage: str) -> dict[str, Any]:
+async def _run_provider_job(
+    db: Session | None,
+    *,
+    run_id: str,
+    job_id: str,
+    expected_stage: str | set[str],
+) -> dict[str, Any]:
     if db is None:
         raise AgencyRuntimeError("AI_VIDEO_PROVIDER_CONTEXT_NOT_FOUND", "Database session is required.")
     run, job = _load_run_and_job(db, run_id, job_id)
-    if job.stage != expected_stage:
-        raise ValueError(f"Provider tool expected stage {expected_stage}, got {job.stage}.")
+    expected_stages = {expected_stage} if isinstance(expected_stage, str) else set(expected_stage)
+    if job.stage not in expected_stages:
+        raise ValueError(f"Provider tool expected stage {sorted(expected_stages)}, got {job.stage}.")
     return _result_payload(await _execute_provider_job(db, run, job))
 
 
@@ -241,12 +272,22 @@ def build_provider_tools(db: Session | None, allowed_tools: list[str] | None = N
     @tool
     async def submit_compose(run_id: str, job_id: str) -> dict[str, Any]:
         """Submit or resume one compose production job through guarded provider services."""
-        return await _run_provider_job(db, run_id=run_id, job_id=job_id, expected_stage="compose")
+        return await _run_provider_job(
+            db,
+            run_id=run_id,
+            job_id=job_id,
+            expected_stage={"episode_compose", "composition"},
+        )
 
     @tool
     async def query_compose_task(run_id: str, job_id: str) -> dict[str, Any]:
         """Query or sync one compose production job through guarded provider services."""
-        return await _run_provider_job(db, run_id=run_id, job_id=job_id, expected_stage="compose")
+        return await _run_provider_job(
+            db,
+            run_id=run_id,
+            job_id=job_id,
+            expected_stage={"episode_compose", "composition"},
+        )
 
     tools_by_name = {
         "submit_image_generation": submit_image_generation,
@@ -398,7 +439,8 @@ from app.domains.ai_video_series.langchain_runtime.tools import build_ai_video_t
 STAGE_TOOLS = {
     "image_generation": ["submit_image_generation", "query_image_task"],
     "video_generation": ["submit_video_generation", "query_video_task"],
-    "compose": ["submit_compose", "query_compose_task"],
+    "episode_compose": ["submit_compose", "query_compose_task"],
+    "composition": ["submit_compose", "query_compose_task"],
 }
 
 

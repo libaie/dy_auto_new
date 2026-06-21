@@ -76,3 +76,11 @@ def test_seedance_submit_and_query_routes_use_langchain_tools():
     assert "query_seedance_task.ainvoke" in query_body
     assert "client.post(" not in generate_body
     assert "client.get(" not in query_body
+
+def test_pixelle_unified_request_uses_langchain_tool_boundary():
+    text = (DOMAINS / "pixelle_integration/pixelle_client.py").read_text(encoding="utf-8")
+
+    assert "@tool\nasync def pixelle_provider_request" in text
+    wrapper = text.split("async def _pixelle_request(", 1)[1]
+    assert "pixelle_provider_request.ainvoke" in wrapper
+    assert "_get_client()" not in wrapper

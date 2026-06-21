@@ -3,6 +3,7 @@ import asyncio
 import json
 import logging
 import httpx
+from langchain_core.tools import tool
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
@@ -75,14 +76,19 @@ async def close_client():
         _client_loop = None
 
 
-async def _pixelle_request(method: str, path: str, db: Session | None = None, **kwargs) -> dict:
+async def _pixelle_request_direct(
+    method: str,
+    base_url: str,
+    path: str,
+    api_key: str = "",
+    request_kwargs: dict | None = None,
+) -> dict:
     """统一的 Pixelle-Video HTTP 请求入口，带指数退避重试."""
-    url = f"{_get_base_url(db)}{path}"
+    url = f"{_normalize_base_url(base_url)}{path}"
     client = _get_client()
     last_err = None
-
-    headers = kwargs.pop("headers", {})
-    api_key = _get_api_key(db)
+    kwargs = dict(request_kwargs or {})
+    headers = kwargs.pop("headers", {}) or {}
     if api_key:
         headers["X-API-Key"] = api_key
 
@@ -97,11 +103,11 @@ async def _pixelle_request(method: str, path: str, db: Session | None = None, **
                 logger.error("Pixelle-Video returned non-JSON response: %s", raw)
                 raise RuntimeError(f"Pixelle-Video returned invalid JSON (status={r.status_code}): {raw}")
         except RuntimeError:
-            raise  # JSON decode error — don't retry, it's not transient
+            raise
         except httpx.HTTPStatusError as e:
             last_err = e
             if e.response.status_code < 500:
-                raise  # 4xx — don't retry client errors
+                raise
         except (httpx.ConnectError, httpx.TimeoutException, httpx.RemoteProtocolError) as e:
             last_err = e
         if attempt < MAX_RETRIES - 1:
@@ -110,3 +116,25 @@ async def _pixelle_request(method: str, path: str, db: Session | None = None, **
                            method, path, attempt + 1, MAX_RETRIES, delay, last_err)
             await asyncio.sleep(delay)
     raise last_err
+
+
+@tool
+async def pixelle_provider_request(
+    method: str,
+    base_url: str,
+    path: str,
+    api_key: str = "",
+    request_kwargs: dict | None = None,
+) -> dict:
+    """Execute one Pixelle provider HTTP request with retry and API-key handling."""
+    return await _pixelle_request_direct(method, base_url, path, api_key, request_kwargs)
+
+
+async def _pixelle_request(method: str, path: str, db: Session | None = None, **kwargs) -> dict:
+    return await pixelle_provider_request.ainvoke({
+        "method": method,
+        "base_url": _get_base_url(db),
+        "path": path,
+        "api_key": _get_api_key(db),
+        "request_kwargs": kwargs,
+    })

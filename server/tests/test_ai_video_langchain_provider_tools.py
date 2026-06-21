@@ -62,6 +62,40 @@ async def test_submit_video_generation_rejects_wrong_stage(monkeypatch, db):
         await _tool(tools, "submit_video_generation").ainvoke({"run_id": "run-1", "job_id": "image-job"})
 
 
+@pytest.mark.asyncio
+async def test_submit_compose_accepts_real_compose_job_stages(monkeypatch, db):
+    calls = []
+    run = type("Run", (), {"id": "run-1", "production_plan_id": "plan-1"})()
+    jobs = {
+        stage: type("Job", (), {"id": f"job-{stage}", "stage": stage, "plan_id": "plan-1"})()
+        for stage in ("episode_compose", "composition")
+    }
+
+    async def fake_execute_real_job(db_arg, run, job):
+        calls.append((db_arg, run.id, job.id, job.stage))
+        return FakeResult(
+            data={
+                "provider_stage_task_id": f"pst-{job.stage}",
+                "provider_result": {"status": "submitted", "assets": []},
+            }
+        )
+
+    monkeypatch.setattr(provider_tools, "_load_run_and_job", lambda db_arg, run_id, job_id: (run, jobs[job_id[4:]]))
+    monkeypatch.setattr(provider_tools, "_execute_provider_job", fake_execute_real_job)
+
+    tools = provider_tools.build_provider_tools(db, allowed_tools=["submit_compose"])
+    submit_compose = _tool(tools, "submit_compose")
+
+    for stage in ("episode_compose", "composition"):
+        result = await submit_compose.ainvoke({"run_id": "run-1", "job_id": f"job-{stage}"})
+        assert result["provider_stage_task_id"] == f"pst-{stage}"
+
+    assert calls == [
+        (db, "run-1", "job-episode_compose", "episode_compose"),
+        (db, "run-1", "job-composition", "composition"),
+    ]
+
+
 def test_provider_tools_import_has_no_config_side_effects_under_production_debug():
     repo_root = Path(__file__).resolve().parents[2]
     env = os.environ.copy()

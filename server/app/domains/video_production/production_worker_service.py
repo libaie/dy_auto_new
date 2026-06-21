@@ -72,17 +72,42 @@ async def execute_real_job(db: Session, run: VideoProductionRun, job: Production
         job_stage=job.stage,
         runtime_config=resolve_runtime_model_config(db, "llm_agency_expert_review"),
     )
+    if not isinstance(parsed, dict):
+        parsed = {"status": "failed", "raw": parsed}
     if parsed.get("status") != "success":
+        return _provider_agent_blocked_result(run, job, parsed)
+    return ProductionActionResult.success(parsed.get("message") or "Provider stage agent completed.", data=parsed)
+
+
+def _provider_agent_blocked_result(
+    run: VideoProductionRun,
+    job: ProductionJob,
+    parsed: dict,
+) -> ProductionActionResult:
+    code = str(parsed.get("code") or parsed.get("error_code") or "")
+    if code in {item.value for item in ProductionErrorCode}:
+        affected_ids = parsed.get("affected_ids")
+        if not isinstance(affected_ids, list):
+            affected_ids = [job.id]
+        retryable = parsed.get("retryable")
         return ProductionActionResult.blocked(
-            ProductionErrorCode.PROVIDER_STAGE_TASK_SYNC_REQUIRED,
+            code,
             parsed.get("message") or "Provider stage agent did not complete successfully.",
-            "Retry the provider worker job so the provider stage task can be synchronized.",
-            repair_route=f"/video-production/{run.id}",
-            affected_ids=[job.id],
-            retryable=True,
+            parsed.get("repair_action") or "Review the provider stage result and retry the worker job when ready.",
+            repair_route=parsed.get("repair_route") or f"/video-production/{run.id}",
+            affected_ids=affected_ids,
+            retryable=retryable if isinstance(retryable, bool) else False,
             data=parsed,
         )
-    return ProductionActionResult.success(parsed.get("message") or "Provider stage agent completed.", data=parsed)
+    return ProductionActionResult.blocked(
+        ProductionErrorCode.PROVIDER_STAGE_TASK_SYNC_REQUIRED,
+        parsed.get("message") or "Provider stage agent did not complete successfully.",
+        "Retry the provider worker job so the provider stage task can be synchronized.",
+        repair_route=f"/video-production/{run.id}",
+        affected_ids=[job.id],
+        retryable=True,
+        data=parsed,
+    )
 
 
 async def execute_provider_job_direct(db: Session, run: VideoProductionRun, job: ProductionJob) -> ProductionActionResult:

@@ -122,6 +122,24 @@ def _linked_run_with_image_job_refs(db, *, reference_roles_json):
     return run, segment
 
 
+def _route_provider_agent_to_direct_helper(monkeypatch):
+    from app.domains.ai_video_series.langchain_runtime import provider_tools
+    from app.domains.video_production import production_worker_service
+
+    calls = []
+
+    async def fake_agent(db, *, run_id, job_id, job_stage, runtime_config, agent_runner=None):
+        del runtime_config, agent_runner
+        run = db.query(VideoProductionRun).filter(VideoProductionRun.id == run_id).one()
+        job = db.query(ProductionJob).filter(ProductionJob.id == job_id).one()
+        calls.append((run_id, job_id, job_stage))
+        result = await production_worker_service.execute_provider_job_direct(db, run, job)
+        return provider_tools._result_payload(result)
+
+    monkeypatch.setattr(production_worker_service, "run_provider_stage_agent", fake_agent)
+    return calls
+
+
 def test_real_worker_step_claims_limited_batch_and_returns_visible_summary(db, monkeypatch):
     from app.domains.video_production.production_worker_service import run_real_worker_step
 
@@ -315,10 +333,12 @@ def test_real_worker_step_terminal_provider_failure_is_not_resynced(db, monkeypa
     monkeypatch.setattr("app.domains.video_production.production_worker_service.resolve_runtime_model_config", fake_config)
     monkeypatch.setattr("app.domains.video_production.video_production_service.submit_image_batch", fake_submit_image_batch)
     monkeypatch.setattr("app.domains.video_production.video_production_service.get_stage_task", fake_get_stage_task)
+    agent_calls = _route_provider_agent_to_direct_helper(monkeypatch)
 
     first = run_real_worker_step(db, run.id, lease_id="worker-a", batch_size=1)
 
     assert first["processed"] == 1
+    assert [call[2] for call in agent_calls] == ["image_generation"]
     assert first["items"][0]["ok"] is False
     assert first["items"][0]["status"] == "failed"
     assert first["items"][0]["retryable"] is False
@@ -410,10 +430,12 @@ def test_real_worker_step_executes_image_job_and_persists_asset(db, monkeypatch)
     monkeypatch.setattr("app.domains.video_production.video_production_service.submit_image_batch", fake_submit_image_batch)
     monkeypatch.setattr("app.domains.video_production.video_production_service.get_stage_task", fake_get_stage_task)
     monkeypatch.setattr("app.domains.video_production.production_worker_service.run_ai_audit_for_assets", lambda db, run, assets: assets)
+    agent_calls = _route_provider_agent_to_direct_helper(monkeypatch)
 
     result = run_real_worker_step(db, run.id, lease_id="worker-a", batch_size=1)
 
     assert result["processed"] == 1
+    assert [call[2] for call in agent_calls] == ["image_generation"]
     assert result["items"][0]["ok"] is True
     assert submitted["frames"][0]["production_segment_id"] == segment.id
     assert submitted["template_config"]["external_task_id"]
@@ -454,10 +476,12 @@ def test_real_worker_step_blocks_image_job_without_reference_urls_before_provide
     monkeypatch.setenv("DY_AUTO_PROVIDER_SUBMIT_WORKER_COUNT", "1")
     monkeypatch.setattr("app.domains.video_production.production_worker_service.resolve_runtime_model_config", fake_config)
     monkeypatch.setattr("app.domains.video_production.video_production_service.submit_image_batch", fail_submit_image_batch)
+    agent_calls = _route_provider_agent_to_direct_helper(monkeypatch)
 
     result = run_real_worker_step(db, run.id, lease_id="worker-a", batch_size=1)
 
     assert result["processed"] == 1
+    assert [call[2] for call in agent_calls] == ["image_generation"]
     assert result["items"][0]["ok"] is False
     assert result["items"][0]["error_code"] == ProductionErrorCode.REVIEW_GATE_BLOCKED.value
     assert segment.id in result["items"][0]["repair"]["affected_ids"]
@@ -531,10 +555,12 @@ def test_real_worker_step_persists_registered_provider_asset_before_audit(db, mo
     monkeypatch.setattr("app.domains.video_production.video_production_service.get_stage_task", fake_get_stage_task)
     monkeypatch.setattr("app.domains.video_production.asset_storage_guard.persist_provider_asset", fake_persist_provider_asset)
     monkeypatch.setattr("app.domains.video_production.production_worker_service.run_ai_audit_for_assets", fake_audit)
+    agent_calls = _route_provider_agent_to_direct_helper(monkeypatch)
 
     result = run_real_worker_step(db, run.id, lease_id="worker-a", batch_size=1)
 
     assert result["processed"] == 1
+    assert [call[2] for call in agent_calls] == ["image_generation"]
     asset = db.query(VideoProductionAsset).filter_by(run_id=run.id, asset_type="image").one()
     assert asset.production_segment_id == segment.id
     assert asset.copy_status == "persisted"
@@ -619,6 +645,7 @@ def test_real_worker_keeps_run_running_until_stage_jobs_are_finished(db, monkeyp
     monkeypatch.setattr("app.domains.video_production.video_production_service.submit_image_batch", fake_submit_image_batch)
     monkeypatch.setattr("app.domains.video_production.video_production_service.get_stage_task", fake_get_stage_task)
     monkeypatch.setattr("app.domains.video_production.production_worker_service.run_ai_audit_for_assets", lambda db, run, assets: assets)
+    agent_calls = _route_provider_agent_to_direct_helper(monkeypatch)
 
     first = run_real_worker_step(db, run.id, lease_id="worker-a", batch_size=1)
     db.refresh(run)
@@ -631,6 +658,7 @@ def test_real_worker_keeps_run_running_until_stage_jobs_are_finished(db, monkeyp
     db.refresh(run)
 
     assert second["processed"] == 1
+    assert [call[2] for call in agent_calls] == ["image_generation", "image_generation"]
     assert run.status == "image_review_pending"
     assert set(submitted_targets) == {first_segment.id, second_segment.id}
 
@@ -731,6 +759,7 @@ def test_real_worker_marks_completed_provider_result_without_assets_failed(db, m
     monkeypatch.setattr("app.domains.video_production.production_worker_service.resolve_runtime_model_config", fake_config)
     monkeypatch.setattr("app.domains.video_production.video_production_service.submit_image_batch", fake_submit_image_batch)
     monkeypatch.setattr("app.domains.video_production.video_production_service.get_stage_task", fake_get_stage_task)
+    agent_calls = _route_provider_agent_to_direct_helper(monkeypatch)
 
     result = run_real_worker_step(db, run.id, lease_id="worker-a", batch_size=1)
 
@@ -738,6 +767,7 @@ def test_real_worker_marks_completed_provider_result_without_assets_failed(db, m
     job = db.query(ProductionJob).filter_by(plan_id=run.production_plan_id).one()
     db.refresh(run)
     assert item["ok"] is False
+    assert [call[2] for call in agent_calls] == ["image_generation"]
     assert item["error_code"] == ProductionErrorCode.PROVIDER_TASK_FAILED.value
     assert "no assets" in item["error"].lower()
     assert job.status == "failed"

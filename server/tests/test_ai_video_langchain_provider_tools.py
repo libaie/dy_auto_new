@@ -6,6 +6,8 @@ from pathlib import Path
 import pytest
 
 from app.domains.ai_video_series.langchain_runtime import provider_tools
+from app.domains.video_production.production_action_result import ProductionActionResult
+from app.domains.video_production.production_errors import ProductionErrorCode
 
 
 class FakeResult:
@@ -17,6 +19,29 @@ class FakeResult:
 
 def _tool(tools, name):
     return next(item for item in tools if item.name == name)
+
+
+def test_result_payload_preserves_blocked_action_fields():
+    result = ProductionActionResult.blocked(
+        ProductionErrorCode.REVIEW_GATE_BLOCKED,
+        "Review gate blocked.",
+        "Repair storyboard references.",
+        repair_route="/video-production/run-1",
+        affected_ids=["job-1"],
+        retryable=False,
+        data={"stage": "image_stage"},
+    )
+
+    payload = provider_tools._result_payload(result)
+
+    assert payload["status"] == "blocked"
+    assert payload["code"] == ProductionErrorCode.REVIEW_GATE_BLOCKED.value
+    assert payload["error_code"] == ProductionErrorCode.REVIEW_GATE_BLOCKED.value
+    assert payload["retryable"] is False
+    assert payload["repair_action"] == "Repair storyboard references."
+    assert payload["repair_route"] == "/video-production/run-1"
+    assert payload["affected_ids"] == ["job-1"]
+    assert payload["raw"] == {"stage": "image_stage"}
 
 
 @pytest.mark.asyncio

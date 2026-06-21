@@ -44,12 +44,25 @@ def _json_safe(value: Any) -> Any:
         return str(value)
 
 
+def _string_value(value: Any) -> str | None:
+    if value is None:
+        return None
+    return str(getattr(value, "value", value))
+
+
 def _result_payload(result: Any) -> dict[str, Any]:
     data = result.data if isinstance(getattr(result, "data", None), dict) else {}
     provider_result = data.get("provider_result") if isinstance(data.get("provider_result"), dict) else {}
+    code = _string_value(getattr(result, "code", None))
     return {
         "status": str(getattr(result, "status", "")),
         "message": str(getattr(result, "message", "")),
+        "code": code,
+        "error_code": code,
+        "retryable": bool(getattr(result, "retryable", False)),
+        "repair_action": getattr(result, "repair_action", None),
+        "repair_route": getattr(result, "repair_route", None),
+        "affected_ids": _json_safe(getattr(result, "affected_ids", []) or []),
         "provider_stage_task_id": data.get("provider_stage_task_id") or provider_result.get("provider_stage_task_id"),
         "provider_task_id": provider_result.get("provider_task_id")
         or provider_result.get("stage_task_id")

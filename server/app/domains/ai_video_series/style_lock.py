@@ -22,6 +22,7 @@ from app.domains.ai_video_series.read_models import (
     series_char_dict,
     series_scene_dict,
 )
+from app.domains.ai_video_series.langchain_runtime.agent_runner import run_structured_ai_video_json
 from app.domains.model_configuration.ai_generator import ai_generator
 from app.domains.agency_operations.agency_orchestrator import AgencyOrchestrator
 from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
@@ -114,15 +115,13 @@ async def auto_generate_series_assets(series: Series, db: Session) -> dict:
 
 严格输出 JSON 数组，格式：{{"characters": [...]}}"""
     try:
-        raw_chars = await ai_generator.generate_custom(
-            db,
-            _CHAR_SYSTEM,
-            char_prompt,
-            max_tokens=4096,
-            temperature=0.8,
-            request_timeout_seconds=AUTO_GENERATE_ASSET_MODEL_TIMEOUT_SECONDS,
+        char_data = await run_structured_ai_video_json(
+            system_prompt=_CHAR_SYSTEM,
+            user_prompt=char_prompt,
+            runtime_config=resolve_runtime_model_config(db, "script_generation"),
+            db=db,
+            allowed_tools=["validate_json", "read_series_context"],
         )
-        char_data = parse_json_with_key(raw_chars, "characters")
     except Exception as e:
         logger.warning("Auto-generate characters failed: %s", e)
         raise StyleLockDomainError(500, f"角色生成失败: {e}")
@@ -140,15 +139,13 @@ async def auto_generate_series_assets(series: Series, db: Session) -> dict:
 
 严格输出 JSON 数组，格式：{{"scenes": [...]}}"""
     try:
-        raw_scenes = await ai_generator.generate_custom(
-            db,
-            _SCENE_SYSTEM,
-            scene_prompt,
-            max_tokens=4096,
-            temperature=0.8,
-            request_timeout_seconds=AUTO_GENERATE_ASSET_MODEL_TIMEOUT_SECONDS,
+        scene_data = await run_structured_ai_video_json(
+            system_prompt=_SCENE_SYSTEM,
+            user_prompt=scene_prompt,
+            runtime_config=resolve_runtime_model_config(db, "script_generation"),
+            db=db,
+            allowed_tools=["validate_json", "read_series_context"],
         )
-        scene_data = parse_json_with_key(raw_scenes, "scenes")
     except Exception as e:
         logger.warning("Auto-generate scenes failed: %s", e)
         raise StyleLockDomainError(500, f"场景生成失败: {e}")
@@ -560,14 +557,13 @@ async def ensure_series_assets(series: Series, db: Session) -> tuple[list[Charac
     if not series.characters:
         if not series.logline:
             raise StyleLockDomainError(400, "Series logline is required before style lock")
-        raw_chars = await ai_generator.generate_custom(
-            db,
-            _CHAR_SYSTEM,
-            f"Story logline: {series.logline}\nGenre: {series.genre}\nReturn 3-5 characters as JSON with key characters.",
-            max_tokens=4096,
-            temperature=0.8,
+        char_data = await run_structured_ai_video_json(
+            system_prompt=_CHAR_SYSTEM,
+            user_prompt=f"Story logline: {series.logline}\nGenre: {series.genre}\nReturn 3-5 characters as JSON with key characters.",
+            runtime_config=resolve_runtime_model_config(db, "script_generation"),
+            db=db,
+            allowed_tools=["validate_json", "read_series_context"],
         )
-        char_data = parse_json_with_key(raw_chars, "characters")
         for c in char_data["characters"]:
             ch = Character(
                 name=c.get("name", "?"),
@@ -584,14 +580,13 @@ async def ensure_series_assets(series: Series, db: Session) -> tuple[list[Charac
     if not series.scenes:
         if not series.logline:
             raise StyleLockDomainError(400, "Series logline is required before style lock")
-        raw_scenes = await ai_generator.generate_custom(
-            db,
-            _SCENE_SYSTEM,
-            f"Story logline: {series.logline}\nGenre: {series.genre}\nReturn 3-5 locations as JSON with key scenes.",
-            max_tokens=4096,
-            temperature=0.8,
+        scene_data = await run_structured_ai_video_json(
+            system_prompt=_SCENE_SYSTEM,
+            user_prompt=f"Story logline: {series.logline}\nGenre: {series.genre}\nReturn 3-5 locations as JSON with key scenes.",
+            runtime_config=resolve_runtime_model_config(db, "script_generation"),
+            db=db,
+            allowed_tools=["validate_json", "read_series_context"],
         )
-        scene_data = parse_json_with_key(raw_scenes, "scenes")
         for sc in scene_data["scenes"]:
             scene = Scene(
                 name=sc.get("name", "?"),

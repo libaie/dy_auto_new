@@ -89,3 +89,21 @@ class LangChainAgentRunner:
             }
         )
         return extract_json_object(_content_from_agent_response(response))
+
+
+async def run_structured_ai_video_json(
+    *,
+    system_prompt: str,
+    user_prompt: Any,
+    runtime_config: dict[str, Any],
+    db: Any = None,
+    allowed_tools: list[str] | None = None,
+) -> dict[str, Any]:
+    from app.domains.ai_video_series.langchain_runtime.tools import build_ai_video_tools
+
+    return await LangChainAgentRunner().run_json(
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        runtime_config=runtime_config,
+        tools=build_ai_video_tools(db, allowed_tools=allowed_tools or ["validate_json"]),
+    )

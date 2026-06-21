@@ -33,6 +33,25 @@ def _expert_review_model(db):
     return model
 
 
+def _script_generation_model(db):
+    model = AIModel(
+        name="Series Pipeline Script Generation",
+        model_type="llm",
+        provider="openai-compatible",
+        base_url="https://llm.test/v1",
+        api_key=encrypt("script-key"),
+        model_name="script-generation-model",
+        enabled=True,
+        config_json={
+            "scene_key": "script_generation",
+            "protocol": "openai_chat_completions",
+        },
+    )
+    db.add(model)
+    db.commit()
+    return model
+
+
 async def _agency_pass(self, **kwargs):
     return AgencyRuntimeResult(
         result_status="passed",
@@ -327,8 +346,9 @@ async def test_style_lock_regenerates_expired_reference_urls(db, monkeypatch):
 async def test_style_lock_generates_missing_assets_and_records_missing_references(client, db, monkeypatch):
     from app.domains.ai_video_series import router as series_router
     series, _ = _create_series(db, with_episode=False)
+    _script_generation_model(db)
     generated = [
-        json.dumps({
+        {
             "characters": [{
                 "name": "Lin",
                 "role_type": "protagonist",
@@ -338,8 +358,8 @@ async def test_style_lock_generates_missing_assets_and_records_missing_reference
                 "appearance_desc": "short black hair, sharp eyes, long gray coat",
                 "outfit_desc": "gray coat with black boots",
             }]
-        }),
-        json.dumps({
+        },
+        {
             "scenes": [{
                 "name": "Rain Clinic",
                 "scene_type": "indoor",
@@ -347,10 +367,10 @@ async def test_style_lock_generates_missing_assets_and_records_missing_reference
                 "lighting": "night",
                 "mood": "mysterious",
             }]
-        }),
+        },
     ]
     monkeypatch.setattr(
-        "app.domains.ai_video_series.style_lock.ai_generator.generate_custom",
+        "app.domains.ai_video_series.style_lock.run_structured_ai_video_json",
         AsyncMock(side_effect=generated),
     )
     resp = client.post(f"/api/series/{series.id}/style-lock")
@@ -909,6 +929,7 @@ def test_director_auto_plan_persists_storyboard_with_references(client, db, monk
     from app.domains.agency_operations.video_agency_team import build_video_agency_team
 
     series, episode = _create_series(db)
+    _script_generation_model(db)
     character = Character(
         name="Lin",
         role_type="protagonist",
@@ -938,15 +959,15 @@ def test_director_auto_plan_persists_storyboard_with_references(client, db, monk
         }
     }
     db.commit()
-    generate = AsyncMock(return_value=json.dumps({
+    generate = AsyncMock(return_value={
         "frames": [{
             "narration": "Lin enters the clinic.",
             "image_prompt": "Lin walks through neon rain into the clinic.",
             "duration": 5,
             "audio_mode": "tts",
         }]
-        }))
-    monkeypatch.setattr("app.domains.director_planning.director_router.ai_generator.generate_custom", generate)
+    })
+    monkeypatch.setattr("app.domains.director_planning.director_router.run_structured_ai_video_json", generate)
 
     resp = client.post("/api/director/auto-plan", json={
         "series_id": series.id,
@@ -965,8 +986,10 @@ def test_director_auto_plan_persists_storyboard_with_references(client, db, monk
     assert data["storyboard"]["agency_team_version"]
     assert data["storyboard"]["agency_trace"]["error_code"] == "EXPERT_MODEL_CONFIG_MISSING"
     assert data["storyboard"]["quality_gates"]["storyboard"]
-    assert "douyin_strategist" in generate.call_args.args[2]
-    assert "short_video_editing_coach" in generate.call_args.args[2]
+    assert generate.call_args.kwargs["runtime_config"]["scene_key"] == "script_generation"
+    assert generate.call_args.kwargs["allowed_tools"] == ["validate_json", "read_series_context"]
+    assert "douyin_strategist" in generate.call_args.kwargs["user_prompt"]
+    assert "short_video_editing_coach" in generate.call_args.kwargs["user_prompt"]
 
     db.expire_all()
     saved_episode = db.query(Episode).filter(Episode.id == episode.id).one()
@@ -978,6 +1001,7 @@ def test_auto_plan_blocked_agency_trace_does_not_persist_storyboard(client, db, 
     from app.domains.agency_operations.video_agency_team import build_video_agency_team
 
     series, episode = _create_series(db)
+    _script_generation_model(db)
     _expert_review_model(db)
     character = Character(
         name="Lin",
@@ -1007,14 +1031,14 @@ def test_auto_plan_blocked_agency_trace_does_not_persist_storyboard(client, db, 
     db.commit()
 
     monkeypatch.setattr(
-        "app.domains.director_planning.director_router.ai_generator.generate_custom",
-        AsyncMock(return_value=json.dumps({
+        "app.domains.director_planning.director_router.run_structured_ai_video_json",
+        AsyncMock(return_value={
             "frames": [{
                 "narration": "Lin enters the clinic.",
                 "image_prompt": "Lin walks through neon rain into the clinic.",
                 "duration": 5,
             }]
-        })),
+        }),
     )
 
     async def blocked_storyboard_review(self, *args, **kwargs):
@@ -1048,6 +1072,7 @@ def test_director_auto_plan_generation_timeout_persists_fallback_storyboard(clie
     from app.domains.agency_operations.video_agency_team import build_video_agency_team
 
     series, episode = _create_series(db)
+    _script_generation_model(db)
     character = Character(
         name="Lin",
         appearance_desc="short black hair",
@@ -1079,10 +1104,10 @@ def test_director_auto_plan_generation_timeout_persists_fallback_storyboard(clie
         import asyncio
 
         await asyncio.sleep(1)
-        return json.dumps({"frames": []})
+        return {"frames": []}
 
     monkeypatch.setattr("app.domains.director_planning.director_router.DIRECTOR_GENERATION_TIMEOUT_SECONDS", 0.01)
-    monkeypatch.setattr("app.domains.director_planning.director_router.ai_generator.generate_custom", slow_generate)
+    monkeypatch.setattr("app.domains.director_planning.director_router.run_structured_ai_video_json", slow_generate)
 
     resp = client.post("/api/director/auto-plan", json={
         "series_id": series.id,
@@ -1105,6 +1130,7 @@ def test_director_auto_plan_review_timeout_persists_partial_trace(client, db, mo
     from app.domains.agency_operations.video_agency_team import build_video_agency_team
 
     series, episode = _create_series(db)
+    _script_generation_model(db)
     _expert_review_model(db)
     character = Character(
         name="Lin",
@@ -1134,12 +1160,12 @@ def test_director_auto_plan_review_timeout_persists_partial_trace(client, db, mo
     db.commit()
 
     monkeypatch.setattr(
-        "app.domains.director_planning.director_router.ai_generator.generate_custom",
-        AsyncMock(return_value=json.dumps({"frames": [{
+        "app.domains.director_planning.director_router.run_structured_ai_video_json",
+        AsyncMock(return_value={"frames": [{
             "narration": "Lin enters the clinic.",
             "image_prompt": "Lin walks through the clinic.",
             "duration": 5,
-        }]})),
+        }]}),
     )
 
     async def slow_storyboard_review(self, *args, **kwargs):

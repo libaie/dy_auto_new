@@ -12,9 +12,9 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import verify_admin_token
 from app.db.models import Episode, Series
-from app.domains.model_configuration.ai_generator import ai_generator
 from app.domains.agency_operations.agency_orchestrator import AgencyOrchestrator
 from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
+from app.domains.ai_video_series.langchain_runtime.agent_runner import run_structured_ai_video_json
 from app.domains.model_configuration.runtime_model_config import RuntimeModelConfigError, resolve_runtime_model_config
 from app.domains.agency_operations.video_agency_team import build_agency_context, ensure_video_agency_team
 
@@ -388,17 +388,17 @@ async def generate_auto_storyboard(db: Session, body: DirectorAutoPlanRequest) -
     }
     generation_trace = {"stage": "storyboard_generation", "stage_status": "complete"}
     try:
-        raw = await asyncio.wait_for(
-            ai_generator.generate_custom(
-                db,
-                "You are a short-video director. Create a concise storyboard that preserves locked character and scene continuity.",
-                json.dumps(prompt, ensure_ascii=False),
-                max_tokens=4096,
-                temperature=0.7,
+        generation_runtime_config = resolve_runtime_model_config(db, "script_generation")
+        parsed = await asyncio.wait_for(
+            run_structured_ai_video_json(
+                system_prompt="You are a short-video director. Create a concise storyboard that preserves locked character and scene continuity.",
+                user_prompt=json.dumps(prompt, ensure_ascii=False),
+                runtime_config=generation_runtime_config,
+                db=db,
+                allowed_tools=["validate_json", "read_series_context"],
             ),
             timeout=DIRECTOR_GENERATION_TIMEOUT_SECONDS,
         )
-        parsed = _parse_frames_json(raw)
     except asyncio.TimeoutError:
         parsed = {"frames": _fallback_auto_plan_frames(series, episode, style_lock, target_duration)}
         generation_trace = _timeout_trace(

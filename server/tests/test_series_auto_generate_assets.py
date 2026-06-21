@@ -7,8 +7,8 @@ from app.main import app
 client = TestClient(app)
 
 
-def test_auto_generate_assets_uses_long_model_timeout(db, monkeypatch):
-    from app.domains.ai_video_series import router as series_router
+def test_auto_generate_assets_uses_structured_langchain_runtime_config(db, monkeypatch):
+    from app.domains.ai_video_series import style_lock
     series = Series(
         title="City Healer",
         logline="A young doctor solves urban mysteries with a consistent cyber-noir style.",
@@ -17,13 +17,17 @@ def test_auto_generate_assets_uses_long_model_timeout(db, monkeypatch):
     db.add(series)
     db.commit()
 
+    resolved_scene_keys = []
     calls = []
 
-    async def fake_generate_custom(_db, _system_prompt, _user_prompt, **kwargs):
+    def fake_resolve_runtime_model_config(_db, scene_key):
+        resolved_scene_keys.append(scene_key)
+        return {"scene_key": scene_key, "provider": "test", "model": "script-model"}
+
+    async def fake_run_structured_ai_video_json(**kwargs):
         calls.append(kwargs)
         if len(calls) == 1:
-            return """
-            {
+            return {
               "characters": [
                 {
                   "name": "Lin",
@@ -36,9 +40,7 @@ def test_auto_generate_assets_uses_long_model_timeout(db, monkeypatch):
                 }
               ]
             }
-            """
-        return """
-        {
+        return {
           "scenes": [
             {
               "name": "Rain Clinic",
@@ -49,14 +51,13 @@ def test_auto_generate_assets_uses_long_model_timeout(db, monkeypatch):
             }
           ]
         }
-        """
 
-    monkeypatch.setattr(series_router.ai_generator, "generate_custom", fake_generate_custom)
+    monkeypatch.setattr(style_lock, "resolve_runtime_model_config", fake_resolve_runtime_model_config)
+    monkeypatch.setattr(style_lock, "run_structured_ai_video_json", fake_run_structured_ai_video_json)
 
     resp = client.post(f"/api/series/{series.id}/auto-generate")
 
     assert resp.status_code == 200
-    assert [call["request_timeout_seconds"] for call in calls] == [
-        series_router.AUTO_GENERATE_ASSET_MODEL_TIMEOUT_SECONDS,
-        series_router.AUTO_GENERATE_ASSET_MODEL_TIMEOUT_SECONDS,
-    ]
+    assert resolved_scene_keys == ["script_generation", "script_generation"]
+    assert [call["runtime_config"]["scene_key"] for call in calls] == ["script_generation", "script_generation"]
+    assert all(call["allowed_tools"] == ["validate_json", "read_series_context"] for call in calls)

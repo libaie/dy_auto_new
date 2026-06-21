@@ -8,6 +8,7 @@ from json import JSONDecodeError
 from typing import Any, Awaitable, Callable
 
 import httpx
+import openai
 from sqlalchemy.orm import Session
 
 from app.domains.agency_operations.agency_manifest import get_expert, load_manifest, read_expert_markdown
@@ -274,6 +275,27 @@ async def generate_story_plan_with_expert(
         raise error from exc
     except httpx.RequestError as exc:
         error = AgencyRuntimeError("EXPERT_MODEL_HTTP_ERROR", "Story generator model request failed.")
+        _finalize_failed(db, invocation.id, error, started)
+        raise error from exc
+    except openai.APITimeoutError as exc:
+        error = AgencyRuntimeError("EXPERT_MODEL_TIMEOUT", "Story generator model call timed out.")
+        _finalize_failed(db, invocation.id, error, started)
+        raise error from exc
+    except openai.RateLimitError as exc:
+        error = AgencyRuntimeError("EXPERT_MODEL_RATE_LIMITED", "Story generator model call was rate limited.")
+        _finalize_failed(db, invocation.id, error, started)
+        raise error from exc
+    except openai.APIStatusError as exc:
+        code = "EXPERT_MODEL_RATE_LIMITED" if exc.response.status_code == 429 else "EXPERT_MODEL_HTTP_ERROR"
+        error = AgencyRuntimeError(code, f"Story generator model call failed with HTTP {exc.response.status_code}.")
+        _finalize_failed(db, invocation.id, error, started)
+        raise error from exc
+    except openai.APIConnectionError as exc:
+        error = AgencyRuntimeError("EXPERT_MODEL_HTTP_ERROR", "Story generator model request failed.")
+        _finalize_failed(db, invocation.id, error, started)
+        raise error from exc
+    except openai.APIError as exc:
+        error = AgencyRuntimeError("EXPERT_MODEL_HTTP_ERROR", "Story generator model call failed.")
         _finalize_failed(db, invocation.id, error, started)
         raise error from exc
     except AgencyRuntimeError as exc:

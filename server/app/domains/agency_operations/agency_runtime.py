@@ -7,6 +7,12 @@ from typing import Any, Awaitable, Callable
 
 import httpx
 
+from app.domains.agency_operations.agency_runtime_contracts import (
+    AgencyRuntimeError,
+    OPENAI_CHAT_COMPLETIONS_PROTOCOL,
+    OPENAI_COMPATIBLE_PROVIDERS,
+    runtime_setting,
+)
 from app.domains.agency_operations.agency_manifest import (
     get_expert,
     read_expert_markdown,
@@ -17,8 +23,6 @@ from app.domains.model_configuration.runtime_model_config import redact_runtime_
 
 
 VALID_RESULT_STATUSES = {"passed", "warn", "blocked", "failed"}
-OPENAI_COMPATIBLE_PROVIDERS = {"openai", "ark", "doubao", "openai-compatible", "bailian"}
-OPENAI_CHAT_COMPLETIONS_PROTOCOL = "openai_chat_completions"
 REQUIRED_OUTPUT_FIELDS = {
     "decision": str,
     "findings": list,
@@ -55,12 +59,6 @@ SECRET_STRING_MARKERS = (
 MIN_SECRET_VALUE_LENGTH = 4
 
 
-class AgencyRuntimeError(RuntimeError):
-    def __init__(self, error_code: str, message: str):
-        super().__init__(message)
-        self.error_code = error_code
-
-
 @dataclass(frozen=True)
 class AgencyRuntimeResult:
     result_status: str
@@ -73,13 +71,7 @@ class AgencyRuntimeResult:
 MessageContent = str | list[dict[str, Any]]
 ModelClientResponse = str | dict[str, Any]
 ModelClient = Callable[[str, MessageContent, dict[str, Any]], Awaitable[ModelClientResponse]]
-
-
-def _runtime_setting(config: dict[str, Any], key: str, default: Any) -> Any:
-    nested = config.get("config")
-    if isinstance(nested, dict) and key in nested:
-        return nested[key]
-    return config.get(key, default)
+_runtime_setting = runtime_setting
 
 
 def _normalize_key(key: str) -> str:

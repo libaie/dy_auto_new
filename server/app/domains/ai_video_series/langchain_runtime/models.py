@@ -4,16 +4,16 @@ from typing import Any
 
 from langchain_openai import ChatOpenAI
 
-from app.domains.agency_operations.agency_runtime import (
+from app.domains.agency_operations.agency_runtime_contracts import (
     AgencyRuntimeError,
     OPENAI_CHAT_COMPLETIONS_PROTOCOL,
     OPENAI_COMPATIBLE_PROVIDERS,
-    _runtime_setting,
+    runtime_setting,
 )
 
 
 def ensure_langchain_provider_supported(config: dict[str, Any]) -> None:
-    protocol = str(_runtime_setting(config, "protocol", "") or "").lower()
+    protocol = str(runtime_setting(config, "protocol", "") or "").lower()
     provider = str(config.get("provider") or "").lower()
     if protocol == OPENAI_CHAT_COMPLETIONS_PROTOCOL or provider in OPENAI_COMPATIBLE_PROVIDERS:
         return
@@ -38,9 +38,9 @@ def build_langchain_openai_kwargs(config: dict[str, Any]) -> dict[str, Any]:
         "model": model,
         "api_key": api_key,
         "base_url": base_url,
-        "temperature": float(_runtime_setting(config, "temperature", 0.2)),
-        "max_tokens": int(_runtime_setting(config, "max_tokens", 2048)),
-        "timeout": float(_runtime_setting(config, "timeout", 60)),
+        "temperature": float(runtime_setting(config, "temperature", 0.2)),
+        "max_tokens": int(runtime_setting(config, "max_tokens", 2048)),
+        "timeout": float(runtime_setting(config, "timeout", 60)),
     }
 
 

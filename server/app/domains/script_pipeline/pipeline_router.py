@@ -1,5 +1,4 @@
-"""流水线编排 API — thin layer: director_plan → Pixelle-Video → result."""
-import asyncio
+"""流水线编排 API — thin layer for legacy script pipeline runs."""
 import logging
 from datetime import datetime, timezone, timedelta
 
@@ -21,25 +20,13 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/pipeline", tags=["pipeline"])
 
 BJT = timezone(timedelta(hours=8))
-POLL_INTERVAL = 10
-POLL_MAX = 180
-CIRCUIT_BREAKER_COOLDOWN = 60
-_circuit_open_until = 0.0
+PROVIDER_RENDERING_REQUIRES_JOB = "Script pipeline provider rendering requires a production run job."
 
 
 class PipelineStartRequest(BaseModel):
     series_id: str
     episode_id: str | None = None
     director_plan: dict | None = None
-
-
-def _build_storyboard_payload(plan: dict) -> dict:
-    return {
-        "mode": "storyboard",
-        "title": plan.get("title", ""),
-        "frames": plan.get("frames", []),
-        "config": plan.get("config", {}),
-    }
 
 
 def _load_director_plan_from_episode(db: Session, series_id: str, episode_id: str | None) -> dict | None:
@@ -255,36 +242,27 @@ async def _run_pipeline_agency_stage(
     return await orchestrator.run_compose_review(db, **kwargs)
 
 
-async def _submit_and_poll(payload: dict, db: Session) -> dict:
-    import time as _time
-    now = _time.time()
-    global _circuit_open_until
-    if now < _circuit_open_until:
-        raise HTTPException(503, "Pixelle-Video temporarily unavailable (circuit open)")
-
-    submit = await _pixelle_request("POST", "/api/video/generate/async", db, json=payload)
-
-    task_id = submit.get("task_id") or submit.get("id", "")
-    if not task_id:
-        raise HTTPException(502, "Pixelle-Video returned no task_id")
-
-    for attempt in range(POLL_MAX):
-        await asyncio.sleep(POLL_INTERVAL)
-        try:
-            status = await _pixelle_request("GET", f"/api/tasks/{task_id}", db)
-        except Exception as e:
-            if attempt >= 2:
-                _circuit_open_until = _time.time() + CIRCUIT_BREAKER_COOLDOWN
-                raise HTTPException(502, f"Pixelle-Video polling failed: {e}")
-            continue
-
-        status_val = status.get("status", "")
-        if status_val in ("completed", "succeeded", "done"):
-            return {"provider": "pixelle", "status": "completed", "task_id": task_id, **status}
-        if status_val in ("failed", "error"):
-            raise HTTPException(500, f"Video generation failed: {status.get('error', status_val)}")
-
-    raise HTTPException(504, f"Video generation timed out ({POLL_MAX * POLL_INTERVAL}s)")
+def _block_provider_rendering_without_job(
+    db: Session,
+    run: PipelineRun,
+    *,
+    series: Series | None,
+    layer: int,
+    phase: str = "render",
+) -> None:
+    run.status = "blocked"
+    run.current_layer = layer
+    run.error_log = PROVIDER_RENDERING_REQUIRES_JOB
+    layers = dict(run.layers_json or {})
+    layers[str(layer)] = _agency_layer_summary(
+        series,
+        phase,
+        "blocked",
+        error=PROVIDER_RENDERING_REQUIRES_JOB,
+        output_summary={"message": PROVIDER_RENDERING_REQUIRES_JOB},
+    )
+    run.layers_json = layers
+    db.commit()
 
 
 async def _run_all_layers(run_id: str) -> None:
@@ -375,32 +353,15 @@ async def _run_all_layers(run_id: str) -> None:
                 "reference_urls": frame.get("reference_urls") or [],
                 "continuity_notes": frame.get("continuity_notes", ""),
             })
-            render_payload = _build_storyboard_payload({
-                "title": title,
-                "frames": [{
-                    **frame,
-                    "frame_id": frame_id,
-                    "narration": narration_result.get("narration") or frame.get("narration", ""),
-                    "image_prompt": image_prompt_result.get("image_prompt") or frame.get("image_prompt", ""),
-                    "reference_urls": frame.get("reference_urls") or [],
-                    "duration": frame.get("duration") or 5,
-                }],
-                "config": storyboard.get("config", {}),
-            })
-            submit = await _pixelle_request("POST", "/api/video/generate/async", db, json=render_payload)
-            task_id = submit.get("task_id") or submit.get("id")
-            if not task_id:
-                raise HTTPException(502, "Pixelle-Video returned no task_id")
-            await asyncio.sleep(POLL_INTERVAL)
-            status = await _pixelle_request("GET", f"/api/video/task/{task_id}", db)
-            if status.get("status") not in ("completed", "succeeded", "done"):
-                raise HTTPException(500, f"Video generation failed: {status.get('error', status.get('status'))}")
             rendered_segments.append({
                 "frame_id": frame_id,
-                "video_path": status.get("video_path") or status.get("final_video_path", ""),
-                "duration": status.get("duration") or frame.get("duration") or 5,
+                "duration": frame.get("duration") or 5,
                 "narration": narration_result.get("narration") or frame.get("narration", ""),
+                "image_prompt": image_prompt_result.get("image_prompt") or frame.get("image_prompt", ""),
             })
+
+        _block_provider_rendering_without_job(db, run, series=series, layer=4)
+        return
 
         video_trace = await _run_pipeline_agency_stage(
             db,
@@ -505,8 +466,6 @@ async def pipeline_start(
     if not director_plan:
         raise HTTPException(400, "director_plan is required when episode_id is not provided")
 
-    payload = _build_storyboard_payload(director_plan)
-
     run = PipelineRun(
         series_id=body.series_id,
         episode_id=body.episode_id,
@@ -549,48 +508,8 @@ async def pipeline_start(
         output_summary={"frame_count": len(director_plan.get("frames") or [])},
     )
 
-    try:
-        result = await _submit_and_poll(payload, db)
-    except Exception:
-        run.status = "failed"
-        db.commit()
-        raise
-
-    video_path = result.get("video_path") or result.get("final_video_path", "")
-    video = GeneratedVideo(
-        task_id=str(run.id),
-        keyword=director_plan.get("title", ""),
-        title=director_plan.get("title", ""),
-        video_path=video_path,
-        duration=result.get("duration", 0),
-        status="completed",
-        pixelle_task_id=result.get("task_id", ""),
-    )
-    db.add(video)
-
-    run.status = "completed"
-    run.layers_json = {
-        "0": {"status": "completed", "provider": "pixelle", "agency_trace_status": "legacy_summary", **result},
-        "1": _agency_layer_summary(
-            series,
-            "storyboard",
-            "completed",
-            input_summary={"frame_count": len(director_plan.get("frames") or [])},
-            output_summary={"frame_count": len(director_plan.get("frames") or [])},
-            agency_trace=storyboard_trace,
-        ),
-    }
-    run.completed_at = datetime.now(BJT)
-    db.commit()
-
-    return {
-        "run_id": run.id,
-        "status": "completed",
-        "video_id": video.id,
-        "video_path": video_path,
-        "task_id": result.get("task_id", ""),
-        "agency_trace_status": _layers_agency_trace_status(run.layers_json or {}),
-    }
+    _block_provider_rendering_without_job(db, run, series=series, layer=0)
+    raise HTTPException(409, PROVIDER_RENDERING_REQUIRES_JOB)
 
 
 @router.get("/runs/{series_id}")

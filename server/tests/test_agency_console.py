@@ -2,7 +2,6 @@
 import json
 
 import pytest
-from unittest.mock import AsyncMock
 from sqlalchemy.orm import sessionmaker
 
 from fastapi.testclient import TestClient
@@ -265,7 +264,7 @@ def test_agency_console_rejects_non_admin_role(db):
 
 
 @pytest.mark.asyncio
-async def test_pipeline_layers_store_transparency_summaries(db, test_db, monkeypatch):
+async def test_pipeline_layers_block_provider_rendering_without_production_job(db, test_db, monkeypatch):
     from app.domains.script_pipeline import pipeline_router as pipeline
     TestSession = sessionmaker(bind=test_db, autocommit=False, autoflush=False)
     monkeypatch.setattr(pipeline, "SessionLocal", TestSession)
@@ -310,7 +309,10 @@ async def test_pipeline_layers_store_transparency_summaries(db, test_db, monkeyp
     db.add(run)
     db.commit()
 
+    called_paths = []
+
     async def fake_pixelle_request(method, path, db=None, **kwargs):
+        called_paths.append(path)
         if path == "/api/image/generate":
             return {"images": ["https://cdn.test/generated.png"]}
         if path == "/api/content/narration":
@@ -319,26 +321,24 @@ async def test_pipeline_layers_store_transparency_summaries(db, test_db, monkeyp
             return {"title": "Pilot"}
         if path == "/api/content/image-prompt":
             return {"image_prompt": "Lin in cyber-noir clinic."}
-        if path == "/api/video/generate/async":
-            return {"task_id": "task-1"}
-        if path == "/api/video/task/task-1":
-            return {"status": "completed", "progress": 100, "video_path": "frame.mp4", "duration": 5}
-        if path == "/api/postproduction/execute":
-            return {"video_path": "final.mp4", "duration": 5}
         raise AssertionError(path)
 
     monkeypatch.setattr(pipeline, "_pixelle_request", fake_pixelle_request)
-    monkeypatch.setattr(pipeline.asyncio, "sleep", AsyncMock())
 
     await pipeline._run_all_layers(run.id)
 
     db.expire_all()
     saved = db.query(PipelineRun).filter(PipelineRun.id == run.id).one()
+    assert saved.status == "blocked"
     layer_4 = saved.layers_json["4"]
     assert "agency_roles" in layer_4
     assert "quality_gates" in layer_4
-    assert layer_4["status"] == "completed"
-    assert layer_4["output_summary"]["video_path"] == "frame.mp4"
+    assert layer_4["status"] == "blocked"
+    assert layer_4["error"] == "Script pipeline provider rendering requires a production run job."
+    assert "/api/content/title" in called_paths
+    assert "/api/content/narration" in called_paths
+    assert "/api/content/image-prompt" in called_paths
+    assert not any(path.startswith("/api/video/") for path in called_paths)
 
 
 def test_agency_console_includes_latest_run_steps_and_video(db):
@@ -952,7 +952,7 @@ def test_agency_console_marks_layer_only_blocked_trace(db):
 
 
 @pytest.mark.asyncio
-async def test_pipeline_failed_layer_gets_user_facing_recovery_summary(db, test_db, monkeypatch):
+async def test_pipeline_blocked_layer_gets_user_facing_recovery_summary(db, test_db, monkeypatch):
     from app.domains.script_pipeline import pipeline_router as pipeline
     TestSession = sessionmaker(bind=test_db, autocommit=False, autoflush=False)
     monkeypatch.setattr(pipeline, "SessionLocal", TestSession)
@@ -1006,8 +1006,6 @@ async def test_pipeline_failed_layer_gets_user_facing_recovery_summary(db, test_
             return {"title": "Pilot"}
         if path == "/api/content/image-prompt":
             return {"image_prompt": "Lin in cyber-noir clinic."}
-        if path == "/api/video/generate/async":
-            raise RuntimeError("video provider timeout")
         raise AssertionError(path)
 
     monkeypatch.setattr(pipeline, "_pixelle_request", fake_pixelle_request)
@@ -1016,5 +1014,6 @@ async def test_pipeline_failed_layer_gets_user_facing_recovery_summary(db, test_
 
     db.expire_all()
     saved = db.query(PipelineRun).filter(PipelineRun.id == run.id).one()
-    assert saved.status == "failed"
-    assert "4" not in saved.layers_json or saved.layers_json.get("4", {}).get("status") != "completed"
+    assert saved.status == "blocked"
+    assert saved.layers_json["4"]["status"] == "blocked"
+    assert saved.layers_json["4"]["error"] == "Script pipeline provider rendering requires a production run job."

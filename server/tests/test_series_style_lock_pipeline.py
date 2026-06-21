@@ -1197,7 +1197,7 @@ def test_director_auto_plan_review_timeout_persists_partial_trace(client, db, mo
 
 
 @pytest.mark.asyncio
-async def test_pipeline_uses_saved_storyboard_and_persists_episode_and_video(db, test_db, monkeypatch):
+async def test_pipeline_uses_saved_storyboard_and_blocks_provider_rendering_without_job(db, test_db, monkeypatch):
     from app.domains.script_pipeline import pipeline_router as pipeline
     from app.domains.agency_operations.video_agency_team import build_video_agency_team
 
@@ -1245,26 +1245,21 @@ async def test_pipeline_uses_saved_storyboard_and_persists_episode_and_video(db,
             return {"title": "Pilot"}
         if path == "/api/content/image-prompt":
             return {"image_prompt": "consistent cyber-noir clinic interior"}
-        if path == "/api/video/generate/async":
-            return {"task_id": "pixelle-task-1"}
-        if path == "/api/video/task/pixelle-task-1":
-            return {"status": "completed", "progress": 100, "video_path": "frame-1.mp4", "duration": 5}
-        if path == "/api/postproduction/execute":
-            return {"video_path": "server/data/videos/final.mp4", "duration": 5}
         raise AssertionError(f"Unexpected Pixelle path: {path}")
 
     monkeypatch.setattr(pipeline, "_pixelle_request", fake_pixelle_request)
-    monkeypatch.setattr(pipeline.asyncio, "sleep", AsyncMock())
 
     await pipeline._run_all_layers(run.id)
 
     db.expire_all()
     saved_run = db.query(PipelineRun).filter(PipelineRun.id == run.id).one()
-    postproduction_payload = [payload for path, payload in captured_payloads if path == "/api/postproduction/execute"][0]
-    render_payloads = [payload for path, payload in captured_payloads if path == "/api/video/generate/async"]
 
-    assert saved_run.status == "completed"
-    assert saved_run.layers_json["0"]["agency_trace_status"] == "legacy_summary"
+    assert saved_run.status == "blocked"
     assert saved_run.layers_json["1"]["agency_trace_status"] == "complete"
-    assert len(render_payloads) >= 1
-    assert len(captured_payloads) >= 6  # 6 layers completed
+    assert saved_run.layers_json["4"]["status"] == "blocked"
+    assert saved_run.layers_json["4"]["error"] == "Script pipeline provider rendering requires a production run job."
+    assert "/api/content/title" in [path for path, _ in captured_payloads]
+    assert "/api/content/narration" in [path for path, _ in captured_payloads]
+    assert "/api/content/image-prompt" in [path for path, _ in captured_payloads]
+    assert not any(path.startswith("/api/video/") for path, _ in captured_payloads)
+    assert not any(path == "/api/postproduction/execute" for path, _ in captured_payloads)

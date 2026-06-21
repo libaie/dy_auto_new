@@ -82,16 +82,8 @@ async def _agency_pass(self, **kwargs):
 
 
 @pytest.mark.asyncio
-async def test_pipeline_start_blocks_when_expert_review_model_missing(db, monkeypatch):
-    from app.domains.script_pipeline import pipeline_router as pipeline
+async def test_pipeline_start_blocks_when_expert_review_model_missing(db):
     series, episode = _series_with_storyboard(db)
-    captured = {}
-
-    async def fake_submit_and_poll(payload, request_db):
-        captured["called"] = True
-        return {"task_id": "pixelle-task-1", "video_path": "output/final.mp4", "duration": 5}
-
-    monkeypatch.setattr(pipeline, "_submit_and_poll", fake_submit_and_poll)
 
     resp = client.post("/api/pipeline/start", json={
         "series_id": series.id,
@@ -104,28 +96,15 @@ async def test_pipeline_start_blocks_when_expert_review_model_missing(db, monkey
     assert detail["code"] == "EXPERT_MODEL_CONFIG_MISSING"
     assert detail["stage"] == "storyboard"
     assert detail["run_id"]
-    assert captured == {}
     run = db.query(PipelineRun).filter_by(id=detail["run_id"]).one()
     assert run.status == "blocked"
     assert run.layers_json["1"]["agency_trace"]["error_code"] == "EXPERT_MODEL_CONFIG_MISSING"
 
 
 @pytest.mark.asyncio
-async def test_pipeline_start_loads_saved_storyboard_when_director_plan_missing(db, monkeypatch):
-    from app.domains.script_pipeline import pipeline_router as pipeline
+async def test_pipeline_start_blocks_provider_rendering_without_production_job(db, monkeypatch):
     series, episode = _series_with_storyboard(db)
     _expert_review_model(db)
-    captured = {}
-
-    async def fake_submit_and_poll(payload, request_db):
-        captured["payload"] = payload
-        return {
-            "task_id": "pixelle-task-1",
-            "video_path": "output/final.mp4",
-            "duration": 5,
-        }
-
-    monkeypatch.setattr(pipeline, "_submit_and_poll", fake_submit_and_poll)
     monkeypatch.setattr("app.domains.agency_operations.agency_runtime.AgencySkillRuntime.invoke", _agency_pass)
 
     resp = client.post("/api/pipeline/start", json={
@@ -134,12 +113,14 @@ async def test_pipeline_start_loads_saved_storyboard_when_director_plan_missing(
         "director_plan": None,
     })
 
-    assert resp.status_code == 200
-    assert resp.json()["run_id"]
-    assert resp.json()["agency_trace_status"] == "complete"
-    assert captured["payload"]["frames"][0]["frame_id"] == "frame-001"
-    assert captured["payload"]["frames"][0]["reference_urls"] == ["https://cdn.test/ref.png"]
-    run_id = resp.json()["run_id"]
+    assert resp.status_code == 409
+    assert resp.json()["detail"] == "Script pipeline provider rendering requires a production run job."
+    run = db.query(PipelineRun).filter_by(series_id=series.id, episode_id=episode.id).one()
+    assert run.status == "blocked"
+    assert run.layers_json["0"]["status"] == "blocked"
+    assert run.layers_json["0"]["error"] == "Script pipeline provider rendering requires a production run job."
+    assert run.layers_json["1"]["agency_trace_status"] == "complete"
+    run_id = run.id
     invocations = db.query(AgencyExpertInvocation).filter_by(pipeline_run_id=run_id).all()
     assert invocations
     assert {item.stage for item in invocations} == {"storyboard"}

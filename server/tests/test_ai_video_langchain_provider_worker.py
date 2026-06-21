@@ -15,7 +15,7 @@ async def test_execute_real_job_uses_provider_stage_agent(monkeypatch, db):
             "status": "success",
             "message": "done",
             "provider_stage_task_id": "pst-1",
-            "asset_count": 1,
+            "raw": {"provider_result": {"assets": [{"url": "https://cdn.test/image.png"}]}},
         }
 
     class FailDirectExecutor:
@@ -52,6 +52,31 @@ async def test_execute_real_job_uses_provider_stage_agent(monkeypatch, db):
 async def test_execute_real_job_blocks_success_without_provider_evidence(monkeypatch, db):
     async def fake_agent(db_arg, *, run_id, job_id, job_stage, runtime_config, agent_runner=None):
         return {"status": "success", "message": "done"}
+
+    monkeypatch.setattr(worker, "run_provider_stage_agent", fake_agent)
+    monkeypatch.setattr(
+        worker,
+        "resolve_runtime_model_config",
+        lambda db_arg, scene_key: {"provider": "mock", "model": scene_key},
+    )
+    run = type("Run", (), {"id": "run-1", "episode_id": "episode-1", "production_plan_id": "plan-1"})()
+    job = type(
+        "Job",
+        (),
+        {"id": "job-1", "stage": "image_generation", "target_type": "frame", "target_id": "frame-1"},
+    )()
+
+    result = await worker.execute_real_job(db, run, job)
+
+    assert result.status == "blocked"
+    assert result.code == ProductionErrorCode.PROVIDER_STAGE_TASK_SYNC_REQUIRED
+    assert result.retryable is True
+
+
+@pytest.mark.asyncio
+async def test_execute_real_job_blocks_success_with_only_agent_asset_count(monkeypatch, db):
+    async def fake_agent(db_arg, *, run_id, job_id, job_stage, runtime_config, agent_runner=None):
+        return {"status": "success", "provider_stage_task_id": "pst-1", "asset_count": 1}
 
     monkeypatch.setattr(worker, "run_provider_stage_agent", fake_agent)
     monkeypatch.setattr(

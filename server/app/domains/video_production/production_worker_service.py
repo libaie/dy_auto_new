@@ -88,11 +88,6 @@ async def execute_real_job(db: Session, run: VideoProductionRun, job: Production
 def _provider_agent_success_has_provider_evidence(parsed: dict) -> bool:
     if not parsed.get("provider_stage_task_id"):
         return False
-    try:
-        if int(parsed.get("asset_count") or 0) > 0:
-            return True
-    except (TypeError, ValueError):
-        pass
     raw = parsed.get("raw")
     if not isinstance(raw, dict):
         return False

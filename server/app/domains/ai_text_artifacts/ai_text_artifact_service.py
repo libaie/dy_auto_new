@@ -1,3 +1,8 @@
+"""AI 文本产物业务域模块。
+
+AI 文本产物业务域，负责剧本、分镜、规划等文本产物的版本和审查状态。本文件负责 ai_text_artifact_service 相关业务规则、状态转换和外部系统边界。
+"""
+
 from __future__ import annotations
 
 import json

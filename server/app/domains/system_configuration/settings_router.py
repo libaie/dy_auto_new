@@ -1,4 +1,8 @@
-"""System settings API — key-value config store for admin UI."""
+"""系统配置业务域模块。
+
+系统配置业务域，负责安全配置、系统设置和加密存取。本文件负责 settings_router 相关业务规则、状态转换和外部系统边界。
+"""
+
 import logging
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session

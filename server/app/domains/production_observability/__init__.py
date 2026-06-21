@@ -1,1 +1,4 @@
-"""Shared production observability domain."""
+"""生产观测业务域包。
+
+集中声明生产观测业务域的公开边界，避免调用方感知内部文件拆分。
+"""

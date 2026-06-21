@@ -1,3 +1,8 @@
+"""提示词组合工具。
+
+负责把业务上下文、模板和变量组合为模型可消费的提示词。
+"""
+
 from __future__ import annotations
 
 from typing import Any

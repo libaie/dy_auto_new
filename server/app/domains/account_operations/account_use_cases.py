@@ -1,4 +1,7 @@
-"""Account CRUD use cases."""
+"""账号运营业务域模块。
+
+账号运营业务域，负责账号、分组、频道、链路和账号侧读写用例。本文件负责 account_use_cases 相关业务规则、状态转换和外部系统边界。
+"""
 
 from app.config import bj_now
 from app.db.models.account_operations import Account

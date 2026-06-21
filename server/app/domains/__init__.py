@@ -1,1 +1,4 @@
-"""Business-domain packages for the server application."""
+"""后端业务模块包。
+
+集中声明后端业务模块的公开边界，避免调用方感知内部文件拆分。
+"""

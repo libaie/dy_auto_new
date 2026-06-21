@@ -1,4 +1,8 @@
-"""Account groups CRUD API."""
+"""账号运营业务域模块。
+
+账号运营业务域，负责账号、分组、频道、链路和账号侧读写用例。本文件负责 account_groups_router 相关业务规则、状态转换和外部系统边界。
+"""
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 

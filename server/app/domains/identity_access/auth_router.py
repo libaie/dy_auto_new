@@ -1,4 +1,8 @@
-"""Authentication — login, device-login, user registration with brute-force protection."""
+"""身份访问业务域模块。
+
+身份访问业务域，负责登录、鉴权和用户身份上下文。本文件负责 auth_router 相关业务规则、状态转换和外部系统边界。
+"""
+
 import time
 from collections import defaultdict
 from threading import Lock

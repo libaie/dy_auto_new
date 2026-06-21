@@ -1,4 +1,8 @@
-"""DM sequence template API routes."""
+"""内容采集业务域模块。
+
+内容采集业务域，负责采集数据、私信序列、内容生成和实时事件。本文件负责 dm_sequences_router 相关业务规则、状态转换和外部系统边界。
+"""
+
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query

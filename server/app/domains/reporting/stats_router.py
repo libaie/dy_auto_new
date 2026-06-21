@@ -1,4 +1,8 @@
-"""Statistics API — dashboard, daily stats, realtime metrics."""
+"""统计报表业务域模块。
+
+统计报表业务域，负责运营、内容和生产统计读模型。本文件负责 stats_router 相关业务规则、状态转换和外部系统边界。
+"""
+
 from fastapi import APIRouter, Depends, Query, HTTPException
 from typing import Optional
 from sqlalchemy.orm import Session

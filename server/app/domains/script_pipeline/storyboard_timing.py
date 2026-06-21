@@ -1,3 +1,8 @@
+"""剧本流水线业务域模块。
+
+剧本流水线业务域，负责剧本、分镜节奏和文本生产阶段衔接。本文件负责 storyboard_timing 相关业务规则、状态转换和外部系统边界。
+"""
+
 from __future__ import annotations
 
 from typing import Any

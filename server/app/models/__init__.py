@@ -1,3 +1,8 @@
+"""接口模型包。
+
+集中声明旧版接口模型和任务参数结构，兼容设备端与管理端调用。
+"""
+
 from datetime import datetime
 from enum import Enum
 from typing import Any, Optional

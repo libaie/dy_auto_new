@@ -1,4 +1,8 @@
-"""Content template and sensitive word service for content collection."""
+"""内容采集业务域模块。
+
+内容采集业务域，负责采集数据、私信序列、内容生成和实时事件。本文件负责 content_service 相关业务规则、状态转换和外部系统边界。
+"""
+
 import json
 import re
 import time

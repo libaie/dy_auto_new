@@ -1,3 +1,8 @@
+"""生产观测业务域模块。
+
+生产观测业务域，负责生产事件、指标和运行证据聚合。本文件负责 production_observability_service 相关业务规则、状态转换和外部系统边界。
+"""
+
 import re
 from typing import Any
 

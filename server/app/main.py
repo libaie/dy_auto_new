@@ -1,4 +1,8 @@
-"""FastAPI application entry point."""
+"""应用启动入口。
+
+负责 FastAPI 应用、后台 worker、路由注册和生命周期管理。
+"""
+
 import sys
 from pathlib import Path
 

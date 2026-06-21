@@ -1,4 +1,8 @@
-"""Device registration, heartbeat, and status management for device operations."""
+"""设备运营业务域模块。
+
+设备运营业务域，负责设备接入、脚本下发、轮询上报和状态生命周期。本文件负责 device_service 相关业务规则、状态转换和外部系统边界。
+"""
+
 from datetime import datetime, timezone, timedelta
 from sqlalchemy.orm import Session
 from app.config import bj_now

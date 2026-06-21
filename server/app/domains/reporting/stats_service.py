@@ -1,4 +1,8 @@
-"""Daily stats tracking service for reporting and quota checks."""
+"""统计报表业务域模块。
+
+统计报表业务域，负责运营、内容和生产统计读模型。本文件负责 stats_service 相关业务规则、状态转换和外部系统边界。
+"""
+
 from datetime import datetime, timezone
 from app.config import bj_now
 from typing import Optional

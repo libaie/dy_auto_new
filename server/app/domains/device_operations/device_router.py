@@ -1,4 +1,8 @@
-"""Device-facing API — poll, report, heartbeat, selectors."""
+"""设备运营业务域模块。
+
+设备运营业务域，负责设备接入、脚本下发、轮询上报和状态生命周期。本文件负责 device_router 相关业务规则、状态转换和外部系统边界。
+"""
+
 from fastapi import APIRouter, HTTPException, Depends, Request
 from typing import Optional
 from sqlalchemy.orm import Session

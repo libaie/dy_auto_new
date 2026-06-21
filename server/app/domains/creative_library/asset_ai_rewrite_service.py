@@ -1,4 +1,8 @@
-"""AI rewrite candidates for character and scene assets."""
+"""创意库业务域模块。
+
+创意库业务域，负责锚点、参考资产、素材生命周期和 AI 改写。本文件负责 asset_ai_rewrite_service 相关业务规则、状态转换和外部系统边界。
+"""
+
 import json
 import re
 from json import JSONDecodeError

@@ -1,4 +1,7 @@
-"""Creative library domain package."""
+"""创意库业务域包。
+
+集中声明创意库业务域的公开边界，避免调用方感知内部文件拆分。
+"""
 
 DOMAIN_NAME = "creative_library"
 PUBLIC_ROUTE_PREFIXES = (

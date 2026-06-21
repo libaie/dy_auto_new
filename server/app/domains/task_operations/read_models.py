@@ -1,5 +1,7 @@
-"""Payload shaping helpers for task operations routes."""
+"""任务运营业务域模块。
 
+任务运营业务域，负责任务参数解析、执行用例、实时事件和路由接口。本文件负责 read_models 相关业务规则、状态转换和外部系统边界。
+"""
 
 def task_list_response(tasks, total: int) -> dict:
     return {"tasks": tasks, "total": total}

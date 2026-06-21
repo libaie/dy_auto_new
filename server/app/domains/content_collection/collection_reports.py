@@ -1,4 +1,8 @@
-"""Collection report, comment reply, and collected-user profile use cases."""
+"""内容采集业务域模块。
+
+内容采集业务域，负责采集数据、私信序列、内容生成和实时事件。本文件负责 collection_reports 相关业务规则、状态转换和外部系统边界。
+"""
+
 import base64
 import os
 

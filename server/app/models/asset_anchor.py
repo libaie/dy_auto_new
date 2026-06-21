@@ -1,3 +1,8 @@
+"""素材锚点模型。
+
+定义创意素材锚点的数据结构，支撑素材库和生产引用。
+"""
+
 from __future__ import annotations
 
 from enum import Enum

@@ -1,4 +1,8 @@
-"""Video management API — admin endpoints."""
+"""视频库业务域模块。
+
+视频库业务域，负责生成视频的归档、查询和对外展示接口。本文件负责 videos_router 相关业务规则、状态转换和外部系统边界。
+"""
+
 from datetime import datetime
 from typing import Optional
 

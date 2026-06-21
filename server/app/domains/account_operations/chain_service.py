@@ -1,4 +1,8 @@
-"""Chain orchestration service for account operations."""
+"""账号运营业务域模块。
+
+账号运营业务域，负责账号、分组、频道、链路和账号侧读写用例。本文件负责 chain_service 相关业务规则、状态转换和外部系统边界。
+"""
+
 import asyncio
 import logging
 import threading

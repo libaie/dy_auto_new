@@ -1,10 +1,6 @@
-"""Template image storage for selector management.
+"""选择器管理业务域模块。
 
-Templates are stored in resolution subdirectories:
-  template_images/
-    default/          ← fallback templates
-    1080x2400/        ← device-specific templates
-    720x1600/
+选择器管理业务域，负责 UI 选择器模板、版本和设备端匹配配置。本文件负责 template_service 相关业务规则、状态转换和外部系统边界。
 """
 
 import hashlib

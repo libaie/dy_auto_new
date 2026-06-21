@@ -1,4 +1,8 @@
-"""Fernet (AES-128-CBC + HMAC-SHA256) field-level encryption for sensitive settings."""
+"""系统配置业务域模块。
+
+系统配置业务域，负责安全配置、系统设置和加密存取。本文件负责 crypto 相关业务规则、状态转换和外部系统边界。
+"""
+
 import os
 import hashlib
 import base64

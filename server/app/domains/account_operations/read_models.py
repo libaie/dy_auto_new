@@ -1,5 +1,7 @@
-"""Payload shaping helpers for account operations routes."""
+"""账号运营业务域模块。
 
+账号运营业务域，负责账号、分组、频道、链路和账号侧读写用例。本文件负责 read_models 相关业务规则、状态转换和外部系统边界。
+"""
 
 def account_to_dict(acc) -> dict:
     return {

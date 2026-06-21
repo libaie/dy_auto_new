@@ -1,3 +1,8 @@
+"""分镜图片业务域模块。
+
+分镜图片业务域，负责分镜帧图片生成、绑定和状态查询。本文件负责 storyboard_images_router 相关业务规则、状态转换和外部系统边界。
+"""
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query

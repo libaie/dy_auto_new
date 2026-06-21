@@ -1,3 +1,8 @@
+"""脚本模型。
+
+定义设备脚本和任务脚本相关的数据结构。
+"""
+
 from __future__ import annotations
 
 from enum import Enum

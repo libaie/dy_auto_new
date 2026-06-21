@@ -1,4 +1,8 @@
-"""Selector management service for selector CRUD and device selector filtering."""
+"""选择器管理业务域模块。
+
+选择器管理业务域，负责 UI 选择器模板、版本和设备端匹配配置。本文件负责 selector_service 相关业务规则、状态转换和外部系统边界。
+"""
+
 from typing import Optional
 
 from sqlalchemy.orm import Session

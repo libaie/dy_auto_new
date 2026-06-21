@@ -1,4 +1,8 @@
-"""Prompt template management service for prompt management."""
+"""提示词管理业务域模块。
+
+提示词管理业务域，负责提示词模板、改写和版本化配置。本文件负责 prompt_template_service 相关业务规则、状态转换和外部系统边界。
+"""
+
 import json
 from typing import Optional
 

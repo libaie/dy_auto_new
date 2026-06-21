@@ -1,4 +1,4 @@
-// device/handlers/nurture.js
+// 私域培育处理器，负责按任务策略执行轻量互动和跟进动作。
 var BaseHandler = require("./base-handler");
 var uiOperator = require("../core/ui-operator");
 var antiDetect = require("../core/anti-detect");

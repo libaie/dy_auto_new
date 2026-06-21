@@ -381,6 +381,7 @@ localPreFilter: function (text) {
 
       var screen = null, squareImg = null, srcBitmap = null, outBitmap = null;
       try {
+        // 头像裁剪只取当前头像区域，用于本地去重和资料补全。
         screen = images.captureScreen();
         squareImg = images.clip(screen, left, top, sz, sz);
         if (squareImg) {

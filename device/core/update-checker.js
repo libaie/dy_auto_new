@@ -1,3 +1,4 @@
+// 设备更新检查模块，负责发现脚本版本变化并提示或触发更新。
 var apiClient = require("./api-client");
 var logger = require("../utils/logger");
 

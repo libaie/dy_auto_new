@@ -266,6 +266,7 @@ SearchCollectHandler._collectUserData = function (item, comment) {
 
   try {
     var b = avatarEl.bounds();
+    // 点击头像前已确认是真实 UI 节点，失败时不继续强行进入主页。
     if (avatarEl.clickable()) {
       avatarEl.click();
     } else if (b) {

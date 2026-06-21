@@ -1,4 +1,4 @@
-// device/main.js
+// 设备端主入口，负责拉取任务、调度处理器并把执行结果回传后端。
 var config = require("./config");
 var apiClient = require("./core/api-client");
 var selectorLoader = require("./core/selector-loader");

@@ -1,3 +1,4 @@
+// 设备崩溃恢复模块，负责记录运行现场并在异常后恢复任务状态。
 var logger = require("../utils/logger");
 
 var TAG = "RECOVERY";
@@ -64,6 +65,7 @@ var crashRecovery = {
         var btn = text(dialogButtons[i]).findOne(2000);
         if (btn) {
           logger.info(TAG, "Found dialog button: " + dialogButtons[i]);
+          // 只点击已识别的系统弹窗按钮，避免恢复流程误触业务页面。
           btn.click();
           sleep(1000);
           return true;

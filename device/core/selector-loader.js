@@ -1,3 +1,4 @@
+// 选择器加载模块，负责读取后端下发或本地缓存的 UI 定位配置。
 var apiClient = require("./api-client");
 var logger = require("../utils/logger");
 

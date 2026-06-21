@@ -1,4 +1,4 @@
-// device/handlers/reply-comment.js
+// 评论回复处理器，负责筛选评论、生成回复并执行关注或私信链路。
 var CommentBaseHandler = require("./comment-base");
 var aiAnalyzer = require("../core/ai-analyzer");
 var uiOperator = require("../core/ui-operator");
@@ -812,6 +812,7 @@ ReplyCommentHandler._replyToComment = function (replyText, nickname) {
   try {
     var focusedNode = className("EditText").focused(true).findOne(3000);
     if (focusedNode) {
+        // 回复前先清掉焦点输入框占位内容，避免 AI 回复和残留文本拼接。
         focusedNode.setText(" ");
         sleep(200);
         for (var di = 0; di < 5; di++) { shell("input keyevent 67", false); }
@@ -1058,6 +1059,7 @@ ReplyCommentHandler._followUser = function () {
         if (!retryBtn) {
           followed = true;
         } else {
+          // 关注重试仍使用原按钮坐标，避免在页面跳转后点击未知区域。
           press(fbx, fby, Math.floor(Math.random() * 100 + 80));
           sleep(Math.floor(Math.random() * 1000 + 1000));
           if (uiOperator.findElement("is_follow", 2000)) followed = true;

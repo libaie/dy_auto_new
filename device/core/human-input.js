@@ -1,6 +1,4 @@
-// device/core/human-input.js
-// Focused text input helper for DM flows.
-
+// 真人输入模拟模块，负责把文本输入拆成更接近人工操作的节奏。
 function _noop() {}
 
 function _defaultDeps() {
@@ -49,6 +47,7 @@ function _chunkSize(deps, remaining) {
 
 function _clearEditText(editText) {
   if (!editText || typeof editText.setText !== "function") return false;
+  // 清空输入框是受控输入的第一步，避免上一条私信或评论残留。
   editText.setText("");
   return true;
 }
@@ -67,6 +66,7 @@ function _readEditText(editText) {
 function _forceEditText(editText, text) {
   if (!editText || typeof editText.setText !== "function") return false;
   try {
+    // 兜底直写只作用于当前输入框，真人节奏仍由上层分块输入控制。
     editText.setText(text);
     return true;
   } catch (e) {

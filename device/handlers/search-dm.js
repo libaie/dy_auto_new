@@ -1,4 +1,4 @@
-// device/handlers/search-dm.js
+// 搜索私信处理器，负责从搜索结果进入用户并执行私信触达。
 var SearchBaseHandler = require("./search-base");
 var aiAnalyzer = require("../core/ai-analyzer");
 var apiClient = require("../core/api-client");

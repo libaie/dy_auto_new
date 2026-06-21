@@ -1,3 +1,4 @@
+// 设备 UI 操作模块，负责点击、滑动、查找节点和安全执行抖音界面动作。
 var selectorLoader = require("./selector-loader");
 var apiClient = require("./api-client");
 var logger = require("../utils/logger");
@@ -705,6 +706,7 @@ var uiOperator = {
     var candidates = collectCandidates(templateFile);
     if (candidates.length === 0) return null;
 
+    // 截屏只用于本地模板匹配，不上传屏幕内容。
     var screen = images.captureScreen();
     if (!screen) return null;
 
@@ -963,6 +965,7 @@ var uiOperator = {
         var cx = bounds.centerX();
         var cy = bounds.centerY();
         if (cx >= 0 && cy >= 0 && cx < device.width && cy < device.height) {
+          // 控件点击失败后只在控件边界中心补点一次，降低误触范围。
           return click(cx, cy);
         }
       }
@@ -985,6 +988,7 @@ var uiOperator = {
       var y = element.y || Math.round(element.y_percent * device.height);
       click(x, y);
     } else {
+      // 输入前只点击目标输入框获取焦点，失败后交给后续 setText 兜底。
       try { element.click(); } catch (e) { /* ignore */ }
     }
     sleep(500);

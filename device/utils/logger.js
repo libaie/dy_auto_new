@@ -1,3 +1,4 @@
+// 设备日志工具，统一输出任务、设备动作和错误诊断信息。
 var config = global.__config || require("../config");
 
 var LOG_LEVELS = { debug: 0, info: 1, warn: 2, error: 3 };

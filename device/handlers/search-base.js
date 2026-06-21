@@ -1,4 +1,4 @@
-// device/handlers/search-base.js
+// 搜索任务基础处理器，封装抖音搜索、结果遍历和通用采集流程。
 var BaseHandler = require("./base-handler");
 var uiOperator = require("../core/ui-operator");
 var antiDetect = require("../core/anti-detect");
@@ -509,6 +509,7 @@ SearchBaseHandler._clickSearchResult = function (index) {
     if (!el) return false;
     if (el.isCoordinate || el.isImage || el.isPress || el.isPackage) return uiOperator.clickElement(el);
     try {
+      // 搜索结果点击只作用于已通过屏幕边界检查的候选节点。
       if (el.clickable && el.clickable()) return el.click();
       var b = el.bounds && el.bounds();
       if (b) return press(b.centerX(), b.centerY(), 80);

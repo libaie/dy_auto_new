@@ -1,5 +1,4 @@
-// device/core/task-timeout.js
-
+// 任务超时控制模块，负责限制单个设备任务的最长执行时间。
 var DEFAULT_TASK_TIMEOUT_MS = 10 * 60 * 1000;
 var NURTURE_TIMEOUT_BUFFER_MS = 2 * 60 * 1000;
 

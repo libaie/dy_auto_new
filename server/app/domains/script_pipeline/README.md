@@ -9,16 +9,8 @@ generation pipeline runtime.
 
 ## Not Owned
 
-- ORM models such as `Episode` and `Series` stay in `app.db_models`;
-  `GeneratedVideo` lives in `app.db.models.video_library`.
 - Database session helpers stay in `app.database`.
 - Role dependencies stay in `app.deps`.
-- Pixelle transport stays in `app.services.pixelle_client`.
-- Agency orchestration internals stay in `app.services`.
-- Non-domain service modules may keep importing `app.services.script_pipeline`
-  until their owning domains move.
-- Non-domain service modules may keep importing `app.services.storyboard_timing`
-  until their owning domains move.
 - Series authoring, AI text artifact, director, and video production routes stay
   in their own routers or domains.
 
@@ -38,48 +30,15 @@ generation pipeline runtime.
   `ScriptDramaticBeat`, `ScriptSceneOutline`, and `ScriptVisualShot` ORM class
   bodies.
 
-## Facade Register
+## Canonical Imports
 
-| Facade | Target | Exit condition |
-|---|---|---|
-| `app.routers.pipeline` | `app.domains.script_pipeline.pipeline_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
-| `app.services.script_pipeline` | `app.domains.script_pipeline.script_pipeline_service` | Direct service imports use the domain service path, except compatibility tests and callers whose owning domains have not moved yet. |
-| `app.services.storyboard_timing` | `app.domains.script_pipeline.storyboard_timing` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
-| `app.db_models.PipelineRun` / `EpisodeScript` / `ScriptDramaticBeat` / `ScriptSceneOutline` / `ScriptVisualShot` | `app.db.models.script_pipeline` | Keep as compatibility re-exports until production imports use the domain model path. |
+The retired router, service, and ORM import packages have been removed. Runtime code, tests, scripts, and new docs must import domain modules directly and use `app.db.models` / `app.db.models.<domain>` for ORM models.
 
 ## Boundaries
 
 - Preserve route paths, route names, auth dependencies, and response shapes.
-- Preserve saved `Episode.storyboard_json` startup compatibility.
-- Preserve monkeypatch compatibility for `_submit_and_poll`.
-- Preserve direct call compatibility for `_run_all_layers`.
 - Keep the script pipeline service runtime independent from `pipeline_router`.
-- Preserve `app.services.script_pipeline` import compatibility during the
-  facade phase.
 
-## Compatibility Cleanup Gates
+## Legacy Import Guard
 
-Do not remove the legacy router facade until all of these are true:
-
-- `app.main` imports `pipeline_router` from `app.domains.script_pipeline`.
-- Route/auth snapshots pass against the domain endpoint module.
-- Legacy and domain imports resolve to the same module object during the alias
-  phase.
-- Existing saved-storyboard and agency console pipeline tests pass.
-- Import inventory shows no unapproved production imports of
-  `app.routers.pipeline`.
-
-Do not remove the legacy service facade until all of these are true:
-
-- `rg "app\.services\.script_pipeline" server/app server/tests` returns only compatibility tests and migration docs.
-- `test_script_pipeline_service_domain_facade.py` has been replaced with tests for direct domain imports.
-- `production_run_service.py` imports `PipelineManager` through `app.domains.script_pipeline.script_pipeline_service` after that service is moved or cleaned up.
-
-Do not remove the legacy storyboard timing facade until all of these are true:
-
-- `rg "app\.services\.storyboard_timing" server/app server/tests` returns only
-  compatibility tests and migration docs.
-- `test_script_pipeline_storyboard_timing_facade.py` has been replaced with
-  tests for direct domain imports.
-- Domain-owned production modules import
-  `app.domains.script_pipeline.storyboard_timing` directly.
+The cleanup gate is complete. Keep the retired import-path and AST inventory tests passing so removed paths stay unavailable.

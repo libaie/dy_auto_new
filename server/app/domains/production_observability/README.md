@@ -21,12 +21,9 @@ This domain owns shared production audit-event writing and secret redaction.
 - `app.db.models.production_observability` owns the `ProductionAuditEvent` ORM
   class body.
 
-## Facade Register
+## Canonical Imports
 
-| Facade | Target | Exit condition |
-|---|---|---|
-| `app.services.production_observability` | `app.domains.production_observability.production_observability_service` | Domain modules import the shared domain path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
-| `app.db_models.ProductionAuditEvent` | `app.db.models.production_observability.ProductionAuditEvent` | Keep as a compatibility re-export until production imports use the domain model path. |
+The retired router, service, and ORM import packages have been removed. Runtime code, tests, scripts, and new docs must import domain modules directly and use `app.db.models` / `app.db.models.<domain>` for ORM models.
 
 ## Boundaries
 
@@ -34,12 +31,6 @@ This domain owns shared production audit-event writing and secret redaction.
 - Preserve caller-owned transaction behavior; event recording flushes only.
 - Keep production workflow ownership in the consuming business domains.
 
-## Compatibility Cleanup Gates
+## Legacy Import Guard
 
-Do not remove the legacy production observability facade until all of these are true:
-
-- `rg "app\.services\.production_observability" server/app server/tests` returns only compatibility tests, migration docs, or service modules whose domains have not moved yet.
-- `test_production_observability_domain_facade.py` has been replaced with tests for direct domain imports.
-- Domain-owned production modules import `app.domains.production_observability.production_observability_service` directly.
-- Direct domain observability coverage proves `_normalize_key`, `_redact`, and
-  `record_production_event` behavior without legacy imports.
+The cleanup gate is complete. Keep the retired import-path and AST inventory tests passing so removed paths stay unavailable.

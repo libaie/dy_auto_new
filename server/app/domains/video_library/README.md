@@ -8,7 +8,6 @@ This domain owns admin generated-video library routes.
 
 ## Not Owned
 
-- `app.routers.video_production` stays outside this domain.
 - Pixelle provider and proxy routes stay outside this domain.
 - Seedance provider routes stay outside this domain.
 
@@ -18,12 +17,9 @@ This domain owns admin generated-video library routes.
   routes.
 - `app.db.models.video_library` owns the `GeneratedVideo` ORM class body.
 
-## Facade Register
+## Canonical Imports
 
-| Facade | Target | Exit condition |
-|---|---|---|
-| `app.routers.videos` | `app.domains.video_library.videos_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
-| `app.db_models.GeneratedVideo` | `app.db.models.video_library.GeneratedVideo` | Keep as a compatibility re-export until production imports use the domain model path. |
+The retired router, service, and ORM import packages have been removed. Runtime code, tests, scripts, and new docs must import domain modules directly and use `app.db.models` / `app.db.models.<domain>` for ORM models.
 
 ## Boundaries
 
@@ -34,14 +30,6 @@ This domain owns admin generated-video library routes.
   download token fallback behavior, and delete behavior.
 - Do not add a service layer in this route-boundary migration.
 
-## Compatibility Cleanup Gates
+## Legacy Import Guard
 
-Do not remove the legacy router facade until all of these are true:
-
-- `app.main` imports the videos router from `app.domains.video_library`.
-- Route/auth snapshots pass against the domain endpoint module.
-- Legacy and domain imports resolve to the same module object during the alias
-  phase.
-- Video library API behavior tests pass.
-- Import inventory shows no unapproved production imports of
-  `app.routers.videos`.
+The cleanup gate is complete. Keep the retired import-path and AST inventory tests passing so removed paths stay unavailable.

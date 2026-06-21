@@ -24,11 +24,9 @@ This domain owns storyboard frame image task and promoted image asset routes.
 - `storyboard_image_service.py` owns storyboard frame image task creation,
   state listing, and promotion to video assets.
 
-## Facade Register
+## Canonical Imports
 
-| Facade | Target | Exit condition |
-|---|---|---|
-| `app.routers.storyboard_images` | `app.domains.storyboard_images.storyboard_images_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
+The retired router, service, and ORM import packages have been removed. Runtime code, tests, scripts, and new docs must import domain modules directly and use `app.db.models` / `app.db.models.<domain>` for ORM models.
 
 ## Boundaries
 
@@ -36,17 +34,7 @@ This domain owns storyboard frame image task and promoted image asset routes.
 - Preserve admin-role protection on every route.
 - Preserve request validation for count and asset version values.
 - Preserve the service layer as the owner of storyboard image business logic.
-- Preserve compatibility for legacy imports during the alias phase.
 
-## Compatibility Cleanup Gates
+## Legacy Import Guard
 
-Do not remove the legacy router facade until all of these are true:
-
-- `app.main` imports `storyboard_images_router` from
-  `app.domains.storyboard_images`.
-- Route/auth snapshots pass against the domain endpoint module.
-- Legacy and domain imports resolve to the same module object during the alias
-  phase.
-- Existing storyboard image API, service, and video bridge tests pass.
-- Import inventory shows no unapproved production imports of
-  `app.routers.storyboard_images`.
+The cleanup gate is complete. Keep the retired import-path and AST inventory tests passing so removed paths stay unavailable.

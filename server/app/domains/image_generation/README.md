@@ -57,111 +57,17 @@ plus image production strategy business logic.
   image model capability diagnostics, preferred model handling, fallback
   candidates, warnings, and rescue actions.
 
-## Facade Register
+## Canonical Imports
 
-| Facade | Target | Exit condition |
-|---|---|---|
-| `app.routers.image_creation` | `app.domains.image_generation.image_creation_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
-| `app.routers.image_production` | `app.domains.image_generation.image_production_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
-| `app.services.image_creation_service` | `app.domains.image_generation.image_creation_service` | Keep while image routers, image A/B services, storyboard images, review asset edits, reference assets, and legacy tests import or monkeypatch image creation through `app.services`; remove after import inventory is clean. |
-| `app.services.image_creation_storage` | `app.domains.image_generation.image_creation_storage` | Keep while the approved image creation service compatibility import remains; remove only after import inventory shows no production legacy imports. |
-| `app.services.image_production_cost_service` | `app.domains.image_generation.image_production_cost_service` | Keep while the approved image creation service compatibility import remains; remove only after import inventory shows no production legacy imports. |
-| `app.services.image_creation_errors` | `app.domains.image_generation.image_creation_errors` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
-| `app.services.image_ab_test_service` | `app.domains.image_generation.image_ab_test_service` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
-| `app.services.image_asset_bridge_service` | `app.domains.image_generation.image_asset_bridge_service` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
-| `app.services.image_review_gate_service` | `app.domains.image_generation.image_review_gate_service` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
-| `app.services.image_production_strategy_service` | `app.domains.image_generation.image_production_strategy_service` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
-| `app.services.image_production_policy_runtime` | `app.domains.image_generation.image_production_policy_runtime` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
-| `app.services.image_production_metrics_service` | `app.domains.image_generation.image_production_metrics_service` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
-| `app.services.image_production_recommendation_service` | `app.domains.image_generation.image_production_recommendation_service` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
-| `app.services.image_selection_preview_service` | `app.domains.image_generation.image_selection_preview_service` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
-| `app.services.image_model_selection_service` | `app.domains.image_generation.image_model_selection_service` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
-| `app.services.image_selection_preview_hash` | `app.domains.image_generation.image_selection_preview_hash` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
+The retired router, service, and ORM import packages have been removed. Runtime code, tests, scripts, and new docs must import domain modules directly and use `app.db.models` / `app.db.models.<domain>` for ORM models.
 
 ## Boundaries
 
 - Keep image route paths, methods, auth dependencies, response shapes, and route
   function names stable.
-- Keep remaining service implementations in `app.services.*` until their
-  service-split plans are approved.
-- Keep ORM models in `app.db_models` during this route-boundary migration.
 - Do not move video production, agency review, AI config, or Pixelle proxy
   ownership into this domain unless a later plan explicitly expands scope.
 
-## Compatibility Cleanup Gates
+## Legacy Import Guard
 
-Do not remove legacy router facades until all of these are true:
-
-- `app.main` imports image routers from `app.domains.image_generation`.
-- Route/auth snapshots pass against domain endpoint modules.
-- Legacy and domain imports resolve to the same module objects during the alias
-  phase.
-- Existing image creation and image production API tests pass.
-- Import inventory shows no unapproved production imports of
-  `app.routers.image_creation` or `app.routers.image_production`.
-
-Do not remove the legacy image error helper facade until all of these are true:
-
-- `rg "app\.services\.image_creation_errors" server/app server/tests` returns only compatibility tests, migration docs, or service modules whose domains have not moved yet.
-- `test_image_generation_error_helper_facade.py` has been replaced with tests for direct domain imports.
-- Domain-owned production modules import `app.domains.image_generation.image_creation_errors` directly.
-
-Do not remove the legacy image A/B test service facade until all of these are true:
-
-- `rg "app\.services\.image_ab_test_service" server/app server/tests` returns only compatibility tests, migration docs, or service modules whose domains have not moved yet.
-- `test_image_generation_ab_test_service_facade.py` has been replaced with tests for direct domain imports.
-- Domain-owned production modules import `app.domains.image_generation.image_ab_test_service` directly.
-
-Do not remove the legacy image asset bridge service facade until all of these are true:
-
-- `rg "app\.services\.image_asset_bridge_service" server/app server/tests` returns only compatibility tests, migration docs, or service modules whose domains have not moved yet.
-- `test_image_generation_asset_bridge_facade.py` has been replaced with tests for direct domain imports.
-- Domain-owned production modules import `app.domains.image_generation.image_asset_bridge_service` directly.
-
-Do not remove the legacy image review gate service facade until all of these are true:
-
-- `rg "app\.services\.image_review_gate_service" server/app server/tests` returns only compatibility tests, migration docs, or service modules whose domains have not moved yet.
-- `test_image_generation_review_gate_facade.py` has been replaced with tests for direct domain imports.
-- Domain-owned production modules import `app.domains.image_generation.image_review_gate_service` directly.
-
-Do not remove the legacy image strategy service facade until all of these are true:
-
-- `rg "app\.services\.image_production_strategy_service" server/app server/tests` returns only compatibility tests and migration docs.
-- `test_image_generation_strategy_service_facade.py` has been replaced with tests for direct domain imports.
-- Domain-owned production modules import `app.domains.image_generation.image_production_strategy_service` directly.
-
-Do not remove the legacy image policy runtime facade until all of these are true:
-
-- `rg "app\.services\.image_production_policy_runtime" server/app server/tests` returns only compatibility tests, migration docs, or service modules whose domains have not moved yet.
-- `test_image_generation_policy_runtime_facade.py` has been replaced with tests for direct domain imports.
-- Domain-owned production modules import `app.domains.image_generation.image_production_policy_runtime` directly.
-
-Do not remove the legacy image metrics service facade until all of these are true:
-
-- `rg "app\.services\.image_production_metrics_service" server/app server/tests` returns only compatibility tests, migration docs, or service modules whose domains have not moved yet.
-- `test_image_generation_metrics_service_facade.py` has been replaced with tests for direct domain imports.
-- Domain-owned production modules import `app.domains.image_generation.image_production_metrics_service` directly.
-
-Do not remove the legacy image recommendation service facade until all of these are true:
-
-- `rg "app\.services\.image_production_recommendation_service" server/app server/tests` returns only compatibility tests, migration docs, or service modules whose domains have not moved yet.
-- `test_image_generation_recommendation_service_facade.py` has been replaced with tests for direct domain imports.
-- Domain-owned production modules import `app.domains.image_generation.image_production_recommendation_service` directly.
-
-Do not remove the legacy selection preview service facade until all of these are true:
-
-- `rg "app\.services\.image_selection_preview_service" server/app server/tests` returns only compatibility tests and migration docs.
-- `test_image_generation_selection_preview_service_facade.py` has been replaced with tests for direct domain imports.
-- Domain-owned production modules import `app.domains.image_generation.image_selection_preview_service` directly.
-
-Do not remove the legacy image model selection service facade until all of these are true:
-
-- `rg "app\.services\.image_model_selection_service" server/app server/tests` returns only compatibility tests and migration docs.
-- `test_image_generation_model_selection_service_facade.py` has been replaced with tests for direct domain imports.
-- Domain-owned production modules import `app.domains.image_generation.image_model_selection_service` directly.
-
-Do not remove the legacy selection preview hash facade until all of these are true:
-
-- `rg "app\.services\.image_selection_preview_hash" server/app server/tests` returns only compatibility tests, migration docs, or service modules whose domains have not moved yet.
-- `test_image_generation_selection_preview_hash_facade.py` has been replaced with tests for direct domain imports.
-- Domain-owned production modules import `app.domains.image_generation.image_selection_preview_hash` directly.
+The cleanup gate is complete. Keep the retired import-path and AST inventory tests passing so removed paths stay unavailable.

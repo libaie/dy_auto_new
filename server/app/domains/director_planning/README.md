@@ -9,14 +9,13 @@ This domain owns director workshop and episode production planning routes.
 ## Not Owned
 
 - `Episode`, `Series`, and production ORM model definitions stay in
-  `app.db_models`.
+  `app.db.models`.
 - Database session helpers stay in `app.database`.
 - Auth dependencies stay in `app.deps`.
-- AI generation stays in `app.services.ai_generator`.
 - Agency review orchestration lives in
   `app.domains.agency_operations.agency_orchestrator`.
 - AI text artifact persistence internals stay in
-  `app.services.ai_text_artifact_service`.
+  `app.domains.ai_text_artifacts.ai_text_artifact_service`.
 - Production plan row construction stays in
   `app.domains.video_production.production_plan_service`.
 - Pipeline execution and video rendering stay in their own domains and services.
@@ -28,29 +27,17 @@ This domain owns director workshop and episode production planning routes.
   storyboard artifact recording through `AITextArtifactService`, director
   timeout constants, and all `/api/director/*` route handlers.
 
-## Facade Register
+## Canonical Imports
 
-| Facade | Target | Exit condition |
-|---|---|---|
-| `app.routers.director` | `app.domains.director_planning.director_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
+The retired router, service, and ORM import packages have been removed. Runtime code, tests, scripts, and new docs must import domain modules directly and use `app.db.models` / `app.db.models.<domain>` for ORM models.
 
 ## Boundaries
 
 - Preserve route paths, route names, auth dependencies, and response shapes.
 - Preserve auto-plan storyboard persistence and AI text artifact side effects.
-- Preserve monkeypatch compatibility for `app.routers.director.ai_generator`,
-  `app.routers.director.AgencyOrchestrator`, and director timeout constants.
 - Keep script pipeline's `/api/director/auto-plan` message as an external route
   hint rather than importing this domain.
 
-## Compatibility Cleanup Gates
+## Legacy Import Guard
 
-Do not remove the legacy router facade until all of these are true:
-
-- `app.main` imports `director_router` from `app.domains.director_planning`.
-- Route/auth snapshots pass against the domain endpoint module.
-- Legacy and domain imports resolve to the same module object during the alias
-  phase.
-- Existing director and style-lock auto-plan tests pass.
-- Import inventory shows no unapproved production imports of
-  `app.routers.director`.
+The cleanup gate is complete. Keep the retired import-path and AST inventory tests passing so removed paths stay unavailable.

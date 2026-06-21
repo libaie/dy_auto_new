@@ -12,19 +12,16 @@ This domain owns admin and device authentication routes.
 - Device secret verification stays with device-facing infrastructure and
   `device_operations`.
 - `User` ORM lives in `app.db.models.identity_access`; `Device` remains in
-  `app.db_models` until the device/account graph moves.
+  `app.db.models.device_operations`.
 
 ## Current Modules
 
 - `auth_router.py` owns admin login, device login, admin-only user registration,
   user listing, and route-local brute-force login protection state.
 
-## Facade Register
+## Canonical Imports
 
-| Facade | Target | Exit condition |
-|---|---|---|
-| `app.routers.auth` | `app.domains.identity_access.auth_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
-| `app.db_models.User` | `app.db.models.identity_access.User` | Keep as a compatibility re-export until production imports use the domain model path. |
+The retired router, service, and ORM import packages have been removed. Runtime code, tests, scripts, and new docs must import domain modules directly and use `app.db.models` / `app.db.models.<domain>` for ORM models.
 
 ## Boundaries
 
@@ -33,16 +30,7 @@ This domain owns admin and device authentication routes.
 - Preserve route paths, route names, auth dependencies, response shapes,
   password hashing, token payloads, trusted-proxy IP behavior, and rate-limit
   behavior.
-- Preserve `_failed_attempts` compatibility because tests and old callers may
-  reset or inspect rate-limit state via `app.routers.auth`.
 
-## Compatibility Cleanup Gates
+## Legacy Import Guard
 
-Do not remove the legacy router facade until all of these are true:
-
-- `app.main` imports the auth router from `app.domains.identity_access`.
-- Route/auth snapshots pass against the domain endpoint module.
-- Legacy and domain imports resolve to the same module object during the alias
-  phase.
-- Existing admin auth tests pass.
-- Import inventory shows no unapproved production imports of `app.routers.auth`.
+The cleanup gate is complete. Keep the retired import-path and AST inventory tests passing so removed paths stay unavailable.

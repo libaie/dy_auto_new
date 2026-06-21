@@ -10,15 +10,14 @@ repair task routes.
 ## Not Owned
 
 - Agency ORM models such as `AgencyExpertInvocation` and `AgencyCreativePatch`
-  stay in `app.db_models`.
 - Database session helpers stay in `app.database`.
 - Auth dependencies stay in `app.deps`.
 - Creative patch mutation lives in
   `app.domains.agency_operations.agency_creative_patch_service`.
 - Debate audit logic lives in
   `app.domains.agency_operations.agency_debate_audit`.
-- Provider reservation accounting stays in
-  `app.services.provider_cost_reservation_service`.
+- Provider reservation accounting lives in
+  `app.domains.video_production.provider_cost_reservation_service`.
 
 ## Current Modules
 
@@ -65,27 +64,9 @@ repair task routes.
   current team version checks, role summaries, and agency context building for
   story, style, and production review stages.
 
-## Facade Register
+## Canonical Imports
 
-| Facade | Target | Exit condition |
-|---|---|---|
-| `app.routers.agency` | `app.domains.agency_operations.agency_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
-| `app.services.agency_console` | `app.domains.agency_operations.agency_console` | Keep while series read models and legacy tests import console payloads through `app.services`; remove after import inventory is clean. |
-| `app.services.agency_orchestrator` | `app.domains.agency_operations.agency_orchestrator` | Keep while dirty service modules and legacy tests import or monkeypatch orchestration through `app.services`; remove after import inventory is clean. |
-| `app.services.agency_manifest` | `app.domains.agency_operations.agency_manifest` | Keep while dirty service modules have approved compatibility imports; remove only after import inventory shows no production legacy imports. |
-| `app.services.agency_contracts` | `app.domains.agency_operations.agency_contracts` | Keep while legacy tests or dirty service modules import agency response contracts from `app.services`; remove after import inventory is clean. |
-| `app.services.agency_repair_contracts` | `app.domains.agency_operations.agency_repair_contracts` | Keep while dirty service modules import repair contracts from `app.services`; remove after import inventory is clean. |
-| `app.services.agency_repair_classifier` | `app.domains.agency_operations.agency_repair_classifier` | Keep while dirty service modules import the repair classifier from `app.services`; remove after import inventory is clean. |
-| `app.services.agency_repair_orchestrator` | `app.domains.agency_operations.agency_repair_orchestrator` | Keep while dirty service modules import repair orchestration from `app.services`; remove after import inventory is clean. |
-| `app.services.agency_scorecard_contracts` | `app.domains.agency_operations.agency_scorecard_contracts` | Keep while dirty agency service modules import scorecard contracts from `app.services`; remove after import inventory is clean. |
-| `app.services.agency_multimodal_review` | `app.domains.agency_operations.agency_multimodal_review` | Keep while legacy tests monkeypatch multimodal review through `app.services`; remove after import inventory is clean. |
-| `app.services.agency_creative_patch_contracts` | `app.domains.agency_operations.agency_creative_patch_contracts` | Keep while dirty creative patch service code imports contracts from `app.services`; remove after import inventory is clean. |
-| `app.services.agency_backtrack_policy` | `app.domains.agency_operations.agency_backtrack_policy` | Keep while dirty video production service code imports backtrack policy from `app.services`; remove after import inventory is clean. |
-| `app.services.agency_repair_executor` | `app.domains.agency_operations.agency_repair_executor` | Keep while dirty production worker code imports repair execution from `app.services`; remove after import inventory is clean. |
-| `app.services.agency_prompting` | `app.domains.agency_operations.agency_prompting` | Keep while dirty agency runtime code imports prompt construction from `app.services`; remove after import inventory is clean. |
-| `app.services.agency_runtime` | `app.domains.agency_operations.agency_runtime` | Keep while dirty agency orchestrator, story generator, script pipeline, and legacy tests import runtime symbols from `app.services`; remove after import inventory is clean. |
-| `app.services.agency_persistence` | `app.domains.agency_operations.agency_persistence` | Keep while dirty agency orchestrator, story generator, and legacy tests import invocation persistence from `app.services`; remove after import inventory is clean. |
-| `app.services.video_agency_team` | `app.domains.agency_operations.video_agency_team` | Keep while legacy tests and older callers import team helpers through `app.services`; remove after import inventory is clean. |
+The retired router, service, and ORM import packages have been removed. Runtime code, tests, scripts, and new docs must import domain modules directly and use `app.db.models` / `app.db.models.<domain>` for ORM models.
 
 ## Boundaries
 
@@ -94,28 +75,7 @@ repair task routes.
   multimodal review, and repair task endpoints.
 - Preserve secret redaction for model snapshots.
 - Preserve repair retry and paid authorization budget semantics.
-- Preserve monkeypatch compatibility for `app.routers.agency` during the alias
-  phase.
-- Preserve monkeypatch compatibility for `app.services.agency_manifest` while
-  dirty service modules keep approved compatibility imports.
 
-## Compatibility Cleanup Gates
+## Legacy Import Guard
 
-Do not remove the legacy router facade until all of these are true:
-
-- `app.main` imports `agency_router` from `app.domains.agency_operations`.
-- Route/auth snapshots pass against the domain endpoint module.
-- Legacy and domain imports resolve to the same module object during the alias
-  phase.
-- Existing agency API, console, repair, and runtime tests pass.
-- Import inventory shows no unapproved production imports of `app.routers.agency`.
-
-Do not remove the legacy agency manifest facade until all of these are true:
-
-- `rg "app\.services\.agency_manifest" server/app server/tests` returns only
-  compatibility tests, migration docs, or service modules whose domains have not
-  moved yet.
-- Direct domain manifest coverage proves `AgencyManifest`, expert lookup,
-  markdown hash checks, legacy expert lookup, and `verify_manifest` behavior.
-- Domain-owned production modules import
-  `app.domains.agency_operations.agency_manifest` directly.
+The cleanup gate is complete. Keep the retired import-path and AST inventory tests passing so removed paths stay unavailable.

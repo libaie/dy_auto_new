@@ -21,13 +21,9 @@ views.
 - `app.db.models.reporting` owns the `DailyStats` and `StatsEvent` ORM class
   bodies.
 
-## Facade Register
+## Canonical Imports
 
-| Facade | Target | Exit condition |
-|---|---|---|
-| `app.routers.stats` | `app.domains.reporting.stats_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
-| `app.services.stats_service` | `app.domains.reporting.stats_service` | All stats service callers import the reporting domain service directly or belong to domains that have not moved yet. |
-| `app.db_models.DailyStats` / `StatsEvent` | `app.db.models.reporting` | Keep as compatibility re-exports until production imports use the domain model path. |
+The retired router, service, and ORM import packages have been removed. Runtime code, tests, scripts, and new docs must import domain modules directly and use `app.db.models` / `app.db.models.<domain>` for ORM models.
 
 ## Boundaries
 
@@ -39,26 +35,6 @@ views.
   date behavior, and dashboard query behavior.
 - Do not add analytics features in this route-boundary migration.
 
-## Compatibility Cleanup Gates
+## Legacy Import Guard
 
-Do not remove the legacy router facade until all of these are true:
-
-- `app.main` imports the stats router from `app.domains.reporting`.
-- Route/auth snapshots pass against the domain endpoint module.
-- Legacy and domain imports resolve to the same module object during the alias
-  phase.
-- Existing stats API, stats service, and device stats reporting tests pass.
-- Import inventory shows no unapproved production imports of
-  `app.routers.stats`.
-
-Do not remove the legacy stats service facade until all of these are true:
-
-- `rg "app\.services\.stats_service" server/app server/tests` returns only
-  compatibility tests, migration docs, or service modules whose domains have
-  not moved yet.
-- `test_reporting_stats_service_facade.py` has been replaced with tests for
-  direct domain imports.
-- Domain-owned reporting modules import `app.domains.reporting.stats_service`
-  directly.
-- Direct domain stats service coverage proves `StatsService` and
-  `stats_service` behavior without legacy imports.
+The cleanup gate is complete. Keep the retired import-path and AST inventory tests passing so removed paths stay unavailable.

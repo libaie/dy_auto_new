@@ -23,14 +23,9 @@ This domain owns admin UI selector management routes.
   resolution-aware image listing, MD5 caching, template path lookup, save, and
   delete operations. It preserves storage under `server/app/template_images`.
 
-## Facade Register
+## Canonical Imports
 
-| Facade | Target | Exit condition |
-|---|---|---|
-| `app.routers.selectors` | `app.domains.selector_management.selectors_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
-| `app.services.selector_service` | `app.domains.selector_management.selector_service` | All selector service callers import the domain service directly or belong to domains that have not moved yet. |
-| `app.services.template_service` | `app.domains.selector_management.template_service` | All template service callers import the domain service directly or belong to domains that have not moved yet. |
-| `app.db_models.UISelector` | `app.db.models.selector_management.UISelector` | Keep as a compatibility re-export until production imports use the domain model path. |
+The retired router, service, and ORM import packages have been removed. Runtime code, tests, scripts, and new docs must import domain modules directly and use `app.db.models` / `app.db.models.<domain>` for ORM models.
 
 ## Boundaries
 
@@ -44,38 +39,6 @@ This domain owns admin UI selector management routes.
 - Preserve route ordering so `/templates/*` paths are not shadowed by
   `/{action_name}`.
 
-## Compatibility Cleanup Gates
+## Legacy Import Guard
 
-Do not remove the legacy router facade until all of these are true:
-
-- `app.main` imports the selector router from `app.domains.selector_management`.
-- Route/auth snapshots pass against the domain endpoint module.
-- Legacy and domain imports resolve to the same module object during the alias
-  phase.
-- Existing selector API, selector service, and device selector tests pass.
-- Import inventory shows no unapproved production imports of
-  `app.routers.selectors`.
-
-Do not remove the legacy selector service facade until all of these are true:
-
-- `rg "app\.services\.selector_service" server/app server/tests` returns only
-  compatibility tests, migration docs, seed helpers, or modules whose domains
-  have not moved yet.
-- `test_selector_service_domain_facade.py` has been replaced with tests for
-  direct domain imports.
-- Domain-owned selector management modules import
-  `app.domains.selector_management.selector_service` directly.
-- Direct domain selector service coverage proves `SelectorService`,
-  `selector_service`, and `_bump_revision` behavior without legacy imports.
-
-Do not remove the legacy template service facade until all of these are true:
-
-- `rg "app\.services\.template_service" server/app server/tests` returns only
-  compatibility tests, migration docs, or modules whose domains have not moved
-  yet.
-- `test_selector_template_service_domain_facade.py` has been replaced with
-  tests for direct domain imports.
-- Domain-owned selector management modules import
-  `app.domains.selector_management.template_service` directly.
-- Direct domain template service coverage proves `TemplateService`,
-  `template_service`, and `TEMPLATE_DIR` behavior without legacy imports.
+The cleanup gate is complete. Keep the retired import-path and AST inventory tests passing so removed paths stay unavailable.

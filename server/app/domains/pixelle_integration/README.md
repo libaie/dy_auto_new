@@ -10,7 +10,6 @@ routes.
 
 ## Not Owned
 
-- `AIModel` and `SystemSetting` ORM model definitions stay in `app.db_models`.
 - Database session helpers stay in `app.database`.
 - Auth dependencies stay in `app.deps`.
 - Runtime model resolution stays in shared services.
@@ -33,57 +32,17 @@ routes.
 - `pixelle_execution_service.py` owns `build_video_stage_frame` payload mapping
   for Pixelle video stage segment frames.
 
-## Facade Register
+## Canonical Imports
 
-| Facade | Target | Exit condition |
-|---|---|---|
-| `app.routers.pixelle` | `app.domains.pixelle_integration.pixelle_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
-| `app.services.pixelle_client` | `app.domains.pixelle_integration.pixelle_client` | Keep while `app.main` shutdown and not-yet-moved service modules have approved compatibility imports; remove only after import inventory shows no production legacy imports. |
-| `app.services.pixelle_stage_client` | `app.domains.pixelle_integration.pixelle_stage_client` | Keep while legacy orchestration services have approved compatibility imports; remove only after import inventory shows no production legacy imports. |
-| `app.services.pixelle_execution_service` | `app.domains.pixelle_integration.pixelle_execution_service` | Legacy imports remain only in compatibility tests or older callers not yet migrated. |
+The retired router, service, and ORM import packages have been removed. Runtime code, tests, scripts, and new docs must import domain modules directly and use `app.db.models` / `app.db.models.<domain>` for ORM models.
 
 ## Boundaries
 
 - Preserve route paths, route names, auth dependencies, and response shapes.
 - Preserve recursive secret redaction and model serialization behavior.
-- Preserve monkeypatch compatibility for `app.routers.pixelle._get_proxy_client`.
 - Preserve both exported routers: `router` and `proxy_router`.
-- Preserve monkeypatch compatibility for `app.services.pixelle_client` while
-  shutdown and not-yet-moved service modules keep approved compatibility
-  imports.
-- Preserve monkeypatch compatibility for `app.services.pixelle_stage_client`
-  while legacy orchestration services keep approved compatibility imports.
 - Keep video-library and video-production ownership outside this domain.
 
-## Compatibility Cleanup Gates
+## Legacy Import Guard
 
-Do not remove the legacy router facade until all of these are true:
-
-- `app.main` imports `pixelle_router` from `app.domains.pixelle_integration`.
-- Route/auth snapshots pass against the domain endpoint module.
-- Legacy and domain imports resolve to the same module object during the alias
-  phase.
-- Existing Pixelle config/proxy tests pass.
-- Import inventory shows no unapproved production imports of
-  `app.routers.pixelle`.
-
-Do not remove the legacy Pixelle client facade until all of these are true:
-
-- `rg "app\.services\.pixelle_client|from app\.services import pixelle_client" server/app server/tests` returns only compatibility tests, migration docs, or service modules whose domains have not moved yet.
-- Direct domain client coverage proves `_get_base_url`, `_pixelle_request`,
-  retry behavior, JSON parsing, API key lookup, no-proxy client creation, and
-  `close_client` behavior.
-- Domain-owned production modules import
-  `app.domains.pixelle_integration.pixelle_client` directly.
-
-Do not remove the legacy Pixelle stage client facade until all of these are
-true:
-
-- `rg "app\.services\.pixelle_stage_client" server/app server/tests` returns
-  only compatibility tests, migration docs, or service modules whose domains
-  have not moved yet.
-- Direct domain stage client coverage proves image batch, image create, stage
-  status, video batch, compose payloads, validation errors, and legacy
-  monkeypatch compatibility.
-- Domain-owned production modules import
-  `app.domains.pixelle_integration.pixelle_stage_client` directly.
+The cleanup gate is complete. Keep the retired import-path and AST inventory tests passing so removed paths stay unavailable.

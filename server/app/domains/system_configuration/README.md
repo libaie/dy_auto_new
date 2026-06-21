@@ -19,13 +19,9 @@ This domain owns admin key-value system configuration routes.
   updates, and masked secret placeholder preservation.
 - `app.db.models.system_configuration` owns the `SystemSetting` ORM class body.
 
-## Facade Register
+## Canonical Imports
 
-| Facade | Target | Exit condition |
-|---|---|---|
-| `app.routers.settings` | `app.domains.system_configuration.settings_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
-| `app.services.crypto` | `app.domains.system_configuration.crypto` | Sensitive-setting crypto compatibility; remove after production callers use the domain path. |
-| `app.db_models.SystemSetting` | `app.db.models.system_configuration.SystemSetting` | Keep as a compatibility re-export until production imports use the domain model path. |
+The retired router, service, and ORM import packages have been removed. Runtime code, tests, scripts, and new docs must import domain modules directly and use `app.db.models` / `app.db.models.<domain>` for ORM models.
 
 ## Boundaries
 
@@ -38,15 +34,6 @@ This domain owns admin key-value system configuration routes.
 - Do not normalize AI/Pixelle/Seedance configuration consumers in this
   route-boundary migration.
 
-## Compatibility Cleanup Gates
+## Legacy Import Guard
 
-Do not remove the legacy router facade until all of these are true:
-
-- `app.main` imports the settings router from
-  `app.domains.system_configuration`.
-- Route/auth snapshots pass against the domain endpoint module.
-- Legacy and domain imports resolve to the same module object during the alias
-  phase.
-- Existing settings endpoint tests pass.
-- Import inventory shows no unapproved production imports of
-  `app.routers.settings`.
+The cleanup gate is complete. Keep the retired import-path and AST inventory tests passing so removed paths stay unavailable.

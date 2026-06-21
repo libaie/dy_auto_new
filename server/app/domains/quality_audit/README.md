@@ -13,8 +13,6 @@ This domain owns AI-assisted image and video asset quality audit routes.
   `app.db.models.model_configuration`.
 - Database session helpers stay in `app.database`.
 - Auth dependencies stay in `app.deps`.
-- Audit gate compatibility imports stay in `app.services.audit_gate` during
-  the facade phase.
 - Model registry and runtime model configuration stay in shared services.
 - Video production orchestration stays in
   `app.domains.video_production.video_production_service`.
@@ -29,40 +27,17 @@ This domain owns AI-assisted image and video asset quality audit routes.
 - `audit_gate.py` owns `classify_audit_gate` for mapping provider audit
   responses into quality gate decisions.
 
-## Facade Register
+## Canonical Imports
 
-| Facade | Target | Exit condition |
-|---|---|---|
-| `app.routers.audit` | `app.domains.quality_audit.audit_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
-| `app.services.audit_gate` | `app.domains.quality_audit.audit_gate` | Domain modules import the domain helper path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
-| `app.db_models.AuditReport` | `app.db.models.quality_audit.AuditReport` | Keep as a compatibility re-export until production imports use the domain model path. |
+The retired router, service, and ORM import packages have been removed. Runtime code, tests, scripts, and new docs must import domain modules directly and use `app.db.models` / `app.db.models.<domain>` for ORM models.
 
 ## Boundaries
 
 - Preserve route paths, route names, auth dependencies, and response shapes.
 - Preserve current report-listing dependency behavior.
-- Preserve monkeypatch compatibility for `app.routers.audit._do_audit` and
-  `app.routers.audit.httpx.post`.
 - Keep video production as a consumer of `_do_audit`, not an owner of audit
   route behavior.
 
-## Compatibility Cleanup Gates
+## Legacy Import Guard
 
-Do not remove the legacy router facade until all of these are true:
-
-- `app.main` imports `audit_router` from `app.domains.quality_audit`.
-- Production consumers import `_do_audit` from
-  `app.domains.quality_audit.audit_router`.
-- Route/auth snapshots pass against the domain endpoint module.
-- Legacy and domain imports resolve to the same module object during the alias
-  phase.
-- Existing audit payload and video production audit-gate tests pass.
-- Import inventory shows no unapproved production imports of `app.routers.audit`.
-
-Do not remove the legacy audit gate facade until all of these are true:
-
-- `rg "app\.services\.audit_gate" server/app server/tests` returns only compatibility tests, migration docs, or service modules whose domains have not moved yet.
-- `test_quality_audit_gate_facade.py` has been replaced with tests for direct domain imports.
-- Domain-owned quality audit modules import `app.domains.quality_audit.audit_gate` directly.
-- Direct domain audit gate coverage proves `classify_audit_gate` behavior
-  without legacy imports.
+The cleanup gate is complete. Keep the retired import-path and AST inventory tests passing so removed paths stay unavailable.

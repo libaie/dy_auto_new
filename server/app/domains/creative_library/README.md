@@ -37,94 +37,15 @@ reference dictionaries, plus character and scene reference asset generation.
   story-text style inference, visual style merging, prompt constraint
   appending, and stored prompt style matching.
 
-## Facade Register
+## Canonical Imports
 
-| Facade | Target | Exit condition |
-|---|---|---|
-| `app.routers.characters` | `app.domains.creative_library.characters_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
-| `app.routers.scenes` | `app.domains.creative_library.scenes_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
-| `app.routers.reference_data` | `app.domains.creative_library.reference_data_router` | Direct app wiring and import inventory prove only approved compatibility references remain. |
-| `app.services.reference_asset_service` | `app.domains.creative_library.reference_asset_service` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
-| `app.services.anchor_service` | `app.domains.creative_library.anchor_service` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
-| `app.services.asset_lifecycle_service` | `app.domains.creative_library.asset_lifecycle_service` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
-| `app.services.asset_ai_rewrite_service` | `app.domains.creative_library.asset_ai_rewrite_service` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
-| `app.services.visual_style_inference_service` | `app.domains.creative_library.visual_style_inference_service` | Domain modules import the domain service path directly, and legacy imports remain only in compatibility tests, migration docs, or service modules whose domains have not moved yet. |
-| `app.db_models.Character` / `Scene` / `ReferenceData` / `ReferenceCategory` / `CharacterAnchor` / `SceneAnchor` | `app.db.models.creative_library` | Keep as compatibility re-exports until production imports use the domain model path. |
+The retired router, service, and ORM import packages have been removed. Runtime code, tests, scripts, and new docs must import domain modules directly and use `app.db.models` / `app.db.models.<domain>` for ORM models.
 
 ## Boundaries
 
 - Keep series character/scene linking in `ai_video_series`.
-- Shared AI generation stays in `app.services.ai_generator`.
-- Non-domain service modules may keep importing
-  `app.services.reference_asset_service` until their owning domains move.
-- Non-domain utility or service modules may keep importing
-  `app.services.anchor_service` until their owning domains move.
-- Non-domain service modules may keep importing
-  `app.services.asset_lifecycle_service` until their owning domains move.
-- Non-domain service modules may keep importing
-  `app.services.asset_ai_rewrite_service` until their owning domains move.
-- Non-domain service modules may keep importing
-  `app.services.visual_style_inference_service` until their owning domains
-  move.
-- Keep series character/scene linking tables in `app.db_models` until a
-  dedicated graph extraction.
 - Keep startup reference data seeding behavior unchanged.
 
-## Compatibility Cleanup Gates
+## Legacy Import Guard
 
-Do not remove legacy router facades until all of these are true:
-
-- `app.main` imports creative library routers from
-  `app.domains.creative_library`.
-- Route/auth snapshots pass against domain endpoint modules.
-- Legacy and domain imports resolve to the same module objects during the alias
-  phase.
-- Existing series, asset archive, asset rewrite, and reference asset tests pass.
-- Import inventory shows no unapproved production imports of
-  `app.routers.characters`, `app.routers.scenes`, or
-  `app.routers.reference_data`.
-
-Do not remove the legacy reference asset service facade until all of these are true:
-
-- `rg "app\.services\.reference_asset_service" server/app server/tests` returns only compatibility tests and migration docs.
-- `test_creative_library_reference_asset_service_facade.py` has been replaced with tests for direct domain imports.
-- Domain-owned production modules import `app.domains.creative_library.reference_asset_service` directly.
-
-Do not remove the legacy anchor service facade until all of these are true:
-
-- `rg "app\.services\.anchor_service" server/app server/tests` returns only
-  compatibility tests and migration docs.
-- `test_creative_library_anchor_service_facade.py` has been replaced with
-  tests for direct domain imports.
-- Domain-owned production modules import
-  `app.domains.creative_library.anchor_service` directly.
-
-Do not remove the legacy asset lifecycle service facade until all of these are
-true:
-
-- `rg "app\.services\.asset_lifecycle_service" server/app server/tests` returns
-  only compatibility tests and migration docs.
-- `test_creative_library_asset_lifecycle_service_facade.py` has been replaced
-  with tests for direct domain imports.
-- Domain-owned production modules import
-  `app.domains.creative_library.asset_lifecycle_service` directly.
-
-Do not remove the legacy asset AI rewrite service facade until all of these are
-true:
-
-- `rg "app\.services\.asset_ai_rewrite_service" server/app server/tests`
-  returns only compatibility tests and migration docs.
-- `test_creative_library_asset_ai_rewrite_service_facade.py` has been replaced
-  with tests for direct domain imports.
-- Domain-owned production modules import
-  `app.domains.creative_library.asset_ai_rewrite_service` directly.
-
-Do not remove the legacy visual style inference service facade until all of
-these are true:
-
-- `rg "app\.services\.visual_style_inference_service" server/app server/tests`
-  returns only compatibility tests and migration docs.
-- `test_creative_library_visual_style_service_facade.py` has been replaced
-  with tests for direct domain imports.
-- Domain-owned production modules import
-  `app.domains.creative_library.visual_style_inference_service` directly.
+The cleanup gate is complete. Keep the retired import-path and AST inventory tests passing so removed paths stay unavailable.

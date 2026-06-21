@@ -1,4 +1,4 @@
-from app.domains.quality_audit.audit_router import _audit_openai_compatible
+from app.domains.quality_audit.audit_router import _audit_gemini, _audit_openai_compatible
 
 
 class _AuditMessage:
@@ -75,3 +75,24 @@ def test_vision_enabled_openai_model_keeps_image_url_payload(monkeypatch):
 
     assert captured["cfg"]["model"] == "gpt-4o"
     assert any(part.get("type") == "image_url" for part in user_content)
+
+def test_gemini_audit_uses_langchain_tool_boundary(monkeypatch):
+    captured = {}
+
+    class FakeTool:
+        def invoke(self, payload):
+            captured.update(payload)
+            return {"raw": '{"score": 0.88, "pass": true, "issues": []}'}
+
+    monkeypatch.setattr("app.domains.quality_audit.audit_router.gemini_audit_request", FakeTool())
+
+    result = _audit_gemini(
+        {"model_name": "gemini-test", "api_key": "secret"},
+        "https://cdn.test/frame.jpg",
+        "- 构图",
+        "只返回 JSON",
+    )
+
+    assert result["score"] == 0.88
+    assert captured["model_name"] == "gemini-test"
+    assert captured["image_url"] == "https://cdn.test/frame.jpg"

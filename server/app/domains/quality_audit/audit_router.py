@@ -3,6 +3,7 @@ import logging
 import json as _json
 import re
 import httpx
+from langchain_core.tools import tool
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -119,8 +120,10 @@ def _audit_openai_compatible(model: dict, image_url: str, criteria_text: str, sy
     ])
     return _parse_audit_json(generator._message_text(response))
 
-def _audit_gemini(model: dict, image_url: str, criteria_text: str, system_prompt: str) -> dict:
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model['model_name']}:generateContent?key={model['api_key']}"
+@tool
+def gemini_audit_request(model_name: str, api_key: str, image_url: str, criteria_text: str, system_prompt: str) -> dict:
+    """Submit one Gemini quality-audit request and return the raw model text."""
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
     resp = httpx.post(
         url,
         json={
@@ -134,8 +137,18 @@ def _audit_gemini(model: dict, image_url: str, criteria_text: str, system_prompt
     )
     resp.raise_for_status()
     data = resp.json()
-    raw = data["candidates"][0]["content"]["parts"][0]["text"]
-    return _parse_audit_json(raw)
+    return {"raw": data["candidates"][0]["content"]["parts"][0]["text"]}
+
+
+def _audit_gemini(model: dict, image_url: str, criteria_text: str, system_prompt: str) -> dict:
+    result = gemini_audit_request.invoke({
+        "model_name": model["model_name"],
+        "api_key": model["api_key"],
+        "image_url": image_url,
+        "criteria_text": criteria_text,
+        "system_prompt": system_prompt,
+    })
+    return _parse_audit_json(result["raw"])
 
 
 def _parse_audit_json(raw: str) -> dict:

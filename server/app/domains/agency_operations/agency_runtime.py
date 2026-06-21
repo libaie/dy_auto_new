@@ -9,9 +9,6 @@ import httpx
 
 from app.domains.agency_operations.agency_runtime_contracts import (
     AgencyRuntimeError,
-    OPENAI_CHAT_COMPLETIONS_PROTOCOL,
-    OPENAI_COMPATIBLE_PROVIDERS,
-    runtime_setting,
 )
 from app.domains.agency_operations.agency_manifest import (
     get_expert,
@@ -19,6 +16,8 @@ from app.domains.agency_operations.agency_manifest import (
 )
 from app.domains.agency_operations.agency_prompting import build_expert_prompt
 from app.domains.agency_operations.agency_scorecard_contracts import normalize_scorecard
+from app.domains.ai_video_series.langchain_runtime.agent_runner import LangChainAgentRunner
+from app.domains.ai_video_series.langchain_runtime.tools import build_ai_video_tools
 from app.domains.model_configuration.runtime_model_config import redact_runtime_model_config
 
 
@@ -71,7 +70,6 @@ class AgencyRuntimeResult:
 MessageContent = str | list[dict[str, Any]]
 ModelClientResponse = str | dict[str, Any]
 ModelClient = Callable[[str, MessageContent, dict[str, Any]], Awaitable[ModelClientResponse]]
-_runtime_setting = runtime_setting
 
 
 def _normalize_key(key: str) -> str:
@@ -119,92 +117,22 @@ def _redact_secrets(value: Any, secret_values: set[str] | None = None) -> Any:
     return value
 
 
-def _chat_completion_url(base_url: str) -> str:
-    normalized = base_url.rstrip("/")
-    if normalized.endswith("/chat/completions"):
-        return normalized
-    return f"{normalized}/chat/completions"
-
-
-def _ensure_openai_compatible_provider(config: dict[str, Any]) -> None:
-    protocol = _runtime_setting(config, "protocol", "")
-    if isinstance(protocol, str) and protocol.lower() == OPENAI_CHAT_COMPLETIONS_PROTOCOL:
-        return
-
-    provider = config.get("provider", "")
-    if isinstance(provider, str) and provider.lower() in OPENAI_COMPATIBLE_PROVIDERS:
-        return
-
-    raise AgencyRuntimeError(
-        "EXPERT_MODEL_PROVIDER_UNSUPPORTED",
-        "Agency expert runtime only supports OpenAI-compatible chat completion providers.",
-    )
-
-
 async def _default_model_client(
     system_prompt: str,
     user_prompt: MessageContent,
     config: dict[str, Any],
-    http_transport: httpx.AsyncBaseTransport | None = None,
+    agent_runner: Any | None = None,
 ) -> ModelClientResponse:
-    _ensure_openai_compatible_provider(config)
-
-    base_url = (config.get("base_url") or "").strip()
-    api_key = config.get("api_key") or ""
-    model = config.get("model") or config.get("model_id") or ""
-    if not base_url or not api_key or not model:
-        raise AgencyRuntimeError(
-            "EXPERT_MODEL_CONFIG_MISSING",
-            "Agency expert runtime model requires base_url, api_key, and model.",
-        )
-
-    timeout = float(_runtime_setting(config, "timeout", 60))
-    max_tokens = int(_runtime_setting(config, "max_tokens", 2048))
-    temperature = float(_runtime_setting(config, "temperature", 0.2))
-
-    client_kwargs: dict[str, Any] = {"timeout": timeout}
-    if http_transport is not None:
-        client_kwargs["transport"] = http_transport
-
-    async with httpx.AsyncClient(**client_kwargs) as client:
-        response = await client.post(
-            _chat_completion_url(base_url),
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "content-type": "application/json",
-            },
-            json={
-                "model": model,
-                "temperature": temperature,
-                "max_tokens": max_tokens,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-            },
-        )
-        response.raise_for_status()
-        try:
-            data = response.json()
-        except ValueError as exc:
-            raise AgencyRuntimeError(
-                "EXPERT_MODEL_HTTP_ERROR",
-                "Agency expert model response was not valid JSON.",
-            ) from exc
-
-    try:
-        content = data["choices"][0]["message"]["content"]
-    except (KeyError, IndexError, TypeError) as exc:
-        raise AgencyRuntimeError(
-            "EXPERT_MODEL_HTTP_ERROR",
-            "Agency expert model response did not include chat completion content.",
-        ) from exc
-    if not isinstance(content, str):
-        raise AgencyRuntimeError(
-            "EXPERT_MODEL_HTTP_ERROR",
-            "Agency expert model response chat completion content was not a string.",
-        )
-    return {"content": content, "token_usage": data.get("usage", {})}
+    parsed = await (agent_runner or LangChainAgentRunner()).run_json(
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        runtime_config=config,
+        tools=build_ai_video_tools(None, allowed_tools=["validate_json"]),
+    )
+    token_usage = parsed.get("token_usage", {}) if isinstance(parsed, dict) else {}
+    if not isinstance(token_usage, dict):
+        token_usage = {}
+    return {"content": json.dumps(parsed, ensure_ascii=False), "token_usage": token_usage}
 
 
 def _split_model_response(response: ModelClientResponse) -> tuple[str, dict[str, Any]]:
@@ -264,11 +192,13 @@ class AgencySkillRuntime:
     def __init__(
         self,
         model_client: ModelClient | None = None,
-        http_transport: httpx.AsyncBaseTransport | None = None,
+        agent_runner: Any | None = None,
     ):
         if model_client is not None:
             self.model_client = model_client
         else:
+            self.agent_runner = agent_runner or LangChainAgentRunner()
+
             async def default_client(
                 system_prompt: str,
                 user_prompt: MessageContent,
@@ -278,7 +208,7 @@ class AgencySkillRuntime:
                     system_prompt,
                     user_prompt,
                     config,
-                    http_transport=http_transport,
+                    agent_runner=self.agent_runner,
                 )
 
             self.model_client = default_client

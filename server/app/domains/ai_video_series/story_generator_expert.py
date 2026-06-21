@@ -14,9 +14,11 @@ from app.domains.agency_operations.agency_manifest import get_expert, load_manif
 from app.domains.agency_operations.agency_persistence import create_or_resume_invocation, finalize_invocation_and_audit
 from app.domains.agency_operations.agency_runtime import (
     AgencyRuntimeError,
-    _chat_completion_url,
-    _ensure_openai_compatible_provider,
-    _runtime_setting,
+)
+from app.domains.agency_operations.agency_runtime_contracts import (
+    OPENAI_CHAT_COMPLETIONS_PROTOCOL,
+    OPENAI_COMPATIBLE_PROVIDERS,
+    runtime_setting,
 )
 from app.domains.model_configuration.runtime_model_config import redact_runtime_model_config, resolve_runtime_model_config
 
@@ -24,6 +26,7 @@ from app.domains.model_configuration.runtime_model_config import redact_runtime_
 STORY_GENERATOR_EXPERT_ID = "story_generator"
 STORY_PLANNING_STAGE = "story_planning"
 SCRIPT_GENERATION_SCENE = "script_generation"
+_runtime_setting = runtime_setting
 
 
 @dataclass(frozen=True)
@@ -104,6 +107,28 @@ def _response_format(config: dict[str, Any]) -> dict[str, Any] | None:
             "schema": STORY_PLAN_OUTPUT_SCHEMA,
         },
     }
+
+
+def _chat_completion_url(base_url: str) -> str:
+    normalized = base_url.rstrip("/")
+    if normalized.endswith("/chat/completions"):
+        return normalized
+    return f"{normalized}/chat/completions"
+
+
+def _ensure_openai_compatible_provider(config: dict[str, Any]) -> None:
+    protocol = _runtime_setting(config, "protocol", "")
+    if isinstance(protocol, str) and protocol.lower() == OPENAI_CHAT_COMPLETIONS_PROTOCOL:
+        return
+
+    provider = config.get("provider", "")
+    if isinstance(provider, str) and provider.lower() in OPENAI_COMPATIBLE_PROVIDERS:
+        return
+
+    raise AgencyRuntimeError(
+        "EXPERT_MODEL_PROVIDER_UNSUPPORTED",
+        "Story generator only supports OpenAI-compatible chat completion providers.",
+    )
 
 
 async def _default_story_model_client(

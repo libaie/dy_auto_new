@@ -359,192 +359,14 @@ async def test_runtime_maps_model_timeout_to_named_error():
 
 
 @pytest.mark.asyncio
-async def test_default_client_sends_openai_compatible_request_payload_headers_and_url():
-    seen = {}
+async def test_runtime_maps_injected_model_http_status_to_named_error():
+    request = httpx.Request("POST", "https://model.test")
+    response = httpx.Response(429, request=request)
 
-    def handler(request):
-        seen["url"] = str(request.url)
-        seen["authorization"] = request.headers["authorization"]
-        seen["content_type"] = request.headers["content-type"]
-        seen["payload"] = json.loads(request.content)
-        return httpx.Response(
-            200,
-            json={
-                "choices": [{"message": {"content": _valid_output()}}],
-                "usage": {"total_tokens": 77},
-            },
-        )
+    async def status_client(system_prompt, user_prompt, config):
+        raise httpx.HTTPStatusError("rate limited", request=request, response=response)
 
-    runtime = AgencySkillRuntime(http_transport=httpx.MockTransport(handler))
-    result = await runtime.invoke(
-        db=None,
-        expert_id="prompt_engineer",
-        stage="storyboard",
-        role="reviewer",
-        stage_context={"frame_count": 3},
-        runtime_config={
-            **_runtime_config(),
-            "provider": "ark",
-            "base_url": "https://model.test/v1/chat/completions",
-        },
-    )
-
-    assert result.result_status == "passed"
-    assert result.token_usage == {"total_tokens": 77}
-    assert seen["url"] == "https://model.test/v1/chat/completions"
-    assert seen["authorization"] == "Bearer secret-key"
-    assert seen["content_type"] == "application/json"
-    assert seen["payload"]["model"] == "mock-model"
-    assert seen["payload"]["messages"][0]["role"] == "system"
-    assert seen["payload"]["messages"][1]["role"] == "user"
-
-
-@pytest.mark.asyncio
-async def test_default_client_sends_multimodal_content_parts():
-    seen = {}
-
-    def handler(request):
-        seen["payload"] = json.loads(request.content)
-        return httpx.Response(200, json={"choices": [{"message": {"content": _valid_output()}}]})
-
-    runtime = AgencySkillRuntime(http_transport=httpx.MockTransport(handler))
-    result = await runtime.invoke(
-        db=None,
-        expert_id="image_review_quality_reviewer",
-        stage="image_review",
-        role="qa",
-        stage_context={
-            "asset_review": {
-                "media_inputs": [{"type": "image_url", "url": "https://cdn.test/shot.png"}],
-            }
-        },
-        runtime_config=_runtime_config(),
-    )
-
-    content = seen["payload"]["messages"][1]["content"]
-    assert result.result_status == "passed"
-    assert content[0]["type"] == "text"
-    assert content[1] == {"type": "image_url", "image_url": {"url": "https://cdn.test/shot.png"}}
-
-
-@pytest.mark.asyncio
-async def test_default_client_sends_video_content_parts():
-    seen = {}
-
-    def handler(request):
-        seen["payload"] = json.loads(request.content)
-        return httpx.Response(200, json={"choices": [{"message": {"content": _valid_output()}}]})
-
-    runtime = AgencySkillRuntime(http_transport=httpx.MockTransport(handler))
-    result = await runtime.invoke(
-        db=None,
-        expert_id="video_review_quality_reviewer",
-        stage="video_review",
-        role="qa",
-        stage_context={
-            "asset_review": {
-                "media_inputs": [{"type": "video_url", "url": "https://cdn.test/shot.mp4"}],
-            }
-        },
-        runtime_config=_runtime_config(),
-    )
-
-    content = seen["payload"]["messages"][1]["content"]
-    assert result.result_status == "passed"
-    assert content[0]["type"] == "text"
-    assert content[1] == {"type": "video_url", "video_url": {"url": "https://cdn.test/shot.mp4"}}
-
-
-@pytest.mark.asyncio
-async def test_default_client_accepts_openai_chat_completions_protocol():
-    def handler(request):
-        return httpx.Response(200, json={"choices": [{"message": {"content": _valid_output()}}]})
-
-    runtime = AgencySkillRuntime(http_transport=httpx.MockTransport(handler))
-    result = await runtime.invoke(
-        db=None,
-        expert_id="prompt_engineer",
-        stage="storyboard",
-        role="reviewer",
-        stage_context={},
-        runtime_config={
-            **_runtime_config(),
-            "provider": "custom",
-            "config": {**_runtime_config()["config"], "protocol": "openai_chat_completions"},
-        },
-    )
-
-    assert result.result_status == "passed"
-
-
-@pytest.mark.asyncio
-async def test_default_client_accepts_bailian_chat_completion_provider():
-    seen = {}
-
-    def handler(request):
-        seen["url"] = str(request.url)
-        seen["payload"] = json.loads(request.content)
-        return httpx.Response(200, json={"choices": [{"message": {"content": _valid_output()}}]})
-
-    runtime = AgencySkillRuntime(http_transport=httpx.MockTransport(handler))
-    result = await runtime.invoke(
-        db=None,
-        expert_id="prompt_engineer",
-        stage="storyboard",
-        role="reviewer",
-        stage_context={},
-        runtime_config={
-            **_runtime_config(),
-            "provider": "bailian",
-            "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-            "model": "qwen-plus",
-            "config": {
-                **_runtime_config()["config"],
-                "max_tokens": 8192,
-            },
-        },
-    )
-
-    assert result.result_status == "passed"
-    assert seen["url"] == "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
-    assert seen["payload"]["model"] == "qwen-plus"
-    assert seen["payload"]["max_tokens"] == 8192
-
-
-@pytest.mark.asyncio
-async def test_default_client_rejects_unsupported_provider_before_http_call():
-    called = False
-
-    def handler(request):
-        nonlocal called
-        called = True
-        return httpx.Response(200, json={})
-
-    runtime = AgencySkillRuntime(http_transport=httpx.MockTransport(handler))
-    with pytest.raises(AgencyRuntimeError) as exc:
-        await runtime.invoke(
-            db=None,
-            expert_id="prompt_engineer",
-            stage="storyboard",
-            role="reviewer",
-            stage_context={},
-            runtime_config={**_runtime_config(), "provider": "anthropic"},
-        )
-
-    assert exc.value.error_code == "EXPERT_MODEL_PROVIDER_UNSUPPORTED"
-    assert called is False
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ("status_code", "error_code"),
-    [(429, "EXPERT_MODEL_RATE_LIMITED"), (500, "EXPERT_MODEL_HTTP_ERROR")],
-)
-async def test_default_client_maps_rate_limit_and_http_error_to_named_errors(status_code, error_code):
-    def handler(request):
-        return httpx.Response(status_code, request=request)
-
-    runtime = AgencySkillRuntime(http_transport=httpx.MockTransport(handler))
+    runtime = AgencySkillRuntime(model_client=status_client)
     with pytest.raises(AgencyRuntimeError) as exc:
         await runtime.invoke(
             db=None,
@@ -555,15 +377,15 @@ async def test_default_client_maps_rate_limit_and_http_error_to_named_errors(sta
             runtime_config=_runtime_config(),
         )
 
-    assert exc.value.error_code == error_code
+    assert exc.value.error_code == "EXPERT_MODEL_RATE_LIMITED"
 
 
 @pytest.mark.asyncio
-async def test_default_client_wraps_non_json_provider_response():
-    def handler(request):
-        return httpx.Response(200, text="not json")
+async def test_runtime_maps_injected_model_request_error_to_named_error():
+    async def request_error_client(system_prompt, user_prompt, config):
+        raise httpx.RequestError("network failed")
 
-    runtime = AgencySkillRuntime(http_transport=httpx.MockTransport(handler))
+    runtime = AgencySkillRuntime(model_client=request_error_client)
     with pytest.raises(AgencyRuntimeError) as exc:
         await runtime.invoke(
             db=None,
@@ -578,19 +400,35 @@ async def test_default_client_wraps_non_json_provider_response():
 
 
 @pytest.mark.asyncio
-async def test_default_client_wraps_missing_choices_body_shape():
-    def handler(request):
-        return httpx.Response(200, json={"choices": []})
+async def test_runtime_uses_langchain_runner_for_expert_output():
+    captured = {}
 
-    runtime = AgencySkillRuntime(http_transport=httpx.MockTransport(handler))
-    with pytest.raises(AgencyRuntimeError) as exc:
-        await runtime.invoke(
-            db=None,
-            expert_id="prompt_engineer",
-            stage="storyboard",
-            role="reviewer",
-            stage_context={},
-            runtime_config=_runtime_config(),
-        )
+    class FakeRunner:
+        async def run_json(self, *, system_prompt, user_prompt, runtime_config, tools):
+            captured["runtime_config"] = runtime_config
+            captured["tools"] = [tool.name for tool in tools]
+            return {
+                "decision": "pass",
+                "findings": ["from langchain"],
+                "recommendations": [],
+                "required_changes": [],
+                "evidence": [{"message": "checked"}],
+                "status": "passed",
+                "token_usage": {"total_tokens": 42},
+            }
 
-    assert exc.value.error_code == "EXPERT_MODEL_HTTP_ERROR"
+    runtime = AgencySkillRuntime(agent_runner=FakeRunner())
+    result = await runtime.invoke(
+        db=None,
+        expert_id="prompt_engineer",
+        stage="storyboard",
+        role="reviewer",
+        stage_context={"frame_count": 1},
+        runtime_config=_runtime_config(),
+    )
+
+    assert result.result_status == "passed"
+    assert result.output_summary["findings"] == ["from langchain"]
+    assert result.token_usage == {"total_tokens": 42}
+    assert captured["runtime_config"]["model"] == "mock-model"
+    assert "validate_json" in captured["tools"]

@@ -22,6 +22,8 @@ from app.domains.agency_operations.agency_persistence import (
 from app.domains.agency_operations.agency_runtime import (
     AgencyRuntimeError,
     AgencySkillRuntime,
+)
+from app.domains.agency_operations.agency_runtime_contracts import (
     OPENAI_CHAT_COMPLETIONS_PROTOCOL,
     OPENAI_COMPATIBLE_PROVIDERS,
 )

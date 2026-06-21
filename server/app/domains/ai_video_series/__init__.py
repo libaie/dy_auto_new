@@ -1,7 +1,6 @@
-"""AI video series domain package.
+"""AI 视频系列业务域包。
 
-This package will own the `/api/series/*` business flow once the migration
-passes the compatibility gates documented in README.md.
+集中声明AI 视频系列业务域的公开边界，避免调用方感知内部文件拆分。
 """
 
 DOMAIN_NAME = "ai_video_series"

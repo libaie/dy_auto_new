@@ -1,4 +1,7 @@
-"""Story-planning queue and worker helpers for the AI video series domain."""
+"""AI 视频系列业务域模块。
+
+AI 视频系列业务域，负责系列策划、风格锁定、剧集资产范围和 LangChain 工具编排。本文件负责 story_planning 相关业务规则、状态转换和外部系统边界。
+"""
 
 from datetime import datetime, timezone
 import logging

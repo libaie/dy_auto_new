@@ -1,3 +1,8 @@
+"""视频生产业务域模块。
+
+视频生产业务域，负责生产计划、作业队列、provider 执行、审核门禁和资产状态流转。本文件负责 production_worker_service 相关业务规则、状态转换和外部系统边界。
+"""
+
 import asyncio
 import copy
 import inspect
@@ -750,6 +755,7 @@ class PixelleStageClientAdapter:
         model_config = payload["model_config"]
         provider_template = _provider_stage_template(payload)
         if self.job.stage == "image_generation":
+            # worker 执行真实 provider 阶段时只调用封装服务，保留预算、审计和状态回写边界。
             response = await video_service.submit_image_batch(
                 db=self.db,
                 run_id=self.run.id,
@@ -759,6 +765,7 @@ class PixelleStageClientAdapter:
                 template_config=provider_template,
             )
         elif self.job.stage == "video_generation":
+            # worker 执行真实 provider 阶段时只调用封装服务，保留预算、审计和状态回写边界。
             response = await video_service.submit_video_batch(
                 db=self.db,
                 run_id=self.run.id,
@@ -776,6 +783,7 @@ class PixelleStageClientAdapter:
             }
             if _callable_accepts_provider_stage_metadata(video_service.submit_compose):
                 compose_kwargs.update(provider_template)
+            # worker 执行真实 provider 阶段时只调用封装服务，保留预算、审计和状态回写边界。
             response = await video_service.submit_compose(**compose_kwargs)
         else:
             response = {}

@@ -1,4 +1,8 @@
-"""Pixelle stage payload mapping for series-level production segments."""
+"""Pixelle 集成业务域模块。
+
+Pixelle 集成业务域，负责 Pixelle provider 配置、代理、阶段任务和客户端调用。本文件负责 pixelle_execution_service 相关业务规则、状态转换和外部系统边界。
+"""
+
 from __future__ import annotations
 
 from typing import Any

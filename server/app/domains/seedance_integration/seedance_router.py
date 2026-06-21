@@ -1,4 +1,8 @@
-"""Seedance 2.0 integration through Volcengine Ark."""
+"""Seedance 集成业务域模块。
+
+Seedance 集成业务域，负责视频生成 provider 的提交、查询和代理边界。本文件负责 seedance_router 相关业务规则、状态转换和外部系统边界。
+"""
+
 import asyncio
 import logging
 import os
@@ -54,6 +58,7 @@ def _get_client(api_key: str) -> httpx.AsyncClient:
                 asyncio.ensure_future(_client.aclose())
             except Exception:
                 pass
+        # Seedance provider 调用集中使用受控客户端，避免各路由自行处理鉴权和超时。
         _client = httpx.AsyncClient(
             trust_env=False,
             base_url=SEEDANCE_API_URL,
@@ -188,6 +193,7 @@ async def _do_proxy(request: Request, db: Session, path: str = "") -> Response:
 
     body = await request.body()
     try:
+        # Seedance provider 调用集中使用受控客户端，避免各路由自行处理鉴权和超时。
         resp = await client.request(
             method=request.method,
             url=target_path,

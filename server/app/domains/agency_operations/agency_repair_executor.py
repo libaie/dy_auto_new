@@ -1,3 +1,8 @@
+"""专家团队运营业务域模块。
+
+专家团队运营业务域，负责多智能体专家审查、创意补丁、返修闭环和审计持久化。本文件负责 agency_repair_executor 相关业务规则、状态转换和外部系统边界。
+"""
+
 from __future__ import annotations
 
 from sqlalchemy.orm import Session
@@ -131,6 +136,7 @@ def _micro_tune_segment_prompt(db: Session, job: ProductionJob, repair_type: str
         run.current_stage = "image_generation"
         run.updated_at = bj_now()
     if first_dispatch:
+        # 这里把后续生产或返修动作放入统一队列，保证租约、重试和审计边界一致。
         downstream_job = enqueue_job(
             db,
             job.plan_id,

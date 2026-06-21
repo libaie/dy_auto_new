@@ -1,4 +1,8 @@
-"""Client for Pixelle-Video stage APIs."""
+"""Pixelle 集成业务域模块。
+
+Pixelle 集成业务域，负责 Pixelle provider 配置、代理、阶段任务和客户端调用。本文件负责 pixelle_stage_client 相关业务规则、状态转换和外部系统边界。
+"""
+
 from sqlalchemy.orm import Session
 
 from app.domains.pixelle_integration.pixelle_client import _pixelle_request

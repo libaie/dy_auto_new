@@ -1,3 +1,8 @@
+"""视频生产业务域模块。
+
+视频生产业务域，负责生产计划、作业队列、provider 执行、审核门禁和资产状态流转。本文件负责 asset_storage_guard 相关业务规则、状态转换和外部系统边界。
+"""
+
 from __future__ import annotations
 
 import hashlib
@@ -95,6 +100,7 @@ def _checksum(path: Path) -> str:
 def _download_provider_url(asset: VideoProductionAsset, target: Path) -> None:
     source_url = _validate_provider_url(asset)
     try:
+        # 外部素材先复制到项目可控存储，避免生产结果依赖临时链接。
         with httpx.stream("GET", source_url, follow_redirects=False, timeout=30.0) as response:
             response.raise_for_status()
             with target.open("wb") as handle:

@@ -48,6 +48,49 @@ def test_high_risk_line_requires_nearby_chinese_comment(tmp_path: Path):
     assert high_risk_comment_gaps(good) == []
 
 
+def test_database_query_is_not_high_risk_by_itself(tmp_path: Path):
+    path = tmp_path / "read_model.py"
+    path.write_text(
+        "def load(db):\n    return db.query(User).filter(User.id == '1').first()\n",
+        encoding="utf-8",
+    )
+
+    assert high_risk_comment_gaps(path) == []
+
+
+def test_database_commit_is_not_high_risk_by_itself(tmp_path: Path):
+    path = tmp_path / "write_model.py"
+    path.write_text("def save(db):\n    db.commit()\n", encoding="utf-8")
+
+    assert high_risk_comment_gaps(path) == []
+
+
+def test_httpx_exception_and_timeout_config_are_not_high_risk(tmp_path: Path):
+    path = tmp_path / "http_errors.py"
+    path.write_text(
+        "TIMEOUT = httpx.Timeout(60, connect=10)\n"
+        "def handle():\n"
+        "    try:\n"
+        "        pass\n"
+        "    except httpx.TimeoutException as exc:\n"
+        "        raise exc\n",
+        encoding="utf-8",
+    )
+
+    assert high_risk_comment_gaps(path) == []
+
+
+def test_submit_function_definition_is_not_high_risk_until_called(tmp_path: Path):
+    path = tmp_path / "provider_tools.py"
+    path.write_text(
+        "async def submit_image_generation(run_id: str, job_id: str):\n"
+        "    return {'ok': True}\n",
+        encoding="utf-8",
+    )
+
+    assert high_risk_comment_gaps(path) == []
+
+
 def test_check_files_reports_missing_module_comment(tmp_path: Path):
     bad = tmp_path / "bad.py"
     bad.write_text("VALUE = 1\n", encoding="utf-8")

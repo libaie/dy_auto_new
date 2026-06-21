@@ -1,3 +1,8 @@
+"""专家团队运营业务域模块。
+
+专家团队运营业务域，负责多智能体专家审查、创意补丁、返修闭环和审计持久化。本文件负责 agency_scorecard_contracts 相关业务规则、状态转换和外部系统边界。
+"""
+
 from __future__ import annotations
 
 from typing import Any

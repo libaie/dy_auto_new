@@ -1,3 +1,8 @@
+"""AI 视频系列业务域模块。
+
+AI 视频系列业务域，负责系列策划、风格锁定、剧集资产范围和 LangChain 工具编排。本文件负责 story_generator_expert 相关业务规则、状态转换和外部系统边界。
+"""
+
 from __future__ import annotations
 
 import hashlib

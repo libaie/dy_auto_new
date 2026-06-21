@@ -1,3 +1,8 @@
+"""图片生成业务域模块。
+
+图片生成业务域，负责图片任务创建、策略选择、审核门禁和生成资产入库。本文件负责 image_production_recommendation_service 相关业务规则、状态转换和外部系统边界。
+"""
+
 from __future__ import annotations
 
 from typing import Any

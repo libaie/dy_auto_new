@@ -1,4 +1,8 @@
-"""AI Model Config Center — CRUD with encrypted api_key storage."""
+"""模型配置业务域模块。
+
+模型配置业务域，负责 AI 模型注册、运行时配置解析和连接检测。本文件负责 ai_models_router 相关业务规则、状态转换和外部系统边界。
+"""
+
 import ipaddress
 import logging
 from typing import Literal
@@ -256,6 +260,7 @@ def _build_auth_headers(provider: str, api_key: str) -> dict:
 @tool
 def model_connection_check(test_url: str, headers: dict, strategy: str) -> dict:
     """Run one model-provider connection check."""
+    # 模型连接检测只验证 provider 配置可用性，不写入生产业务状态。
     resp = httpx.get(test_url, headers=headers, timeout=httpx.Timeout(10, connect=5))
     if resp.is_success:
         return {"ok": True, "status_code": resp.status_code, "strategy": strategy}

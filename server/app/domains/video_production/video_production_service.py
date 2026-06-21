@@ -1,4 +1,8 @@
-"""Staged video production orchestration owned by dy_auto."""
+"""视频生产业务域模块。
+
+视频生产业务域，负责生产计划、作业队列、provider 执行、审核门禁和资产状态流转。本文件负责 video_production_service 相关业务规则、状态转换和外部系统边界。
+"""
+
 import logging
 from pathlib import Path
 
@@ -579,6 +583,7 @@ async def start_real_provider_stage_via_executor(db: Session, run: VideoProducti
             raise VideoProductionError("Run has no production segments for image generation")
         for frame in frames:
             target_id = frame["production_segment_id"]
+            # 这里把后续生产或返修动作放入统一队列，保证租约、重试和审计边界一致。
             enqueue_job(
                 db,
                 run.production_plan_id,
@@ -598,6 +603,7 @@ async def start_real_provider_stage_via_executor(db: Session, run: VideoProducti
             raise VideoProductionError("Run has no production segments for video generation")
         for frame in frames:
             target_id = frame["production_segment_id"]
+            # 这里把后续生产或返修动作放入统一队列，保证租约、重试和审计边界一致。
             enqueue_job(
                 db,
                 run.production_plan_id,
@@ -613,6 +619,7 @@ async def start_real_provider_stage_via_executor(db: Session, run: VideoProducti
         run.current_stage = "video_rendering"
     elif normalized_stage == "episode_compose":
         target_id = run.production_episode_id or run.id
+        # 这里把后续生产或返修动作放入统一队列，保证租约、重试和审计边界一致。
         enqueue_job(
             db,
             run.production_plan_id,
@@ -977,6 +984,7 @@ async def start_image_stage(db: Session, run_id: str) -> VideoProductionRun:
         _block_missing_provider_model_config(db, run, stage="image_stage", scene_key="image_generation", exc=exc)
         raise VideoProductionError(str(exc)) from exc
     _assert_legacy_direct_stage_not_paid(run, model_config, "image_generation")
+    # 真实 provider 提交前已完成运行类型、预算和专家门禁校验。
     response = await submit_image_batch(
         db=db,
         run_id=run.id,
@@ -1471,6 +1479,7 @@ async def start_video_stage(db: Session, run_id: str) -> VideoProductionRun:
         _block_missing_provider_model_config(db, run, stage="video_stage", scene_key="video_rendering", exc=exc)
         raise VideoProductionError(str(exc)) from exc
     _assert_legacy_direct_stage_not_paid(run, model_config, "video_rendering")
+    # 真实 provider 提交前已完成运行类型、预算和专家门禁校验。
     response = await submit_video_batch(
         db=db,
         run_id=run.id,
@@ -1624,6 +1633,7 @@ async def start_compose_stage(db: Session, run_id: str) -> VideoProductionRun:
         _block_missing_provider_model_config(db, run, stage="compose", scene_key=COMPOSE_SCENE_KEY, exc=exc)
         raise VideoProductionError(str(exc)) from exc
     _assert_legacy_direct_stage_not_paid(run, model_config, COMPOSE_SCENE_KEY)
+    # 真实 provider 提交前已完成运行类型、预算和专家门禁校验。
     response = await submit_compose(
         db=db,
         run_id=run.id,
@@ -1989,6 +1999,7 @@ async def start_asset_regeneration(db: Session, asset_id: str) -> VideoProductio
                 exc=exc,
             )
             raise VideoProductionError(str(exc)) from exc
+        # 真实 provider 提交前已完成运行类型、预算和专家门禁校验。
         response = await submit_image_batch(
             db=db,
             run_id=run.id,
@@ -2010,6 +2021,7 @@ async def start_asset_regeneration(db: Session, asset_id: str) -> VideoProductio
                 exc=exc,
             )
             raise VideoProductionError(str(exc)) from exc
+        # 真实 provider 提交前已完成运行类型、预算和专家门禁校验。
         response = await submit_video_batch(
             db=db,
             run_id=run.id,

@@ -1,4 +1,8 @@
-"""Pixelle-Video proxy — admin only."""
+"""Pixelle 集成业务域模块。
+
+Pixelle 集成业务域，负责 Pixelle provider 配置、代理、阶段任务和客户端调用。本文件负责 pixelle_router 相关业务规则、状态转换和外部系统边界。
+"""
+
 import logging
 import os
 from pathlib import Path
@@ -64,12 +68,14 @@ def _pixelle_headers(db: Session | None = None) -> dict:
 @tool
 async def reload_pixelle_config(base_url: str, headers: dict) -> bool:
     """Ask Pixelle-Video to reload its config."""
+    # Pixelle 管理连接集中设置超时和鉴权头，避免各接口重复拼接 provider 配置。
     async with httpx.AsyncClient(
         trust_env=False,
         base_url=base_url,
         timeout=httpx.Timeout(5, connect=3),
         headers=headers,
     ) as client:
+        # 配置 reload 是管理端受控动作，失败时只提示重启而不破坏已保存配置。
         resp = await client.post("/api/admin/reload")
         return resp.is_success
 
@@ -77,6 +83,7 @@ async def reload_pixelle_config(base_url: str, headers: dict) -> bool:
 @tool
 async def pixelle_openapi_probe(base_url: str, headers: dict) -> dict:
     """Read Pixelle-Video OpenAPI metadata for a connectivity check."""
+    # Pixelle 管理连接集中设置超时和鉴权头，避免各接口重复拼接 provider 配置。
     async with httpx.AsyncClient(
         trust_env=False,
         base_url=base_url,
@@ -285,6 +292,7 @@ def _get_proxy_client(db=None) -> httpx.AsyncClient:
                 asyncio.ensure_future(_proxy_client.aclose())
             except Exception:
                 pass
+        # Pixelle 管理连接集中设置超时和鉴权头，避免各接口重复拼接 provider 配置。
         _proxy_client = httpx.AsyncClient(trust_env=False,
             base_url=url,
             timeout=httpx.Timeout(cfg["timeout"], connect=10),
@@ -316,6 +324,7 @@ async def _do_proxy(request: Request, db: Session, path: str = "") -> Response:
     body = await request.body()
 
     try:
+        # 透明代理只转发管理端请求，避免前端直接处理 Pixelle 凭据。
         resp = await client.request(
             method=request.method,
             url=target_path,

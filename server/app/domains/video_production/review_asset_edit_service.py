@@ -1,4 +1,7 @@
-"""Review asset edit helpers for the video production domain."""
+"""视频生产业务域模块。
+
+视频生产业务域，负责生产计划、作业队列、provider 执行、审核门禁和资产状态流转。本文件负责 review_asset_edit_service 相关业务规则、状态转换和外部系统边界。
+"""
 
 from __future__ import annotations
 

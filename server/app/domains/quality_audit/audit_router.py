@@ -124,6 +124,7 @@ def _audit_openai_compatible(model: dict, image_url: str, criteria_text: str, sy
 def gemini_audit_request(model_name: str, api_key: str, image_url: str, criteria_text: str, system_prompt: str) -> dict:
     """Submit one Gemini quality-audit request and return the raw model text."""
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
+    # Gemini 审核请求集中在工具边界内，方便质量门禁统一解析结果。
     resp = httpx.post(
         url,
         json={

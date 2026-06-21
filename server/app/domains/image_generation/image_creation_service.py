@@ -1,3 +1,8 @@
+"""图片生成业务域模块。
+
+图片生成业务域，负责图片任务创建、策略选择、审核门禁和生成资产入库。本文件负责 image_creation_service 相关业务规则、状态转换和外部系统边界。
+"""
+
 from __future__ import annotations
 
 import hashlib
@@ -964,6 +969,7 @@ def _recover_task_idempotency_integrity_error(
 
 async def _copy_external_image(value: str) -> dict[str, Any]:
     _validate_public_image_url(value, "generated image")
+    # 外部素材先复制到项目可控存储，避免生产结果依赖临时链接。
     async with httpx.AsyncClient(timeout=httpx.Timeout(60, connect=5), trust_env=False, follow_redirects=False) as client:
         response = await client.get(value)
     response.raise_for_status()
@@ -1176,6 +1182,7 @@ async def create_image_task(db: Session, payload: dict[str, Any]) -> ImageCreati
         return task
 
     try:
+        # 这里提交真实 provider 任务，前置预算、幂等和本地状态必须先由上游完成。
         result = await submit_image_create(db=db, model_config=model_config, **pixelle_payload)
     except Exception as exc:
         safe_message = _redact_provider_error(exc)
@@ -1291,6 +1298,7 @@ async def dispatch_queued_image_task(db: Session, task_id: str) -> ImageCreation
     db.refresh(task)
 
     try:
+        # 这里提交真实 provider 任务，前置预算、幂等和本地状态必须先由上游完成。
         result = await submit_image_create(db=db, model_config=model_config, **saved_payload)
     except Exception as exc:
         safe_message = _redact_provider_error(exc)

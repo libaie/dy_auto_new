@@ -46,23 +46,20 @@ EXCLUDED_PARTS = {
     "tests",
     "spike",
 }
-HIGH_RISK_NEEDLES = [
-    "provider",
-    "submit",
-    "query",
-    "budget",
-    "idempot",
-    "queue",
-    "worker",
-    "retry",
-    "approve",
-    "reject",
-    "httpx",
-    "fetch(",
-    "axios",
-    "device",
-    "click",
-    "swipe",
+HIGH_RISK_PATTERNS = [
+    re.compile(pattern)
+    for pattern in (
+        r"\bprovider\.\w+\(",
+        r"\bsubmit_[a-zA-Z0-9_]+\(",
+        r"\bquery_[a-zA-Z0-9_]+\(",
+        r"\benqueue_job\(",
+        r"\breserve[a-zA-Z0-9_]*\(",
+        r"\bhttpx\.(AsyncClient|get|post|stream)\(",
+        r"\bfetch\(",
+        r"\baxios\.",
+        r"\bclient\.(post|put|patch|delete|request)\(",
+        r"\b(click|swipe|setText|captureScreen|press)\(",
+    )
 ]
 
 
@@ -128,8 +125,10 @@ def high_risk_comment_gaps(path: Path) -> list[tuple[int, str]]:
     lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
     gaps: list[tuple[int, str]] = []
     for index, line in enumerate(lines):
-        lowered = line.lower()
-        if not any(needle in lowered for needle in HIGH_RISK_NEEDLES):
+        stripped = line.strip()
+        if stripped.startswith(("def ", "async def ", "except ")):
+            continue
+        if not any(pattern.search(line) for pattern in HIGH_RISK_PATTERNS):
             continue
         window = "\n".join(lines[max(0, index - 3): index + 1])
         if _has_chinese(window):

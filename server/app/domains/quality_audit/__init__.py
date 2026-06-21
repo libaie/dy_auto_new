@@ -1,4 +1,7 @@
-"""Quality audit domain package."""
+"""质量审查业务域包。
+
+集中声明质量审查业务域的公开边界，避免调用方感知内部文件拆分。
+"""
 
 DOMAIN_NAME = "quality_audit"
 PUBLIC_ROUTE_PREFIX = "/api/audit"

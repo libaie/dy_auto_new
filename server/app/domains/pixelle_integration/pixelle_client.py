@@ -1,4 +1,8 @@
-"""Pixelle-Video HTTP client — unified request with retry, lazy singleton."""
+"""Pixelle 集成业务域模块。
+
+Pixelle 集成业务域，负责 Pixelle provider 配置、代理、阶段任务和客户端调用。本文件负责 pixelle_client 相关业务规则、状态转换和外部系统边界。
+"""
+
 import asyncio
 import json
 import logging
@@ -62,6 +66,7 @@ def _get_client() -> httpx.AsyncClient:
     except RuntimeError:
         loop = None
     if _client is None or getattr(_client, "is_closed", False) or _client_loop is not loop:
+        # Pixelle 客户端集中管理连接池，所有外部请求都经过统一超时和错误映射。
         _client = httpx.AsyncClient(timeout=TIMEOUT, trust_env=False)
         _client_loop = loop
     return _client
@@ -94,6 +99,7 @@ async def _pixelle_request_direct(
 
     for attempt in range(MAX_RETRIES):
         try:
+            # Pixelle provider 请求在这里统一附加鉴权、重试并映射业务错误。
             r = await client.request(method, url, headers=headers, **kwargs)
             r.raise_for_status()
             try:

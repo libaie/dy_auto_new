@@ -1,4 +1,8 @@
-"""Model schema helpers for model configuration."""
+"""模型配置业务域模块。
+
+模型配置业务域，负责 AI 模型注册、运行时配置解析和连接检测。本文件负责 model_schema 相关业务规则、状态转换和外部系统边界。
+"""
+
 from app.data.model_schema_data import get_schema, SCENES, PROVIDERS, PROTOCOLS, CUSTOM_FIELD_POLICY
 
 

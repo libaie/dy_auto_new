@@ -1,5 +1,7 @@
-"""Quality audit gate classification helpers."""
+"""质量审查业务域模块。
 
+质量审查业务域，负责 AI 审核结果、门禁判断和生产质量控制。本文件负责 audit_gate 相关业务规则、状态转换和外部系统边界。
+"""
 
 def classify_audit_gate(result: dict, *, error: bool = False, approve_threshold: float = 0.85) -> dict:
     score = float((result or {}).get("score") or 0.0)

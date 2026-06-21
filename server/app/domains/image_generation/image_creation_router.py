@@ -1,3 +1,8 @@
+"""图片生成业务域模块。
+
+图片生成业务域，负责图片任务创建、策略选择、审核门禁和生成资产入库。本文件负责 image_creation_router 相关业务规则、状态转换和外部系统边界。
+"""
+
 from __future__ import annotations
 
 from pathlib import PurePosixPath
@@ -129,6 +134,7 @@ async def pixelle_file(file_path: str, db: Session = Depends(get_db)):
         )
     headers = {"X-API-Key": PIXELLE_API_KEY} if PIXELLE_API_KEY else {}
     try:
+        # Pixelle 文件代理只读取已生成 output 文件，避免前端直接暴露 provider 地址。
         async with httpx.AsyncClient(base_url=_get_base_url(db), timeout=httpx.Timeout(60, connect=5), trust_env=False) as client:
             resp = await client.get(f"/api/files/{quote(clean, safe='/')}", headers=headers)
     except httpx.TimeoutException as exc:

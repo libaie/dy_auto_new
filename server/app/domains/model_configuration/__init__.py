@@ -1,4 +1,7 @@
-"""Model configuration domain package."""
+"""模型配置业务域包。
+
+集中声明模型配置业务域的公开边界，避免调用方感知内部文件拆分。
+"""
 
 DOMAIN_NAME = "model_configuration"
 PUBLIC_ROUTE_PREFIX = "/api/ai-models"

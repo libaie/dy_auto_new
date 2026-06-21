@@ -3,7 +3,6 @@ from pathlib import Path
 
 DOMAINS = Path(__file__).resolve().parents[1] / "app/domains"
 HTTP_BOUNDARY_ALLOW = {
-    "device_operations/content_bridge.py",
     "image_generation/image_creation_router.py",
     "image_generation/image_creation_service.py",
     "model_configuration/ai_models_router.py",

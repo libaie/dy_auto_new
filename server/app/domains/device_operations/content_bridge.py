@@ -105,51 +105,22 @@ async def ai_proxy(
     db: Session = Depends(get_db),
     _: None = Depends(verify_device_secret),
 ):
-    """设备端 AI 代理 — 设备不持有 API Key，通过服务端调用 AI。"""
-    import httpx
-    from app.config import get_ai_config_with_key
-
-    ai_cfg = get_ai_config_with_key(db)
-    if not ai_cfg or not ai_cfg.get("api_url"):
-        raise HTTPException(status_code=503, detail="AI service not configured")
+    """设备端 AI 代理 — 设备不持有 API Key，通过服务端 LangChain 出口调用 AI。"""
+    from app.domains.model_configuration.ai_generator import ai_generator
 
     try:
-        async with httpx.AsyncClient(timeout=60) as client:
-            model = ai_cfg.get("model", "deepseek-chat")
-            json_body = {
-                "model": model,
-                "max_tokens": request.max_tokens,
-                "temperature": request.temperature,
-                "messages": [{"role": "user", "content": request.prompt}],
-            }
-            # thinking 参数仅在 deepseek-reasoner 或明确支持 thinking 的模型上发送
-            if ai_cfg.get("thinking_enabled") and ("reasoner" in model.lower() or "r1" in model.lower()):
-                json_body["thinking"] = {"type": "enabled"}
-            logger.debug("AI proxy request: model=%s max_tokens=%s temp=%s prompt_len=%s thinking=%s",
-                          model, request.max_tokens, request.temperature, len(request.prompt),
-                          "thinking" in json_body)
-            resp = await client.post(
-                ai_cfg["api_url"],
-                headers={
-                    "Content-Type": "application/json",
-                    "Authorization": f"Bearer {ai_cfg.get('api_key', '')}",
-                },
-                json=json_body,
-            )
-        if resp.status_code != 200:
-            logger.error("AI API error: status=%s body=%s", resp.status_code, resp.text[:500])
-            raise HTTPException(status_code=502, detail=f"AI API error: {resp.status_code}")
-        result = resp.json()
-        logger.debug("AI API response: %s", {k: str(v)[:200] for k, v in result.items() if k != "choices"})
-        content = (result.get("choices", [{}])[0].get("message", {}).get("content") or "").strip()
-        if not content:
-            logger.error("AI API returned empty content. Full response: %s", str(result)[:1000])
+        content = await ai_generator.generate_custom(
+            db,
+            "你是一个简洁、可靠的中文助手。直接回答用户请求。",
+            request.prompt,
+            max_tokens=request.max_tokens,
+            temperature=request.temperature,
+        )
         return DeviceAIProxyResponse(content=content)
-    except httpx.TimeoutException:
-        raise HTTPException(status_code=504, detail="AI API timeout")
-    except (KeyError, IndexError) as e:
-        logger.error("Invalid AI response structure: %s", e)
-        raise HTTPException(status_code=502, detail=f"Invalid AI response: {e}")
+    except RuntimeError as e:
+        if "not configured" in str(e):
+            raise HTTPException(status_code=503, detail="AI service not configured") from e
+        raise HTTPException(status_code=502, detail=f"AI service error: {e}") from e
 
 @router.post("/collect-report")
 async def collect_report(

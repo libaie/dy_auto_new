@@ -83,6 +83,31 @@ def test_generate_content_bridge_response_shape(db):
     assert response.json() == {"content": "Generated reply", "template_id": template.id}
 
 
+def test_ai_proxy_uses_shared_langchain_generator():
+    captured = {}
+
+    async def fake_generate_custom(db_session, system_prompt, user_prompt, **kwargs):
+        captured["system_prompt"] = system_prompt
+        captured["user_prompt"] = user_prompt
+        captured["kwargs"] = kwargs
+        return "Proxy reply"
+
+    with patch(
+        "app.domains.model_configuration.ai_generator.ai_generator.generate_custom",
+        side_effect=fake_generate_custom,
+    ):
+        with TestClient(app) as client:
+            response = client.post(
+                "/api/device/ai-proxy",
+                json={"prompt": "Say hi", "max_tokens": 123, "temperature": 0.2},
+                headers=HEADERS,
+            )
+
+    assert response.status_code == 200
+    assert response.json() == {"content": "Proxy reply"}
+    assert captured["user_prompt"] == "Say hi"
+    assert captured["kwargs"] == {"max_tokens": 123, "temperature": 0.2}
+
 def test_collect_report_bridge_response_shape():
     payload = {
         "task_id": "collect-shape-task",

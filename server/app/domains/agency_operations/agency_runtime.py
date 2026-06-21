@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Awaitable, Callable
 
 import httpx
+import openai
 
 from app.domains.agency_operations.agency_runtime_contracts import (
     AgencyRuntimeError,
@@ -273,6 +274,21 @@ class AgencySkillRuntime:
             ) from exc
         except httpx.RequestError as exc:
             raise AgencyRuntimeError("EXPERT_MODEL_HTTP_ERROR", "Agency expert model request failed.") from exc
+        except openai.APITimeoutError as exc:
+            raise AgencyRuntimeError("EXPERT_MODEL_TIMEOUT", "Agency expert model call timed out.") from exc
+        except openai.RateLimitError as exc:
+            raise AgencyRuntimeError("EXPERT_MODEL_RATE_LIMITED", "Agency expert model call was rate limited.") from exc
+        except openai.APIStatusError as exc:
+            status_code = exc.response.status_code
+            error_code = "EXPERT_MODEL_RATE_LIMITED" if status_code == 429 else "EXPERT_MODEL_HTTP_ERROR"
+            raise AgencyRuntimeError(
+                error_code,
+                f"Agency expert model call failed with HTTP {status_code}.",
+            ) from exc
+        except openai.APIConnectionError as exc:
+            raise AgencyRuntimeError("EXPERT_MODEL_HTTP_ERROR", "Agency expert model request failed.") from exc
+        except openai.APIError as exc:
+            raise AgencyRuntimeError("EXPERT_MODEL_HTTP_ERROR", "Agency expert model call failed.") from exc
 
         raw, response_token_usage = _split_model_response(model_response)
         parsed = _parse_expert_output(raw)

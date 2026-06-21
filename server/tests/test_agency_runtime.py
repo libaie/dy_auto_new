@@ -1,6 +1,7 @@
 import json
 
 import httpx
+import openai
 import pytest
 
 from app.domains.agency_operations.agency_prompting import build_expert_prompt
@@ -397,6 +398,51 @@ async def test_runtime_maps_injected_model_request_error_to_named_error():
         )
 
     assert exc.value.error_code == "EXPERT_MODEL_HTTP_ERROR"
+
+
+@pytest.mark.asyncio
+async def test_runtime_maps_langchain_rate_limit_to_named_error():
+    request = httpx.Request("POST", "https://model.test")
+    response = httpx.Response(429, request=request)
+
+    class FakeRunner:
+        async def run_json(self, *, system_prompt, user_prompt, runtime_config, tools):
+            raise openai.RateLimitError("rate limited", response=response, body=None)
+
+    runtime = AgencySkillRuntime(agent_runner=FakeRunner())
+    with pytest.raises(AgencyRuntimeError) as exc:
+        await runtime.invoke(
+            db=None,
+            expert_id="prompt_engineer",
+            stage="storyboard",
+            role="reviewer",
+            stage_context={},
+            runtime_config=_runtime_config(),
+        )
+
+    assert exc.value.error_code == "EXPERT_MODEL_RATE_LIMITED"
+
+
+@pytest.mark.asyncio
+async def test_runtime_maps_langchain_timeout_to_named_error():
+    request = httpx.Request("POST", "https://model.test")
+
+    class FakeRunner:
+        async def run_json(self, *, system_prompt, user_prompt, runtime_config, tools):
+            raise openai.APITimeoutError(request)
+
+    runtime = AgencySkillRuntime(agent_runner=FakeRunner())
+    with pytest.raises(AgencyRuntimeError) as exc:
+        await runtime.invoke(
+            db=None,
+            expert_id="prompt_engineer",
+            stage="storyboard",
+            role="reviewer",
+            stage_context={},
+            runtime_config=_runtime_config(),
+        )
+
+    assert exc.value.error_code == "EXPERT_MODEL_TIMEOUT"
 
 
 @pytest.mark.asyncio

@@ -1,4 +1,4 @@
-"""AI 审图 API — 使用 AIModel 配置直接调用 GPT-4o/Gemini Vision 进行多模态审计."""
+"""AI 审图 API — 使用 AIModel 配置进行多模态审计."""
 import logging
 import json as _json
 import re
@@ -11,7 +11,7 @@ from app.deps import verify_admin_token
 from app.db.models.model_configuration import AIModel
 from app.db.models.quality_audit import AuditReport
 from app.domains.quality_audit.audit_gate import classify_audit_gate
-from app.domains.system_configuration.crypto import decrypt
+from app.domains.model_configuration.ai_generator import AiGeneratorService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/audit", tags=["audit"])
@@ -94,33 +94,30 @@ def _audit_user_content(image_url: str, criteria_text: str, *, supports_vision: 
 
 
 def _audit_openai_compatible(model: dict, image_url: str, criteria_text: str, system_prompt: str) -> dict:
-    base = model.get("base_url", "https://api.openai.com/v1")
     config = _audit_config(model)
-    resp = httpx.post(
-        f"{base.rstrip('/')}/chat/completions",
-        headers={"Authorization": f"Bearer {model['api_key']}"},
-        json={
+    generator = AiGeneratorService()
+    chat_model = generator._create_chat_model(
+        {
+            "base_url": model.get("base_url", "https://api.openai.com/v1"),
+            "api_key": model["api_key"],
             "model": _audit_model_name(model),
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {
-                    "role": "user",
-                    "content": _audit_user_content(
-                        image_url,
-                        criteria_text,
-                        supports_vision=_supports_vision_audit(model, config),
-                    ),
-                },
-            ],
-            "max_tokens": config.get("max_tokens", 500),
-            "temperature": config.get("temperature", 0.1),
+            "timeout": 60,
         },
-        timeout=httpx.Timeout(60, connect=10),
+        max_tokens=int(config.get("max_tokens", 500)),
+        temperature=float(config.get("temperature", 0.1)),
     )
-    resp.raise_for_status()
-    raw = resp.json()["choices"][0]["message"]["content"]
-    return _parse_audit_json(raw)
-
+    response = chat_model.invoke([
+        ("system", system_prompt),
+        (
+            "human",
+            _audit_user_content(
+                image_url,
+                criteria_text,
+                supports_vision=_supports_vision_audit(model, config),
+            ),
+        ),
+    ])
+    return _parse_audit_json(generator._message_text(response))
 
 def _audit_gemini(model: dict, image_url: str, criteria_text: str, system_prompt: str) -> dict:
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model['model_name']}:generateContent?key={model['api_key']}"

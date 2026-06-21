@@ -24,13 +24,19 @@ def extract_json_object(raw: Any) -> dict[str, Any]:
             if candidate:
                 candidates.append(candidate)
     decoder = json.JSONDecoder()
+    embedded_candidates = []
     for candidate in candidates:
         try:
             parsed = json.loads(candidate)
         except (TypeError, JSONDecodeError):
-            parsed = None
+            embedded_candidates.append(candidate)
+            continue
         if isinstance(parsed, dict):
             return parsed
+        raise AgencyRuntimeError("EXPERT_OUTPUT_INVALID_JSON", "LangChain agent output was not a JSON object.")
+    for candidate in embedded_candidates:
+        if candidate.lstrip().startswith("["):
+            continue
         for index, char in enumerate(candidate):
             if char != "{":
                 continue

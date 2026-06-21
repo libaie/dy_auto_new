@@ -1,6 +1,6 @@
 import pytest
 
-from app.domains.agency_operations.agency_runtime import AgencyRuntimeError
+from app.domains.agency_operations.agency_runtime_contracts import AgencyRuntimeError
 from app.domains.ai_video_series.langchain_runtime.agent_runner import (
     LangChainAgentRunner,
     extract_json_object,
@@ -23,6 +23,30 @@ def test_extract_json_object_accepts_plain_json():
 
 def test_extract_json_object_accepts_fenced_json():
     assert extract_json_object('```json\n{"status": "passed"}\n```') == {"status": "passed"}
+
+
+def test_extract_json_object_returns_dict_unchanged():
+    raw = {"status": "passed"}
+
+    assert extract_json_object(raw) is raw
+
+
+def test_extract_json_object_accepts_embedded_json_object():
+    assert extract_json_object('prefix {"status": "passed"} suffix') == {"status": "passed"}
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        '[{"status": "passed"}]',
+        '```json\n[{"status": "passed"}]\n```',
+    ],
+)
+def test_extract_json_object_rejects_top_level_arrays(raw):
+    with pytest.raises(AgencyRuntimeError) as exc:
+        extract_json_object(raw)
+
+    assert exc.value.error_code == "EXPERT_OUTPUT_INVALID_JSON"
 
 
 def test_extract_json_object_rejects_non_json():

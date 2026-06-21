@@ -1,0 +1,48 @@
+from __future__ import annotations
+
+from typing import Any
+
+from langchain_openai import ChatOpenAI
+
+from app.domains.agency_operations.agency_runtime import (
+    AgencyRuntimeError,
+    OPENAI_CHAT_COMPLETIONS_PROTOCOL,
+    OPENAI_COMPATIBLE_PROVIDERS,
+    _runtime_setting,
+)
+
+
+def ensure_langchain_provider_supported(config: dict[str, Any]) -> None:
+    protocol = str(_runtime_setting(config, "protocol", "") or "").lower()
+    provider = str(config.get("provider") or "").lower()
+    if protocol == OPENAI_CHAT_COMPLETIONS_PROTOCOL or provider in OPENAI_COMPATIBLE_PROVIDERS:
+        return
+    raise AgencyRuntimeError(
+        "EXPERT_MODEL_PROVIDER_UNSUPPORTED",
+        "AI video LangChain runtime only supports OpenAI-compatible chat completion providers.",
+    )
+
+
+def build_langchain_openai_kwargs(config: dict[str, Any]) -> dict[str, Any]:
+    ensure_langchain_provider_supported(config)
+    base_url = str(config.get("base_url") or "").strip()
+    api_key = str(config.get("api_key") or "").strip()
+    model = str(config.get("model") or config.get("model_id") or "").strip()
+    missing = [name for name, value in (("base_url", base_url), ("api_key", api_key), ("model", model)) if not value]
+    if missing:
+        raise AgencyRuntimeError(
+            "EXPERT_MODEL_CONFIG_MISSING",
+            f"AI video LangChain runtime requires {', '.join(missing)}.",
+        )
+    return {
+        "model": model,
+        "api_key": api_key,
+        "base_url": base_url,
+        "temperature": float(_runtime_setting(config, "temperature", 0.2)),
+        "max_tokens": int(_runtime_setting(config, "max_tokens", 2048)),
+        "timeout": float(_runtime_setting(config, "timeout", 60)),
+    }
+
+
+def create_chat_model(config: dict[str, Any]) -> ChatOpenAI:
+    return ChatOpenAI(**build_langchain_openai_kwargs(config))

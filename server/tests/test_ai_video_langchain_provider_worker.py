@@ -1,5 +1,6 @@
 import pytest
 
+from app.domains.agency_operations.agency_runtime_contracts import AgencyRuntimeError
 from app.domains.video_production import production_worker_service as worker
 from app.domains.video_production.production_errors import ProductionErrorCode
 
@@ -10,7 +11,12 @@ async def test_execute_real_job_uses_provider_stage_agent(monkeypatch, db):
 
     async def fake_agent(db_arg, *, run_id, job_id, job_stage, runtime_config, agent_runner=None):
         calls.append((db_arg, run_id, job_id, job_stage, runtime_config["provider"]))
-        return {"status": "success", "message": "done", "asset_count": 1}
+        return {
+            "status": "success",
+            "message": "done",
+            "provider_stage_task_id": "pst-1",
+            "asset_count": 1,
+        }
 
     class FailDirectExecutor:
         async def execute(self, *args, **kwargs):
@@ -40,6 +46,57 @@ async def test_execute_real_job_uses_provider_stage_agent(monkeypatch, db):
     assert result.status == "success"
     assert result.data["status"] == "success"
     assert calls == [(db, "run-1", "job-1", "image_generation", "mock")]
+
+
+@pytest.mark.asyncio
+async def test_execute_real_job_blocks_success_without_provider_evidence(monkeypatch, db):
+    async def fake_agent(db_arg, *, run_id, job_id, job_stage, runtime_config, agent_runner=None):
+        return {"status": "success", "message": "done"}
+
+    monkeypatch.setattr(worker, "run_provider_stage_agent", fake_agent)
+    monkeypatch.setattr(
+        worker,
+        "resolve_runtime_model_config",
+        lambda db_arg, scene_key: {"provider": "mock", "model": scene_key},
+    )
+    run = type("Run", (), {"id": "run-1", "episode_id": "episode-1", "production_plan_id": "plan-1"})()
+    job = type(
+        "Job",
+        (),
+        {"id": "job-1", "stage": "image_generation", "target_type": "frame", "target_id": "frame-1"},
+    )()
+
+    result = await worker.execute_real_job(db, run, job)
+
+    assert result.status == "blocked"
+    assert result.code == ProductionErrorCode.PROVIDER_STAGE_TASK_SYNC_REQUIRED
+    assert result.retryable is True
+
+
+@pytest.mark.asyncio
+async def test_execute_real_job_maps_agent_runtime_error_to_sync_required(monkeypatch, db):
+    async def fake_agent(db_arg, *, run_id, job_id, job_stage, runtime_config, agent_runner=None):
+        raise AgencyRuntimeError("EXPERT_OUTPUT_INVALID_JSON", "LangChain agent output was not valid JSON.")
+
+    monkeypatch.setattr(worker, "run_provider_stage_agent", fake_agent)
+    monkeypatch.setattr(
+        worker,
+        "resolve_runtime_model_config",
+        lambda db_arg, scene_key: {"provider": "mock", "model": scene_key},
+    )
+    run = type("Run", (), {"id": "run-1", "episode_id": "episode-1", "production_plan_id": "plan-1"})()
+    job = type(
+        "Job",
+        (),
+        {"id": "job-1", "stage": "image_generation", "target_type": "frame", "target_id": "frame-1"},
+    )()
+
+    result = await worker.execute_real_job(db, run, job)
+
+    assert result.status == "blocked"
+    assert result.code == ProductionErrorCode.PROVIDER_STAGE_TASK_SYNC_REQUIRED
+    assert result.retryable is True
+    assert result.data["error_code"] == "EXPERT_OUTPUT_INVALID_JSON"
 
 
 @pytest.mark.asyncio

@@ -12,6 +12,7 @@ from app.config import PIXELLE_CONFIG_PATH, bj_now
 from app.db.models.video_production import ProductionJob, ProductionSegment, VideoProductionRun
 from app.domains.agency_operations.agency_creative_patch_service import unresolved_patch_gate
 from app.domains.agency_operations.agency_repair_executor import execute_repair_job, is_agency_repair_stage
+from app.domains.agency_operations.agency_runtime_contracts import AgencyRuntimeError
 from app.domains.ai_video_series.langchain_runtime.provider_stage_orchestrator import run_provider_stage_agent
 from app.domains.model_configuration.runtime_model_config import resolve_runtime_model_config
 from app.domains.video_production.production_action_result import ProductionActionResult
@@ -65,18 +66,39 @@ def _pixelle_output_root() -> Path:
 async def execute_real_job(db: Session, run: VideoProductionRun, job: ProductionJob) -> ProductionActionResult:
     if is_agency_repair_stage(job.stage):
         return await execute_repair_job(db, job)
-    parsed = await run_provider_stage_agent(
-        db,
-        run_id=run.id,
-        job_id=job.id,
-        job_stage=job.stage,
-        runtime_config=resolve_runtime_model_config(db, "llm_agency_expert_review"),
-    )
+    try:
+        parsed = await run_provider_stage_agent(
+            db,
+            run_id=run.id,
+            job_id=job.id,
+            job_stage=job.stage,
+            runtime_config=resolve_runtime_model_config(db, "llm_agency_expert_review"),
+        )
+    except AgencyRuntimeError as exc:
+        parsed = {"status": "failed", "message": str(exc), "error_code": exc.error_code}
     if not isinstance(parsed, dict):
         parsed = {"status": "failed", "raw": parsed}
     if parsed.get("status") != "success":
         return _provider_agent_blocked_result(run, job, parsed)
+    if not _provider_agent_success_has_provider_evidence(parsed):
+        return _provider_agent_blocked_result(run, job, parsed)
     return ProductionActionResult.success(parsed.get("message") or "Provider stage agent completed.", data=parsed)
+
+
+def _provider_agent_success_has_provider_evidence(parsed: dict) -> bool:
+    if not parsed.get("provider_stage_task_id"):
+        return False
+    try:
+        if int(parsed.get("asset_count") or 0) > 0:
+            return True
+    except (TypeError, ValueError):
+        pass
+    raw = parsed.get("raw")
+    if not isinstance(raw, dict):
+        return False
+    provider_result = raw.get("provider_result") if isinstance(raw.get("provider_result"), dict) else raw
+    assets = provider_result.get("assets") if isinstance(provider_result, dict) else None
+    return isinstance(assets, list) and len(assets) > 0
 
 
 def _provider_agent_blocked_result(

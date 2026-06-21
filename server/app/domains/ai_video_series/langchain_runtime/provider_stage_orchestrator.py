@@ -34,7 +34,9 @@ async def run_provider_stage_agent(
     return await runner.run_json(
         system_prompt=(
             "You are an AI video provider stage operator. Use only the provided tools "
-            "to submit and query provider work for this production job."
+            "to submit and query provider work for this production job. "
+            "Call each tool named in required_sequence in order with run_id and job_id, "
+            "then return the final tool result as a JSON object."
         ),
         user_prompt=json.dumps(
             {

@@ -16,51 +16,45 @@ class CapturingRunner:
         return {"status": "ok"}
 
 
+@pytest.mark.parametrize(
+    ("job_stage", "expected_tools"),
+    [
+        ("image_generation", ["submit_image_generation", "query_image_task"]),
+        ("video_generation", ["submit_video_generation", "query_video_task"]),
+        ("episode_compose", ["submit_compose", "query_compose_task"]),
+        ("composition", ["submit_compose", "query_compose_task"]),
+    ],
+)
 @pytest.mark.asyncio
-async def test_image_generation_agent_gets_only_image_provider_tools(db):
+async def test_provider_stage_agent_gets_stage_tools_and_prompt_fields(db, job_stage, expected_tools):
     runner = CapturingRunner()
+    runtime_config = {"provider": "mock", "api_key": "sentinel-secret-123"}
 
     result = await run_provider_stage_agent(
         db,
         run_id="run-1",
-        job_id="job-image-1",
-        job_stage="image_generation",
-        runtime_config={"provider": "mock"},
+        job_id="job-1",
+        job_stage=job_stage,
+        runtime_config=runtime_config,
         agent_runner=runner,
     )
 
     assert result == {"status": "ok"}
-    assert [tool.name for tool in runner.calls[0]["tools"]] == [
-        "submit_image_generation",
-        "query_image_task",
-    ]
-    user_prompt = json.loads(runner.calls[0]["user_prompt"])
-    assert user_prompt["job_id"] == "job-image-1"
-    assert user_prompt["required_sequence"] == [
-        "submit_image_generation",
-        "query_image_task",
-    ]
-
-
-@pytest.mark.asyncio
-async def test_episode_compose_agent_gets_compose_provider_tools(db):
-    runner = CapturingRunner()
-
-    await run_provider_stage_agent(
-        db,
-        run_id="run-1",
-        job_id="job-compose-1",
-        job_stage="episode_compose",
-        runtime_config={"provider": "mock"},
-        agent_runner=runner,
-    )
-
-    assert [tool.name for tool in runner.calls[0]["tools"]] == [
-        "submit_compose",
-        "query_compose_task",
-    ]
-    user_prompt = json.loads(runner.calls[0]["user_prompt"])
-    assert user_prompt["required_sequence"] == ["submit_compose", "query_compose_task"]
+    call = runner.calls[0]
+    assert [tool.name for tool in call["tools"]] == expected_tools
+    assert call["runtime_config"] == runtime_config
+    assert "sentinel-secret-123" not in call["system_prompt"]
+    assert "sentinel-secret-123" not in call["user_prompt"]
+    assert (
+        "Call each tool named in required_sequence in order with run_id and job_id, "
+        "then return the final tool result as a JSON object."
+    ) in call["system_prompt"]
+    assert json.loads(call["user_prompt"]) == {
+        "run_id": "run-1",
+        "job_id": "job-1",
+        "job_stage": job_stage,
+        "required_sequence": expected_tools,
+    }
 
 
 @pytest.mark.asyncio

@@ -20,6 +20,37 @@ def _tool(tools, name):
 
 
 @pytest.mark.asyncio
+async def test_provider_tool_uses_direct_provider_helper(monkeypatch, db):
+    called = []
+    run = type("Run", (), {"id": "run-1", "production_plan_id": "plan-1"})()
+    job = type("Job", (), {"id": "job-1", "stage": "image_generation", "plan_id": "plan-1"})()
+
+    async def fake_direct(db_arg, run_arg, job_arg):
+        called.append((run_arg.id, job_arg.id))
+        return type("Result", (), {"status": "success", "message": "direct", "data": {}})()
+
+    async def fail_routed(*args, **kwargs):
+        raise AssertionError("provider tools should use execute_provider_job_direct")
+
+    monkeypatch.setattr(provider_tools, "_load_run_and_job", lambda db_arg, run_id, job_id: (run, job))
+    monkeypatch.setattr(
+        "app.domains.video_production.production_worker_service.execute_provider_job_direct",
+        fake_direct,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        "app.domains.video_production.production_worker_service.execute_real_job",
+        fail_routed,
+    )
+
+    tool = provider_tools.build_provider_tools(db, allowed_tools=["submit_image_generation"])[0]
+    result = await tool.ainvoke({"run_id": "run-1", "job_id": "job-1"})
+
+    assert result["status"] == "success"
+    assert called == [("run-1", "job-1")]
+
+
+@pytest.mark.asyncio
 async def test_submit_image_generation_uses_existing_worker_service(monkeypatch, db):
     calls = []
     run = type("Run", (), {"id": "run-1", "production_plan_id": "plan-1"})()

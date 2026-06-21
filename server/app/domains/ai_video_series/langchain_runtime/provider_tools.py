@@ -61,9 +61,9 @@ def _result_payload(result: Any) -> dict[str, Any]:
 
 
 async def _execute_provider_job(db: Session, run: Any, job: Any) -> Any:
-    from app.domains.video_production.production_worker_service import execute_real_job
+    from app.domains.video_production.production_worker_service import execute_provider_job_direct
 
-    return await execute_real_job(db, run, job)
+    return await execute_provider_job_direct(db, run, job)
 
 
 async def _run_provider_job(

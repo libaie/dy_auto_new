@@ -12,6 +12,7 @@ from app.config import PIXELLE_CONFIG_PATH, bj_now
 from app.db.models.video_production import ProductionJob, ProductionSegment, VideoProductionRun
 from app.domains.agency_operations.agency_creative_patch_service import unresolved_patch_gate
 from app.domains.agency_operations.agency_repair_executor import execute_repair_job, is_agency_repair_stage
+from app.domains.ai_video_series.langchain_runtime.provider_stage_orchestrator import run_provider_stage_agent
 from app.domains.model_configuration.runtime_model_config import resolve_runtime_model_config
 from app.domains.video_production.production_action_result import ProductionActionResult
 from app.domains.video_production.production_errors import ProductionErrorCode, ProductionRepairableError, to_http_detail
@@ -64,6 +65,27 @@ def _pixelle_output_root() -> Path:
 async def execute_real_job(db: Session, run: VideoProductionRun, job: ProductionJob) -> ProductionActionResult:
     if is_agency_repair_stage(job.stage):
         return await execute_repair_job(db, job)
+    parsed = await run_provider_stage_agent(
+        db,
+        run_id=run.id,
+        job_id=job.id,
+        job_stage=job.stage,
+        runtime_config=resolve_runtime_model_config(db, "llm_agency_expert_review"),
+    )
+    if parsed.get("status") != "success":
+        return ProductionActionResult.blocked(
+            ProductionErrorCode.PROVIDER_STAGE_TASK_SYNC_REQUIRED,
+            parsed.get("message") or "Provider stage agent did not complete successfully.",
+            "Retry the provider worker job so the provider stage task can be synchronized.",
+            repair_route=f"/video-production/{run.id}",
+            affected_ids=[job.id],
+            retryable=True,
+            data=parsed,
+        )
+    return ProductionActionResult.success(parsed.get("message") or "Provider stage agent completed.", data=parsed)
+
+
+async def execute_provider_job_direct(db: Session, run: VideoProductionRun, job: ProductionJob) -> ProductionActionResult:
     job_spec = _job_spec(db, run, job)
     gate_result = await _run_deferred_stage_gates(db, run, job, job_spec)
     if gate_result is not None:

@@ -17,25 +17,26 @@ The AI video stack currently mixes several LLM entry points:
 
 Use LangChain for the AI video LLM application layer:
 
-1. All AI video text generation, structured planning, storyboard generation, and expert review calls go through a LangChain runtime.
-2. Existing image/video provider services remain the production execution layer and are exposed to agents as tools where needed.
-3. The existing production state machine, cost reservation, asset persistence, audit events, and route response shapes stay intact.
+1. All AI video text generation, structured planning, storyboard generation, image generation, video generation, provider submit/query, and expert review calls go through a LangChain runtime.
+2. Stage-specific agents may directly call provider tools such as `submit_image_generation`, `query_image_task`, `submit_video_generation`, and `query_video_task`.
+3. Provider tools must reuse existing service boundaries for budget checks, idempotency keys, task persistence, provider clients, status queries, audit events, and error mapping.
+4. Existing route response shapes, database tables, production status fields, and public error behavior stay intact.
 
-This chooses the smallest design that satisfies "LLM + tool + multi-agent orchestration" without turning provider task execution into an opaque agent loop.
+This chooses the user-approved B-1 design: agents orchestrate the full AI video production loop, while write-capable tools keep paid provider execution auditable and stateful through existing project services.
 
 ## Alternatives Considered
 
-### A. Recommended: LangChain LLM and tools, keep provider execution services
+### A. LangChain LLM and tools, keep provider execution services outside the agent loop
 
 Replace direct LLM calls with LangChain agents and tool calls. Provider renderers, queues, cost accounting, and persistence remain deterministic services.
 
-Tradeoff: Agents orchestrate decisions, not every low-level provider operation. This keeps production behavior testable.
+Tradeoff: Easier to test, but it does not satisfy the chosen requirement that agents orchestrate image/video provider submit/query.
 
-### B. Full provider-in-agent loop
+### B. Selected: agent-orchestrated provider loop through guarded tools
 
-Wrap image generation, video generation, provider submit/query, persistence, and approval actions as tools and let the agent decide the full sequence.
+Wrap image generation, video generation, provider submit/query, persistence, and approval actions as tools and let stage agents decide the production sequence.
 
-Tradeoff: More "agentic", but harder to audit, more expensive to test, and risks bypassing existing production gates.
+Tradeoff: More surface area and tests, but each paid/write-capable tool still uses existing budget, idempotency, persistence, provider client, query, and audit services. Agents can orchestrate provider work without bypassing production gates.
 
 ### C. Agency-only LangChain replacement
 
@@ -62,10 +63,25 @@ Use tools for deterministic capabilities that the model should not fake:
 - Validate and parse JSON into existing Pydantic/domain schemas.
 - Write AI text artifacts through `AITextArtifactService`.
 - Create or update generated character and scene assets through existing domain services.
-- Request existing image/video production actions through current service boundaries when a workflow needs provider work.
+- Submit image generation through current provider and production service boundaries.
+- Query image generation provider tasks and persist completed image assets.
+- Submit video generation through current provider and production service boundaries.
+- Query video generation provider tasks and persist completed video assets.
+- Persist production job, segment, run, and artifact state transitions through existing DB models.
 - Record agency invocation, audit event, token usage, and model snapshot through existing agency persistence.
 
-Provider submit/query functions remain service-owned. Tools call them; agents do not own provider lifecycle state.
+Agents may choose when to call provider submit/query tools, but the tools own the irreversible side effects: budget reservation, idempotency, provider API call, task id persistence, status mapping, asset persistence, and audit event creation. No AI video agent may call provider clients or `ai_generator.generate_custom()` directly.
+
+## Provider Tool Contract
+
+Write-capable provider tools must be narrow and explicit:
+
+- Inputs include `series_id`, `episode_id`, target ids, prompt payload, provider scene key, and an idempotency key or enough data to derive one.
+- Outputs include local job/asset ids, provider task id when available, normalized status, cost metadata when available, and audit event ids when recorded.
+- Repeated calls with the same idempotency key return the existing local job/task state instead of submitting duplicate paid work.
+- Query tools update local status and asset URLs by calling existing provider query services.
+- Tool errors map to existing `AgencyRuntimeError` or production error codes and are persisted as failed invocations/audit events.
+- Tools never accept arbitrary raw provider URLs or API keys from the agent prompt.
 
 ## Multi-Agent Flow
 
@@ -78,6 +94,14 @@ Keep the existing stage DAG as the first orchestration contract:
 
 Each expert becomes a LangChain agent with a stage-specific system prompt and a restricted tool set. The orchestrator runs reviewers first, passes reviewer outputs to the lead, then runs QA where configured. Existing idempotency keys and persistence still decide whether an invocation should resume or execute.
 
+Provider stages use the same staged pattern:
+
+- `image_stage`: image agent reads context, submits image jobs, queries provider tasks, persists successful assets, and returns normalized stage output.
+- `image_review`: review agents inspect generated assets and may request bounded regeneration through provider tools.
+- `video_stage`: video agent submits segment/video jobs, queries provider tasks, persists clips, and returns normalized stage output.
+- `video_review`: review agents inspect video assets and may request bounded regeneration through provider tools.
+- `compose_preflight` and `compose`: agents inspect readiness and call only existing compose/preflight service tools.
+
 ## Replacement Map
 
 - `AgencySkillRuntime.invoke()` becomes a LangChain agent invocation path.
@@ -85,6 +109,9 @@ Each expert becomes a LangChain agent with a stage-specific system prompt and a 
 - `ScriptGenerationPipeline.default_script_model_client()` uses a script-stage agent or shared LangChain structured-output runner.
 - `director_router.generate_auto_storyboard()` uses a storyboard agent.
 - `style_lock.auto_generate_series_assets()` and `ensure_series_assets()` use asset-planning tools and structured-output agents instead of `ai_generator.generate_custom()`.
+- Image production stages call LangChain provider tools instead of route-local provider submit/poll helpers.
+- Video production stages call LangChain provider tools instead of route-local provider submit/poll helpers.
+- Provider task query/poll behavior is centralized in LangChain provider tools that delegate to existing provider services.
 
 `model_configuration.ai_generator` can remain for non-AI-video features until their own migration exists, but AI video modules must stop calling it directly.
 
@@ -104,21 +131,23 @@ Minimum verification for implementation:
 
 - Unit tests for model-config-to-LangChain mapping using fake model objects.
 - Tool tests for each write-capable tool, using existing services and DB fixtures.
+- Provider tool tests proving image/video submit/query tools call existing services, preserve idempotency, persist task ids/status, and avoid duplicate paid submits.
 - Agency runtime tests proving reviewer, lead, and QA order still works with fake LangChain agents.
+- Provider-stage orchestration tests proving fake agents can submit, query, persist, review, and regenerate bounded image/video work.
 - Story planning, style lock, storyboard, and script pipeline tests proving outputs still populate existing DB fields and AI text artifacts.
-- Inventory test proving AI video modules no longer call `ai_generator.generate_custom()` or direct `httpx` chat completion clients.
+- Inventory test proving AI video orchestration modules no longer call `ai_generator.generate_custom()`, direct `httpx` chat completion clients, or scattered provider submit/query helpers outside the approved LangChain provider tool modules and existing provider service modules.
 - Existing focused tests for series planning, script pipeline, director planning, agency orchestration, and production start flow still pass.
 
 ## Out Of Scope
 
 - No frontend redesign.
-- No rewrite of image/video provider clients.
+- No rewrite of image/video provider clients; LangChain tools delegate to them.
 - No migration of unrelated content, account, or device AI features.
 - No LangSmith dependency requirement; tracing can be added later if needed.
 
 ## Spec Self-Review
 
 - All requirements are explicit.
-- The design satisfies the original scope by replacing AI video LLM application calls, not just agency review.
-- Provider execution is deliberately kept outside the agent loop to preserve state-machine and cost-accounting behavior.
+- The design satisfies the selected B-1 scope by replacing AI video LLM calls and letting agents orchestrate image/video provider submit/query through guarded tools.
+- Provider execution enters the agent loop only through tools that preserve budget checks, idempotency, state persistence, provider clients, status queries, and audit behavior.
 - The implementation can be split into testable slices without changing route contracts.

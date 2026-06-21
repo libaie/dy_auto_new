@@ -5,6 +5,7 @@ from scripts.check_chinese_comments import (
     check_files,
     has_chinese_module_comment,
     high_risk_comment_gaps,
+    inventory,
 )
 
 
@@ -91,6 +92,26 @@ def test_submit_function_definition_is_not_high_risk_until_called(tmp_path: Path
     assert high_risk_comment_gaps(path) == []
 
 
+def test_frontend_api_wrapper_request_is_not_high_risk_by_itself(tmp_path: Path):
+    path = tmp_path / "accounts.js"
+    path.write_text(
+        "// 前端 API 客户端：封装账号相关后端接口。\n"
+        "export function createAccount(data) { return client.post('/accounts', data) }\n",
+        encoding="utf-8",
+    )
+
+    assert high_risk_comment_gaps(path) == []
+
+
+def test_device_click_still_requires_nearby_chinese_comment(tmp_path: Path):
+    device_dir = tmp_path / "device" / "handlers"
+    device_dir.mkdir(parents=True)
+    path = device_dir / "search.js"
+    path.write_text("function run() {\n  button.click();\n}\n", encoding="utf-8")
+
+    assert high_risk_comment_gaps(path) == [(2, "button.click();")]
+
+
 def test_check_files_reports_missing_module_comment(tmp_path: Path):
     bad = tmp_path / "bad.py"
     bad.write_text("VALUE = 1\n", encoding="utf-8")
@@ -98,3 +119,10 @@ def test_check_files_reports_missing_module_comment(tmp_path: Path):
     result = check_files([bad], strict_risk=False)
 
     assert result == CheckResult(module_missing=[bad], risk_missing=[])
+
+
+def test_all_business_code_has_standard_chinese_comments():
+    result = check_files(inventory("all"), strict_risk=True)
+
+    assert result.module_missing == []
+    assert result.risk_missing == []

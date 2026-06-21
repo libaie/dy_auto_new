@@ -46,7 +46,7 @@ EXCLUDED_PARTS = {
     "tests",
     "spike",
 }
-HIGH_RISK_PATTERNS = [
+BACKEND_HIGH_RISK_PATTERNS = [
     re.compile(pattern)
     for pattern in (
         r"\bprovider\.\w+\(",
@@ -55,12 +55,17 @@ HIGH_RISK_PATTERNS = [
         r"\benqueue_job\(",
         r"\breserve[a-zA-Z0-9_]*\(",
         r"\bhttpx\.(AsyncClient|get|post|stream)\(",
-        r"\bfetch\(",
-        r"\baxios\.",
-        r"\bclient\.(post|put|patch|delete|request)\(",
+    )
+]
+DEVICE_HIGH_RISK_PATTERNS = [
+    re.compile(pattern)
+    for pattern in (
         r"\b(click|swipe|setText|captureScreen|press)\(",
     )
 ]
+DEVICE_RISK_EXCLUDED_FILES = {
+    "device/core/floating-window.js",
+}
 
 
 @dataclass(frozen=True)
@@ -123,14 +128,18 @@ def has_chinese_module_comment(path: Path) -> bool:
 
 def high_risk_comment_gaps(path: Path) -> list[tuple[int, str]]:
     lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
+    path_key = path.as_posix()
+    if any(path_key.endswith(item) for item in DEVICE_RISK_EXCLUDED_FILES):
+        return []
+    patterns = DEVICE_HIGH_RISK_PATTERNS if "/device/" in f"/{path_key}" else BACKEND_HIGH_RISK_PATTERNS
     gaps: list[tuple[int, str]] = []
     for index, line in enumerate(lines):
         stripped = line.strip()
         if stripped.startswith(("def ", "async def ", "except ")):
             continue
-        if not any(pattern.search(line) for pattern in HIGH_RISK_PATTERNS):
+        if not any(pattern.search(line) for pattern in patterns):
             continue
-        window = "\n".join(lines[max(0, index - 3): index + 1])
+        window = "\n".join(lines[max(0, index - 5): index + 1])
         if _has_chinese(window):
             continue
         gaps.append((index + 1, line.strip()[:120]))

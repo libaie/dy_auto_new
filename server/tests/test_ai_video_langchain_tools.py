@@ -29,3 +29,9 @@ def test_build_ai_video_tools_returns_restricted_tool_names(db):
     tools = build_ai_video_tools(db=None, allowed_tools=["validate_json"])
 
     assert [tool.name for tool in tools] == ["validate_json"]
+
+
+def test_build_ai_video_tools_respects_empty_allowed_tools(db):
+    tools = build_ai_video_tools(db=None, allowed_tools=[])
+
+    assert tools == []

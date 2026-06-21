@@ -46,7 +46,7 @@ def series_context_payload(db: Session, series_id: str, episode_id: str | None =
 
 
 def build_ai_video_tools(db: Session | None, allowed_tools: list[str] | None = None) -> list[Any]:
-    selected = set(allowed_tools or ["validate_json", "read_series_context"])
+    selected = set(["validate_json", "read_series_context"] if allowed_tools is None else allowed_tools)
 
     @tool
     def validate_json(raw: str) -> dict[str, Any]:

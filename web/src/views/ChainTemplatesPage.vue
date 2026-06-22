@@ -72,6 +72,8 @@ const columns = [
 ]
 
 // --- Fetch templates ---
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 fetchTemplates 对应业务流程的处理结果。
 async function fetchTemplates() {
   loading.value = true
   try {
@@ -92,6 +94,8 @@ async function fetchTemplates() {
 }
 
 // 前端业务函数：协调 handlePageChange 对应的页面流程、接口调用或状态转换。
+// 入参：p 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handlePageChange 对应业务流程的处理结果。
 function handlePageChange(p) {
   page.value = p
   fetchTemplates()
@@ -99,6 +103,8 @@ function handlePageChange(p) {
 
 // --- Open create dialog ---
 // 前端业务函数：协调 openCreateDialog 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 openCreateDialog 对应业务流程的处理结果。
 function openCreateDialog() {
   isEditing.value = false
   editingId.value = null
@@ -111,6 +117,8 @@ function openCreateDialog() {
 
 // --- Open edit dialog ---
 // 前端业务函数：协调 openEditDialog 对应的页面流程、接口调用或状态转换。
+// 入参：template 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 openEditDialog 对应业务流程的处理结果。
 function openEditDialog(template) {
   isEditing.value = true
   editingId.value = template.id
@@ -123,6 +131,8 @@ function openEditDialog(template) {
 
 // --- Step management ---
 // 前端业务函数：协调 addStep 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 addStep 对应业务流程的处理结果。
 function addStep() {
   const nextOrder = form.steps.length + 1
   form.steps.push({
@@ -133,6 +143,8 @@ function addStep() {
   })
 }
 
+// 入参：index 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 removeStep 对应业务流程的处理结果。
 function removeStep(index) {
   form.steps.splice(index, 1)
   // Re-number steps
@@ -140,6 +152,8 @@ function removeStep(index) {
 }
 
 // 前端业务函数：协调 moveStepUp 对应的页面流程、接口调用或状态转换。
+// 入参：index 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 moveStepUp 对应业务流程的处理结果。
 function moveStepUp(index) {
   if (index === 0) return
   const temp = form.steps[index]
@@ -149,6 +163,8 @@ function moveStepUp(index) {
 }
 
 // 前端业务函数：协调 moveStepDown 对应的页面流程、接口调用或状态转换。
+// 入参：index 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 moveStepDown 对应业务流程的处理结果。
 function moveStepDown(index) {
   if (index === form.steps.length - 1) return
   const temp = form.steps[index]
@@ -158,6 +174,8 @@ function moveStepDown(index) {
 }
 
 // 前端业务函数：协调 onStepTypeChange 对应的页面流程、接口调用或状态转换。
+// 入参：step 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 onStepTypeChange 对应业务流程的处理结果。
 function onStepTypeChange(step) {
   step.params = { ...typeParamDefaults[step.type] || {} }
   step.label = typeOptions.find(o => o.value === step.type)?.label || step.type
@@ -165,6 +183,8 @@ function onStepTypeChange(step) {
 
 // --- Save ---
 // 前端业务函数：协调 handleSave 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleSave 对应业务流程的处理结果。
 async function handleSave() {
   if (!form.name.trim()) {
     formError.value = '模板名称不能为空'
@@ -204,12 +224,16 @@ async function handleSave() {
 
 // --- Delete ---
 // 前端业务函数：协调 openDeleteDialog 对应的页面流程、接口调用或状态转换。
+// 入参：template 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 openDeleteDialog 对应业务流程的处理结果。
 function openDeleteDialog(template) {
   deletingTemplate.value = template
   showDeleteDialog.value = true
 }
 
 // 前端业务函数：协调 handleDelete 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleDelete 对应业务流程的处理结果。
 async function handleDelete() {
   if (!deletingTemplate.value) return
   deleting.value = true

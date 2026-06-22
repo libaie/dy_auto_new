@@ -25,13 +25,21 @@ DEFAULT_REAL_PROVIDER_CAPABILITY = {
 
 
 def _merge_dict(target: dict, source: object) -> None:
-    """业务函数：处理 _merge_dict 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _merge_dict 对应的业务流程、校验或数据转换。
+
+    入参：target、source 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if isinstance(source, dict):
         target.update(source)
 
 
 def capability_from_model_config(model_config: dict | None) -> dict:
-    """业务函数：处理 capability_from_model_config 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 capability_from_model_config 对应的业务流程、校验或数据转换。
+
+    入参：model_config 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     capability = deepcopy(DEFAULT_REAL_PROVIDER_CAPABILITY)
     if not model_config:
         return capability
@@ -43,7 +51,11 @@ def capability_from_model_config(model_config: dict | None) -> dict:
 
 
 def assert_real_paid_allowed(capability: dict) -> None:
-    """业务函数：处理 assert_real_paid_allowed 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 assert_real_paid_allowed 对应的业务流程、校验或数据转换。
+
+    入参：capability 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     required = (
         "real_paid_allowed",
         "supports_external_task_id",

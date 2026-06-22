@@ -368,11 +368,15 @@ const providerOptions = computed(() => {
 })
 
 // 前端业务函数：协调 providerLabel 对应的页面流程、接口调用或状态转换。
+// 入参：providerKey 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 providerLabel 对应业务流程的处理结果。
 function providerLabel(providerKey) {
   return schema.value.providers?.[providerKey]?.label || providerKey
 }
 
 // 前端业务函数：协调 sceneDefaultConfig 对应的页面流程、接口调用或状态转换。
+// 入参：scene 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 sceneDefaultConfig 对应业务流程的处理结果。
 function sceneDefaultConfig(scene) {
   const defaults = { ...(DEFAULT_CONFIG[scene?.model_type] || {}) }
   for (const field of scene?.fields || []) {
@@ -384,16 +388,22 @@ function sceneDefaultConfig(scene) {
 }
 
 // 前端业务函数：协调 modelTypeDefaultConfig 对应的页面流程、接口调用或状态转换。
+// 入参：modelType 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 modelTypeDefaultConfig 对应业务流程的处理结果。
 function modelTypeDefaultConfig(modelType) {
   return { ...(DEFAULT_CONFIG[modelType] || {}) }
 }
 
 // 前端业务函数：协调 defaultSceneForModelType 对应的页面流程、接口调用或状态转换。
+// 入参：modelType 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 defaultSceneForModelType 对应业务流程的处理结果。
 function defaultSceneForModelType(modelType) {
   return sceneOptions.value.find(scene => scene.model_type === modelType) || null
 }
 
 // 前端业务函数：协调 applyScene 对应的页面流程、接口调用或状态转换。
+// 入参：sceneKey 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 applyScene 对应业务流程的处理结果。
 function applyScene(sceneKey) {
   const scene = sceneOptions.value.find(item => item.key === sceneKey)
   if (!scene) {
@@ -489,11 +499,15 @@ watch(() => form.model_type, (mt) => {
 })
 
 // 前端业务函数：协调 onSceneChange 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 onSceneChange 对应业务流程的处理结果。
 function onSceneChange() {
   applyScene(form.scene_key)
 }
 
 // 前端业务函数：协调 startCreate 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 startCreate 对应业务流程的处理结果。
 function startCreate() {
   const id = '__new__' + Date.now()
   const scene = defaultSceneForModelType('llm')
@@ -510,11 +524,15 @@ function startCreate() {
 }
 
 // 前端业务函数：协调 selectModel 对应的页面流程、接口调用或状态转换。
+// 入参：id 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 selectModel 对应业务流程的处理结果。
 function selectModel(id) {
   selectedId.value = id
 }
 
 // 前端业务函数：协调 toggleEnabled 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 toggleEnabled 对应业务流程的处理结果。
 async function toggleEnabled() {
   if (isNew.value) return
   const newEnabled = !form.enabled
@@ -531,6 +549,8 @@ async function toggleEnabled() {
   }
 }
 
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 save 对应业务流程的处理结果。
 async function save() {
   saving.value = true
   testResult.value = null
@@ -582,6 +602,8 @@ async function save() {
 }
 
 // 前端业务函数：协调 testConnection 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 testConnection 对应业务流程的处理结果。
 async function testConnection() {
   if (isNew.value) return
   testing.value = true
@@ -597,11 +619,15 @@ async function testConnection() {
 }
 
 // 前端业务函数：协调 confirmDelete 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 confirmDelete 对应业务流程的处理结果。
 function confirmDelete() {
   showDeleteConfirm.value = true
 }
 
 // 前端业务函数：协调 doDelete 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 doDelete 对应业务流程的处理结果。
 async function doDelete() {
   saving.value = true
   try {

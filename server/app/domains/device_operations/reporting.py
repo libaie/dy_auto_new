@@ -28,7 +28,11 @@ async def report_progress(
     db: Session = Depends(get_db),
     authed_device_id: str = Depends(verify_device_secret),
 ):
-    """业务函数：处理 report_progress 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 report_progress 对应的业务流程、校验或数据转换。
+
+    入参：report、db、authed_device_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Device reports task execution progress. Broadcast to admin WS for real-time UI."""
     from app.db.models import Task as DBTask
     db_task = db.query(DBTask).filter(DBTask.id == report.task_id).first()
@@ -57,7 +61,11 @@ async def report_result(
     authed_device_id: Optional[str] = Depends(verify_device_secret),
 ):
     # Verify lease: accept current lease, log stale reports, fall back to device_id
-    """业务函数：处理 report_result 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 report_result 对应的业务流程、校验或数据转换。
+
+    入参：report、db、authed_device_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if authed_device_id:
         from app.db.models import Task as DBTask
         db_task = db.query(DBTask).filter(DBTask.id == report.task_id).first()
@@ -116,8 +124,10 @@ def stats_increment(
     db: Session = Depends(get_db),
     authed_device_id: str = Depends(verify_device_secret),
 ):
-    """设备端增量统计上报——idempotent: 同一 (task,device,type,target,op_index) 只计一次。
-    校验 task→account 归属和 task→device 归属，防止跨账号伪造统计。
+    """业务函数：处理 stats_increment 对应的业务流程、校验或数据转换。
+
+    入参：body、db、authed_device_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
     """
     from app.domains.reporting.stats_service import stats_service
     from app.db.models.reporting import StatsEvent
@@ -171,7 +181,11 @@ async def heartbeat(
     db: Session = Depends(get_db),
     authed_device_id: Optional[str] = Depends(verify_device_secret),
 ):
-    """业务函数：处理 heartbeat 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 heartbeat 对应的业务流程、校验或数据转换。
+
+    入参：body、raw_request、db、authed_device_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     device_id = body.get("device_id", "")
     # Per-device secret: use the verified device_id, reject mismatch
     if authed_device_id and authed_device_id != device_id:
@@ -199,7 +213,11 @@ async def report_risk(
     db: Session = Depends(get_db),
     _: None = Depends(verify_device_secret),
 ):
-    """业务函数：处理 report_risk 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 report_risk 对应的业务流程、校验或数据转换。
+
+    入参：report、db、_ 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Device reports risk control detection. Marks account as risk_controlled."""
     from app.db.models import Account
     account = db.query(Account).filter(Account.id == report.account_id).first()

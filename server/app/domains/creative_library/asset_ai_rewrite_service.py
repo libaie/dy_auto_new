@@ -14,9 +14,16 @@ from app.domains.model_configuration.ai_generator import ai_generator
 
 
 class AssetAiRewriteError(Exception):
-    """业务类：承载 AssetAiRewriteError 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 AssetAiRewriteError 相关的数据结构、状态或业务协作。
+
+    类参数：code、details、message 承载该类的业务配置、状态或数据字段。
+    """
     def __init__(self, code: str, message: str, details: dict | None = None):
-        """初始化业务对象依赖，保存后续流程需要的运行上下文。"""
+        """初始化业务对象依赖，保存后续流程需要的运行上下文。
+
+        入参：code、message、details 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         super().__init__(message)
         self.code = code
         self.message = message
@@ -50,7 +57,11 @@ Allowed fields: {fields}."""
 
 
 async def generate_character_rewrite_candidate(db: Session, character_id: str, instruction: str = "") -> dict:
-    """业务函数：处理 generate_character_rewrite_candidate 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 generate_character_rewrite_candidate 对应的业务流程、校验或数据转换。
+
+    入参：db、character_id、instruction 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     character = db.query(Character).filter(Character.id == character_id).first()
     if not character:
         raise AssetAiRewriteError(
@@ -72,7 +83,11 @@ async def generate_character_rewrite_candidate(db: Session, character_id: str, i
 
 
 async def generate_scene_rewrite_candidate(db: Session, scene_id: str, instruction: str = "") -> dict:
-    """业务函数：处理 generate_scene_rewrite_candidate 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 generate_scene_rewrite_candidate 对应的业务流程、校验或数据转换。
+
+    入参：db、scene_id、instruction 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     scene = db.query(Scene).filter(Scene.id == scene_id).first()
     if not scene:
         raise AssetAiRewriteError(
@@ -94,7 +109,11 @@ async def generate_scene_rewrite_candidate(db: Session, scene_id: str, instructi
 
 
 def _user_prompt(asset_type: str, current: dict, instruction: str) -> str:
-    """业务函数：处理 _user_prompt 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _user_prompt 对应的业务流程、校验或数据转换。
+
+    入参：asset_type、current、instruction 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return (
         f"Asset type: {asset_type}\n"
         f"Current JSON:\n{json.dumps(current, ensure_ascii=False, indent=2)}\n"
@@ -104,7 +123,11 @@ def _user_prompt(asset_type: str, current: dict, instruction: str) -> str:
 
 
 def _response(asset_type: str, asset_id: str, current: dict, candidate: dict) -> dict:
-    """业务函数：处理 _response 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _response 对应的业务流程、校验或数据转换。
+
+    入参：asset_type、asset_id、current、candidate 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return {
         "ok": True,
         "asset_type": asset_type,
@@ -117,12 +140,20 @@ def _response(asset_type: str, asset_id: str, current: dict, candidate: dict) ->
 
 
 def _row_to_allowed_dict(row, allowed_fields: tuple[str, ...]) -> dict:
-    """业务函数：处理 _row_to_allowed_dict 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _row_to_allowed_dict 对应的业务流程、校验或数据转换。
+
+    入参：row、allowed_fields 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return {field: getattr(row, field) for field in allowed_fields}
 
 
 def _parse_candidate(raw: str, allowed_fields: tuple[str, ...]) -> dict:
-    """业务函数：处理 _parse_candidate 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _parse_candidate 对应的业务流程、校验或数据转换。
+
+    入参：raw、allowed_fields 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     for parsed in _parse_json_objects(raw):
         root = parsed.get("candidate") if isinstance(parsed.get("candidate"), dict) else parsed
         candidate = {field: root[field] for field in allowed_fields if field in root}
@@ -132,7 +163,11 @@ def _parse_candidate(raw: str, allowed_fields: tuple[str, ...]) -> dict:
 
 
 def _parse_json_objects(raw: str) -> list[dict]:
-    """业务函数：处理 _parse_json_objects 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _parse_json_objects 对应的业务流程、校验或数据转换。
+
+    入参：raw 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if not isinstance(raw, str) or not raw.strip():
         _raise_invalid(raw or "", "AI output was empty")
 
@@ -166,7 +201,11 @@ def _parse_json_objects(raw: str) -> list[dict]:
 
 
 def _raise_invalid(raw: str, reason: str) -> None:
-    """业务函数：处理 _raise_invalid 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _raise_invalid 对应的业务流程、校验或数据转换。
+
+    入参：raw、reason 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     preview = raw if isinstance(raw, str) else repr(raw)
     raise AssetAiRewriteError(
         "AI_REWRITE_INVALID_OUTPUT",

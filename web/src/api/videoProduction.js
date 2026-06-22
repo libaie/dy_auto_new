@@ -6,6 +6,8 @@ const DEFAULT_TREE_PAGE_SIZE = 50
 const MAX_TREE_PAGE_SIZE = 100
 
 // 前端业务函数：协调 toBoundedPositiveInteger 对应的页面流程、接口调用或状态转换。
+// 入参：value、fallback、max 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 toBoundedPositiveInteger 对应业务流程的处理结果。
 function toBoundedPositiveInteger(value, fallback, max = Number.MAX_SAFE_INTEGER) {
   const numberValue = Number(value)
   if (!Number.isFinite(numberValue) || numberValue < 1) return fallback
@@ -13,6 +15,8 @@ function toBoundedPositiveInteger(value, fallback, max = Number.MAX_SAFE_INTEGER
 }
 
 // 前端业务函数：协调 boundedTreeParams 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 boundedTreeParams 对应业务流程的处理结果。
 function boundedTreeParams(params = {}) {
   return {
     ...params,
@@ -22,6 +26,8 @@ function boundedTreeParams(params = {}) {
 }
 
 // 前端业务函数：协调 createVideoProductionRun 对应的页面流程、接口调用或状态转换。
+// 入参：seriesId、episodeId 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 createVideoProductionRun 对应业务流程的处理结果。
 export function createVideoProductionRun(seriesId, episodeId) {
   return client.post('/video-production/runs', {
     series_id: seriesId,
@@ -76,21 +82,29 @@ export function createOneSentenceVideo({
 }
 
 // 前端业务函数：协调 getVideoProductionRun 对应的页面流程、接口调用或状态转换。
+// 入参：runId 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 getVideoProductionRun 对应业务流程的处理结果。
 export function getVideoProductionRun(runId) {
   return client.get(`/video-production/runs/${runId}`)
 }
 
 // 前端业务函数：协调 backfillRunTextArtifacts 对应的页面流程、接口调用或状态转换。
+// 入参：runId 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 backfillRunTextArtifacts 对应业务流程的处理结果。
 export function backfillRunTextArtifacts(runId) {
   return client.post(`/video-production/runs/${runId}/backfill-text-artifacts`)
 }
 
 // 前端业务函数：协调 getRunReadiness 对应的页面流程、接口调用或状态转换。
+// 入参：runId 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 getRunReadiness 对应业务流程的处理结果。
 export function getRunReadiness(runId) {
   return client.get(`/video-production/runs/${runId}/readiness`)
 }
 
 // 前端业务函数：协调 runMockSchedulerStep 对应的页面流程、接口调用或状态转换。
+// 入参：runId 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 runMockSchedulerStep 对应业务流程的处理结果。
 export function runMockSchedulerStep(runId, payload = {}) {
   return client.post(`/video-production/runs/${runId}/mock-worker-step`, {
     lease_id: 'ui-worker',
@@ -100,6 +114,8 @@ export function runMockSchedulerStep(runId, payload = {}) {
 }
 
 // 前端业务函数：协调 runRealWorkerStep 对应的页面流程、接口调用或状态转换。
+// 入参：runId 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 runRealWorkerStep 对应业务流程的处理结果。
 export function runRealWorkerStep(runId, payload = {}) {
   return client.post(`/video-production/runs/${runId}/worker-step`, {
     lease_id: 'ui-real-worker',
@@ -109,126 +125,176 @@ export function runRealWorkerStep(runId, payload = {}) {
 }
 
 // 前端业务函数：协调 startImageStage 对应的页面流程、接口调用或状态转换。
+// 入参：runId 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 startImageStage 对应业务流程的处理结果。
 export function startImageStage(runId) {
   return client.post(`/video-production/runs/${runId}/start-images`)
 }
 
 // 前端业务函数：协调 syncImageStage 对应的页面流程、接口调用或状态转换。
+// 入参：runId 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 syncImageStage 对应业务流程的处理结果。
 export function syncImageStage(runId) {
   return client.post(`/video-production/runs/${runId}/sync-image-results`)
 }
 
 // 前端业务函数：协调 listReviewItems 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 listReviewItems 对应业务流程的处理结果。
 export function listReviewItems(params = {}) {
   return client.get('/video-production/review-items', { params })
 }
 
 // 前端业务函数：协调 reviewAsset 对应的页面流程、接口调用或状态转换。
+// 入参：assetId、action、comment 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 reviewAsset 对应业务流程的处理结果。
 export function reviewAsset(assetId, action, comment = '') {
   return client.post(`/video-production/assets/${assetId}/review`, { action, comment })
 }
 
 // 前端业务函数：协调 regenerateAsset 对应的页面流程、接口调用或状态转换。
+// 入参：assetId、payload 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 regenerateAsset 对应业务流程的处理结果。
 export function regenerateAsset(assetId, payload) {
   return client.post(`/video-production/assets/${assetId}/regenerate`, payload)
 }
 
 // 前端业务函数：协调 voidProductionAsset 对应的页面流程、接口调用或状态转换。
+// 入参：assetId 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 voidProductionAsset 对应业务流程的处理结果。
 export function voidProductionAsset(assetId, payload = {}) {
   return client.post(`/video-production/assets/${assetId}/void`, payload)
 }
 
 // 前端业务函数：协调 imageEditProductionAsset 对应的页面流程、接口调用或状态转换。
+// 入参：assetId、payload 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 imageEditProductionAsset 对应业务流程的处理结果。
 export function imageEditProductionAsset(assetId, payload) {
   return client.post(`/video-production/assets/${assetId}/image-edit`, payload)
 }
 
 // 前端业务函数：协调 startVideoStage 对应的页面流程、接口调用或状态转换。
+// 入参：runId 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 startVideoStage 对应业务流程的处理结果。
 export function startVideoStage(runId) {
   return client.post(`/video-production/runs/${runId}/start-videos`)
 }
 
 // 前端业务函数：协调 syncVideoStage 对应的页面流程、接口调用或状态转换。
+// 入参：runId 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 syncVideoStage 对应业务流程的处理结果。
 export function syncVideoStage(runId) {
   return client.post(`/video-production/runs/${runId}/sync-video-results`)
 }
 
 // 前端业务函数：协调 startComposeStage 对应的页面流程、接口调用或状态转换。
+// 入参：runId 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 startComposeStage 对应业务流程的处理结果。
 export function startComposeStage(runId) {
   return client.post(`/video-production/runs/${runId}/compose`)
 }
 
 // 前端业务函数：协调 syncComposeStage 对应的页面流程、接口调用或状态转换。
+// 入参：runId 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 syncComposeStage 对应业务流程的处理结果。
 export function syncComposeStage(runId) {
   return client.post(`/video-production/runs/${runId}/sync-compose-results`)
 }
 
 // 前端业务函数：协调 startAssetRegeneration 对应的页面流程、接口调用或状态转换。
+// 入参：assetId 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 startAssetRegeneration 对应业务流程的处理结果。
 export function startAssetRegeneration(assetId) {
   return client.post(`/video-production/assets/${assetId}/start-regeneration`)
 }
 
 // 前端业务函数：协调 syncAssetRegeneration 对应的页面流程、接口调用或状态转换。
+// 入参：assetId 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 syncAssetRegeneration 对应业务流程的处理结果。
 export function syncAssetRegeneration(assetId) {
   return client.post(`/video-production/assets/${assetId}/sync-regeneration`)
 }
 
 // 前端业务函数：协调 retryAssetPersistence 对应的页面流程、接口调用或状态转换。
+// 入参：assetId 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 retryAssetPersistence 对应业务流程的处理结果。
 export function retryAssetPersistence(assetId) {
   return client.post(`/video-production/assets/${assetId}/persist-retry`)
 }
 
 // 前端业务函数：协调 getProductionTree 对应的页面流程、接口调用或状态转换。
+// 入参：planId 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 getProductionTree 对应业务流程的处理结果。
 export function getProductionTree(planId, params = {}) {
   return client.get(`/video-production/plans/${planId}/tree`, { params: boundedTreeParams(params) })
 }
 
 // 前端业务函数：协调 getRunProductionTree 对应的页面流程、接口调用或状态转换。
+// 入参：runId 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 getRunProductionTree 对应业务流程的处理结果。
 export function getRunProductionTree(runId, params = {}) {
   return client.get(`/video-production/runs/${runId}/tree`, { params: boundedTreeParams(params) })
 }
 
 // 前端业务函数：协调 getSegmentDetail 对应的页面流程、接口调用或状态转换。
+// 入参：segmentId 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 getSegmentDetail 对应业务流程的处理结果。
 export function getSegmentDetail(segmentId, params = {}) {
   return client.get(`/video-production/segments/${segmentId}/detail`, { params })
 }
 
 // 前端业务函数：协调 getProviderStageTasks 对应的页面流程、接口调用或状态转换。
+// 入参：runId 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 getProviderStageTasks 对应业务流程的处理结果。
 export function getProviderStageTasks(runId, params = {}) {
   return client.get(`/video-production/runs/${runId}/provider-stage-tasks`, { params: boundedTreeParams(params) })
 }
 
 // 前端业务函数：协调 getSegmentRetryImpact 对应的页面流程、接口调用或状态转换。
+// 入参：segmentId 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 getSegmentRetryImpact 对应业务流程的处理结果。
 export function getSegmentRetryImpact(segmentId) {
   return client.get(`/video-production/segments/${segmentId}/retry-impact`)
 }
 
 // 前端业务函数：协调 getRunCosts 对应的页面流程、接口调用或状态转换。
+// 入参：runId 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 getRunCosts 对应业务流程的处理结果。
 export function getRunCosts(runId) {
   return client.get(`/video-production/runs/${runId}/costs`)
 }
 
 // 前端业务函数：协调 retryProductionSegment 对应的页面流程、接口调用或状态转换。
+// 入参：segmentId 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 retryProductionSegment 对应业务流程的处理结果。
 export function retryProductionSegment(segmentId) {
   return client.post(`/video-production/segments/${segmentId}/retry`)
 }
 
 // 前端业务函数：协调 pauseProductionRun 对应的页面流程、接口调用或状态转换。
+// 入参：runId 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 pauseProductionRun 对应业务流程的处理结果。
 export function pauseProductionRun(runId) {
   return client.post(`/video-production/runs/${runId}/pause`)
 }
 
 // 前端业务函数：协调 resumeProductionRun 对应的页面流程、接口调用或状态转换。
+// 入参：runId 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 resumeProductionRun 对应业务流程的处理结果。
 export function resumeProductionRun(runId) {
   return client.post(`/video-production/runs/${runId}/resume`)
 }
 
 // 前端业务函数：协调 bulkReviewProductionAssets 对应的页面流程、接口调用或状态转换。
+// 入参：payload 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 bulkReviewProductionAssets 对应业务流程的处理结果。
 export function bulkReviewProductionAssets(payload) {
   return client.post('/video-production/reviews/bulk-action', payload)
 }
 
 // 前端业务函数：协调 createVideoCollection 对应的页面流程、接口调用或状态转换。
+// 入参：seriesId 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 createVideoCollection 对应业务流程的处理结果。
 export function createVideoCollection(seriesId) {
   return client.post('/video-production/collections', { series_id: seriesId })
 }

@@ -19,11 +19,15 @@ let clockTimer = null
 let statsTimer = null
 
 // 前端业务函数：协调 updateClock 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 updateClock 对应业务流程的处理结果。
 function updateClock() {
   currentTime.value = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
 }
 
 // 前端业务函数：协调 fetchStats 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 fetchStats 对应业务流程的处理结果。
 async function fetchStats() {
   try { const res = await getRealtimeStats(); stats.value = res.data || stats.value } catch {}
 }
@@ -35,6 +39,8 @@ onMounted(() => {
 onUnmounted(() => { clearInterval(clockTimer); clearInterval(statsTimer) })
 
 // 前端业务函数：协调 handleLogout 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleLogout 对应业务流程的处理结果。
 function handleLogout() { auth.logout(); router.push('/login') }
 
 const categories = [
@@ -45,6 +51,8 @@ const categories = [
   { key: 'system', label: '系统', to: '/settings' },
 ]
 
+// 入参：cat 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleCategoryClick 对应业务流程的处理结果。
 function handleCategoryClick(cat) {
   if (props.activeCategory !== cat.key) {
     router.push(cat.to)

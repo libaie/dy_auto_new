@@ -155,6 +155,8 @@ const categoryOptions = [
   { value: 'collect', label: '采集相关' },
 ]
 
+// 入参：cat 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 getCategoryLabel 对应业务流程的处理结果。
 function getCategoryLabel(cat) {
   const opt = categoryOptions.find(o => o.value === cat)
   return opt ? opt.label : '未分类'
@@ -174,11 +176,15 @@ const categoryColorMap = {
 }
 
 // 前端业务函数：协调 getCategoryClass 对应的页面流程、接口调用或状态转换。
+// 入参：cat 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 getCategoryClass 对应业务流程的处理结果。
 function getCategoryClass(cat) {
   return categoryColorMap[cat] || 'bg-cyan-500/15 text-cyan-300 border-cyan-500/25'
 }
 
 // 前端业务函数：协调 _matchVersion 对应的页面流程、接口调用或状态转换。
+// 入参：s 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 _matchVersion 对应业务流程的处理结果。
 function _matchVersion(s) {
   return (s.platform_version || 'default')
 }
@@ -239,6 +245,8 @@ const regexAiPrompt = useSavedPrompt('selector_regex', '')
 const cleanAiPrompt = useSavedPrompt('selector_clean', '')
 
 // 前端业务函数：协调 generateRegexAI 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 generateRegexAI 对应业务流程的处理结果。
 async function generateRegexAI() {
   if (!regexAiPrompt.value.trim()) {
     formError.value = '请输入正则需求描述'
@@ -256,6 +264,8 @@ async function generateRegexAI() {
 }
 
 // 前端业务函数：协调 generateCleanPromptAI 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 generateCleanPromptAI 对应业务流程的处理结果。
 async function generateCleanPromptAI() {
   if (!cleanAiPrompt.value.trim()) {
     formError.value = '请输入清洗需求描述'
@@ -281,6 +291,8 @@ const strategyList = ref([])
 // Normalize legacy condition types: classNameContains → type:className + match_mode:contains
 // (Chain steps use their own type system — classNameContains is valid there, do NOT touch)
 // 前端业务函数：协调 _normalizeLegacyTypes 对应的页面流程、接口调用或状态转换。
+// 入参：strategies 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 _normalizeLegacyTypes 对应业务流程的处理结果。
 function _normalizeLegacyTypes(strategies) {
   const MAP = { classNameContains: 'className', idContains: 'id', textContains: 'text', descContains: 'desc' }
   for (const s of strategies) {
@@ -294,6 +306,8 @@ function _normalizeLegacyTypes(strategies) {
 }
 
 // 前端业务函数：协调 syncStrategiesToList 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 syncStrategiesToList 对应业务流程的处理结果。
 function syncStrategiesToList() {
   try {
     strategyList.value = _normalizeLegacyTypes(JSON.parse(form.strategies || '[]'))
@@ -303,23 +317,31 @@ function syncStrategiesToList() {
 }
 
 // 前端业务函数：协调 syncListToStrategies 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 syncListToStrategies 对应业务流程的处理结果。
 function syncListToStrategies() {
   form.strategies = JSON.stringify(_normalizeLegacyTypes(strategyList.value), null, 2)
 }
 
 // 前端业务函数：协调 addStrategy 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 addStrategy 对应业务流程的处理结果。
 function addStrategy() {
   strategyList.value.push({ type: 'text', value: '', priority: strategyList.value.length + 1 })
   syncListToStrategies()
 }
 
 // 前端业务函数：协调 updateStrategy 对应的页面流程、接口调用或状态转换。
+// 入参：index、newStrategy 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 updateStrategy 对应业务流程的处理结果。
 function updateStrategy(index, newStrategy) {
   strategyList.value[index] = newStrategy
   syncListToStrategies()
 }
 
 // 前端业务函数：协调 deleteStrategy 对应的页面流程、接口调用或状态转换。
+// 入参：index 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 deleteStrategy 对应业务流程的处理结果。
 function deleteStrategy(index) {
   strategyList.value.splice(index, 1)
   // Re-index priorities
@@ -328,6 +350,8 @@ function deleteStrategy(index) {
 }
 
 // 前端业务函数：协调 moveStrategy 对应的页面流程、接口调用或状态转换。
+// 入参：index、direction 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 moveStrategy 对应业务流程的处理结果。
 function moveStrategy(index, direction) {
   const target = index + direction
   if (target < 0 || target >= strategyList.value.length) return
@@ -350,12 +374,16 @@ const toast = useToastStore()
 
 // --- WebSocket ---
 // 前端业务函数：协调 wsUrl 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 wsUrl 对应业务流程的处理结果。
 function wsUrl() {
   const token = localStorage.getItem('token') || ''
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
   return `${protocol}//${location.host}/api/devices/ws/pair-events?token=${encodeURIComponent(token)}`
 }
 useWebSocket(wsUrl, {
+  // 入参：msg 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 onMessage 对应业务流程的处理结果。
   onMessage(msg) {
     if (msg.event === 'selectors_changed') fetchSelectors()
   },
@@ -363,6 +391,8 @@ useWebSocket(wsUrl, {
 
 // --- Fetch selectors ---
 // 前端业务函数：协调 fetchSelectors 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 fetchSelectors 对应业务流程的处理结果。
 async function fetchSelectors() {
   loading.value = true
   try {
@@ -383,6 +413,8 @@ watch(includeDisabled, () => {
 
 // --- Format strategy summary ---
 // 前端业务函数：协调 formatStrategies 对应的页面流程、接口调用或状态转换。
+// 入参：strategies 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 formatStrategies 对应业务流程的处理结果。
 function formatStrategies(strategies) {
   if (!strategies || strategies.length === 0) return '无策略'
   const parts = strategies.map((s) => {
@@ -403,6 +435,8 @@ function formatStrategies(strategies) {
 }
 
 // --- Open create dialog ---
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 openCreateDialog 对应业务流程的处理结果。
 function openCreateDialog() {
   isEditing.value = false
   form.action_name = ''
@@ -427,6 +461,8 @@ function openCreateDialog() {
 
 // --- Open edit dialog ---
 // 前端业务函数：协调 openEditDialog 对应的页面流程、接口调用或状态转换。
+// 入参：sel 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 openEditDialog 对应业务流程的处理结果。
 function openEditDialog(sel) {
   isEditing.value = true
   // Snapshot the original composite key — platform_version/resolution_profile
@@ -454,6 +490,8 @@ function openEditDialog(sel) {
 
 // --- Save (create or update) ---
 // 前端业务函数：协调 handleSave 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleSave 对应业务流程的处理结果。
 async function handleSave() {
   if (!form.action_name.trim()) {
     formError.value = 'action_name 不能为空'
@@ -517,12 +555,16 @@ async function handleSave() {
 
 // --- Delete ---
 // 前端业务函数：协调 openDeleteDialog 对应的页面流程、接口调用或状态转换。
+// 入参：sel 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 openDeleteDialog 对应业务流程的处理结果。
 function openDeleteDialog(sel) {
   deletingSelector.value = sel
   showDeleteDialog.value = true
 }
 
 // 前端业务函数：协调 handleDelete 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleDelete 对应业务流程的处理结果。
 async function handleDelete() {
   if (!deletingSelector.value) return
   deleting.value = true
@@ -540,6 +582,8 @@ async function handleDelete() {
 
 // --- Toggle enabled ---
 // 前端业务函数：协调 handleToggle 对应的页面流程、接口调用或状态转换。
+// 入参：sel、newValue 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleToggle 对应业务流程的处理结果。
 async function handleToggle(sel, newValue) {
   const previous = sel.enabled
   sel.enabled = newValue

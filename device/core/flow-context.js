@@ -7,16 +7,22 @@
 var flowContext = {
   _current: "idle",
 
+  // 入参：state 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 enter 对应业务流程的处理结果。
   enter: function (state) {
     this._current = state;
   },
 
   // 设备业务函数：处理 is 对应的抖音自动化动作、状态或安全边界。
+  // 入参：state 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 is 对应业务流程的处理结果。
   is: function (state) {
     return this._current === state;
   },
 
   // 设备业务函数：处理 reset 对应的抖音自动化动作、状态或安全边界。
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 reset 对应业务流程的处理结果。
   reset: function () {
     this._current = "idle";
   },

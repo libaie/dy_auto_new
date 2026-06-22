@@ -14,7 +14,11 @@ from app.db.models.image_production import ImageCreationTask, ImageProductionCos
 
 
 def _usage_from_provider_response(task: ImageCreationTask) -> dict[str, Any]:
-    """业务函数：处理 _usage_from_provider_response 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _usage_from_provider_response 对应的业务流程、校验或数据转换。
+
+    入参：task 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     response = task.provider_response_json or {}
     usage = response.get("usage") if isinstance(response, dict) else {}
     if isinstance(usage, dict) and usage:
@@ -24,14 +28,22 @@ def _usage_from_provider_response(task: ImageCreationTask) -> dict[str, Any]:
 
 
 def _event_key(task: ImageCreationTask, event_type: str) -> str:
-    """业务函数：处理 _event_key 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _event_key 对应的业务流程、校验或数据转换。
+
+    入参：task、event_type 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if event_type == "actual":
         return f"{task.id}:actual:{task.provider_task_id or task.pixelle_task_id or 'current'}"
     return f"{task.id}:{event_type}"
 
 
 def _existing(db: Session, event_key: str) -> ImageProductionCostEvent | None:
-    """业务函数：处理 _existing 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _existing 对应的业务流程、校验或数据转换。
+
+    入参：db、event_key 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return (
         db.query(ImageProductionCostEvent)
         .filter(ImageProductionCostEvent.event_key == event_key)
@@ -40,7 +52,11 @@ def _existing(db: Session, event_key: str) -> ImageProductionCostEvent | None:
 
 
 def record_estimated_cost_event(db: Session, task: ImageCreationTask) -> ImageProductionCostEvent:
-    """业务函数：处理 record_estimated_cost_event 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 record_estimated_cost_event 对应的业务流程、校验或数据转换。
+
+    入参：db、task 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     event_key = _event_key(task, "estimate")
     existing = _existing(db, event_key)
     if existing:
@@ -76,7 +92,11 @@ def record_estimated_cost_event(db: Session, task: ImageCreationTask) -> ImagePr
 
 
 def record_actual_cost_event(db: Session, task: ImageCreationTask) -> ImageProductionCostEvent | None:
-    """业务函数：处理 record_actual_cost_event 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 record_actual_cost_event 对应的业务流程、校验或数据转换。
+
+    入参：db、task 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     event_key = _event_key(task, "actual")
     existing = _existing(db, event_key)
     if existing:

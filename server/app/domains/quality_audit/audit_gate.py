@@ -4,7 +4,11 @@
 """
 
 def classify_audit_gate(result: dict, *, error: bool = False, approve_threshold: float = 0.85) -> dict:
-    """业务函数：处理 classify_audit_gate 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 classify_audit_gate 对应的业务流程、校验或数据转换。
+
+    入参：result、error、approve_threshold 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     score = float((result or {}).get("score") or 0.0)
     issues = list((result or {}).get("issues") or [])
     raw_pass = bool((result or {}).get("pass_fail", False))

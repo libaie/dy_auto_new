@@ -33,13 +33,24 @@ _NURTURE_TYPE_TO_COLUMN = {
 
 
 class StatsService:
-    """业务类：承载 StatsService 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 StatsService 相关的数据结构、状态或业务协作。
+
+    类参数：无显式类参数 承载该类的业务配置、状态或数据字段。
+    """
     def _today(self) -> str:
-        """业务函数：处理 _today 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 _today 对应的业务流程、校验或数据转换。
+
+        入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         return bj_now().strftime("%Y-%m-%d")
 
     def _get_or_create(self, db: Session, account_id: str, date: str) -> DailyStats:
-        """业务函数：处理 _get_or_create 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 _get_or_create 对应的业务流程、校验或数据转换。
+
+        入参：db、account_id、date 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         """Get or create daily stats row for an account+date."""
         stats = db.query(DailyStats).filter(
             and_(DailyStats.account_id == account_id, DailyStats.date == date)
@@ -51,7 +62,11 @@ class StatsService:
         return stats
 
     def increment(self, db: Session, account_id: str, task_type: str, count: int = 1) -> None:
-        """业务函数：处理 increment 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 increment 对应的业务流程、校验或数据转换。
+
+        入参：db、account_id、task_type、count 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         """Increment operation count for a task type. Only flushes — caller must commit."""
         column = _TASK_TYPE_TO_COLUMN.get(task_type)
         if not column:
@@ -63,7 +78,11 @@ class StatsService:
         db.flush()
 
     def get_today_counts(self, db: Session, account_id: str) -> dict[str, int]:
-        """业务函数：处理 get_today_counts 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 get_today_counts 对应的业务流程、校验或数据转换。
+
+        入参：db、account_id 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         """Get today's operation counts for an account."""
         date = self._today()
         stats = self._get_or_create(db, account_id, date)
@@ -78,7 +97,11 @@ class StatsService:
         }
 
     def _get_limits(self, db: Session, account_id: str) -> dict[str, int]:
-        """业务函数：处理 _get_limits 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 _get_limits 对应的业务流程、校验或数据转换。
+
+        入参：db、account_id 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         """Get the daily limits for an account."""
         account = db.query(Account).filter(Account.id == account_id).first()
         if not account or not account.daily_limits:
@@ -86,13 +109,21 @@ class StatsService:
         return dict(account.daily_limits)
 
     def _limit_for_column(self, limits: dict, column_key: str, default: int = 999) -> int:
-        """业务函数：处理 _limit_for_column 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 _limit_for_column 对应的业务流程、校验或数据转换。
+
+        入参：limits、column_key、default 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         if column_key == "nurture_likes":
             return limits.get("nurture_likes", limits.get("likes", default))
         return limits.get(column_key, default)
 
     def _nurture_quota_columns(self, params: Optional[dict]) -> set[str]:
-        """业务函数：处理 _nurture_quota_columns 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 _nurture_quota_columns 对应的业务流程、校验或数据转换。
+
+        入参：params 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         if not isinstance(params, dict):
             return {"nurture_likes"}
         action_types: set[str] = set()
@@ -117,7 +148,11 @@ class StatsService:
         return columns or {"nurture_likes"}
 
     def check_quota(self, db: Session, account_id: str, task_type: str, params: Optional[dict] = None) -> bool:
-        """业务函数：处理 check_quota 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 check_quota 对应的业务流程、校验或数据转换。
+
+        入参：db、account_id、task_type、params 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         """Check if account has remaining quota for this task type today.
 
         Returns True if quota is available, False if limit reached.
@@ -131,7 +166,11 @@ class StatsService:
         counts = self.get_today_counts(db, account_id)
 
         def _check_limit(column_key: str, default: int = 999) -> bool:
-            """业务函数：处理 _check_limit 对应的业务流程、校验或数据转换。"""
+            """业务函数：处理 _check_limit 对应的业务流程、校验或数据转换。
+
+            入参：column_key、default 为该业务流程需要的上下文、标识或载荷。
+            出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+            """
             limit = self._limit_for_column(limits, column_key, default)
             if limit == -1:
                 return True
@@ -156,7 +195,11 @@ class StatsService:
         return _check_limit(column, 999)
 
     def get_remaining_quotas(self, db: Session, account_id: str) -> dict[str, int]:
-        """业务函数：处理 get_remaining_quotas 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 get_remaining_quotas 对应的业务流程、校验或数据转换。
+
+        入参：db、account_id 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         """Get remaining quotas for all operation types."""
         account = db.query(Account).filter(Account.id == account_id).first()
         if not account:
@@ -176,7 +219,11 @@ class StatsService:
         return remaining
 
     def inject_task_quota_params(self, db: Session, account_id: str, task_type: str, params: dict) -> dict:
-        """业务函数：处理 inject_task_quota_params 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 inject_task_quota_params 对应的业务流程、校验或数据转换。
+
+        入参：db、account_id、task_type、params 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         params = dict(params or {})
         if task_type != "nurture":
             return params

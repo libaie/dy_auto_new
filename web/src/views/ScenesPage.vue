@@ -278,11 +278,15 @@ const sceneReferenceSlotsWithProgress = computed(() => sceneReferenceSlots.value
 })))
 
 // 前端业务函数：协调 referenceProgress 对应的页面流程、接口调用或状态转换。
+// 入参：scene、slot 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 referenceProgress 对应业务流程的处理结果。
 function referenceProgress(scene, slot) {
   return scene?.meta_json?.reference_generation?.[slot] || null
 }
 
 // 前端业务函数：协调 hasActiveReferenceProgress 对应的页面流程、接口调用或状态转换。
+// 入参：items 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 hasActiveReferenceProgress 对应业务流程的处理结果。
 function hasActiveReferenceProgress(items) {
   return items.some((scene) => Object.values(scene?.meta_json?.reference_generation || {}).some((progress) => (
     ['pending', 'generating'].includes(progress?.status)
@@ -290,6 +294,8 @@ function hasActiveReferenceProgress(items) {
 }
 
 // 前端业务函数：协调 scheduleReferencePoll 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 scheduleReferencePoll 对应业务流程的处理结果。
 function scheduleReferencePoll() {
   if (referencePollTimer.value) {
     clearTimeout(referencePollTimer.value)
@@ -301,11 +307,15 @@ function scheduleReferencePoll() {
 }
 
 // 前端业务函数：协调 messageFromError 对应的页面流程、接口调用或状态转换。
+// 入参：errorValue、fallback 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 messageFromError 对应业务流程的处理结果。
 function messageFromError(errorValue, fallback) {
   return errorValue?.response?.data?.detail || errorValue?.message || fallback
 }
 
 // 前端业务函数：协调 pickAllowed 对应的页面流程、接口调用或状态转换。
+// 入参：source、fields 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 pickAllowed 对应业务流程的处理结果。
 function pickAllowed(source, fields) {
   return fields.reduce((payload, field) => {
     payload[field] = source?.[field] ?? ''
@@ -314,6 +324,8 @@ function pickAllowed(source, fields) {
 }
 
 // 前端业务函数：协调 pickCandidateFields 对应的页面流程、接口调用或状态转换。
+// 入参：candidate、fields 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 pickCandidateFields 对应业务流程的处理结果。
 function pickCandidateFields(candidate, fields) {
   return fields.reduce((payload, field) => {
     if (Object.prototype.hasOwnProperty.call(candidate || {}, field) && candidate[field] !== undefined) {
@@ -324,6 +336,8 @@ function pickCandidateFields(candidate, fields) {
 }
 
 // 前端业务函数：协调 mergeAllowedDraft 对应的页面流程、接口调用或状态转换。
+// 入参：draft、candidate 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 mergeAllowedDraft 对应业务流程的处理结果。
 function mergeAllowedDraft(draft, candidate) {
   return {
     ...pickAllowed(draft, SCENE_EDIT_FIELDS),
@@ -332,6 +346,8 @@ function mergeAllowedDraft(draft, candidate) {
 }
 
 // 前端业务函数：协调 loadOpts 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 loadOpts 对应业务流程的处理结果。
 async function loadOpts() {
   try {
     const [t, l, m, g] = await Promise.all([
@@ -356,6 +372,8 @@ async function loadOpts() {
 }
 
 // 前端业务函数：协调 load 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 load 对应业务流程的处理结果。
 async function load() {
   loading.value = true
   error.value = ''
@@ -372,6 +390,8 @@ async function load() {
 }
 
 // 前端业务函数：协调 syncSelected 对应的页面流程、接口调用或状态转换。
+// 入参：id 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 syncSelected 对应业务流程的处理结果。
 function syncSelected(id) {
   const fresh = scenes.value.find((s) => s.id === id) || null
   selectedScene.value = fresh
@@ -382,6 +402,8 @@ function syncSelected(id) {
 }
 
 // 前端业务函数：协调 openScene 对应的页面流程、接口调用或状态转换。
+// 入参：scene 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 openScene 对应业务流程的处理结果。
 function openScene(scene) {
   drawerError.value = ''
   selectedScene.value = scene
@@ -390,6 +412,8 @@ function openScene(scene) {
 }
 
 // 前端业务函数：协调 closeScene 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 closeScene 对应业务流程的处理结果。
 function closeScene() {
   selectedScene.value = null
   drawerError.value = ''
@@ -398,6 +422,8 @@ function closeScene() {
 }
 
 // 前端业务函数：协调 saveScene 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 saveScene 对应业务流程的处理结果。
 async function saveScene() {
   if (!selectedScene.value) return
   const id = selectedScene.value.id
@@ -415,6 +441,8 @@ async function saveScene() {
 }
 
 // 前端业务函数：协调 regenerateSceneReference 对应的页面流程、接口调用或状态转换。
+// 入参：slot 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 regenerateSceneReference 对应业务流程的处理结果。
 async function regenerateSceneReference(slot) {
   if (!selectedScene.value) return
   const id = selectedScene.value.id
@@ -432,6 +460,8 @@ async function regenerateSceneReference(slot) {
 }
 
 // 前端业务函数：协调 replaceSceneReference 对应的页面流程、接口调用或状态转换。
+// 入参：slot、url 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 replaceSceneReference 对应业务流程的处理结果。
 async function replaceSceneReference(slot, url) {
   if (!selectedScene.value) return
   const id = selectedScene.value.id
@@ -445,6 +475,8 @@ async function replaceSceneReference(slot, url) {
   }
 }
 
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 requestSceneRewrite 对应业务流程的处理结果。
 async function requestSceneRewrite() {
   if (!selectedScene.value) return
   drawerError.value = ''
@@ -460,6 +492,8 @@ async function requestSceneRewrite() {
   }
 }
 
+// 入参：candidate 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 applySceneRewrite 对应业务流程的处理结果。
 async function applySceneRewrite(candidate) {
   if (!selectedScene.value) return
   const id = selectedScene.value.id
@@ -474,6 +508,8 @@ async function applySceneRewrite(candidate) {
   }
 }
 
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 confirmDeleteScene 对应业务流程的处理结果。
 async function confirmDeleteScene() {
   if (!selectedScene.value) return
   drawerError.value = ''
@@ -486,6 +522,8 @@ async function confirmDeleteScene() {
   }
 }
 
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 doCreate 对应业务流程的处理结果。
 async function doCreate() {
   error.value = ''
   try {
@@ -497,6 +535,8 @@ async function doCreate() {
   }
 }
 
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 doAiGenerate 对应业务流程的处理结果。
 async function doAiGenerate() {
   aiGenerating.value = true
   aiResult.value = []
@@ -513,6 +553,8 @@ async function doAiGenerate() {
 }
 
 // 前端业务函数：协调 doBatchCreate 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 doBatchCreate 对应业务流程的处理结果。
 async function doBatchCreate() {
   const selected = aiResult.value.filter((s) => s._selected)
   if (!selected.length) return
@@ -539,15 +581,21 @@ async function doBatchCreate() {
 }
 
 // 前端业务函数：协调 sceneTypeLabel 对应的页面流程、接口调用或状态转换。
+// 入参：value 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 sceneTypeLabel 对应业务流程的处理结果。
 function sceneTypeLabel(value) {
   return typeOptions.value.find((item) => item.value === value)?.label || value || '未设置'
 }
 
+// 入参：value 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 lightingLabel 对应业务流程的处理结果。
 function lightingLabel(value) {
   return lightingOptions.value.find((item) => item.value === value)?.label || value || ''
 }
 
 // 前端业务函数：协调 moodLabel 对应的页面流程、接口调用或状态转换。
+// 入参：value 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 moodLabel 对应业务流程的处理结果。
 function moodLabel(value) {
   return moodOptions.value.find((item) => item.value === value)?.label || value || ''
 }

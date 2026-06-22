@@ -132,27 +132,37 @@ const DECISION_TEXT = {
   legacy_summary: '已记录历史审计结论',
 }
 
+// 入参：stage 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 stageName 对应业务流程的处理结果。
 function stageName(stage) {
   return phaseLabel(stage, stageNames.value[stage])
 }
 
 // 前端业务函数：协调 expertName 对应的页面流程、接口调用或状态转换。
+// 入参：id、fallback 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 expertName 对应业务流程的处理结果。
 function expertName(id, fallback = '') {
   return knownExpertName(id, expertNames.value[id] || fallback)
 }
 
 // 前端业务函数：协调 decisionText 对应的页面流程、接口调用或状态转换。
+// 入参：value 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 decisionText 对应业务流程的处理结果。
 function decisionText(value) {
   const key = String(value || '').toLowerCase()
   if (DECISION_TEXT[key]) return DECISION_TEXT[key]
   return cleanText(value, 'decision', '专家结论待补充')
 }
 
+// 入参：value、field、fallback 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 cleanText 对应业务流程的处理结果。
 function cleanText(value, field, fallback) {
   return decisionLogText(value, field, fallback)
 }
 
 // 前端业务函数：协调 listText 对应的页面流程、接口调用或状态转换。
+// 入参：value、fallback、field 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 listText 对应业务流程的处理结果。
 function listText(value, fallback = '', field = 'generic') {
   if (!value) return ''
   const values = Array.isArray(value) ? value : [value]
@@ -169,11 +179,15 @@ function listText(value, fallback = '', field = 'generic') {
 }
 
 // 前端业务函数：协调 repairTasks 对应的页面流程、接口调用或状态转换。
+// 入参：item 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 repairTasks 对应业务流程的处理结果。
 function repairTasks(item) {
   return item?.repair_tasks || item?.output_summary_json?.repair_tasks || []
 }
 
 // 前端业务函数：协调 isHistorical 对应的页面流程、接口调用或状态转换。
+// 入参：item 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 isHistorical 对应业务流程的处理结果。
 function isHistorical(item) {
   return Boolean(item?.legacy || item?.display_scope === 'historical_audit' || isLegacyExpert(item?.expert_id))
 }

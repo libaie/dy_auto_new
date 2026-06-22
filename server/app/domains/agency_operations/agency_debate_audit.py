@@ -52,7 +52,11 @@ async def run_debate_audit(
     production_segment_id: str | None = None,
     pipeline_run_id: str | None = None,
 ) -> dict[str, Any]:
-    """业务函数：处理 run_debate_audit 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 run_debate_audit 对应的业务流程、校验或数据转换。
+
+    入参：db、series_id、stage、stage_context、runtime_config、runtime_invoke、episode_id、run_id、production_plan_id、production_episode_id、production_segment_id、pipeline_run_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     orchestrator = AgencyOrchestrator(runtime_invoke=runtime_invoke, enable_debate=False)
     common = {
         "series_id": series_id,
@@ -182,7 +186,11 @@ async def _invoke_debate_role(
     role: str,
     opponent_summary: dict[str, Any] | None,
 ) -> dict[str, Any]:
-    """业务函数：处理 _invoke_debate_role 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _invoke_debate_role 对应的业务流程、校验或数据转换。
+
+    入参：db、orchestrator、common、stage_context、round_number、expert_id、role、opponent_summary 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     context = {
         **stage_context,
         "debate": {
@@ -204,7 +212,11 @@ async def _invoke_debate_role(
 
 
 def _summary_for_invocation(db: Session, invocation_id: str) -> dict[str, Any]:
-    """业务函数：处理 _summary_for_invocation 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _summary_for_invocation 对应的业务流程、校验或数据转换。
+
+    入参：db、invocation_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     invocation = db.query(AgencyExpertInvocation).filter(AgencyExpertInvocation.id == invocation_id).first()
     if not invocation:
         return {}
@@ -217,7 +229,11 @@ def _summary_for_invocation(db: Session, invocation_id: str) -> dict[str, Any]:
 
 
 def _scorecard_for_invocation(db: Session, invocation_id: str, result_status: str) -> tuple[dict[str, Any], bool]:
-    """业务函数：处理 _scorecard_for_invocation 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _scorecard_for_invocation 对应的业务流程、校验或数据转换。
+
+    入参：db、invocation_id、result_status 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     invocation = db.query(AgencyExpertInvocation).filter(AgencyExpertInvocation.id == invocation_id).first()
     raw = ((invocation.output_summary_json or {}).get("scorecard") if invocation else None) or {}
     has_scorecard = isinstance(raw, dict) and bool(raw)
@@ -228,7 +244,11 @@ def _scorecard_for_invocation(db: Session, invocation_id: str, result_status: st
 
 
 def _result_blocks(result: dict[str, Any], scorecard: dict[str, Any], has_scorecard: bool) -> bool:
-    """业务函数：处理 _result_blocks 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _result_blocks 对应的业务流程、校验或数据转换。
+
+    入参：result、scorecard、has_scorecard 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if result.get("result_status") in {"blocked", "failed"}:
         return True
     if not has_scorecard:
@@ -237,7 +257,11 @@ def _result_blocks(result: dict[str, Any], scorecard: dict[str, Any], has_scorec
 
 
 def _repair_intent_for_stage(stage: str, final_verdict: str) -> str:
-    """业务函数：处理 _repair_intent_for_stage 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _repair_intent_for_stage 对应的业务流程、校验或数据转换。
+
+    入参：stage、final_verdict 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if final_verdict == "pass":
         return "none"
     if stage.startswith("video"):
@@ -250,7 +274,11 @@ def _repair_intent_for_stage(stage: str, final_verdict: str) -> str:
 
 
 def _downgrade_reason(status: str, stage: str, missing_scorecards: list[str] | None = None) -> str:
-    """业务函数：处理 _downgrade_reason 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _downgrade_reason 对应的业务流程、校验或数据转换。
+
+    入参：status、stage、missing_scorecards 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if status == "consensus_pass":
         return ""
     if missing_scorecards:
@@ -274,7 +302,11 @@ def _record_repair_intent(
     production_segment_id: str | None,
     debate_trace: dict[str, Any],
 ) -> None:
-    """业务函数：处理 _record_repair_intent 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _record_repair_intent 对应的业务流程、校验或数据转换。
+
+    入参：db、stage、stage_context、repair_intent、series_id、run_id、production_plan_id、production_episode_id、production_segment_id、debate_trace 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     repair_type = _repair_type_for_intent(stage, repair_intent)
     targets = _repair_targets(stage_context, production_segment_id=production_segment_id, fallback_id=run_id or series_id)
     created_job_ids: list[str] = []
@@ -331,7 +363,11 @@ def _record_repair_intent(
 
 
 def _repair_type_for_intent(stage: str, repair_intent: str) -> str:
-    """业务函数：处理 _repair_type_for_intent 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _repair_type_for_intent 对应的业务流程、校验或数据转换。
+
+    入参：stage、repair_intent 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if stage.startswith("video") or repair_intent == "regenerate_video":
         return "video_segment_failed"
     if repair_intent in {"prompt_tune", "backtrack_storyboard"}:
@@ -345,7 +381,11 @@ def _repair_targets(
     production_segment_id: str | None,
     fallback_id: str,
 ) -> list[tuple[str, str]]:
-    """业务函数：处理 _repair_targets 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _repair_targets 对应的业务流程、校验或数据转换。
+
+    入参：stage_context、production_segment_id、fallback_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     targets: list[tuple[str, str]] = []
     if production_segment_id:
         targets.append(("production_segment", production_segment_id))
@@ -368,7 +408,11 @@ def _repair_targets(
 
 
 def _context_items(stage_context: dict[str, Any]) -> list[Any]:
-    """业务函数：处理 _context_items 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _context_items 对应的业务流程、校验或数据转换。
+
+    入参：stage_context 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     for key in ("frames", "segments", "shots"):
         value = stage_context.get(key)
         if isinstance(value, list):

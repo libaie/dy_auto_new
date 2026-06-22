@@ -27,6 +27,8 @@ const templateTypes = [
   { key: 'video', label: '视频', hint: '需要AI生成视频画面' },
 ]
 
+// 入参：key、value 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 updateField 对应业务流程的处理结果。
 function updateField(key, value) {
   emit('update:modelValue', { ...props.modelValue, [key]: value })
 }
@@ -56,6 +58,8 @@ const ttsPreviewText = ref('大家好，这是一段测试语音。')
 const ttsPreviewLoading = ref(false)
 const ttsPreviewAudio = ref('')
 
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleTTSPreview 对应业务流程的处理结果。
 async function handleTTSPreview() {
   ttsPreviewLoading.value = true
   ttsPreviewAudio.value = ''
@@ -78,6 +82,8 @@ async function handleTTSPreview() {
 }
 
 // 前端业务函数：协调 getTemplatePreviewUrl 对应的页面流程、接口调用或状态转换。
+// 入参：tpl 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 getTemplatePreviewUrl 对应业务流程的处理结果。
 function getTemplatePreviewUrl(tpl) {
   const key = (tpl.key || tpl.path || tpl.name || '').replace(/\\/g, '/')
   const parts = key.split('/')
@@ -91,11 +97,15 @@ function getTemplatePreviewUrl(tpl) {
 }
 
 // 前端业务函数：协调 isSelected 对应的页面流程、接口调用或状态转换。
+// 入参：tpl 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 isSelected 对应业务流程的处理结果。
 function isSelected(tpl) {
   return (props.modelValue.frameTemplate || '') === (tpl.key || tpl.path || tpl.name)
 }
 
 // 前端业务函数：协调 filteredTemplates 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 filteredTemplates 对应业务流程的处理结果。
 function filteredTemplates() {
   let list = props.templates || []
   list = list.filter(t => {
@@ -118,6 +128,8 @@ const previewLoading = ref(false)
 const showPreview = ref(false)
 const previewRenderText = ref('AI 视频工坊')
 
+// 入参：tpl 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 openRenderPreview 对应业务流程的处理结果。
 function openRenderPreview(tpl) {
   if (tpl) {
     previewTemplate.value = tpl
@@ -133,6 +145,8 @@ function openRenderPreview(tpl) {
 }
 
 // 前端业务函数：协调 handlePlaywrightRender 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handlePlaywrightRender 对应业务流程的处理结果。
 async function handlePlaywrightRender() {
   previewLoading.value = true
   try {
@@ -149,6 +163,8 @@ async function handlePlaywrightRender() {
 }
 
 // 前端业务函数：协调 closePreview 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 closePreview 对应业务流程的处理结果。
 function closePreview() {
   showPreview.value = false
   previewTemplate.value = null
@@ -156,6 +172,8 @@ function closePreview() {
 }
 
 // 前端业务函数：协调 getTemplateSize 对应的页面流程、接口调用或状态转换。
+// 入参：tplPath 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 getTemplateSize 对应业务流程的处理结果。
 function getTemplateSize(tplPath) {
   if (!tplPath) return ''
   const key = tplPath.replace(/\\/g, '/')
@@ -172,6 +190,8 @@ const mediaPreviewUrl = ref('')
 const mediaPreviewPrompt = ref('')
 
 // 前端业务函数：协调 handleMediaPreview 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleMediaPreview 对应业务流程的处理结果。
 async function handleMediaPreview() {
   mediaPreviewLoading.value = true
   mediaPreviewUrl.value = ''

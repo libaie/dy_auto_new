@@ -82,16 +82,28 @@ TRANSITIONS = {
 
 
 def provider_task_is_active(status: str) -> bool:
-    """业务函数：处理 provider_task_is_active 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 provider_task_is_active 对应的业务流程、校验或数据转换。
+
+    入参：status 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return status in PROVIDER_TASK_ACTIVE_STATUSES
 
 
 def asset_is_reviewable(asset_or_status: object) -> bool:
-    """业务函数：处理 asset_is_reviewable 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 asset_is_reviewable 对应的业务流程、校验或数据转换。
+
+    入参：asset_or_status 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     status = getattr(asset_or_status, "status", asset_or_status)
     return status in ASSET_REVIEWABLE_STATUSES
 
 
 def validate_transition(entity: str, from_status: str, to_status: str) -> bool:
-    """业务函数：处理 validate_transition 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 validate_transition 对应的业务流程、校验或数据转换。
+
+    入参：entity、from_status、to_status 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return to_status in TRANSITIONS.get(entity, {}).get(from_status, set())

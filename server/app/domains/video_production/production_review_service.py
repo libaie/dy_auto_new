@@ -18,7 +18,11 @@ SUPPORTED_BULK_ASSET_TYPES = GATED_ASSET_TYPES
 
 
 def _review_snapshot(asset: VideoProductionAsset) -> dict:
-    """业务函数：处理 _review_snapshot 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _review_snapshot 对应的业务流程、校验或数据转换。
+
+    入参：asset 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return {
         "target_type": asset.target_type,
         "target_id": asset.target_id,
@@ -29,7 +33,11 @@ def _review_snapshot(asset: VideoProductionAsset) -> dict:
 
 
 def _assert_bulk_approvable(asset: VideoProductionAsset) -> None:
-    """业务函数：处理 _assert_bulk_approvable 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _assert_bulk_approvable 对应的业务流程、校验或数据转换。
+
+    入参：asset 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if not asset_is_reviewable(asset):
         raise ValueError("Bulk approve requires review_pending assets")
     if asset.copy_status != "persisted" or not asset.checksum or not asset.storage_path:
@@ -43,7 +51,11 @@ def apply_bulk_review_action(
     reviewer_user_id: str | None = None,
     comment: str = "",
 ) -> dict:
-    """业务函数：处理 apply_bulk_review_action 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 apply_bulk_review_action 对应的业务流程、校验或数据转换。
+
+    入参：db、asset_ids、action、reviewer_user_id、comment 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if action not in SUPPORTED_BULK_REVIEW_ACTIONS:
         raise ValueError(f"Unsupported review action: {action}")
 

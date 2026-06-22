@@ -160,36 +160,50 @@ const visibleTasks = computed(() => expanded.value ? props.tasks : props.tasks.s
 const hasHiddenTasks = computed(() => props.tasks.length > props.initialVisibleCount)
 
 // 前端业务函数：协调 text 对应的页面流程、接口调用或状态转换。
+// 入参：value、fallback 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 text 对应业务流程的处理结果。
 function text(value, fallback) {
   return safeAutoRepairText(value, fallback)
 }
 
 // 前端业务函数：协调 typeLabel 对应的页面流程、接口调用或状态转换。
+// 入参：type 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 typeLabel 对应业务流程的处理结果。
 function typeLabel(type) {
   return autoRepairTypeLabel(type)
 }
 
 // 前端业务函数：协调 statusLabel 对应的页面流程、接口调用或状态转换。
+// 入参：status 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 statusLabel 对应业务流程的处理结果。
 function statusLabel(status) {
   return autoRepairStatusLabel(status)
 }
 
 // 前端业务函数：协调 canRetry 对应的页面流程、接口调用或状态转换。
+// 入参：task 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 canRetry 对应业务流程的处理结果。
 function canRetry(task) {
   return Boolean(task?.retry_actions?.retry_enabled || task?.retry_actions?.paid_authorization_required)
 }
 
 // 前端业务函数：协调 primaryLabel 对应的页面流程、接口调用或状态转换。
+// 入参：task 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 primaryLabel 对应业务流程的处理结果。
 function primaryLabel(task) {
   return safeAutoRepairText(task?.retry_actions?.primary_label, task?.retry_actions?.paid_authorization_required ? copy.authorizeRetry : copy.retry)
 }
 
 // 前端业务函数：协调 affectedTextFor 对应的页面流程、接口调用或状态转换。
+// 入参：task 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 affectedTextFor 对应业务流程的处理结果。
 function affectedTextFor(task) {
   return (task.affected_ids || []).filter(Boolean).join('、')
 }
 
 // 前端业务函数：协调 handleRetry 对应的页面流程、接口调用或状态转换。
+// 入参：task 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleRetry 对应业务流程的处理结果。
 async function handleRetry(task) {
   if (task?.retry_actions?.paid_authorization_required) {
     lastTrigger.value = document.activeElement
@@ -205,6 +219,8 @@ async function handleRetry(task) {
 }
 
 // 前端业务函数：协调 closePaidConfirm 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 closePaidConfirm 对应业务流程的处理结果。
 function closePaidConfirm() {
   confirmTask.value = null
   confirmError.value = ''
@@ -214,6 +230,8 @@ function closePaidConfirm() {
 }
 
 // 前端业务函数：协调 confirmPaidRetry 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 confirmPaidRetry 对应业务流程的处理结果。
 function confirmPaidRetry() {
   if (!confirmReason.value.trim()) {
     confirmError.value = copy.paidConfirmMissingReason

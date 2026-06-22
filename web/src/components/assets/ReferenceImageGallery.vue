@@ -20,6 +20,8 @@ const MANAGED_IMAGE_PREFIXES = ['/static/', '/api/image-creation/pixelle-files/'
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]', '::1'])
 
 // 前端业务函数：协调 clearEditing 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 clearEditing 对应业务流程的处理结果。
 function clearEditing() {
   Object.keys(editing).forEach((key) => {
     delete editing[key]
@@ -36,38 +38,52 @@ watch(
 )
 
 // 前端业务函数：协调 startEdit 对应的页面流程、接口调用或状态转换。
+// 入参：slot 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 startEdit 对应业务流程的处理结果。
 function startEdit(slot) {
   editing[slot.key] = slot.url || ''
 }
 
 // 前端业务函数：协调 cancelEdit 对应的页面流程、接口调用或状态转换。
+// 入参：slotKey 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 cancelEdit 对应业务流程的处理结果。
 function cancelEdit(slotKey) {
   delete editing[slotKey]
 }
 
 // 前端业务函数：协调 saveUrl 对应的页面流程、接口调用或状态转换。
+// 入参：slotKey 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 saveUrl 对应业务流程的处理结果。
 function saveUrl(slotKey) {
   emit('replace-url', slotKey, (editing[slotKey] || '').trim())
   delete editing[slotKey]
 }
 
 // 前端业务函数：协调 regenerateAll 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 regenerateAll 对应业务流程的处理结果。
 function regenerateAll() {
   props.slots.forEach((slot) => emit('regenerate', slot.key))
 }
 
 // 前端业务函数：协调 copyUrl 对应的页面流程、接口调用或状态转换。
+// 入参：url 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 copyUrl 对应业务流程的处理结果。
 async function copyUrl(url) {
   if (!url) return
   await navigator.clipboard?.writeText(url)
 }
 
 // 前端业务函数：协调 isManagedPath 对应的页面流程、接口调用或状态转换。
+// 入参：path 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 isManagedPath 对应业务流程的处理结果。
 function isManagedPath(path) {
   return MANAGED_IMAGE_PREFIXES.some((prefix) => String(path || '').startsWith(prefix))
 }
 
 // 前端业务函数：协调 normalizeImageUrl 对应的页面流程、接口调用或状态转换。
+// 入参：url 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 normalizeImageUrl 对应业务流程的处理结果。
 function normalizeImageUrl(url) {
   const clean = String(url || '').trim()
   if (!clean) return ''
@@ -87,6 +103,8 @@ function normalizeImageUrl(url) {
 }
 
 // 前端业务函数：协调 tosSignedUrlExpired 对应的页面流程、接口调用或状态转换。
+// 入参：url 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 tosSignedUrlExpired 对应业务流程的处理结果。
 function tosSignedUrlExpired(url) {
   const clean = String(url || '').trim()
   if (!clean) return false
@@ -106,17 +124,23 @@ function tosSignedUrlExpired(url) {
 }
 
 // 前端业务函数：协调 slotImageSrc 对应的页面流程、接口调用或状态转换。
+// 入参：slot 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 slotImageSrc 对应业务流程的处理结果。
 function slotImageSrc(slot) {
   if (!slot?.url || tosSignedUrlExpired(slot.url)) return ''
   return normalizeImageUrl(slot.url)
 }
 
 // 前端业务函数：协调 slotProgress 对应的页面流程、接口调用或状态转换。
+// 入参：slot 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 slotProgress 对应业务流程的处理结果。
 function slotProgress(slot) {
   return slot?.progress || {}
 }
 
 // 前端业务函数：协调 slotStatusText 对应的页面流程、接口调用或状态转换。
+// 入参：slot 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 slotStatusText 对应业务流程的处理结果。
 function slotStatusText(slot) {
   const progress = slotProgress(slot)
   if (progress.status === 'generating') return '风格锁定生成中'
@@ -128,6 +152,8 @@ function slotStatusText(slot) {
   return '已配置'
 }
 
+// 入参：slot 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 progressClass 对应业务流程的处理结果。
 function progressClass(slot) {
   const status = slotProgress(slot).status
   if (status === 'generating') return 'border-cyan-500/30 bg-cyan-500/10 text-cyan-200'
@@ -137,6 +163,8 @@ function progressClass(slot) {
 }
 
 // 前端业务函数：协调 openOriginal 对应的页面流程、接口调用或状态转换。
+// 入参：slot 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 openOriginal 对应业务流程的处理结果。
 function openOriginal(slot) {
   const src = slotImageSrc(slot)
   if (!src) return
@@ -144,6 +172,8 @@ function openOriginal(slot) {
 }
 
 // 前端业务函数：协调 closeOriginal 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 closeOriginal 对应业务流程的处理结果。
 function closeOriginal() {
   previewSlot.value = null
 }

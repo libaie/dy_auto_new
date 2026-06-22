@@ -20,18 +20,30 @@ from app.domains.image_generation.image_creation_service import asset_payload, c
 
 
 def _stable_hash(value: Any) -> str:
-    """业务函数：处理 _stable_hash 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _stable_hash 对应的业务流程、校验或数据转换。
+
+    入参：value 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     encoded = json.dumps(value, ensure_ascii=False, sort_keys=True, default=str).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()[:16]
 
 
 def _normalized_frame_id(frame: dict[str, Any], index: int) -> str:
-    """业务函数：处理 _normalized_frame_id 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _normalized_frame_id 对应的业务流程、校验或数据转换。
+
+    入参：frame、index 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return str(frame.get("frame_id") or frame.get("shot_id") or frame.get("id") or f"frame-{index + 1:03d}")
 
 
 def _storyboard_frames(storyboard: dict[str, Any] | None) -> list[dict[str, Any]]:
-    """业务函数：处理 _storyboard_frames 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _storyboard_frames 对应的业务流程、校验或数据转换。
+
+    入参：storyboard 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     frames = storyboard.get("frames") if isinstance(storyboard, dict) else []
     if not isinstance(frames, list):
         return []
@@ -50,7 +62,11 @@ def _load_storyboard_scope(
     episode_id: str,
     run_id: str | None = None,
 ) -> tuple[Series, Episode, VideoProductionRun | None, list[dict[str, Any]]]:
-    """业务函数：处理 _load_storyboard_scope 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _load_storyboard_scope 对应的业务流程、校验或数据转换。
+
+    入参：db、series_id、episode_id、run_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     series = db.query(Series).filter(Series.id == series_id).first()
     if not series:
         raise image_error(404, "SERIES_NOT_FOUND", "Series not found.", "Reload the series page.", retryable=False)
@@ -72,7 +88,11 @@ def _load_storyboard_scope(
 
 
 def _find_frame(frames: list[dict[str, Any]], frame_id: str) -> dict[str, Any]:
-    """业务函数：处理 _find_frame 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _find_frame 对应的业务流程、校验或数据转换。
+
+    入参：frames、frame_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     wanted = str(frame_id)
     for frame in frames:
         keys = {str(frame.get("frame_id") or ""), str(frame.get("shot_id") or ""), str(frame.get("id") or "")}
@@ -89,12 +109,20 @@ def _find_frame(frames: list[dict[str, Any]], frame_id: str) -> dict[str, Any]:
 
 
 def _frame_reference_images(frame: dict[str, Any]) -> list[dict[str, Any]]:
-    """业务函数：处理 _frame_reference_images 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _frame_reference_images 对应的业务流程、校验或数据转换。
+
+    入参：frame 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     images: list[dict[str, Any]] = []
     seen: set[str] = set()
 
     def add(url: Any, role: str = "reference") -> None:
-        """业务函数：处理 add 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 add 对应的业务流程、校验或数据转换。
+
+        入参：url、role 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         clean = str(url or "").strip()
         if not clean or clean in seen:
             return
@@ -127,7 +155,11 @@ def _task_idempotency_key(
     reference_images: list[dict[str, Any]],
     run_id: str | None = None,
 ) -> str:
-    """业务函数：处理 _task_idempotency_key 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _task_idempotency_key 对应的业务流程、校验或数据转换。
+
+    入参：series_id、episode_id、frame_id、prompt、reference_images、run_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     prompt_hash = _stable_hash({"prompt": prompt, "references": reference_images})
     if run_id:
         run_hash = _stable_hash({"run_id": run_id})
@@ -136,7 +168,11 @@ def _task_idempotency_key(
 
 
 def _existing_task_for_key(db: Session, idempotency_key: str) -> ImageCreationTask | None:
-    """业务函数：处理 _existing_task_for_key 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _existing_task_for_key 对应的业务流程、校验或数据转换。
+
+    入参：db、idempotency_key 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return db.query(ImageCreationTask).filter(ImageCreationTask.idempotency_key == idempotency_key).first()
 
 
@@ -151,7 +187,11 @@ def _frame_payload(
     size: str | None,
     user_id: str | None,
 ) -> dict[str, Any]:
-    """业务函数：处理 _frame_payload 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _frame_payload 对应的业务流程、校验或数据转换。
+
+    入参：series_id、episode_id、run_id、frame、force、count、size、user_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     frame_id = str(frame["frame_id"])
     prompt = str(frame.get("image_prompt") or frame.get("visual_prompt") or "").strip()
     if not prompt:
@@ -199,7 +239,11 @@ def _frame_payload(
 
 
 def _frame_result(frame: dict[str, Any], *, status: str, task: ImageCreationTask | None = None, error: Any = None) -> dict[str, Any]:
-    """业务函数：处理 _frame_result 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _frame_result 对应的业务流程、校验或数据转换。
+
+    入参：frame、status、task、error 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     result = {
         "frame_id": frame["frame_id"],
         "time_range": frame.get("time_range") or "",
@@ -224,7 +268,11 @@ async def create_storyboard_frame_image_task(
     size: str | None = None,
     user_id: str | None = None,
 ) -> dict[str, Any]:
-    """业务函数：处理 create_storyboard_frame_image_task 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 create_storyboard_frame_image_task 对应的业务流程、校验或数据转换。
+
+    入参：db、series_id、episode_id、frame_id、run_id、force、count、size、user_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     _, _, _, frames = _load_storyboard_scope(db, series_id=series_id, episode_id=episode_id, run_id=run_id)
     frame = _find_frame(frames, frame_id)
     payload = _frame_payload(
@@ -255,7 +303,11 @@ async def create_missing_storyboard_image_tasks(
     size: str | None = None,
     user_id: str | None = None,
 ) -> dict[str, Any]:
-    """业务函数：处理 create_missing_storyboard_image_tasks 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 create_missing_storyboard_image_tasks 对应的业务流程、校验或数据转换。
+
+    入参：db、series_id、episode_id、run_id、force、count、size、user_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     _, _, _, frames = _load_storyboard_scope(db, series_id=series_id, episode_id=episode_id, run_id=run_id)
     results: list[dict[str, Any]] = []
     summary = {"created": 0, "skipped": 0, "failed": 0}
@@ -287,14 +339,22 @@ async def create_missing_storyboard_image_tasks(
 
 
 def _context_matches_run(context: dict[str, Any] | None, run_id: str | None) -> bool:
-    """业务函数：处理 _context_matches_run 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _context_matches_run 对应的业务流程、校验或数据转换。
+
+    入参：context、run_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if not run_id:
         return True
     return str((context or {}).get("run_id") or "") == str(run_id)
 
 
 def _context_matches_storyboard_frame(context: dict[str, Any] | None, *, run_id: str, frame_id: str) -> bool:
-    """业务函数：处理 _context_matches_storyboard_frame 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _context_matches_storyboard_frame 对应的业务流程、校验或数据转换。
+
+    入参：context、run_id、frame_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if not isinstance(context, dict):
         return False
     return (
@@ -304,7 +364,11 @@ def _context_matches_storyboard_frame(context: dict[str, Any] | None, *, run_id:
 
 
 def _latest_tasks_by_frame(db: Session, *, series_id: str, episode_id: str, run_id: str | None = None) -> dict[str, ImageCreationTask]:
-    """业务函数：处理 _latest_tasks_by_frame 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _latest_tasks_by_frame 对应的业务流程、校验或数据转换。
+
+    入参：db、series_id、episode_id、run_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     rows = (
         db.query(ImageCreationTask)
         .filter(ImageCreationTask.series_id == series_id)
@@ -324,7 +388,11 @@ def _latest_tasks_by_frame(db: Session, *, series_id: str, episode_id: str, run_
 
 
 def _latest_assets_by_frame(db: Session, *, series_id: str, episode_id: str, run_id: str | None = None) -> dict[str, ImageCreationAsset]:
-    """业务函数：处理 _latest_assets_by_frame 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _latest_assets_by_frame 对应的业务流程、校验或数据转换。
+
+    入参：db、series_id、episode_id、run_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     rows = (
         db.query(ImageCreationAsset)
         .filter(ImageCreationAsset.series_id == series_id)
@@ -344,7 +412,11 @@ def _latest_assets_by_frame(db: Session, *, series_id: str, episode_id: str, run
 
 
 def _state_for(task: ImageCreationTask | None, asset: ImageCreationAsset | None) -> str:
-    """业务函数：处理 _state_for 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _state_for 对应的业务流程、校验或数据转换。
+
+    入参：task、asset 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if asset:
         if asset.status == "approved":
             return "approved"
@@ -367,7 +439,11 @@ def list_storyboard_image_state(
     episode_id: str,
     run_id: str | None = None,
 ) -> dict[str, Any]:
-    """业务函数：处理 list_storyboard_image_state 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 list_storyboard_image_state 对应的业务流程、校验或数据转换。
+
+    入参：db、series_id、episode_id、run_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     _, _, _, frames = _load_storyboard_scope(db, series_id=series_id, episode_id=episode_id, run_id=run_id)
     tasks_by_frame = _latest_tasks_by_frame(db, series_id=series_id, episode_id=episode_id, run_id=run_id)
     assets_by_frame = _latest_assets_by_frame(db, series_id=series_id, episode_id=episode_id, run_id=run_id)
@@ -408,7 +484,11 @@ def promote_storyboard_image_asset(
     asset_version: int | None = None,
     user_id: str | None = None,
 ) -> dict[str, Any]:
-    """业务函数：处理 promote_storyboard_image_asset 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 promote_storyboard_image_asset 对应的业务流程、校验或数据转换。
+
+    入参：db、asset_id、run_id、frame_id、episode_id、asset_version、user_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     asset = db.query(ImageCreationAsset).filter(ImageCreationAsset.id == asset_id).first()
     if not asset:
         raise image_error(404, "SOURCE_ASSET_NOT_FOUND", "Source image asset not found.", "Pick another image asset.", retryable=False)

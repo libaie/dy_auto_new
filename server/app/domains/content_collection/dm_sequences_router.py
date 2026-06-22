@@ -21,32 +21,49 @@ _ORIGINAL_VARIANT_DELAY_MS = mutations._variant_delay_ms
 
 
 def _variant_delay_ms() -> int:
-    """业务函数：处理 _variant_delay_ms 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _variant_delay_ms 对应的业务流程、校验或数据转换。
+
+    入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return _ORIGINAL_VARIANT_DELAY_MS()
 
 
 def _sync_legacy_monkeypatch_hooks():
-    """业务函数：处理 _sync_legacy_monkeypatch_hooks 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _sync_legacy_monkeypatch_hooks 对应的业务流程、校验或数据转换。
+
+    入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     mutations.random = random
     mutations._variant_delay_ms = _variant_delay_ms
 
 
 class SequenceMessage(BaseModel):
-    """业务类：承载 SequenceMessage 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 SequenceMessage 相关的数据结构、状态或业务协作。
+
+    类参数：content、delay_ms、order 承载该类的业务配置、状态或数据字段。
+    """
     order: int
     content: str = Field(..., min_length=1, max_length=500)
     delay_ms: int = Field(default=0, ge=0, le=60000)
 
 
 class SequenceCreate(BaseModel):
-    """业务类：承载 SequenceCreate 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 SequenceCreate 相关的数据结构、状态或业务协作。
+
+    类参数：industry、messages、name 承载该类的业务配置、状态或数据字段。
+    """
     name: str = Field(..., min_length=1, max_length=100)
     messages: list[SequenceMessage] = Field(..., min_length=1)
     industry: Optional[str] = None
 
 
 class SequenceUpdate(BaseModel):
-    """业务类：承载 SequenceUpdate 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 SequenceUpdate 相关的数据结构、状态或业务协作。
+
+    类参数：industry、messages、name、variants 承载该类的业务配置、状态或数据字段。
+    """
     name: Optional[str] = Field(default=None, min_length=1, max_length=100)
     messages: Optional[list[SequenceMessage]] = Field(default=None, min_length=1)
     industry: Optional[str] = None
@@ -54,14 +71,20 @@ class SequenceUpdate(BaseModel):
 
 
 class DMSequenceGenerateRequest(BaseModel):
-    """业务类：承载 DMSequenceGenerateRequest 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 DMSequenceGenerateRequest 相关的数据结构、状态或业务协作。
+
+    类参数：description、industry、link_url 承载该类的业务配置、状态或数据字段。
+    """
     industry: str = Field(default="general", description="行业key: health/beauty/education/travel/secondhand/general")
     description: str = Field(..., min_length=5, max_length=500, description="大白话描述")
     link_url: str = Field(..., min_length=5, max_length=500, description="消息2的短链URL")
 
 
 class VariantsGenerateRequest(BaseModel):
-    """业务类：承载 VariantsGenerateRequest 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 VariantsGenerateRequest 相关的数据结构、状态或业务协作。
+
+    类参数：count 承载该类的业务配置、状态或数据字段。
+    """
     count: int = Field(default=3, ge=1, le=20, description="生成变体套数")
 
 
@@ -71,7 +94,11 @@ def list_sequences(
     db: Session = Depends(get_db),
     user: tuple = Depends(verify_admin_token),
 ):
-    """业务函数：处理 list_sequences 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 list_sequences 对应的业务流程、校验或数据转换。
+
+    入参：industry、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return mutations.list_dm_sequences(db, user, industry=industry)
 
 
@@ -81,7 +108,11 @@ def create_sequence(
     db: Session = Depends(get_db),
     user: tuple = Depends(require_role("admin")),
 ):
-    """业务函数：处理 create_sequence 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 create_sequence 对应的业务流程、校验或数据转换。
+
+    入参：body、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return mutations.create_dm_sequence(db, user, body)
 
 
@@ -91,7 +122,11 @@ def get_sequence(
     db: Session = Depends(get_db),
     user: tuple = Depends(verify_admin_token),
 ):
-    """业务函数：处理 get_sequence 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 get_sequence 对应的业务流程、校验或数据转换。
+
+    入参：sequence_id、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return mutations.get_dm_sequence(db, user, sequence_id)
 
 
@@ -102,7 +137,11 @@ def update_sequence(
     db: Session = Depends(get_db),
     user: tuple = Depends(require_role("admin")),
 ):
-    """业务函数：处理 update_sequence 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 update_sequence 对应的业务流程、校验或数据转换。
+
+    入参：sequence_id、body、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return mutations.update_dm_sequence(db, user, sequence_id, body)
 
 
@@ -112,7 +151,11 @@ def delete_sequence(
     db: Session = Depends(get_db),
     user: tuple = Depends(require_role("admin")),
 ):
-    """业务函数：处理 delete_sequence 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 delete_sequence 对应的业务流程、校验或数据转换。
+
+    入参：sequence_id、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return mutations.delete_dm_sequence(db, user, sequence_id)
 
 
@@ -122,7 +165,11 @@ async def generate_dm_sequence(
     db: Session = Depends(get_db),
     current_user: tuple = Depends(require_role("admin")),
 ):
-    """业务函数：处理 generate_dm_sequence 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 generate_dm_sequence 对应的业务流程、校验或数据转换。
+
+    入参：body、db、current_user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return StreamingResponse(
         await mutations.generate_dm_sequence_events(db, body),
         media_type="text/event-stream",
@@ -141,7 +188,11 @@ async def generate_variants(
     db: Session = Depends(get_db),
     current_user: tuple = Depends(require_role("admin")),
 ):
-    """业务函数：处理 generate_variants 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 generate_variants 对应的业务流程、校验或数据转换。
+
+    入参：seq_id、body、db、current_user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     _sync_legacy_monkeypatch_hooks()
     return await mutations.generate_dm_variants(db, seq_id, body)
 
@@ -151,6 +202,10 @@ def device_sync(
     db: Session = Depends(get_db),
     device_id: Optional[str] = Depends(verify_device_secret),
 ):
-    """业务函数：处理 device_sync 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 device_sync 对应的业务流程、校验或数据转换。
+
+    入参：db、device_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     _sync_legacy_monkeypatch_hooks()
     return mutations.device_sync_dm_sequences(db, device_id)

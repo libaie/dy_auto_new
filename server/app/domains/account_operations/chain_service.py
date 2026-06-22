@@ -25,9 +25,16 @@ VALID_STEP_TYPES = {t.value for t in TaskType}
 
 
 class ChainService:
-    """业务类：承载 ChainService 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 ChainService 相关的数据结构、状态或业务协作。
+
+    类参数：无显式类参数 承载该类的业务配置、状态或数据字段。
+    """
     def is_account_busy(self, db: Session, account_id: str) -> bool:
-        """业务函数：处理 is_account_busy 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 is_account_busy 对应的业务流程、校验或数据转换。
+
+        入参：db、account_id 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         """Check if account has pending or running tasks."""
         count = db.query(DBTask).filter(
             DBTask.account_id == account_id,
@@ -43,7 +50,11 @@ class ChainService:
         device_id: Optional[str] = None,
         user_id: Optional[str] = None,
     ) -> dict:
-        """业务函数：处理 create_chain_instances 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 create_chain_instances 对应的业务流程、校验或数据转换。
+
+        入参：db、template_id、account_ids、device_id、user_id 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         """Create chain instances for each account, skipping busy ones.
 
         Uses a thread lock to prevent TOCTOU race on is_account_busy check.
@@ -95,7 +106,11 @@ class ChainService:
         return results
 
     def resolve_accounts_from_groups(self, db: Session, group_ids: list[str], user_id: Optional[str] = None) -> list[str]:
-        """业务函数：处理 resolve_accounts_from_groups 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 resolve_accounts_from_groups 对应的业务流程、校验或数据转换。
+
+        入参：db、group_ids、user_id 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         """Expand group IDs to unique active account IDs, optionally scoped to user."""
         query = (
             db.query(AccountGroupMember.account_id)
@@ -111,7 +126,11 @@ class ChainService:
         return [a[0] for a in account_ids]
 
     def advance_chain(self, db: Session, task_id: str, status: str, result: dict = None):
-        """业务函数：处理 advance_chain 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 advance_chain 对应的业务流程、校验或数据转换。
+
+        入参：db、task_id、status、result 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         """Advance chain to next step after task completion/failure.
 
         Uses flush (not commit) — caller is responsible for the final commit.
@@ -148,7 +167,11 @@ class ChainService:
         # Do NOT commit here — caller (report_result) handles the commit
 
     def _create_step_task(self, db: Session, chain: ChainInstance, step_order: int, template: ChainTemplate):
-        """业务函数：处理 _create_step_task 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 _create_step_task 对应的业务流程、校验或数据转换。
+
+        入参：db、chain、step_order、template 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         """Create a Task for the given step. Caller is responsible for commit/flush."""
         step = next((s for s in template.steps if s["step_order"] == step_order), None)
         if not step:
@@ -171,7 +194,11 @@ class ChainService:
         db.add(task)
 
     def _safe_push_pending_tasks(self, db: Session, account_ids: list[str]):
-        """业务函数：处理 _safe_push_pending_tasks 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 _safe_push_pending_tasks 对应的业务流程、校验或数据转换。
+
+        入参：db、account_ids 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         """Push pending tasks for chain instances to devices.
 
         Uses chain's device_id if set, otherwise falls back to account-bound device.
@@ -203,7 +230,11 @@ class ChainService:
             })
 
     def _safe_push_step_task(self, db: Session, chain: ChainInstance):
-        """业务函数：处理 _safe_push_step_task 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 _safe_push_step_task 对应的业务流程、校验或数据转换。
+
+        入参：db、chain 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         """Push the current step task to the device.
 
         Uses chain's device_id if set, otherwise falls back to account-bound device.
@@ -234,7 +265,11 @@ class ChainService:
 
     @staticmethod
     def _schedule_push(device_id: str, data: dict):
-        """业务函数：处理 _schedule_push 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 _schedule_push 对应的业务流程、校验或数据转换。
+
+        入参：device_id、data 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         """Schedule a WS push, safe for both sync and async call sites."""
         from app.ws_manager import pair_ws_manager
 
@@ -244,7 +279,11 @@ class ChainService:
         except RuntimeError:
             # No running event loop — fire and forget via a new thread
             def _push():
-                """业务函数：处理 _push 对应的业务流程、校验或数据转换。"""
+                """业务函数：处理 _push 对应的业务流程、校验或数据转换。
+
+                入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+                出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+                """
                 try:
                     asyncio.run(pair_ws_manager.send_to_device(device_id, data))
                 except Exception as e:
@@ -253,7 +292,11 @@ class ChainService:
 
 
 def _task_to_push_dict(task: DBTask) -> dict:
-    """业务函数：处理 _task_to_push_dict 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _task_to_push_dict 对应的业务流程、校验或数据转换。
+
+    入参：task 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return {
         "id": task.id,
         "type": task.type,

@@ -53,7 +53,11 @@ DEFAULT_NEGATIVE = "no text, no logo, no watermark"
 
 
 def story_text_from_parts(*parts: Any) -> str:
-    """业务函数：处理 story_text_from_parts 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 story_text_from_parts 对应的业务流程、校验或数据转换。
+
+    入参：parts 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     values: list[str] = []
     for part in parts:
         if isinstance(part, dict):
@@ -66,7 +70,11 @@ def story_text_from_parts(*parts: Any) -> str:
 
 
 def infer_visual_style_from_story(*parts: Any) -> dict[str, str]:
-    """业务函数：处理 infer_visual_style_from_story 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 infer_visual_style_from_story 对应的业务流程、校验或数据转换。
+
+    入参：parts 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     text = story_text_from_parts(*parts).lower()
     illustration_hits = [keyword for keyword in ILLUSTRATION_KEYWORDS if keyword.lower() in text]
     live_action_hits = [keyword for keyword in LIVE_ACTION_KEYWORDS if keyword.lower() in text]
@@ -88,7 +96,11 @@ def infer_visual_style_from_story(*parts: Any) -> dict[str, str]:
 
 
 def merge_visual_style(base: dict[str, Any] | None, inferred: dict[str, str]) -> dict[str, Any]:
-    """业务函数：处理 merge_visual_style 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 merge_visual_style 对应的业务流程、校验或数据转换。
+
+    入参：base、inferred 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     merged = dict(base or {})
     merged["medium"] = inferred["medium"]
     merged["prompt"] = inferred["prompt"]
@@ -98,7 +110,11 @@ def merge_visual_style(base: dict[str, Any] | None, inferred: dict[str, str]) ->
 
 
 def append_visual_style_constraints(prompt: str, visual_style: dict[str, Any] | None) -> str:
-    """业务函数：处理 append_visual_style_constraints 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 append_visual_style_constraints 对应的业务流程、校验或数据转换。
+
+    入参：prompt、visual_style 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     visual_style = visual_style or {}
     constraint = str(visual_style.get("prompt") or "").strip()
     negative = str(visual_style.get("negative_prompt") or "").strip()
@@ -107,7 +123,11 @@ def append_visual_style_constraints(prompt: str, visual_style: dict[str, Any] | 
 
 
 def reference_prompt_matches_visual_style(stored_prompt: str | None, visual_style: dict[str, Any] | None) -> bool:
-    """业务函数：处理 reference_prompt_matches_visual_style 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 reference_prompt_matches_visual_style 对应的业务流程、校验或数据转换。
+
+    入参：stored_prompt、visual_style 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     medium = (visual_style or {}).get("medium")
     if medium != "photorealistic_live_action":
         return True

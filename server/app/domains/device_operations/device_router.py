@@ -33,7 +33,11 @@ def register_device(
     authed_device_id: Optional[str] = Depends(verify_device_secret),
 ):
     # Per-device secret: reject mismatch
-    """业务函数：处理 register_device 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 register_device 对应的业务流程、校验或数据转换。
+
+    入参：request、raw_request、db、authed_device_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if authed_device_id and authed_device_id != request.device_id:
         raise HTTPException(status_code=403, detail="Device ID mismatch")
     from app.domains.device_operations.device_service import device_service

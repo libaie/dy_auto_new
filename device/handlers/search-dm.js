@@ -26,6 +26,8 @@ var SearchDMHandler = Object.create(SearchBaseHandler);
  * 页面导航: 视频详情页 → 个人主页 → 私信聊天室 → 发消息 → 回退到视频详情页
  * 确保退出时页面状态与进入前完全一致，避免外层循环在错误的页面继续执行
  */
+// 入参：content、stats 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 SearchDMHandler._interactWithVideo 对应业务流程的处理结果。
 SearchDMHandler._interactWithVideo = function (content, stats) {
   var params = this._params || {};
 

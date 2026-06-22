@@ -11,7 +11,11 @@ from typing import Any
 
 
 def _source_identity(payload: dict[str, Any]) -> dict[str, Any]:
-    """业务函数：处理 _source_identity 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _source_identity 对应的业务流程、校验或数据转换。
+
+    入参：payload 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     source = dict(payload.get("source") or {})
     if payload.get("source_url") and not source.get("url"):
         source["url"] = payload["source_url"]
@@ -26,7 +30,11 @@ def _source_identity(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _reference_identities(payload: dict[str, Any]) -> list[dict[str, Any]]:
-    """业务函数：处理 _reference_identities 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _reference_identities 对应的业务流程、校验或数据转换。
+
+    入参：payload 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     items = []
     for raw in payload.get("reference_images") or []:
         item = {"url": raw} if isinstance(raw, str) else dict(raw or {})
@@ -51,7 +59,11 @@ def selection_preview_hash_inputs(
     selected_model_config_version: int | None,
     provider_options: dict[str, Any],
 ) -> dict[str, Any]:
-    """业务函数：处理 selection_preview_hash_inputs 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 selection_preview_hash_inputs 对应的业务流程、校验或数据转换。
+
+    入参：payload、mode、destination_role、strategy_id、strategy_version、selected_model_id、selected_model_config_version、provider_options 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return {
         "mode": mode,
         "destination_role": payload.get("_requested_destination_role", destination_role),
@@ -82,6 +94,10 @@ def selection_preview_hash_inputs(
 
 
 def selection_preview_request_hash(hash_inputs: dict[str, Any]) -> str:
-    """业务函数：处理 selection_preview_request_hash 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 selection_preview_request_hash 对应的业务流程、校验或数据转换。
+
+    入参：hash_inputs 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     stable = json.dumps(hash_inputs, sort_keys=True, ensure_ascii=False, default=str).encode("utf-8")
     return hashlib.sha256(stable).hexdigest()

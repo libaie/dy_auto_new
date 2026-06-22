@@ -25,6 +25,8 @@ let _authHandler = null
 let _toastHandler = null
 
 // 前端业务函数：协调 handleUnauthorizedResponse 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleUnauthorizedResponse 对应业务流程的处理结果。
 export function handleUnauthorizedResponse() {
   if (_authHandler) {
     _authHandler()
@@ -64,6 +66,8 @@ client.interceptors.response.use(
  * Sets up the 401 handler to properly log out via the store and redirect via the router.
  */
 // 前端业务函数：协调 setupAuthInterceptor 对应的页面流程、接口调用或状态转换。
+// 入参：authStore、router 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 setupAuthInterceptor 对应业务流程的处理结果。
 export function setupAuthInterceptor(authStore, router) {
   _authHandler = () => {
     authStore.logout()
@@ -76,6 +80,8 @@ export function setupAuthInterceptor(authStore, router) {
  * Sets up the global toast handler for all non-401 errors.
  */
 // 前端业务函数：协调 setupToastInterceptor 对应的页面流程、接口调用或状态转换。
+// 入参：toastStore 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 setupToastInterceptor 对应业务流程的处理结果。
 export function setupToastInterceptor(toastStore) {
   _toastHandler = (message) => {
     toastStore.error(message)

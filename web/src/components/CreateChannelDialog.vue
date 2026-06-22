@@ -228,6 +228,8 @@ watch(() => form.value.group_id, async (gid) => {
 })
 
 // 前端业务函数：协调 expandKeywords 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 expandKeywords 对应业务流程的处理结果。
 async function expandKeywords() {
   var seed = seedKeyword.value.trim()
   if (!seed) return
@@ -257,6 +259,8 @@ async function expandKeywords() {
 }
 
 // 前端业务函数：协调 submit 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 submit 对应业务流程的处理结果。
 async function submit() {
   error.value = ''
   const keywords = keywordsText.value.split('\n').map(k => k.trim()).filter(Boolean)

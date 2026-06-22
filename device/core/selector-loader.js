@@ -4,6 +4,8 @@ var logger = require("../utils/logger");
 
 var TAG = "选择器";
 
+// 入参：dir 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 ensureDirPath 对应业务流程的处理结果。
 function ensureDirPath(dir) {
   if (!dir) return false;
   try {
@@ -28,6 +30,8 @@ var selectorLoader = global.__selectorLoader || {
   /**
    * 初始化 — 从后端拉取全量选择器（带重试）
    */
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 init 对应业务流程的处理结果。
   init: function () {
     // 第一时间捕获设备分辨率，后续 syncTemplates 等依赖
     this._resolution = device.width + "x" + device.height;
@@ -110,6 +114,8 @@ var selectorLoader = global.__selectorLoader || {
    * 检查并增量更新选择器
    * @param {number} serverVersion - 服务端版本号
    */
+  // 入参：serverVersion 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 checkAndUpdate 对应业务流程的处理结果。
   checkAndUpdate: function (serverVersion) {
     if (serverVersion > this._version) {
       logger.info(TAG, "选择器已过期 (本地=" + this._version + ", 服务端=" + serverVersion + "), 更新中...");
@@ -128,6 +134,8 @@ var selectorLoader = global.__selectorLoader || {
    * @param {string} actionName - 操作名称 (如 "like_button")
    * @returns {Object|null} { strategies: [...] }
    */
+  // 入参：actionName 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 get 对应业务流程的处理结果。
   get: function (actionName) {
     var selector = this._cache[actionName];
     if (selector) return selector;
@@ -162,6 +170,8 @@ var selectorLoader = global.__selectorLoader || {
    * 这样 _cache 每个 action 只存一条，不会膨胀
    * @param {Array} selectors
    */
+  // 入参：selectors 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _applySelectors 对应业务流程的处理结果。
   _applySelectors: function (selectors) {
     var douyinVersion = this._douyinVersion;
     if (douyinVersion === undefined) {
@@ -181,6 +191,8 @@ var selectorLoader = global.__selectorLoader || {
     var devAR = _aspectTag(devRes);
 
     // 设备业务函数：处理 _priority 对应的抖音自动化动作、状态或安全边界。
+    // 入参：platformVer 为该业务流程需要的上下文、标识或载荷。
+    // 出参：返回 _priority 对应业务流程的处理结果。
     function _priority(platformVer) {
       // exact match: 3, specific version (e.g. "38.6.0"): 2, default/empty: 1
       if (platformVer === douyinVersion) return 3;
@@ -189,6 +201,8 @@ var selectorLoader = global.__selectorLoader || {
     }
 
     // 设备业务函数：处理 _resProfileScore 对应的抖音自动化动作、状态或安全边界。
+    // 入参：sel 为该业务流程需要的上下文、标识或载荷。
+    // 出参：返回 _resProfileScore 对应业务流程的处理结果。
     function _resProfileScore(sel) {
       var rp = sel.resolution_profile || "default";
       if (!rp || rp === "default") return 1;
@@ -198,6 +212,8 @@ var selectorLoader = global.__selectorLoader || {
     }
 
     // 设备业务函数：处理 _versionDist 对应的抖音自动化动作、状态或安全边界。
+    // 入参：v1、v2 为该业务流程需要的上下文、标识或载荷。
+    // 出参：返回 _versionDist 对应业务流程的处理结果。
     function _versionDist(v1, v2) {
       if (!v1 || !v2 || v1 === "default" || v2 === "default") return 999999999;
       var p1 = String(v1).split("."), p2 = String(v2).split(".");
@@ -210,6 +226,8 @@ var selectorLoader = global.__selectorLoader || {
     }
 
     // 设备业务函数：处理 _versionCompare 对应的抖音自动化动作、状态或安全边界。
+    // 入参：v1、v2 为该业务流程需要的上下文、标识或载荷。
+    // 出参：返回 _versionCompare 对应业务流程的处理结果。
     function _versionCompare(v1, v2) {
       var p1 = String(v1 || "").split(".");
       var p2 = String(v2 || "").split(".");
@@ -223,6 +241,8 @@ var selectorLoader = global.__selectorLoader || {
     }
 
     // 设备业务函数：处理 _prefersNotFutureVersion 对应的抖音自动化动作、状态或安全边界。
+    // 入参：v1、v2、target 为该业务流程需要的上下文、标识或载荷。
+    // 出参：返回 _prefersNotFutureVersion 对应业务流程的处理结果。
     function _prefersNotFutureVersion(v1, v2, target) {
       var v1Future = _versionCompare(v1, target) > 0;
       var v2Future = _versionCompare(v2, target) > 0;
@@ -231,6 +251,8 @@ var selectorLoader = global.__selectorLoader || {
     }
 
     // 设备业务函数：处理 _aspectTag 对应的抖音自动化动作、状态或安全边界。
+    // 入参：resolution 为该业务流程需要的上下文、标识或载荷。
+    // 出参：返回 _aspectTag 对应业务流程的处理结果。
     function _aspectTag(resolution) {
       if (!resolution) return "unknown";
       var parts = resolution.split("x");
@@ -243,6 +265,8 @@ var selectorLoader = global.__selectorLoader || {
     }
 
     // 设备业务函数：处理 _isBetter 对应的抖音自动化动作、状态或安全边界。
+    // 入参：s、existing 为该业务流程需要的上下文、标识或载荷。
+    // 出参：返回 _isBetter 对应业务流程的处理结果。
     function _isBetter(s, existing) {
       var p = _priority(s.platform_version);
       var ep = _priority(existing.platform_version);
@@ -311,6 +335,8 @@ var selectorLoader = global.__selectorLoader || {
   /**
    * 同步模板图片 — 从服务端下载缺失的模板，清理多余的
    */
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 syncTemplates 对应业务流程的处理结果。
   syncTemplates: function () {
     try {
       var response = apiClient.fetchTemplateList(this._resolution);
@@ -420,6 +446,8 @@ var selectorLoader = global.__selectorLoader || {
   /**
    * 获取当前版本号
    */
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 getVersion 对应业务流程的处理结果。
   getVersion: function () {
     return this._version;
   },

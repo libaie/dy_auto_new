@@ -15,7 +15,11 @@ from app.domains.model_configuration.runtime_model_config import _model_supports
 
 
 def _model_identity(model: AIModel) -> dict[str, Any]:
-    """业务函数：处理 _model_identity 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _model_identity 对应的业务流程、校验或数据转换。
+
+    入参：model 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return {
         "model_id": model.id,
         "name": model.name,
@@ -25,7 +29,11 @@ def _model_identity(model: AIModel) -> dict[str, Any]:
 
 
 def _selected_model_payload(model: AIModel, scene_key: str, capability_key: str) -> dict[str, Any]:
-    """业务函数：处理 _selected_model_payload 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _selected_model_payload 对应的业务流程、校验或数据转换。
+
+    入参：model、scene_key、capability_key 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     config = model.config_json or {}
     return {
         **_model_identity(model),
@@ -36,7 +44,11 @@ def _selected_model_payload(model: AIModel, scene_key: str, capability_key: str)
 
 
 def _rejected_candidate(model: AIModel, reason: str, detail: str, rescue_action: str) -> dict[str, Any]:
-    """业务函数：处理 _rejected_candidate 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _rejected_candidate 对应的业务流程、校验或数据转换。
+
+    入参：model、reason、detail、rescue_action 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return {
         **_model_identity(model),
         "reason": reason,
@@ -46,7 +58,11 @@ def _rejected_candidate(model: AIModel, reason: str, detail: str, rescue_action:
 
 
 def _fallback_model_payload(model: AIModel) -> dict[str, Any]:
-    """业务函数：处理 _fallback_model_payload 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _fallback_model_payload 对应的业务流程、校验或数据转换。
+
+    入参：model 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return {
         **_model_identity(model),
         "risk_labels": ["requires_manual_confirmation"],
@@ -54,7 +70,11 @@ def _fallback_model_payload(model: AIModel) -> dict[str, Any]:
 
 
 def _fallback_model_ids(strategy: ImageProductionStrategy | None) -> list[str]:
-    """业务函数：处理 _fallback_model_ids 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _fallback_model_ids 对应的业务流程、校验或数据转换。
+
+    入参：strategy 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if not strategy or not isinstance(strategy.fallback_model_ids_json, list):
         return []
     return [model_id for model_id in strategy.fallback_model_ids_json if isinstance(model_id, str)]
@@ -68,7 +88,11 @@ def resolve_image_model_selection(
     requested_model_id: str | None = None,
     strategy: ImageProductionStrategy | None = None,
 ) -> dict[str, Any]:
-    """业务函数：处理 resolve_image_model_selection 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 resolve_image_model_selection 对应的业务流程、校验或数据转换。
+
+    入参：db、scene_key、capability_key、requested_model_id、strategy 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     models = (
         db.query(AIModel)
         .filter(AIModel.model_type == "image")

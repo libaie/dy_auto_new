@@ -21,7 +21,11 @@ async def create_group(
     db: Session = Depends(get_db),
     user = Depends(require_role("admin")),
 ):
-    """业务函数：处理 create_group 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 create_group 对应的业务流程、校验或数据转换。
+
+    入参：request、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     user_id, _ = user
     try:
         group = group_use_cases.create_group(db, request, user_id)
@@ -38,7 +42,11 @@ def list_groups(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 list_groups 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 list_groups 对应的业务流程、校验或数据转换。
+
+    入参：skip、limit、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return group_use_cases.list_groups(db, skip, limit, user)
 
 
@@ -48,7 +56,11 @@ def get_group(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 get_group 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 get_group 对应的业务流程、校验或数据转换。
+
+    入参：group_id、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     try:
         return group_use_cases.get_group(db, group_id, user)
     except LookupError:
@@ -62,7 +74,11 @@ async def update_group(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 update_group 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 update_group 对应的业务流程、校验或数据转换。
+
+    入参：group_id、request、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     try:
         group = group_use_cases.update_group(db, group_id, request, user)
     except LookupError:
@@ -79,7 +95,11 @@ async def delete_group(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 delete_group 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 delete_group 对应的业务流程、校验或数据转换。
+
+    入参：group_id、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     try:
         result = group_use_cases.delete_group(db, group_id, user)
     except LookupError:
@@ -95,7 +115,11 @@ def list_members(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 list_members 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 list_members 对应的业务流程、校验或数据转换。
+
+    入参：group_id、status、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     try:
         return group_use_cases.list_members(db, group_id, status, user)
     except LookupError:
@@ -109,7 +133,11 @@ async def add_members(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 add_members 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 add_members 对应的业务流程、校验或数据转换。
+
+    入参：group_id、request、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     try:
         result = group_use_cases.add_members(db, group_id, request, user)
     except LookupError:
@@ -127,7 +155,11 @@ async def remove_members(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 remove_members 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 remove_members 对应的业务流程、校验或数据转换。
+
+    入参：group_id、request、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     try:
         result = group_use_cases.remove_members(db, group_id, request, user)
     except LookupError:

@@ -61,12 +61,16 @@ const cancelling = ref(false)
 
 // --- WebSocket ---
 // 前端业务函数：协调 wsUrl 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 wsUrl 对应业务流程的处理结果。
 function wsUrl() {
   const token = localStorage.getItem('token') || ''
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
   return `${protocol}//${location.host}/api/devices/ws/pair-events?token=${encodeURIComponent(token)}`
 }
 useWebSocket(wsUrl, {
+  // 入参：msg 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 onMessage 对应业务流程的处理结果。
   onMessage(msg) {
     if (msg.event === 'task_updated' || msg.event === 'tasks_changed') fetchTasks(true)
     else if (msg.event === 'task_progress') taskProgress[msg.task_id] = { step: msg.step, detail: msg.detail, progress: msg.progress }
@@ -75,6 +79,8 @@ useWebSocket(wsUrl, {
 
 // --- Tasks ---
 // 前端业务函数：协调 fetchTasks 对应的页面流程、接口调用或状态转换。
+// 入参：silent 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 fetchTasks 对应业务流程的处理结果。
 async function fetchTasks(silent) {
   if (!silent) loading.value = true
   try {
@@ -96,9 +102,13 @@ async function fetchTasks(silent) {
   } finally { loading.value = false }
 }
 
+// 入参：row 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleDeleteTask 对应业务流程的处理结果。
 async function handleDeleteTask(row) {
   try { await deleteTask(row.id); toast.success('已删除'); fetchTasks() } catch { toast.error('删除失败') }
 }
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleBatchDelete 对应业务流程的处理结果。
 async function handleBatchDelete() {
   if (!selectedTaskIds.value.length) { toast.error('请先选择任务'); return }
   batchDeleting.value = true
@@ -106,21 +116,31 @@ async function handleBatchDelete() {
   catch { toast.error('批量删除失败') }
   finally { batchDeleting.value = false }
 }
+// 入参：col 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleSort 对应业务流程的处理结果。
 function handleSort(col) {
   if (sortBy.value === col) sortOrder.value = sortOrder.value === 'desc' ? 'asc' : 'desc'
   else { sortBy.value = col; sortOrder.value = 'desc' }
   fetchTasks()
 }
 // 前端业务函数：协调 toggleSelectAll 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 toggleSelectAll 对应业务流程的处理结果。
 function toggleSelectAll() {
   if (selectedTaskIds.value.length === tasks.value.length) selectedTaskIds.value = []
   else selectedTaskIds.value = tasks.value.map(t => t.id)
 }
 // 前端业务函数：协调 handlePageChange 对应的页面流程、接口调用或状态转换。
+// 入参：p 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handlePageChange 对应业务流程的处理结果。
 function handlePageChange(p) { page.value = p; fetchTasks() }
 // 前端业务函数：协调 openCancelDialog 对应的页面流程、接口调用或状态转换。
+// 入参：task 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 openCancelDialog 对应业务流程的处理结果。
 function openCancelDialog(task) { cancellingTask.value = task; showCancelDialog.value = true }
 // 前端业务函数：协调 handleCancel 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleCancel 对应业务流程的处理结果。
 async function handleCancel() {
   if (!cancellingTask.value) return
   cancelling.value = true
@@ -130,17 +150,25 @@ async function handleCancel() {
 }
 
 // --- Channels ---
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 fetchChannels 对应业务流程的处理结果。
 async function fetchChannels() {
   channelsLoading.value = true
   try { const resp = await listChannels(); channels.value = resp.data.channels || [] }
   catch {}
   finally { channelsLoading.value = false }
 }
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 activeChannelCount 对应业务流程的处理结果。
 const activeChannelCount = () => channels.value.filter(c => c.status === 'active').length
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 pausedChannelCount 对应业务流程的处理结果。
 const pausedChannelCount = () => channels.value.filter(c => c.status === 'paused').length
 
 // --- Ref data ---
 // 前端业务函数：协调 loadRefData 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 loadRefData 对应业务流程的处理结果。
 async function loadRefData() {
   try {
     const [acctRes, grpRes, devRes, tplRes, ptRes] = await Promise.all([
@@ -156,11 +184,15 @@ async function loadRefData() {
 }
 
 // 前端业务函数：协调 onCreated 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 onCreated 对应业务流程的处理结果。
 function onCreated() {
   showCreateDialog.value = false; showKeywordDialog.value = false
   page.value = 1; fetchTasks(); fetchChannels()
 }
 // 前端业务函数：协调 onChannelRefresh 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 onChannelRefresh 对应业务流程的处理结果。
 function onChannelRefresh() { fetchChannels(); fetchTasks(true) }
 
 watch(statusFilter, () => { page.value = 1; fetchTasks() })

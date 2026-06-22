@@ -30,7 +30,11 @@ async def create_task(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 create_task 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 create_task 对应的业务流程、校验或数据转换。
+
+    入参：request、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     try:
         task = await task_use_cases.create_task(db, request, user)
     except task_use_cases.TaskParamsError as e:
@@ -49,7 +53,11 @@ async def batch_create_tasks(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 batch_create_tasks 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 batch_create_tasks 对应的业务流程、校验或数据转换。
+
+    入参：request、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     try:
         outcome = await task_use_cases.batch_create_tasks(db, request, user)
     except task_use_cases.TaskParamsError as e:
@@ -76,7 +84,11 @@ def list_tasks(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 list_tasks 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 list_tasks 对应的业务流程、校验或数据转换。
+
+    入参：status、type、search、sort_by、sort_order、skip、limit、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return task_use_cases.list_tasks(
         db=db,
         status=status,
@@ -96,7 +108,11 @@ async def batch_delete_tasks(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 batch_delete_tasks 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 batch_delete_tasks 对应的业务流程、校验或数据转换。
+
+    入参：body、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     result = task_use_cases.batch_delete_tasks(db, body.task_ids)
     await realtime_events.broadcast_tasks_changed()
     return result
@@ -108,7 +124,11 @@ def get_task(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 get_task 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 get_task 对应的业务流程、校验或数据转换。
+
+    入参：task_id、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     try:
         return task_use_cases.get_task(db, task_id)
     except task_use_cases.TaskNotFoundError:
@@ -121,7 +141,11 @@ async def cancel_task(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 cancel_task 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 cancel_task 对应的业务流程、校验或数据转换。
+
+    入参：task_id、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     try:
         task = task_use_cases.cancel_task(db, task_id)
     except task_use_cases.TaskNotFoundError:
@@ -139,7 +163,11 @@ async def cancel_task(
 
 @router.delete("/{task_id}")
 async def delete_task(task_id: str, db=Depends(get_db), _=Depends(verify_admin_token)):
-    """业务函数：处理 delete_task 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 delete_task 对应的业务流程、校验或数据转换。
+
+    入参：task_id、db、_ 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     try:
         result = task_use_cases.delete_task(db, task_id)
     except task_use_cases.TaskNotFoundError:

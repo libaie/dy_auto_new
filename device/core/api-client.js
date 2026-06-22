@@ -13,6 +13,8 @@ var netConfig = config.network || {
 };
 
 // 设备业务函数：处理 getTaskExecutor 对应的抖音自动化动作、状态或安全边界。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 getTaskExecutor 对应业务流程的处理结果。
 function getTaskExecutor() {
   return require("./task-executor");
 }
@@ -22,6 +24,8 @@ var offlineQueue = [];
 var isOnline = true;
 var _lastRequestWas4xx = false;  // 4xx = 客户端错误，不应重试
 
+// 入参：dir 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 _ensureDirPath 对应业务流程的处理结果。
 function _ensureDirPath(dir) {
   if (!dir) return false;
   try {
@@ -37,11 +41,15 @@ function _ensureDirPath(dir) {
 var apiClient = {
   _onAuthFailure: null,
   // 设备业务函数：处理 _lastRequestWas4xx 对应的抖音自动化动作、状态或安全边界。
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _lastRequestWas4xx 对应业务流程的处理结果。
   _lastRequestWas4xx: function () { return _lastRequestWas4xx; },
 
   /**
    * 设置认证失败回调（401 时触发）
    */
+  // 入参：callback 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 setAuthFailureHandler 对应业务流程的处理结果。
   setAuthFailureHandler: function (callback) {
     this._onAuthFailure = callback;
   },
@@ -50,6 +58,8 @@ var apiClient = {
    * 应用代理配置到 HTTP 请求
    * @param {Object} proxyConfig - { type, host, port, username, password }
    */
+  // 入参：proxyConfig 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 setProxy 对应业务流程的处理结果。
   setProxy: function (proxyConfig) {
     if (!proxyConfig || !proxyConfig.host) {
       logger.info(TAG, "未配置代理");
@@ -66,6 +76,8 @@ var apiClient = {
    * 获取当前代理配置的 HTTP 选项
    * @returns {Object} 适合 http.get/http.post 的选项
    */
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _getProxyOptions 对应业务流程的处理结果。
   _getProxyOptions: function () {
     if (!config.proxy) return {};
 
@@ -83,6 +95,8 @@ var apiClient = {
   /**
    * 计算重试延迟（指数退避 + 抖动）
    */
+  // 入参：attempt 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _retryDelay 对应业务流程的处理结果。
   _retryDelay: function (attempt) {
     var base = netConfig.retryBaseDelay * Math.pow(2, attempt);
     var jitter = Math.random() * base * 0.3;
@@ -99,6 +113,8 @@ var apiClient = {
   /**
    * 读取响应体为字符串（兼容 AutoJS6 的 Java ResponseBody 对象）
    */
+  // 入参：response 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _readBody 对应业务流程的处理结果。
   _readBody: function (response) {
     var body = response.body;
     if (typeof body === "string") return body;
@@ -112,6 +128,8 @@ var apiClient = {
   /**
    * 读取响应体为字节数组（用于二进制下载）
    */
+  // 入参：response 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _readBodyBytes 对应业务流程的处理结果。
   _readBodyBytes: function (response) {
     var body = response.body;
     if (body instanceof Array) return body;
@@ -127,6 +145,8 @@ var apiClient = {
   },
 
   // 设备业务函数：处理 _requestWithRetry 对应的抖音自动化动作、状态或安全边界。
+  // 入参：method、url、opts 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _requestWithRetry 对应业务流程的处理结果。
   _requestWithRetry: function (method, url, opts) {
     var body = opts.body || null;
     var timeout = opts.timeout || netConfig.requestTimeout;
@@ -199,6 +219,8 @@ var apiClient = {
   /**
    * 带重试的 HTTP GET
    */
+  // 入参：path、params 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 get 对应业务流程的处理结果。
   get: function (path, params) {
     if (!config.serverUrl) {
       logger.error(TAG, "serverUrl 未设置，无法请求: " + path);
@@ -218,6 +240,8 @@ var apiClient = {
   /**
    * 带重试的 HTTP POST
    */
+  // 入参：path、body、timeout 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 post 对应业务流程的处理结果。
   post: function (path, body, timeout) {
     if (!config.serverUrl) {
       logger.error(TAG, "serverUrl 未设置，无法请求: " + path);
@@ -230,6 +254,8 @@ var apiClient = {
   /**
    * 带重试的二进制下载
    */
+  // 入参：url 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _downloadWithRetry 对应业务流程的处理结果。
   _downloadWithRetry: function (url) {
     return this._requestWithRetry("GET", url, {
       timeout: 60000,
@@ -241,6 +267,8 @@ var apiClient = {
   /**
    * 标记网络恢复，刷新离线队列
    */
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _markOnline 对应业务流程的处理结果。
   _markOnline: function () {
     if (!isOnline) {
       logger.info(TAG, "网络已恢复，刷新离线队列 (" +
@@ -253,6 +281,8 @@ var apiClient = {
   /**
    * 标记网络离线
    */
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _markOffline 对应业务流程的处理结果。
   _markOffline: function () {
     if (isOnline) {
       logger.warn(TAG, "网络已离线");
@@ -263,6 +293,8 @@ var apiClient = {
   /**
    * 刷新离线队列
    */
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _flushOfflineQueue 对应业务流程的处理结果。
   _flushOfflineQueue: function () {
     var MAX_FLUSH_RETRIES = 3;
     while (offlineQueue.length > 0) {
@@ -283,16 +315,22 @@ var apiClient = {
 
   // --- 业务方法 ---
 
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 poll 对应业务流程的处理结果。
   poll: function () {
     return this.get("/api/device/poll", { device_id: config.deviceId });
   },
 
   // 设备业务函数：处理 fetchDMSequences 对应的抖音自动化动作、状态或安全边界。
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 fetchDMSequences 对应业务流程的处理结果。
   fetchDMSequences: function () {
     return this.get("/api/dm-sequences/device/sync");
   },
 
   // 设备业务函数：处理 fetchTemplateList 对应的抖音自动化动作、状态或安全边界。
+  // 入参：resolution 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 fetchTemplateList 对应业务流程的处理结果。
   fetchTemplateList: function (resolution) {
     var path = "/api/device/templates";
     if (resolution) path += "?resolution=" + encodeURIComponent(resolution);
@@ -300,6 +338,8 @@ var apiClient = {
   },
 
   // 设备业务函数：处理 uploadCalibration 对应的抖音自动化动作、状态或安全边界。
+  // 入参：templates、resolution 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 uploadCalibration 对应业务流程的处理结果。
   uploadCalibration: function (templates, resolution) {
     var body = {
       templates: templates.map(function (t) {
@@ -316,6 +356,8 @@ var apiClient = {
   },
 
   // 设备业务函数：处理 downloadTemplate 对应的抖音自动化动作、状态或安全边界。
+  // 入参：filename、resolution 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 downloadTemplate 对应业务流程的处理结果。
   downloadTemplate: function (filename, resolution) {
     var url = config.serverUrl + "/api/device/templates/" + encodeURIComponent(filename);
     if (resolution) url += "?resolution=" + encodeURIComponent(resolution);
@@ -323,6 +365,8 @@ var apiClient = {
   },
 
   // 设备业务函数：处理 _pushToOfflineQueue 对应的抖音自动化动作、状态或安全边界。
+  // 入参：path、body、label、critical 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _pushToOfflineQueue 对应业务流程的处理结果。
   _pushToOfflineQueue: function (path, body, label, critical) {
     if (offlineQueue.length >= netConfig.offlineQueueMax) {
       // Prefer evicting non-critical items (stats) over critical (task reports, collect)
@@ -344,6 +388,8 @@ var apiClient = {
     offlineQueue.push({ path: path, body: body, retries: 0, critical: !!critical });
   },
 
+  // 入参：taskId、status、result、uiSnapshot、leaseId 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 report 对应业务流程的处理结果。
   report: function (taskId, status, result, uiSnapshot, leaseId) {
     _lastRequestWas4xx = false;
     var body = {
@@ -361,6 +407,8 @@ var apiClient = {
     return response;
   },
 
+  // 入参：payload 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 collectReport 对应业务流程的处理结果。
   collectReport: function (payload) {
     _lastRequestWas4xx = false;
     var response = this.post("/api/device/collect-report", payload);
@@ -368,11 +416,15 @@ var apiClient = {
     return response;
   },
 
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 heartbeat 对应业务流程的处理结果。
   heartbeat: function () {
     return this.post("/api/device/heartbeat", { device_id: config.deviceId });
   },
 
   // 设备业务函数：处理 reportProgress 对应的抖音自动化动作、状态或安全边界。
+  // 入参：taskId、step、detail、progress 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 reportProgress 对应业务流程的处理结果。
   reportProgress: function (taskId, step, detail, progress) {
     var body = {
       task_id: taskId,
@@ -387,22 +439,30 @@ var apiClient = {
   },
 
   // 设备业务函数：处理 fetchSelectors 对应的抖音自动化动作、状态或安全边界。
+  // 入参：currentVersion 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 fetchSelectors 对应业务流程的处理结果。
   fetchSelectors: function (currentVersion) {
     return this.get("/api/device/selectors", { version: currentVersion || 0 });
   },
 
   // 设备业务函数：处理 fetchPromptTemplates 对应的抖音自动化动作、状态或安全边界。
+  // 入参：currentVersion 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 fetchPromptTemplates 对应业务流程的处理结果。
   fetchPromptTemplates: function (currentVersion) {
     return this.get("/api/device/prompt-templates", { version: currentVersion || 0 });
   },
 
   // 设备业务函数：处理 getScriptVersion 对应的抖音自动化动作、状态或安全边界。
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 getScriptVersion 对应业务流程的处理结果。
   getScriptVersion: function () {
     var result = this.get("/api/device/script-version");
     return result ? result.version : null;
   },
 
   // 设备业务函数：处理 downloadScript 对应的抖音自动化动作、状态或安全边界。
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 downloadScript 对应业务流程的处理结果。
   downloadScript: function () {
     var url = config.serverUrl + "/api/device/script-download";
     var body = this._downloadWithRetry(url);
@@ -444,6 +504,8 @@ var apiClient = {
     return true;
   },
 
+  // 入参：deviceInfo 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 register 对应业务流程的处理结果。
   register: function (deviceInfo) {
     return this.post("/api/device/register", deviceInfo);
   },
@@ -454,6 +516,8 @@ var apiClient = {
    * @param {string} riskType - 风控类型 (captcha, risk_control, verify)
    * @param {Object} detail - 风控详情
    */
+  // 入参：author、text 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 claimCommentReply 对应业务流程的处理结果。
   claimCommentReply: function (author, text) {
     return this.post("/api/device/comment-claim-reply", {
       author: author,
@@ -462,6 +526,8 @@ var apiClient = {
   },
 
   // 设备业务函数：处理 releaseCommentReply 对应的抖音自动化动作、状态或安全边界。
+  // 入参：author、text 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 releaseCommentReply 对应业务流程的处理结果。
   releaseCommentReply: function (author, text) {
     return this.post("/api/device/comment-claim-release", {
       author: author,
@@ -470,6 +536,8 @@ var apiClient = {
   },
 
   // 设备业务函数：处理 reportRiskControl 对应的抖音自动化动作、状态或安全边界。
+  // 入参：accountId、riskType、detail 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 reportRiskControl 对应业务流程的处理结果。
   reportRiskControl: function (accountId, riskType, detail) {
     return this.post("/api/device/risk-report", {
       account_id: accountId,
@@ -481,11 +549,15 @@ var apiClient = {
   },
 
   // 设备业务函数：处理 isOnline 对应的抖音自动化动作、状态或安全边界。
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 isOnline 对应业务流程的处理结果。
   isOnline: function () {
     return isOnline;
   },
 
   // 设备业务函数：处理 getOfflineQueueSize 对应的抖音自动化动作、状态或安全边界。
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 getOfflineQueueSize 对应业务流程的处理结果。
   getOfflineQueueSize: function () {
     return offlineQueue.length;
   },
@@ -493,21 +565,29 @@ var apiClient = {
   // --- DM conversation ---
 
   // 设备业务函数：处理 claimDMRecipient 对应的抖音自动化动作、状态或安全边界。
+  // 入参：data 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 claimDMRecipient 对应业务流程的处理结果。
   claimDMRecipient: function (data) {
     return this.post("/api/device/dm-claim-recipient", data);
   },
 
   // 设备业务函数：处理 reportDMSend 对应的抖音自动化动作、状态或安全边界。
+  // 入参：data 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 reportDMSend 对应业务流程的处理结果。
   reportDMSend: function (data) {
     return this.post("/api/device/dm-send-report", data);
   },
 
   // 设备业务函数：处理 releaseDMRecipient 对应的抖音自动化动作、状态或安全边界。
+  // 入参：data 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 releaseDMRecipient 对应业务流程的处理结果。
   releaseDMRecipient: function (data) {
     return this.post("/api/device/dm-release-recipient", data);
   },
 
   // 设备业务函数：处理 saveCommentAIReply 对应的抖音自动化动作、状态或安全边界。
+  // 入参：nickname、text、aiReply、taskId、intendedProvince、intendedCity、intendedAttraction 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 saveCommentAIReply 对应业务流程的处理结果。
   saveCommentAIReply: function (nickname, text, aiReply, taskId, intendedProvince, intendedCity, intendedAttraction) {
     var data = {
       nickname: nickname, text: text, ai_reply: aiReply, task_id: taskId || null,
@@ -519,6 +599,8 @@ var apiClient = {
   },
 
   // 设备业务函数：处理 saveUserProfile 对应的抖音自动化动作、状态或安全边界。
+  // 入参：data 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 saveUserProfile 对应业务流程的处理结果。
   saveUserProfile: function (data) {
     var payload = {
       nickname: data.nickname,
@@ -541,6 +623,8 @@ var apiClient = {
   },
 
   // 设备业务函数：处理 uploadUserAvatar 对应的抖音自动化动作、状态或安全边界。
+  // 入参：douyinId、imageBase64 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 uploadUserAvatar 对应业务流程的处理结果。
   uploadUserAvatar: function (douyinId, imageBase64) {
     return this.post("/api/device/user-avatar", { douyin_id: douyinId, image_base64: imageBase64 });
   },
@@ -552,6 +636,8 @@ var apiClient = {
    * @param {string} taskType — "reply_comment" | "follow" | "search_dm" | ...
    * @param {number} count — 操作次数，默认 1
    */
+  // 入参：accountId、taskType、targetId、count 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 incrementStats 对应业务流程的处理结果。
   incrementStats: function (accountId, taskType, targetId, count) {
     var taskExecutor = getTaskExecutor();
     var tid = taskExecutor.getCurrentTaskId();

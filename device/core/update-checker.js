@@ -5,6 +5,8 @@ var logger = require("../utils/logger");
 var TAG = "UPDATE";
 
 // 设备业务函数：处理 ensureDirPath 对应的抖音自动化动作、状态或安全边界。
+// 入参：dir 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 ensureDirPath 对应业务流程的处理结果。
 function ensureDirPath(dir) {
   if (!dir) return false;
   try {
@@ -18,6 +20,8 @@ function ensureDirPath(dir) {
 }
 
 // 设备业务函数：处理 parentDir 对应的抖音自动化动作、状态或安全边界。
+// 入参：path 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 parentDir 对应业务流程的处理结果。
 function parentDir(path) {
   var s = String(path || "");
   var idx = Math.max(s.lastIndexOf("/"), s.lastIndexOf("\\"));
@@ -25,6 +29,8 @@ function parentDir(path) {
 }
 
 // 设备业务函数：处理 extractZip 对应的抖音自动化动作、状态或安全边界。
+// 入参：zipPath、destDir 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 extractZip 对应业务流程的处理结果。
 function extractZip(zipPath, destDir) {
   ensureDirPath(destDir);
 
@@ -75,6 +81,8 @@ function extractZip(zipPath, destDir) {
 
 var updateChecker = {
   // 设备业务函数：处理 _getBaseDir 对应的抖音自动化动作、状态或安全边界。
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _getBaseDir 对应业务流程的处理结果。
   _getBaseDir: function () {
     try { return context.getFilesDir().getAbsolutePath(); } catch (e) {}
     try { return context.getExternalFilesDir(null).getAbsolutePath(); } catch (e2) {}
@@ -82,11 +90,15 @@ var updateChecker = {
   },
 
   // 设备业务函数：处理 _versionFile 对应的抖音自动化动作、状态或安全边界。
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _versionFile 对应业务流程的处理结果。
   _versionFile: function () {
     return this._getBaseDir() + "/update/local_version.txt";
   },
 
   // 设备业务函数：处理 getLocalVersion 对应的抖音自动化动作、状态或安全边界。
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 getLocalVersion 对应业务流程的处理结果。
   getLocalVersion: function () {
     try {
       var vf = this._versionFile();
@@ -100,6 +112,8 @@ var updateChecker = {
   },
 
   // 设备业务函数：处理 saveLocalVersion 对应的抖音自动化动作、状态或安全边界。
+  // 入参：version 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 saveLocalVersion 对应业务流程的处理结果。
   saveLocalVersion: function (version) {
     try {
       var vf = this._versionFile();
@@ -111,6 +125,8 @@ var updateChecker = {
   },
 
   // 设备业务函数：处理 checkAndUpdate 对应的抖音自动化动作、状态或安全边界。
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 checkAndUpdate 对应业务流程的处理结果。
   checkAndUpdate: function () {
     logger.info(TAG, "Checking for script updates...");
 
@@ -181,6 +197,8 @@ var updateChecker = {
   },
 
   // 设备业务函数：处理 _copyDir 对应的抖音自动化动作、状态或安全边界。
+  // 入参：src、dst 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _copyDir 对应业务流程的处理结果。
   _copyDir: function (src, dst) {
     var items = files.listDir(src);
     for (var i = 0; i < items.length; i++) {

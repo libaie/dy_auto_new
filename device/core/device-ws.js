@@ -29,6 +29,8 @@ var deviceWs = {
   /**
    * 设置推送消息回调
    */
+  // 入参：callbacks 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 setCallbacks 对应业务流程的处理结果。
   setCallbacks: function (callbacks) {
     for (var key in callbacks) {
       if (callbacks.hasOwnProperty(key)) {
@@ -40,6 +42,8 @@ var deviceWs = {
   /**
    * 设置认证失败回调
    */
+  // 入参：callback 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 setAuthFailureHandler 对应业务流程的处理结果。
   setAuthFailureHandler: function (callback) {
     this._onAuthFailure = callback;
   },
@@ -47,6 +51,8 @@ var deviceWs = {
   /**
    * 设置连接成功回调（用于重连后重新 poll）
    */
+  // 入参：callback 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 setOnConnectedHandler 对应业务流程的处理结果。
   setOnConnectedHandler: function (callback) {
     this._onConnected = callback;
   },
@@ -54,6 +60,8 @@ var deviceWs = {
   /**
    * 启动设备状态 WS 连接
    */
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 start 对应业务流程的处理结果。
   start: function () {
     this._stopped = false;
     this._connect();
@@ -62,6 +70,8 @@ var deviceWs = {
   /**
    * 停止 WS 连接
    */
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 stop 对应业务流程的处理结果。
   stop: function () {
     this._stopped = true;
     if (this._reconnectTimer) {
@@ -83,6 +93,8 @@ var deviceWs = {
   /**
    * 发送断开通知给服务端，让服务端立即标记离线
    */
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 sendDisconnect 对应业务流程的处理结果。
   sendDisconnect: function () {
     if (this._ws && this._connected) {
       try {
@@ -94,6 +106,8 @@ var deviceWs = {
   /**
    * 是否已连接
    */
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 isConnected 对应业务流程的处理结果。
   isConnected: function () {
     return this._connected;
   },
@@ -101,6 +115,8 @@ var deviceWs = {
   /**
    * 处理服务端推送消息
    */
+  // 入参：text 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _handleMessage 对应业务流程的处理结果。
   _handleMessage: function (text) {
     try {
       var msg = JSON.parse(text);
@@ -147,6 +163,8 @@ var deviceWs = {
     }
   },
 
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _connect 对应业务流程的处理结果。
   _connect: function () {
     if (!config.serverUrl || !config.deviceSecret) {
       logger.debug(TAG, "未配对，跳过 WS 连接");
@@ -177,6 +195,8 @@ var deviceWs = {
 
       var listener = new JavaAdapter(WebSocketListener, {
         // 设备业务函数：处理 onOpen 对应的抖音自动化动作、状态或安全边界。
+        // 入参：ws、response 为该业务流程需要的上下文、标识或载荷。
+        // 出参：返回 onOpen 对应业务流程的处理结果。
         onOpen: function (ws, response) {
           logger.info(TAG, "已连接，发送认证消息");
           self._ws = ws;
@@ -202,6 +222,8 @@ var deviceWs = {
             }
           }
         },
+        // 入参：ws、text 为该业务流程需要的上下文、标识或载荷。
+        // 出参：返回 onMessage 对应业务流程的处理结果。
         onMessage: function (ws, text) {
           var str = String(text);
           // 服务端 pong 响应 — 忽略
@@ -215,6 +237,8 @@ var deviceWs = {
           self._handleMessage(str);
         },
         // 设备业务函数：处理 onClosing 对应的抖音自动化动作、状态或安全边界。
+        // 入参：ws、code、reason 为该业务流程需要的上下文、标识或载荷。
+        // 出参：返回 onClosing 对应业务流程的处理结果。
         onClosing: function (ws, code, reason) {
           logger.info(TAG, "连接关闭: code=" + code + " reason=" + reason);
           try { ws.close(1000, null); } catch (e) { /* already closed */ }
@@ -234,6 +258,8 @@ var deviceWs = {
           self._scheduleReconnect();
         },
         // 设备业务函数：处理 onFailure 对应的抖音自动化动作、状态或安全边界。
+        // 入参：ws、t、response 为该业务流程需要的上下文、标识或载荷。
+        // 出参：返回 onFailure 对应业务流程的处理结果。
         onFailure: function (ws, t, response) {
           var msg = t.getMessage() || "";
           var code = response ? response.code() : 0;
@@ -250,6 +276,8 @@ var deviceWs = {
     }
   },
 
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _startPing 对应业务流程的处理结果。
   _startPing: function () {
     var self = this;
     if (this._pingTimer) clearInterval(this._pingTimer);
@@ -267,6 +295,8 @@ var deviceWs = {
   },
 
   // 设备业务函数：处理 _cleanup 对应的抖音自动化动作、状态或安全边界。
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _cleanup 对应业务流程的处理结果。
   _cleanup: function () {
     this._connected = false;
     this._ws = null;
@@ -277,6 +307,8 @@ var deviceWs = {
   },
 
   // 设备业务函数：处理 _scheduleReconnect 对应的抖音自动化动作、状态或安全边界。
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _scheduleReconnect 对应业务流程的处理结果。
   _scheduleReconnect: function () {
     var self = this;
     if (this._stopped) return;

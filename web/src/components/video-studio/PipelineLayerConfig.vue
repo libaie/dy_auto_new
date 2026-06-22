@@ -10,6 +10,8 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue'])
 
 // 前端业务函数：协调 setLayer 对应的页面流程、接口调用或状态转换。
+// 入参：layer、value 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 setLayer 对应业务流程的处理结果。
 function setLayer(layer, value) {
   emit('update:modelValue', { ...props.modelValue, [layer]: value })
 }

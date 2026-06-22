@@ -13,7 +13,11 @@ from app.database import SessionLocal
 
 
 async def offline_checker():
-    """业务函数：处理 offline_checker 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 offline_checker 对应的业务流程、校验或数据转换。
+
+    入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Mark stale devices offline and recover stuck tasks.
 
     Heartbeats are collected in memory by the websocket manager and flushed to

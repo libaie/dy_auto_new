@@ -13,6 +13,8 @@ var antiDetect = {
    * 操作前随机延迟
    * @param {string} actionName - 操作名称（用于日志）
    */
+  // 入参：actionName 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 randomDelay 对应业务流程的处理结果。
   randomDelay: function (actionName) {
     var delay = Math.floor(
       Math.random() * (settings.delayMax - settings.delayMin) + settings.delayMin
@@ -24,6 +26,8 @@ var antiDetect = {
   /**
    * 操作后随机延迟（比操作前稍短）
    */
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 postActionDelay 对应业务流程的处理结果。
   postActionDelay: function () {
     var delay = Math.floor(
       Math.random() * (settings.delayMax - settings.delayMin) * 0.5 + settings.delayMin * 0.5
@@ -35,6 +39,8 @@ var antiDetect = {
    * 随机停顿 — 模拟用户走神
    * @returns {boolean} 是否执行了停顿
    */
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 maybePause 对应业务流程的处理结果。
   maybePause: function () {
     if (Math.random() < settings.pauseProbability) {
       var pauseDuration = Math.floor(
@@ -55,6 +61,8 @@ var antiDetect = {
    * @param {number} endY
    */
   // 设备业务函数：处理 humanSwipe 对应的抖音自动化动作、状态或安全边界。
+  // 入参：startX、startY、endX、endY 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 humanSwipe 对应业务流程的处理结果。
   humanSwipe: function (startX, startY, endX, endY) {
     var path = bezier.generateSwipePath(startX, startY, endX, endY);
     logger.debug(TAG, "拟人滑动 " + path.length + " 个轨迹点");
@@ -77,6 +85,8 @@ var antiDetect = {
    * 拟人上滑（浏览下一条视频）
    * 比普通 swipe 更自然
    */
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 humanSwipeUp 对应业务流程的处理结果。
   humanSwipeUp: function () {
     var startX = device.width / 2 + Math.floor(Math.random() * 60 - 30);
     var startY = device.height * (0.65 + Math.random() * 0.1);
@@ -91,6 +101,8 @@ var antiDetect = {
    * @param {number} baseInterval - 基础间隔（毫秒）
    * @returns {number} 波动后的间隔
    */
+  // 入参：baseInterval 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 varyRhythm 对应业务流程的处理结果。
   varyRhythm: function (baseInterval) {
     var variation = baseInterval * settings.rhythmVariation;
     var offset = (Math.random() - 0.5) * 2 * variation;
@@ -101,6 +113,8 @@ var antiDetect = {
    * 检查当前是否在活跃时间窗口内
    * @returns {boolean}
    */
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 isActiveHour 对应业务流程的处理结果。
   isActiveHour: function () {
     var hour = new Date().getHours();
     var hours = settings.activeHours;
@@ -113,6 +127,8 @@ var antiDetect = {
    * 高峰时段延迟短、低谷时段延迟长
    * @returns {number} 倍率 (0.5 ~ 2.0)
    */
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 getTimeMultiplier 对应业务流程的处理结果。
   getTimeMultiplier: function () {
     var hour = new Date().getHours();
     var hours = settings.activeHours;
@@ -137,6 +153,8 @@ var antiDetect = {
    * @param {number} endY
    */
   // 设备业务函数：处理 humanSwipeEnhanced 对应的抖音自动化动作、状态或安全边界。
+  // 入参：startX、startY、endX、endY 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 humanSwipeEnhanced 对应业务流程的处理结果。
   humanSwipeEnhanced: function (startX, startY, endX, endY) {
     // 添加起点微抖动（手指按下时不完全静止）
     var jitterX = Math.floor(Math.random() * 6 - 3);
@@ -170,6 +188,8 @@ var antiDetect = {
    * @param {number} radius - 偏移半径（像素），默认 10
    * @returns {{x: number, y: number}}
    */
+  // 入参：centerX、centerY、radius 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 randomClickOffset 对应业务流程的处理结果。
   randomClickOffset: function (centerX, centerY, radius) {
     radius = radius || 10;
     var angle = Math.random() * Math.PI * 2;
@@ -184,6 +204,8 @@ var antiDetect = {
    * 从服务端配置更新反检测参数
    * @param {Object} serverConfig - 服务端下发的反检测配置
    */
+  // 入参：serverConfig 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 updateFromServer 对应业务流程的处理结果。
   updateFromServer: function (serverConfig) {
     if (!serverConfig) return;
 
@@ -204,6 +226,8 @@ var antiDetect = {
    * @param {Function} actionFn - 实际操作函数
    * @returns {*} 操作返回值
    */
+  // 入参：actionName、actionFn 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 wrapAction 对应业务流程的处理结果。
   wrapAction: function (actionName, actionFn) {
     var timeMultiplier = this.getTimeMultiplier();
     this.randomDelay(actionName);

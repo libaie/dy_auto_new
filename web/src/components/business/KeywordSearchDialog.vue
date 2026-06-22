@@ -72,6 +72,8 @@ const keywordProcessingCountMeta = computed(() => {
 })
 
 // 前端业务函数：协调 validateKeywordProcessingCount 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 validateKeywordProcessingCount 对应业务流程的处理结果。
 function validateKeywordProcessingCount() {
   if (keywordActionType.value === 'search_dm' && (keywordProcessingCount.value < 1 || keywordProcessingCount.value > 50)) {
     keywordError.value = '搜索私信数量需在 1-50 之间'
@@ -81,6 +83,8 @@ function validateKeywordProcessingCount() {
 }
 
 // 前端业务函数：协调 resetForm 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 resetForm 对应业务流程的处理结果。
 function resetForm() {
   keywordSeed.value = ''
   keywordList.value = []
@@ -117,6 +121,8 @@ watch(keywordActionType, (newType) => {
 })
 
 // 前端业务函数：协调 handleGenerateKeywords 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleGenerateKeywords 对应业务流程的处理结果。
 async function handleGenerateKeywords() {
   if (!keywordSeed.value.trim()) { keywordError.value = '请输入种子关键词'; return }
   keywordGenerating.value = true
@@ -136,9 +142,13 @@ async function handleGenerateKeywords() {
 }
 
 // 前端业务函数：协调 removeKeyword 对应的页面流程、接口调用或状态转换。
+// 入参：idx 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 removeKeyword 对应业务流程的处理结果。
 function removeKeyword(idx) { keywordList.value.splice(idx, 1) }
 
 // 前端业务函数：协调 handleBatchCreateKeywordTasks 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleBatchCreateKeywordTasks 对应业务流程的处理结果。
 async function handleBatchCreateKeywordTasks() {
   if (keywordList.value.length === 0) { keywordError.value = '请先生成关键词'; return }
   if (keywordSelectionMode.value === 'single' && !keywordSingleAccountId.value) { keywordError.value = '请选择账号'; return }

@@ -26,6 +26,8 @@ var taskExecutor = {
    * 标记当前任务为已取消
    * @param {string} taskId
    */
+  // 入参：taskId 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 cancel 对应业务流程的处理结果。
   cancel: function (taskId) {
     if (this._currentTaskId === taskId) {
       this._cancelled = true;
@@ -36,6 +38,8 @@ var taskExecutor = {
   /**
    * 当前任务是否已被取消
    */
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 isCancelled 对应业务流程的处理结果。
   isCancelled: function () {
     return this._cancelled;
   },
@@ -43,6 +47,8 @@ var taskExecutor = {
   /**
    * 获取当前 task_id（供 apiClient 上报使用）
    */
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 getCurrentTaskId 对应业务流程的处理结果。
   getCurrentTaskId: function () {
     return this._currentTaskId;
   },
@@ -50,6 +56,8 @@ var taskExecutor = {
   /**
    * 获取当前 lease_id（供 apiClient 上报使用）
    */
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 getCurrentLeaseId 对应业务流程的处理结果。
   getCurrentLeaseId: function () {
     return this._currentLeaseId;
   },
@@ -57,6 +65,8 @@ var taskExecutor = {
   /**
    * 获取下一个幂等操作序号（供 stats 上报使用）
    */
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 getNextOpIndex 对应业务流程的处理结果。
   getNextOpIndex: function () {
     return this._nextOpIndex++;
   },
@@ -64,11 +74,15 @@ var taskExecutor = {
   /**
    * 获取当前 account_id（供 stats 上报使用）
    */
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 getCurrentAccountId 对应业务流程的处理结果。
   getCurrentAccountId: function () {
     return this._currentAccountId;
   },
 
   // 设备业务函数：处理 execute 对应的抖音自动化动作、状态或安全边界。
+  // 入参：task 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 execute 对应业务流程的处理结果。
   execute: function (task) {
     logger.info(TAG, "执行任务: " + task.id + " 类型=" + task.type);
 
@@ -148,6 +162,8 @@ var taskExecutor = {
    * @param {string} type
    * @param {Object} handler
    */
+  // 入参：type、handler 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 registerHandler 对应业务流程的处理结果。
   registerHandler: function (type, handler) {
     handlers[type] = handler;
   },

@@ -27,7 +27,11 @@ def list_comments(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 list_comments 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 list_comments 对应的业务流程、校验或数据转换。
+
+    入参：keyword、account_id、search、task_id、skip、limit、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return read_models.list_comments(
         db=db,
         user=user,
@@ -56,7 +60,11 @@ def list_users(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 list_users 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 list_users 对应的业务流程、校验或数据转换。
+
+    入参：keyword、account_id、search、task_id、is_private、date_from、date_to、sort_by、sort_order、skip、limit、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return read_models.list_users(
         db=db,
         user=user,
@@ -86,7 +94,11 @@ def list_conversations(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 list_conversations 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 list_conversations 对应的业务流程、校验或数据转换。
+
+    入参：account_id、stage、status、search、task_id、skip、limit、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return read_models.list_conversations(
         db=db,
         user=user,
@@ -106,7 +118,11 @@ def get_conversation(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 get_conversation 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 get_conversation 对应的业务流程、校验或数据转换。
+
+    入参：conversation_id、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return read_models.get_conversation(
         db=db,
         user=user,
@@ -125,7 +141,11 @@ def export_comments(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 export_comments 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 export_comments 对应的业务流程、校验或数据转换。
+
+    入参：keyword、account_id、search、task_id、date_from、date_to、skip、limit、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return read_models.export_comments(
         db=db,
         user=user,
@@ -156,7 +176,11 @@ def export_users(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 export_users 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 export_users 对应的业务流程、校验或数据转换。
+
+    入参：keyword、account_id、search、task_id、is_private、date_from、date_to、sort_by、sort_order、skip、limit、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return read_models.export_users(
         db=db,
         user=user,
@@ -188,7 +212,11 @@ def export_conversations(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 export_conversations 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 export_conversations 对应的业务流程、校验或数据转换。
+
+    入参：account_id、stage、status、search、task_id、date_from、date_to、skip、limit、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return read_models.export_conversations(
         db=db,
         user=user,

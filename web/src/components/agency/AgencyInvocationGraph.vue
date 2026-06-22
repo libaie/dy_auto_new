@@ -122,16 +122,22 @@ const expertNames = computed(() => Object.fromEntries(
 ))
 
 // 前端业务函数：协调 stageLabel 对应的页面流程、接口调用或状态转换。
+// 入参：stage 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 stageLabel 对应业务流程的处理结果。
 function stageLabel(stage) {
   return phaseLabel(stage.stage, stage.label)
 }
 
 // 前端业务函数：协调 expertName 对应的页面流程、接口调用或状态转换。
+// 入参：id 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 expertName 对应业务流程的处理结果。
 function expertName(id) {
   return knownExpertName(id, expertNames.value[id])
 }
 
 // 前端业务函数：协调 normalizeIds 对应的页面流程、接口调用或状态转换。
+// 入参：value 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 normalizeIds 对应业务流程的处理结果。
 function normalizeIds(value) {
   if (!value) return []
   if (Array.isArray(value)) return value.flatMap(normalizeIds)
@@ -140,21 +146,29 @@ function normalizeIds(value) {
 }
 
 // 前端业务函数：协调 isCurrentId 对应的页面流程、接口调用或状态转换。
+// 入参：id 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 isCurrentId 对应业务流程的处理结果。
 function isCurrentId(id) {
   return Boolean(id && isCurrentExpert(id) && !isLegacyExpert(id))
 }
 
 // 前端业务函数：协调 currentIds 对应的页面流程、接口调用或状态转换。
+// 入参：value 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 currentIds 对应业务流程的处理结果。
 function currentIds(value) {
   return normalizeIds(value).filter(isCurrentId)
 }
 
 // 前端业务函数：协调 stageInvocations 对应的页面流程、接口调用或状态转换。
+// 入参：stage 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 stageInvocations 对应业务流程的处理结果。
 function stageInvocations(stage) {
   return props.invocations.filter(item => item.stage === stage.stage && isCurrentId(item.expert_id))
 }
 
 // 前端业务函数：协调 invocationCount 对应的页面流程、接口调用或状态转换。
+// 入参：stage 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 invocationCount 对应业务流程的处理结果。
 function invocationCount(stage) {
   const count = stageInvocations(stage).length
   return count ? `${count} 条调用记录` : '未记录调用'

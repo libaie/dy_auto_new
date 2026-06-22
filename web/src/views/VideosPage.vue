@@ -28,12 +28,16 @@ const showDeleteConfirm = ref(false)
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize)))
 
 // 前端业务函数：协调 wsUrl 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 wsUrl 对应业务流程的处理结果。
 function wsUrl() {
   const token = localStorage.getItem('token') || ''
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
   return `${protocol}//${location.host}/api/devices/ws/pair-events?token=${encodeURIComponent(token)}`
 }
 const { connect: wsConnect } = useWebSocket(wsUrl, {
+  // 入参：msg 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 onMessage 对应业务流程的处理结果。
   onMessage(msg) {
     if (msg.event === 'task_updated' || msg.event === 'tasks_changed') {
       fetchData()
@@ -42,6 +46,8 @@ const { connect: wsConnect } = useWebSocket(wsUrl, {
 })
 
 // 前端业务函数：协调 fetchData 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 fetchData 对应业务流程的处理结果。
 async function fetchData() {
   loading.value = true
   try {
@@ -59,36 +65,48 @@ async function fetchData() {
 }
 
 // 前端业务函数：协调 handleSearch 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleSearch 对应业务流程的处理结果。
 function handleSearch() {
   page.value = 1
   fetchData()
 }
 
 // 前端业务函数：协调 goPage 对应的页面流程、接口调用或状态转换。
+// 入参：p 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 goPage 对应业务流程的处理结果。
 function goPage(p) {
   page.value = p
   fetchData()
 }
 
 // 前端业务函数：协调 openPreview 对应的页面流程、接口调用或状态转换。
+// 入参：video 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 openPreview 对应业务流程的处理结果。
 function openPreview(video) {
   previewVideo.value = video
   showPreview.value = true
 }
 
 // 前端业务函数：协调 closePreview 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 closePreview 对应业务流程的处理结果。
 function closePreview() {
   showPreview.value = false
   previewVideo.value = null
 }
 
 // 前端业务函数：协调 confirmDelete 对应的页面流程、接口调用或状态转换。
+// 入参：video 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 confirmDelete 对应业务流程的处理结果。
 function confirmDelete(video) {
   deleteTarget.value = video
   showDeleteConfirm.value = true
 }
 
 // 前端业务函数：协调 handleDelete 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleDelete 对应业务流程的处理结果。
 async function handleDelete() {
   if (!deleteTarget.value) return
   try {
@@ -102,17 +120,23 @@ async function handleDelete() {
   }
 }
 
+// 入参：status 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 statusVariant 对应业务流程的处理结果。
 function statusVariant(status) {
   const map = { completed: 'success', failed: 'danger', processing: 'warning', pending: 'info' }
   return map[status] || 'info'
 }
 
 // 前端业务函数：协调 statusLabel 对应的页面流程、接口调用或状态转换。
+// 入参：status 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 statusLabel 对应业务流程的处理结果。
 function statusLabel(status) {
   const map = { completed: '已完成', failed: '失败', processing: '生成中', pending: '待处理' }
   return map[status] || status
 }
 
+// 入参：seconds 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 formatDuration 对应业务流程的处理结果。
 function formatDuration(seconds) {
   if (!seconds) return '-'
   const m = Math.floor(seconds / 60)

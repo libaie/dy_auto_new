@@ -50,15 +50,21 @@ const conversationHistoryIncomplete = ref(false)
 const conversationFailedCount = computed(() => conversationMessages.value.filter(m => m.status === 'failed').length)
 
 // 前端业务函数：协调 messageStatusLabel 对应的页面流程、接口调用或状态转换。
+// 入参：status 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 messageStatusLabel 对应业务流程的处理结果。
 function messageStatusLabel(status) {
   return status === 'failed' ? '失败' : '已发送'
 }
 
+// 入参：status 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 messageStatusClass 对应业务流程的处理结果。
 function messageStatusClass(status) {
   return status === 'failed' ? 'bg-rose-500/15 text-rose-300' : 'bg-emerald-500/15 text-emerald-300'
 }
 
 // 前端业务函数：协调 openConversationDetail 对应的页面流程、接口调用或状态转换。
+// 入参：conv 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 openConversationDetail 对应业务流程的处理结果。
 async function openConversationDetail(conv) {
   selectedConversation.value = conv
   conversationMessages.value = []
@@ -79,6 +85,8 @@ async function openConversationDetail(conv) {
 }
 
 // 前端业务函数：协调 closeConversationDetail 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 closeConversationDetail 对应业务流程的处理结果。
 function closeConversationDetail() {
   conversationDetailOpen.value = false
 }
@@ -93,6 +101,8 @@ watch(() => route.query.task_id, (val) => {
 })
 
 // 前端业务函数：协调 switchTab 对应的页面流程、接口调用或状态转换。
+// 入参：key 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 switchTab 对应业务流程的处理结果。
 function switchTab(key) {
   activeTab.value = key
   page.value = 1
@@ -102,6 +112,8 @@ function switchTab(key) {
 }
 
 // 前端业务函数：协调 wsUrl 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 wsUrl 对应业务流程的处理结果。
 function wsUrl() {
   const token = localStorage.getItem('token') || ''
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
@@ -109,6 +121,8 @@ function wsUrl() {
 }
 const VALID_WS_TYPES = ['comments', 'users', 'conversations']
 const { connect: wsConnect } = useWebSocket(wsUrl, {
+  // 入参：msg 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 onMessage 对应业务流程的处理结果。
   onMessage(msg) {
     if (msg.event === 'data_changed' && VALID_WS_TYPES.includes(msg.type)) {
       newDataBadge.value[msg.type] = (newDataBadge.value[msg.type] || 0) + 1
@@ -117,6 +131,8 @@ const { connect: wsConnect } = useWebSocket(wsUrl, {
 })
 
 // 前端业务函数：协调 fetchData 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 fetchData 对应业务流程的处理结果。
 async function fetchData() {
   loading.value = true
   try {
@@ -140,11 +156,17 @@ async function fetchData() {
 }
 
 // 前端业务函数：协调 handlePageChange 对应的页面流程、接口调用或状态转换。
+// 入参：p 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handlePageChange 对应业务流程的处理结果。
 function handlePageChange(p) { page.value = p; fetchData() }
 // 前端业务函数：协调 handleSearch 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleSearch 对应业务流程的处理结果。
 function handleSearch() { page.value = 1; fetchData() }
 
 // 前端业务函数：协调 buildDataParams 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 buildDataParams 对应业务流程的处理结果。
 function buildDataParams({ includePagination = false } = {}) {
   const params = {}
   if (includePagination) {
@@ -174,6 +196,8 @@ function buildDataParams({ includePagination = false } = {}) {
 
 const exporting = ref(false)
 // 前端业务函数：协调 doExport 对应的页面流程、接口调用或状态转换。
+// 入参：all 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 doExport 对应业务流程的处理结果。
 async function doExport(all) {
   exporting.value = true
   try {
@@ -214,6 +238,8 @@ const avatarGradients = [
   'linear-gradient(135deg, #f43f5e, #a855f7)',
 ]
 // 前端业务函数：协调 avatarGradient 对应的页面流程、接口调用或状态转换。
+// 入参：name 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 avatarGradient 对应业务流程的处理结果。
 function avatarGradient(name) {
   if (!name) return avatarGradients[0]
   let hash = 0
@@ -221,6 +247,8 @@ function avatarGradient(name) {
   return avatarGradients[Math.abs(hash) % avatarGradients.length]
 }
 
+// 入参：s 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 stageBadgeClass 对应业务流程的处理结果。
 const stageBadgeClass = (s) => ({
   qualifying: 'bg-blue-500/20 text-blue-300',
   nurturing: 'bg-emerald-500/20 text-emerald-300',
@@ -228,6 +256,8 @@ const stageBadgeClass = (s) => ({
   follow_up: 'bg-purple-500/20 text-purple-300',
 }[s] || 'bg-slate-500/20 text-slate-300')
 
+// 入参：s 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 stageLabel 对应业务流程的处理结果。
 const stageLabel = (s) => ({
   qualifying: '触达', nurturing: '培育', converting: '转化', follow_up: '跟进',
 }[s] || s)

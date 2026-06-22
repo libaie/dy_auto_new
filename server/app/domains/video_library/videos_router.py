@@ -20,7 +20,10 @@ router = APIRouter(prefix="/api/videos", tags=["videos"])
 
 
 class VideoResponse(BaseModel):
-    """业务类：承载 VideoResponse 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 VideoResponse 相关的数据结构、状态或业务协作。
+
+    类参数：created_at、duration、error、id、keyword、model_config、pixelle_task_id、status、task_id、title、video_path 承载该类的业务配置、状态或数据字段。
+    """
     id: str
     task_id: Optional[str] = None
     keyword: str
@@ -36,7 +39,10 @@ class VideoResponse(BaseModel):
 
 
 class VideoListResponse(BaseModel):
-    """业务类：承载 VideoListResponse 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 VideoListResponse 相关的数据结构、状态或业务协作。
+
+    类参数：items、total 承载该类的业务配置、状态或数据字段。
+    """
     items: list[VideoResponse]
     total: int
 
@@ -50,7 +56,11 @@ def list_videos(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 list_videos 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 list_videos 对应的业务流程、校验或数据转换。
+
+    入参：keyword、status、skip、limit、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     limit = min(limit, 100)
     query = db.query(GeneratedVideo)
     if keyword:
@@ -69,7 +79,11 @@ def get_video(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 get_video 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 get_video 对应的业务流程、校验或数据转换。
+
+    入参：video_id、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     video = db.query(GeneratedVideo).filter(GeneratedVideo.id == video_id).first()
     if not video:
         raise HTTPException(status_code=404, detail="视频不存在")
@@ -84,7 +98,11 @@ def download_video(
     db: Session = Depends(get_db),
 ):
     # Browser-native elements (<video>, <a>) can't set headers — accept query token as fallback
-    """业务函数：处理 download_video 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 download_video 对应的业务流程、校验或数据转换。
+
+    入参：video_id、token、authorization、db 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     username = None
     if authorization and authorization.startswith("Bearer "):
         try:
@@ -117,7 +135,11 @@ def delete_video(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 delete_video 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 delete_video 对应的业务流程、校验或数据转换。
+
+    入参：video_id、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     video = db.query(GeneratedVideo).filter(GeneratedVideo.id == video_id).first()
     if not video:
         raise HTTPException(status_code=404, detail="视频不存在")

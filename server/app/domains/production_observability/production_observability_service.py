@@ -29,12 +29,20 @@ SECRET_KEYS = {
 
 
 def _normalize_key(key: str) -> str:
-    """业务函数：处理 _normalize_key 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _normalize_key 对应的业务流程、校验或数据转换。
+
+    入参：key 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return re.sub(r"[^a-z0-9]", "", key.lower())
 
 
 def _redact(value: Any) -> Any:
-    """业务函数：处理 _redact 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _redact 对应的业务流程、校验或数据转换。
+
+    入参：value 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if isinstance(value, dict):
         return {
             key: "[REDACTED]"
@@ -58,7 +66,11 @@ def record_production_event(
     provider_task_id: str | None = None,
     payload: dict | None = None,
 ) -> ProductionAuditEvent:
-    """业务函数：处理 record_production_event 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 record_production_event 对应的业务流程、校验或数据转换。
+
+    入参：db、event_type、run_id、production_plan_id、production_episode_id、production_segment_id、provider_task_id、payload 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     event = ProductionAuditEvent(
         event_type=event_type,
         run_id=run_id,

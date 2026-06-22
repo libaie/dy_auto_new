@@ -10,6 +10,8 @@ import { useToastStore } from '../stores/toast.js'
 Chart.register(...registerables)
 
 // 前端业务函数：协调 formatDate 对应的页面流程、接口调用或状态转换。
+// 入参：d 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 formatDate 对应业务流程的处理结果。
 function formatDate(d) {
   const yyyy = d.getFullYear()
   const mm = String(d.getMonth() + 1).padStart(2, '0')
@@ -73,6 +75,8 @@ const overallLimit = computed(() => {
 })
 
 // 前端业务函数：协调 pct 对应的页面流程、接口调用或状态转换。
+// 入参：used、limit 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 pct 对应业务流程的处理结果。
 function pct(used, limit) {
   // -1 = unlimited → 100% as long as something was done
   if (limit === -1) return used > 0 ? 100 : 0
@@ -81,6 +85,8 @@ function pct(used, limit) {
 }
 
 // 前端业务函数：协调 pctColor 对应的页面流程、接口调用或状态转换。
+// 入参：pct 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 pctColor 对应业务流程的处理结果。
 function pctColor(pct) {
   if (pct >= 90) return '#f87171'
   if (pct >= 70) return '#fbbf24'
@@ -89,6 +95,8 @@ function pctColor(pct) {
 }
 
 // 前端业务函数：协调 ringDash 对应的页面流程、接口调用或状态转换。
+// 入参：val、r 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 ringDash 对应业务流程的处理结果。
 function ringDash(val, r) {
   const circ = 2 * Math.PI * r
   const filled = (val / 100) * circ
@@ -96,6 +104,8 @@ function ringDash(val, r) {
 }
 
 // 前端业务函数：协调 buildCharts 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 buildCharts 对应业务流程的处理结果。
 function buildCharts() {
   const accounts = statsData.value?.accounts
   if (!accounts || accounts.length === 0) return
@@ -199,6 +209,8 @@ watch(() => statsData.value, () => {
 })
 
 // 前端业务函数：协调 fetchStats 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 fetchStats 对应业务流程的处理结果。
 async function fetchStats() {
   loading.value = true
   try {

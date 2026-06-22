@@ -10,6 +10,8 @@ const COMPLETED_STATUSES = new Set(['completed', 'succeeded', 'success', 'done']
 const FAILED_STATUSES = new Set(['failed', 'error'])
 
 // 前端业务函数：协调 uploadResponsePath 对应的页面流程、接口调用或状态转换。
+// 入参：data 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 uploadResponsePath 对应业务流程的处理结果。
 function uploadResponsePath(data) {
   const payload = data?.data && typeof data.data === 'object' ? data.data : data
   if (!payload || typeof payload !== 'object') return ''
@@ -22,6 +24,8 @@ function uploadResponsePath(data) {
 }
 
 // 前端业务函数：协调 uploadPixelleFile 对应的页面流程、接口调用或状态转换。
+// 入参：file 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 uploadPixelleFile 对应业务流程的处理结果。
 export async function uploadPixelleFile(file) {
   const formData = new FormData()
   formData.append('file', file)
@@ -31,6 +35,8 @@ export async function uploadPixelleFile(file) {
   return path
 }
 
+// 入参：files 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 uploadPixelleFiles 对应业务流程的处理结果。
 export async function uploadPixelleFiles(files) {
   const results = []
   for (const file of Array.from(files || [])) {
@@ -40,6 +46,8 @@ export async function uploadPixelleFiles(files) {
 }
 
 // 前端业务函数：协调 videoUrlFromTask 对应的页面流程、接口调用或状态转换。
+// 入参：data 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 videoUrlFromTask 对应业务流程的处理结果。
 function videoUrlFromTask(data) {
   const direct = data.video_url || data.url
   if (direct) return String(direct)
@@ -48,6 +56,8 @@ function videoUrlFromTask(data) {
 }
 
 // 前端业务函数：协调 taskResult 对应的页面流程、接口调用或状态转换。
+// 入参：taskId、data 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 taskResult 对应业务流程的处理结果。
 function taskResult(taskId, data) {
   const videoPath = data.video_path || data.final_video_path || data.file_path || data.video_url || data.url || ''
   return {
@@ -62,6 +72,8 @@ function taskResult(taskId, data) {
 }
 
 // 前端业务函数：协调 runPixelleVideoGeneration 对应的页面流程、接口调用或状态转换。
+// 入参：payload 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 runPixelleVideoGeneration 对应业务流程的处理结果。
 export async function runPixelleVideoGeneration(payload, options = {}) {
   const {
     intervalMs = 5000,

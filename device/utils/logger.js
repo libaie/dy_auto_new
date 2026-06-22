@@ -10,6 +10,8 @@ var logger = {
   _maxHistory: 200,   // 最大历史条数
   _listeners: [],     // 日志更新监听器
 
+  // 入参：level、tag、msg 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _log 对应业务流程的处理结果。
   _log: function (level, tag, msg) {
     if (LOG_LEVELS[level] >= this._level) {
       var now = new Date();
@@ -47,12 +49,20 @@ var logger = {
   },
 
   // 设备业务函数：处理 debug 对应的抖音自动化动作、状态或安全边界。
+  // 入参：tag、msg 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 debug 对应业务流程的处理结果。
   debug: function (tag, msg) { this._log("debug", tag, msg); },
   // 设备业务函数：处理 info 对应的抖音自动化动作、状态或安全边界。
+  // 入参：tag、msg 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 info 对应业务流程的处理结果。
   info: function (tag, msg) { this._log("info", tag, msg); },
   // 设备业务函数：处理 warn 对应的抖音自动化动作、状态或安全边界。
+  // 入参：tag、msg 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 warn 对应业务流程的处理结果。
   warn: function (tag, msg) { this._log("warn", tag, msg); },
   // 设备业务函数：处理 error 对应的抖音自动化动作、状态或安全边界。
+  // 入参：tag、msg 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 error 对应业务流程的处理结果。
   error: function (tag, msg) { this._log("error", tag, msg); },
 
   /**
@@ -60,6 +70,8 @@ var logger = {
    * @param {number} count - 获取最近 N 条
    * @returns {Array}
    */
+  // 入参：count 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 getHistory 对应业务流程的处理结果。
   getHistory: function (count) {
     count = count || 50;
     return this._history.slice(-count);
@@ -69,6 +81,8 @@ var logger = {
    * 添加日志监听器
    * @param {Function} callback - function(level, tag, msg)
    */
+  // 入参：callback 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 addListener 对应业务流程的处理结果。
   addListener: function (callback) {
     this._listeners.push(callback);
   },
@@ -77,6 +91,8 @@ var logger = {
    * 移除日志监听器
    * @param {Function} callback
    */
+  // 入参：callback 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 removeListener 对应业务流程的处理结果。
   removeListener: function (callback) {
     var idx = this._listeners.indexOf(callback);
     if (idx !== -1) {
@@ -87,6 +103,8 @@ var logger = {
   /**
    * 清空日志历史
    */
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 clearHistory 对应业务流程的处理结果。
   clearHistory: function () {
     this._history = [];
   },

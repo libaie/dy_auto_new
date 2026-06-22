@@ -24,6 +24,8 @@ var SearchBaseHandler = Object.create(BaseHandler);
  *   - sort_by: string (可选，排序方式: "latest"|"most_liked")
  * @returns {Object} { success, result, error }
  */
+// 入参：params 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 SearchBaseHandler.execute 对应业务流程的处理结果。
 SearchBaseHandler.execute = function (params) {
   this._params = params;
   var keyword = params.keyword;
@@ -42,6 +44,8 @@ SearchBaseHandler.execute = function (params) {
 
   var taskId = params.task_id || "";
   var apiClient = require("../core/api-client");
+  // 入参：step、detail、prog 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _reportProgress 对应业务流程的处理结果。
   function _reportProgress(step, detail, prog) {
     if (taskId) { try { apiClient.reportProgress(taskId, step, detail, prog); } catch (e) {} }
   }
@@ -152,6 +156,8 @@ SearchBaseHandler.execute = function (params) {
  * 打开搜索页
  * 先尝试直接点击搜索入口，失败则 back() 后重试
  */
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 SearchBaseHandler._openSearch 对应业务流程的处理结果。
 SearchBaseHandler._openSearch = function () {
   // 0. 确保抖音在前台——设备重启或 crash 恢复后抖音可能不在前台
   if (!uiOperator.openApp()) {
@@ -206,6 +212,8 @@ SearchBaseHandler._openSearch = function () {
  * 在搜索框输入关键词
  * 使用 setText 直接设置（测试验证可用）
  */
+// 入参：keyword 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 SearchBaseHandler._inputKeyword 对应业务流程的处理结果。
 SearchBaseHandler._inputKeyword = function (keyword) {
   // 确认在搜索页
   if (!uiOperator.isOnPage("is_search_view")) {
@@ -235,6 +243,8 @@ SearchBaseHandler._inputKeyword = function (keyword) {
 /**
  * 点击联想词 — RecyclerView 内遍历匹配关键词
  */
+// 入参：keyword 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 SearchBaseHandler._clickSuggestion 对应业务流程的处理结果。
 SearchBaseHandler._clickSuggestion = function (keyword) {
   // RecyclerView 遍历匹配联想词
   var rv = id("recycler_view").findOne(2000);
@@ -269,6 +279,8 @@ SearchBaseHandler._clickSuggestion = function (keyword) {
  * 等待搜索动作真正进入结果页。
  * 抖音点击联想词/搜索按钮后有时不会跳转，必须显式校验，避免后续流程误判为“已无结果”而直接跳过。
  */
+// 入参：keyword、timeoutMs 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 SearchBaseHandler._waitForSearchResults 对应业务流程的处理结果。
 SearchBaseHandler._waitForSearchResults = function (keyword, timeoutMs) {
   timeoutMs = timeoutMs || 10000;
   var intervalMs = 500;
@@ -304,6 +316,8 @@ SearchBaseHandler._waitForSearchResults = function (keyword, timeoutMs) {
  * 点击"视频" tab
  * 优先使用选择器系统，回退到硬编码
  */
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 SearchBaseHandler._clickVideoTab 对应业务流程的处理结果。
 SearchBaseHandler._clickVideoTab = function () {
   var clicked = this.safeClick("search_video_tab", 2);
   if (clicked) {
@@ -319,6 +333,8 @@ SearchBaseHandler._clickVideoTab = function () {
  * 使用选择器系统（支持 text 和 image 策略）
  * @param {string} sortBy - "latest" 或 "most_liked"
  */
+// 入参：sortBy 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 SearchBaseHandler._sortResults 对应业务流程的处理结果。
 SearchBaseHandler._sortResults = function (sortBy) {
   var actionMap = {
     "latest": "sort_latest",
@@ -455,6 +471,8 @@ SearchBaseHandler._sortResults = function (sortBy) {
  * @param {string} sortBy - "latest" 或 "most_liked"
  * @returns {boolean}
  */
+// 入参：keyword、sortBy 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 SearchBaseHandler.searchSortAndOpenFirstResult 对应业务流程的处理结果。
 SearchBaseHandler.searchSortAndOpenFirstResult = function (keyword, sortBy) {
   if (!this._openSearch()) return false;
   if (!this._inputKeyword(keyword)) return false;
@@ -478,6 +496,8 @@ SearchBaseHandler.searchSortAndOpenFirstResult = function (keyword, sortBy) {
 /**
  * 点击搜索按钮（备用）
  */
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 SearchBaseHandler._submitSearch 对应业务流程的处理结果。
 SearchBaseHandler._submitSearch = function () {
   return this.safeClick("search_button", 3);
 };
@@ -486,11 +506,15 @@ SearchBaseHandler._submitSearch = function () {
  * 点击第 index 个搜索结果
  * 通过选择器系统查找视频列表容器，再点击子项
  */
+// 入参：index 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 SearchBaseHandler._clickSearchResult 对应业务流程的处理结果。
 SearchBaseHandler._clickSearchResult = function (index) {
   var screenW = device.width;
   var screenH = device.height;
 
   // 设备业务函数：处理 isVisible 对应的抖音自动化动作、状态或安全边界。
+  // 入参：el 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 isVisible 对应业务流程的处理结果。
   function isVisible(el) {
     if (!el) return false;
     if (el.isCoordinate || el.isImage || el.isPress) {
@@ -507,6 +531,8 @@ SearchBaseHandler._clickSearchResult = function (index) {
   }
 
   // 设备业务函数：处理 tryClick 对应的抖音自动化动作、状态或安全边界。
+  // 入参：el 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 tryClick 对应业务流程的处理结果。
   function tryClick(el) {
     if (!el) return false;
     if (el.isCoordinate || el.isImage || el.isPress || el.isPackage) return uiOperator.clickElement(el);
@@ -520,6 +546,8 @@ SearchBaseHandler._clickSearchResult = function (index) {
   }
 
   // 设备业务函数：处理 findRecyclerView 对应的抖音自动化动作、状态或安全边界。
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 findRecyclerView 对应业务流程的处理结果。
   function findRecyclerView() {
     var rv = id("recycler_view").findOne(500);
     if (rv) return rv;
@@ -579,6 +607,8 @@ SearchBaseHandler._clickSearchResult = function (index) {
 /**
  * 返回上一页
  */
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 SearchBaseHandler._goBack 对应业务流程的处理结果。
 SearchBaseHandler._goBack = function () {
   back();
   sleep(1000);
@@ -596,6 +626,8 @@ SearchBaseHandler._goBack = function () {
  *
  * @returns {boolean} 是否成功回到搜索列表页
  */
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 SearchBaseHandler._backToSearchResults 对应业务流程的处理结果。
 SearchBaseHandler._backToSearchResults = function () {
   var maxBacks = 5;
   for (var i = 0; i < maxBacks; i++) {
@@ -618,6 +650,8 @@ SearchBaseHandler._backToSearchResults = function () {
 /**
  * 搜索关键词并打开第一个结果视频
  */
+// 入参：keyword 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 SearchBaseHandler.searchAndOpenFirstResult 对应业务流程的处理结果。
 SearchBaseHandler.searchAndOpenFirstResult = function (keyword) {
   if (!this._openSearch()) return false;
   if (!this._inputKeyword(keyword)) return false;
@@ -638,6 +672,8 @@ SearchBaseHandler.searchAndOpenFirstResult = function (keyword) {
  * @param {Object} stats - 统计对象
  * @returns {boolean} 是否成功
  */
+// 入参：content、stats 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 SearchBaseHandler._interactWithVideo 对应业务流程的处理结果。
 SearchBaseHandler._interactWithVideo = function (content, stats) {
   throw new Error("_interactWithVideo() not implemented");
 };
@@ -648,6 +684,8 @@ SearchBaseHandler._interactWithVideo = function (content, stats) {
  * 获取缓存目录 — 兼容 Android 10+ scoped storage
  * 复用 api-client.js 的路径策略: 优先 getExternalFilesDir, 回退 /sdcard/
  */
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 SearchBaseHandler._getCacheDir 对应业务流程的处理结果。
 SearchBaseHandler._getCacheDir = function () {
   var dirs = this._getCacheDirCandidates();
   for (var i = 0; i < dirs.length; i++) {
@@ -657,9 +695,13 @@ SearchBaseHandler._getCacheDir = function () {
 };
 
 // 设备业务函数：处理 SearchBaseHandler._getCacheDirCandidates 对应的抖音自动化动作、状态或安全边界。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 SearchBaseHandler._getCacheDirCandidates 对应业务流程的处理结果。
 SearchBaseHandler._getCacheDirCandidates = function () {
   var dirs = [];
   // 设备业务函数：处理 add 对应的抖音自动化动作、状态或安全边界。
+  // 入参：dir 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 add 对应业务流程的处理结果。
   function add(dir) {
     if (dir && dirs.indexOf(dir) === -1) dirs.push(dir);
   }
@@ -676,6 +718,8 @@ SearchBaseHandler._getCacheDirCandidates = function () {
 };
 
 // 设备业务函数：处理 SearchBaseHandler._ensureCacheDir 对应的抖音自动化动作、状态或安全边界。
+// 入参：dir 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 SearchBaseHandler._ensureCacheDir 对应业务流程的处理结果。
 SearchBaseHandler._ensureCacheDir = function (dir) {
   try {
     var f = new java.io.File(String(dir));
@@ -687,6 +731,8 @@ SearchBaseHandler._ensureCacheDir = function (dir) {
   }
 };
 
+// 入参：key、defaultVal 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 SearchBaseHandler._storageGet 对应业务流程的处理结果。
 SearchBaseHandler._storageGet = function (key, defaultVal) {
   var dirs = this._getCacheDirCandidates();
   for (var i = 0; i < dirs.length; i++) {
@@ -705,6 +751,8 @@ SearchBaseHandler._storageGet = function (key, defaultVal) {
 };
 
 // 设备业务函数：处理 SearchBaseHandler._storageSet 对应的抖音自动化动作、状态或安全边界。
+// 入参：key、val 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 SearchBaseHandler._storageSet 对应业务流程的处理结果。
 SearchBaseHandler._storageSet = function (key, val) {
   var dirs = this._getCacheDirCandidates();
   var lastErr = "";
@@ -725,6 +773,8 @@ SearchBaseHandler._storageSet = function (key, val) {
 
 // ==== DM 序列发送方法 (search-dm / reply-comment 共用) ====
 
+// 入参：dmSequences 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 SearchBaseHandler.applyDMSequences 对应业务流程的处理结果。
 SearchBaseHandler.applyDMSequences = function (dmSequences) {
   var dmCache = {};
   var ids = [];
@@ -743,6 +793,8 @@ SearchBaseHandler.applyDMSequences = function (dmSequences) {
   return dmCache;
 };
 
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 SearchBaseHandler.syncDMSequences 对应业务流程的处理结果。
 SearchBaseHandler.syncDMSequences = function () {
   try {
     var apiClient = require("../core/api-client");
@@ -757,6 +809,8 @@ SearchBaseHandler.syncDMSequences = function () {
   return this._dmSeqCache || {};
 };
 
+// 入参：seqId 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 SearchBaseHandler._getDMCachedSequence 对应业务流程的处理结果。
 SearchBaseHandler._getDMCachedSequence = function (seqId) {
   return this._dmSeqCache && this._dmSeqCache[seqId];
 };
@@ -766,6 +820,8 @@ SearchBaseHandler._getDMCachedSequence = function (seqId) {
  * 优先级: dm_sequence_id(缓存+变体) > dm_messages(内联回退) > content > AI 生成
  * 支持变体轮替: cached.variants 存在时轮替选取，设备重启后从 KV 恢复索引
  */
+// 入参：params 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 SearchBaseHandler.resolveMessages 对应业务流程的处理结果。
 SearchBaseHandler.resolveMessages = function (params) {
   // 1. dm_sequence_id — 查 poll 缓存 (含 variants, 优先于内联 dm_messages)
   if (params.dm_sequence_id) {
@@ -824,6 +880,8 @@ SearchBaseHandler.resolveMessages = function (params) {
 /**
  * 变量替换 — 不存在的 key → 空字符串
  */
+// 入参：template、vars 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 SearchBaseHandler.applyVariables 对应业务流程的处理结果。
 SearchBaseHandler.applyVariables = function (template, vars) {
   return template.replace(/\{\{(\w+)\}\}/g, function (_, key) {
     return vars[key] || "";
@@ -833,6 +891,8 @@ SearchBaseHandler.applyVariables = function (template, vars) {
 /**
  * 发送消息序列通用循环（拟人输入 + 延迟）
  */
+// 入参：results 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 SearchBaseHandler._countSentDMResults 对应业务流程的处理结果。
 SearchBaseHandler._countSentDMResults = function (results) {
   var count = 0;
   if (!results) return count;
@@ -843,6 +903,8 @@ SearchBaseHandler._countSentDMResults = function (results) {
 };
 
 // 设备业务函数：处理 SearchBaseHandler._buildFallbackRecipientId 对应的抖音自动化动作、状态或安全边界。
+// 入参：nickname 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 SearchBaseHandler._buildFallbackRecipientId 对应业务流程的处理结果。
 SearchBaseHandler._buildFallbackRecipientId = function (nickname) {
   var value = nickname || "unknown";
   var hash = 0;
@@ -854,6 +916,8 @@ SearchBaseHandler._buildFallbackRecipientId = function (nickname) {
 };
 
 // 设备业务函数：处理 SearchBaseHandler._buildDMMessageKey 对应的抖音自动化动作、状态或安全边界。
+// 入参：conversationId、params、order 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 SearchBaseHandler._buildDMMessageKey 对应业务流程的处理结果。
 SearchBaseHandler._buildDMMessageKey = function (conversationId, params, order) {
   var taskId = (params && params.task_id) || conversationId || "task";
   var sequenceId = (params && params.dm_sequence_id) || "single";
@@ -861,6 +925,8 @@ SearchBaseHandler._buildDMMessageKey = function (conversationId, params, order) 
 };
 
 // 设备业务函数：处理 SearchBaseHandler._reportDMSendResults 对应的抖音自动化动作、状态或安全边界。
+// 入参：conversationId、results、params、stage、intent、keyword 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 SearchBaseHandler._reportDMSendResults 对应业务流程的处理结果。
 SearchBaseHandler._reportDMSendResults = function (conversationId, results, params, stage, intent, keyword) {
   if (!conversationId || !results || results.length === 0) return 0;
   var apiClient = require("../core/api-client");
@@ -892,6 +958,8 @@ SearchBaseHandler._reportDMSendResults = function (conversationId, results, para
 };
 
 // 设备业务函数：处理 SearchBaseHandler._buildDMFailureResults 对应的抖音自动化动作、状态或安全边界。
+// 入参：messages、keyword、errorMessage 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 SearchBaseHandler._buildDMFailureResults 对应业务流程的处理结果。
 SearchBaseHandler._buildDMFailureResults = function (messages, keyword, errorMessage) {
   var results = [];
   if (!messages) return results;
@@ -911,6 +979,8 @@ SearchBaseHandler._buildDMFailureResults = function (messages, keyword, errorMes
 };
 
 // 设备业务函数：处理 SearchBaseHandler._sendMessageSequence 对应的抖音自动化动作、状态或安全边界。
+// 入参：messages、stats、keyword 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 SearchBaseHandler._sendMessageSequence 对应业务流程的处理结果。
 SearchBaseHandler._sendMessageSequence = function (messages, stats, keyword) {
   var results = [];
   var antiDetect = require("../core/anti-detect");

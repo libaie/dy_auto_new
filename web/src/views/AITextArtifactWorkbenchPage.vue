@@ -111,16 +111,22 @@ const loading = ref(false)
 const error = ref('')
 
 // 前端业务函数：协调 formatJson 对应的页面流程、接口调用或状态转换。
+// 入参：value 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 formatJson 对应业务流程的处理结果。
 function formatJson(value) {
   return JSON.stringify(value || {}, null, 2)
 }
 
 // 前端业务函数：协调 shortId 对应的页面流程、接口调用或状态转换。
+// 入参：value 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 shortId 对应业务流程的处理结果。
 function shortId(value) {
   return String(value || '').slice(0, 8)
 }
 
 // 前端业务函数：协调 artifactEpisodeNumber 对应的页面流程、接口调用或状态转换。
+// 入参：artifact 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 artifactEpisodeNumber 对应业务流程的处理结果。
 function artifactEpisodeNumber(artifact) {
   const content = artifact?.content_json || {}
   const input = artifact?.input_json || {}
@@ -129,6 +135,8 @@ function artifactEpisodeNumber(artifact) {
 }
 
 // 前端业务函数：协调 artifactEpisodeTitle 对应的页面流程、接口调用或状态转换。
+// 入参：artifact 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 artifactEpisodeTitle 对应业务流程的处理结果。
 function artifactEpisodeTitle(artifact) {
   const content = artifact?.content_json || {}
   const input = artifact?.input_json || {}
@@ -136,6 +144,8 @@ function artifactEpisodeTitle(artifact) {
 }
 
 // 前端业务函数：协调 artifactTargetLabel 对应的页面流程、接口调用或状态转换。
+// 入参：artifact 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 artifactTargetLabel 对应业务流程的处理结果。
 function artifactTargetLabel(artifact) {
   if (!artifact) return ''
   if (artifact.target_type === 'episode' || artifact.episode_id) {
@@ -152,12 +162,16 @@ function artifactTargetLabel(artifact) {
   return ''
 }
 
+// 入参：artifact 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 artifactListTitle 对应业务流程的处理结果。
 function artifactListTitle(artifact) {
   const target = artifactTargetLabel(artifact)
   return target ? `${artifact.artifact_type} · ${target}` : artifact.artifact_type
 }
 
 // 前端业务函数：协调 selectArtifact 对应的页面流程、接口调用或状态转换。
+// 入参：artifact 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 selectArtifact 对应业务流程的处理结果。
 function selectArtifact(artifact) {
   selectedArtifact.value = artifact
   draftText.value = artifact?.content_text || formatJson(artifact?.content_json)
@@ -165,6 +179,8 @@ function selectArtifact(artifact) {
 }
 
 // 前端业务函数：协调 load 对应的页面流程、接口调用或状态转换。
+// 入参：preferredArtifactId 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 load 对应业务流程的处理结果。
 async function load(preferredArtifactId = '') {
   loading.value = true
   error.value = ''
@@ -195,6 +211,8 @@ async function load(preferredArtifactId = '') {
 }
 
 // 前端业务函数：协调 saveEdit 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 saveEdit 对应业务流程的处理结果。
 async function saveEdit() {
   if (!selectedArtifact.value) return
   const { data } = await editAITextArtifact(selectedArtifact.value.id, {
@@ -205,6 +223,8 @@ async function saveEdit() {
 }
 
 // 前端业务函数：协调 approve 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 approve 对应业务流程的处理结果。
 async function approve() {
   if (!selectedArtifact.value) return
   const { data } = await approveAITextArtifact(selectedArtifact.value.id)
@@ -212,6 +232,8 @@ async function approve() {
 }
 
 // 前端业务函数：协调 regenerate 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 regenerate 对应业务流程的处理结果。
 async function regenerate() {
   if (!selectedArtifact.value) return
   const { data } = await regenerateAITextArtifact(selectedArtifact.value.id, {

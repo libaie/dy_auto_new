@@ -18,22 +18,30 @@ var ReplyCommentHandler = Object.create(CommentBaseHandler);
 ReplyCommentHandler._config = { videoTimeoutMs: 120000, interVideoDelay: 2500, defaultVideoCount: 3 };
 
 // 设备业务函数：处理 ReplyCommentHandler._beforeSearch 对应的抖音自动化动作、状态或安全边界。
+// 入参：params 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 ReplyCommentHandler._beforeSearch 对应业务流程的处理结果。
 ReplyCommentHandler._beforeSearch = function (params) {
   this._dest = aiAnalyzer.resolveDestination(params.keyword);
 };
 
 // 设备业务函数：处理 ReplyCommentHandler._initStats 对应的抖音自动化动作、状态或安全边界。
+// 入参：params 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 ReplyCommentHandler._initStats 对应业务流程的处理结果。
 ReplyCommentHandler._initStats = function (params) {
   return { videos_processed: 0, success_count: 0, fail_count: 0, skipped: 0,
     follow_count: 0, dm_count: 0, details: [] };
 };
 
 // 设备业务函数：处理 ReplyCommentHandler._onVideoSkipped 对应的抖音自动化动作、状态或安全边界。
+// 入参：params、stats、videoIndex 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 ReplyCommentHandler._onVideoSkipped 对应业务流程的处理结果。
 ReplyCommentHandler._onVideoSkipped = function (params, stats, videoIndex) {
   stats.videos_processed++;
 };
 
 // 设备业务函数：处理 ReplyCommentHandler._ensureCommentsOpen 对应的抖音自动化动作、状态或安全边界。
+// 入参：params、videoIndex 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 ReplyCommentHandler._ensureCommentsOpen 对应业务流程的处理结果。
 ReplyCommentHandler._ensureCommentsOpen = function (params, videoIndex) {
   var videoStartTime = Date.now();
   var VIDEO_TIMEOUT = this._config.videoTimeoutMs;
@@ -51,6 +59,8 @@ ReplyCommentHandler._ensureCommentsOpen = function (params, videoIndex) {
   return false;
 };
 
+// 入参：params、stats、videoIndex 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 ReplyCommentHandler._processComments 对应业务流程的处理结果。
 ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
   var keyword = params.keyword;
   var content = params.content || "";
@@ -95,11 +105,15 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
   }
 
   // 设备业务函数：处理 _reportProgress 对应的抖音自动化动作、状态或安全边界。
+  // 入参：step、detail、prog 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _reportProgress 对应业务流程的处理结果。
   function _reportProgress(step, detail, prog) {
     if (taskId) { try { apiClient.reportProgress(taskId, step, detail, prog); } catch (e) {} }
   }
 
   // 日DM计数器
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _getServerDate 对应业务流程的处理结果。
   function _getServerDate() {
     // 优先用服务端日期（main.js catchUpPoll 设置）
     if (ReplyCommentHandler._serverDate) return ReplyCommentHandler._serverDate;
@@ -108,12 +122,16 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
   }
 
   // 设备业务函数：处理 _getDailyDMCount 对应的抖音自动化动作、状态或安全边界。
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _getDailyDMCount 对应业务流程的处理结果。
   function _getDailyDMCount() {
     var dateKey = _getServerDate();
     return ReplyCommentHandler._storageGet("dm_daily_" + dateKey, 0);
   }
 
   // 设备业务函数：处理 _incrementDailyDMCount 对应的抖音自动化动作、状态或安全边界。
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _incrementDailyDMCount 对应业务流程的处理结果。
   function _incrementDailyDMCount() {
     var dateKey = _getServerDate();
     var current = ReplyCommentHandler._storageGet("dm_daily_" + dateKey, 0);
@@ -138,12 +156,16 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
 
 
   // 设备业务函数：处理 _getDailyReplyCount 对应的抖音自动化动作、状态或安全边界。
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _getDailyReplyCount 对应业务流程的处理结果。
   function _getDailyReplyCount() {
     var dateKey = _getServerDate();
     return ReplyCommentHandler._storageGet("reply_daily_" + dateKey, 0);
   }
 
   // 设备业务函数：处理 _incrementDailyReplyCount 对应的抖音自动化动作、状态或安全边界。
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _incrementDailyReplyCount 对应业务流程的处理结果。
   function _incrementDailyReplyCount() {
     var dateKey = _getServerDate();
     var current = ReplyCommentHandler._storageGet("reply_daily_" + dateKey, 0);
@@ -152,12 +174,16 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
   }
 
   // 设备业务函数：处理 _getDailyFollowCount 对应的抖音自动化动作、状态或安全边界。
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _getDailyFollowCount 对应业务流程的处理结果。
   function _getDailyFollowCount() {
     var dateKey = _getServerDate();
     return ReplyCommentHandler._storageGet("follow_daily_" + dateKey, 0);
   }
 
   // 设备业务函数：处理 _incrementDailyFollowCount 对应的抖音自动化动作、状态或安全边界。
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _incrementDailyFollowCount 对应业务流程的处理结果。
   function _incrementDailyFollowCount() {
     var dateKey = _getServerDate();
     var current = ReplyCommentHandler._storageGet("follow_daily_" + dateKey, 0);
@@ -166,6 +192,8 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
   }
 
   // 用服务端每日计数初始化本地计数器，保证日志与服务端同步
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _syncDailyCounters 对应业务流程的处理结果。
   function _syncDailyCounters() {
     var dateKey = _getServerDate();
     logger.info(TAG, "开始同步每日计数 (date=" + dateKey + " srvReply=" + params.server_today_reply + " srvFollow=" + params.server_today_follow + " srvDM=" + params.server_today_dm + ")");
@@ -200,6 +228,8 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
   var seenComments = {};
 
   // 设备业务函数：处理 _commentKey 对应的抖音自动化动作、状态或安全边界。
+  // 入参：comment 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _commentKey 对应业务流程的处理结果。
   function _commentKey(comment) {
     // 只按昵称+内容去重，不参与 time — 同一评论在 RecyclerView 复用/二次解析时
     // 相对时间（如"3小时前"）的 parseTime 依赖 new Date() 会变化，导致同一评论
@@ -210,6 +240,8 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
   }
 
   // 设备业务函数：处理 _hasCommentEndMarker 对应的抖音自动化动作、状态或安全边界。
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _hasCommentEndMarker 对应业务流程的处理结果。
   function _hasCommentEndMarker() {
     try {
       if (!selectorLoader._cache || !selectorLoader._cache.is_comment_end) return false;
@@ -220,6 +252,8 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
   }
 
   // 设备业务函数：处理 _advanceAfterSkip 对应的抖音自动化动作、状态或安全边界。
+  // 入参：reason 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _advanceAfterSkip 对应业务流程的处理结果。
   function _advanceAfterSkip(reason) {
     var progress = readAllMode
       ? ("已读" + uniqueRead + "/" + count + ", 有效" + processed)
@@ -707,6 +741,8 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
 /**
  * 打开评论区 — 点击视频评论入口按钮
  */
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 ReplyCommentHandler._openComments 对应业务流程的处理结果。
 ReplyCommentHandler._openComments = function () {
   return commentUtils.openComments();
 };
@@ -718,6 +754,8 @@ ReplyCommentHandler._openComments = function () {
  * @param {number} maxCount - 最多读取数量
  * @returns {Array} [{ nickname, text, time, element }]
  */
+// 入参：maxCount 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 ReplyCommentHandler._readComments 对应业务流程的处理结果。
 ReplyCommentHandler._readComments = function (maxCount) {
   var comments = [];
 
@@ -765,6 +803,8 @@ ReplyCommentHandler._readComments = function (maxCount) {
  * @param {UiObject} item - 评论项元素
  * @returns {Object|null} { nickname, text, time, element }
  */
+// 入参：item 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 ReplyCommentHandler._parseCommentItem 对应业务流程的处理结果。
 ReplyCommentHandler._parseCommentItem = function (item) {
   var result = commentUtils.parseCommentItem(item, this);
   if (result) result.element = item;  // 保持向后兼容
@@ -778,6 +818,8 @@ ReplyCommentHandler._parseCommentItem = function (item) {
  * @param {number} maxAgeDays
  * @returns {Array} 筛选后的评论
  */
+// 入参：comments、maxAgeMs 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 ReplyCommentHandler._filterByTime 对应业务流程的处理结果。
 ReplyCommentHandler._filterByTime = function (comments, maxAgeMs) {
   return commentUtils.filterByTime(comments, maxAgeMs);
 };
@@ -791,6 +833,8 @@ ReplyCommentHandler._filterByTime = function (comments, maxAgeMs) {
  * @param {string} timeStr
  * @returns {Date|null}
  */
+// 入参：timeStr 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 ReplyCommentHandler._parseTime 对应业务流程的处理结果。
 ReplyCommentHandler._parseTime = function (timeStr) {
   return commentUtils.parseTime(timeStr);
 };
@@ -799,6 +843,8 @@ ReplyCommentHandler._parseTime = function (timeStr) {
  * 回复评论
  * 流程: 点回复(键盘唤起+输入框聚焦) → input()模拟打字 → 图找图发送
  */
+// 入参：replyText、nickname 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 ReplyCommentHandler._replyToComment 对应业务流程的处理结果。
 ReplyCommentHandler._replyToComment = function (replyText, nickname) {
   // 1. 点回复按钮 → 键盘唤起，输入框自动获得焦点
   // if (!this.safeClick("comment_reply_button", 3)) {
@@ -903,6 +949,8 @@ ReplyCommentHandler._replyToComment = function (replyText, nickname) {
  * 安全关闭键盘 — 仅在非评论区页面使用 back
  * 评论区用 back 会关闭评论面板，所以评论面板内不调用此方法
  */
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 ReplyCommentHandler._dismissKeyboard 对应业务流程的处理结果。
 ReplyCommentHandler._dismissKeyboard = function () {
   // 如果在评论面板，不用 back（会退出评论）
   if (uiOperator.findElement("is_comment_view", 300)) {
@@ -917,6 +965,8 @@ ReplyCommentHandler._dismissKeyboard = function () {
  * @param {string} nickname - 评论者昵称
  * @returns {boolean}
  */
+// 入参：commentAuthorAvatarEl、nickname 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 ReplyCommentHandler._enterCommenterProfile 对应业务流程的处理结果。
 ReplyCommentHandler._enterCommenterProfile = function (commentAuthorAvatarEl, nickname) {
   // 先判断目标评论者昵称是否可见（昵称可见=头像在同一行可见）
   var nameVisible = false;
@@ -1009,6 +1059,8 @@ ReplyCommentHandler._enterCommenterProfile = function (commentAuthorAvatarEl, ni
  * 关注用户 — 拟人化操作，避免被检测
  * 进入主页后：浏览一下 → 随机延迟 → 点关注 → 验证
  */
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 ReplyCommentHandler._followUser 对应业务流程的处理结果。
 ReplyCommentHandler._followUser = function () {
   try {
     // 1. 随机停留，给主页加载时间
@@ -1097,6 +1149,8 @@ ReplyCommentHandler._followUser = function () {
  * 采集用户主页数据 — 抖音号/获赞/粉丝/作品/性别/年龄/IP/是否私密
  * 调用时机：已在个人主页时采集，不 back（调用方负责返回评论区）
  */
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 ReplyCommentHandler._collectProfileData 对应业务流程的处理结果。
 ReplyCommentHandler._collectProfileData = function () {
   return commentUtils.collectProfileData({ uploadAvatar: false });
 };
@@ -1105,6 +1159,8 @@ ReplyCommentHandler._collectProfileData = function () {
  * 发送私信
  * @param {string} content - 私信内容
  */
+// 入参：content 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 ReplyCommentHandler._sendDM 对应业务流程的处理结果。
 ReplyCommentHandler._sendDM = function (content) {
   // 1. 进入私信页：点 dm_entry_btn
   var messageClicked = this.safeClick("dm_entry_btn", 5);
@@ -1178,6 +1234,8 @@ ReplyCommentHandler._sendDM = function (content) {
   return true;
 };
 
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 ReplyCommentHandler._returnToComments 对应业务流程的处理结果。
 ReplyCommentHandler._returnToComments = function () {
   var maxBacks = 5;
   for (var i = 0; i < maxBacks; i++) {

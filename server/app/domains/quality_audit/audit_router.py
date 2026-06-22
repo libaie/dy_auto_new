@@ -19,7 +19,10 @@ router = APIRouter(prefix="/api/audit", tags=["audit"])
 
 
 class AuditImageRequest(BaseModel):
-    """业务类：承载 AuditImageRequest 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 AuditImageRequest 相关的数据结构、状态或业务协作。
+
+    类参数：audit_criteria、audit_model_id、image_url、target_id、target_type 承载该类的业务配置、状态或数据字段。
+    """
     image_url: str
     target_type: str = "frame"
     target_id: str = ""
@@ -28,7 +31,11 @@ class AuditImageRequest(BaseModel):
 
 
 def _get_audit_model(db: Session, model_id: str | None) -> dict:
-    """业务函数：处理 _get_audit_model 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _get_audit_model 对应的业务流程、校验或数据转换。
+
+    入参：db、model_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Resolve audit model via registry with backward-compatible fallback."""
     from app.domains.model_configuration.model_registry import get_model_for_scene, ModelResolutionError
     try:
@@ -38,7 +45,11 @@ def _get_audit_model(db: Session, model_id: str | None) -> dict:
 
 
 def _do_audit(model: dict, image_url: str, criteria: list[str] | None) -> dict:
-    """业务函数：处理 _do_audit 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _do_audit 对应的业务流程、校验或数据转换。
+
+    入参：model、image_url、criteria 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     provider = model.get("provider", "")
     if provider == "none":
         return {"score": 1.0, "pass_fail": True, "issues": [], "raw": "skipped"}
@@ -63,7 +74,11 @@ def _do_audit(model: dict, image_url: str, criteria: list[str] | None) -> dict:
 
 
 def _audit_config(model: dict) -> dict:
-    """业务函数：处理 _audit_config 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _audit_config 对应的业务流程、校验或数据转换。
+
+    入参：model 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     config = {}
     for key in ("config_json", "config"):
         value = model.get(key)
@@ -73,12 +88,20 @@ def _audit_config(model: dict) -> dict:
 
 
 def _audit_model_name(model: dict) -> str:
-    """业务函数：处理 _audit_model_name 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _audit_model_name 对应的业务流程、校验或数据转换。
+
+    入参：model 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return str(model.get("model_name") or model.get("model") or "gpt-4o")
 
 
 def _supports_vision_audit(model: dict, config: dict) -> bool:
-    """业务函数：处理 _supports_vision_audit 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _supports_vision_audit 对应的业务流程、校验或数据转换。
+
+    入参：model、config 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if "supports_vision_audit" in config:
         return bool(config["supports_vision_audit"])
     provider = str(model.get("provider") or "").lower()
@@ -87,7 +110,11 @@ def _supports_vision_audit(model: dict, config: dict) -> bool:
 
 
 def _audit_user_content(image_url: str, criteria_text: str, *, supports_vision: bool):
-    """业务函数：处理 _audit_user_content 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _audit_user_content 对应的业务流程、校验或数据转换。
+
+    入参：image_url、criteria_text、supports_vision 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if supports_vision:
         return [
             {"type": "text", "text": f"审计标准：\n{criteria_text}\n\n请审计这张图片。"},
@@ -102,7 +129,11 @@ def _audit_user_content(image_url: str, criteria_text: str, *, supports_vision: 
 
 
 def _audit_openai_compatible(model: dict, image_url: str, criteria_text: str, system_prompt: str) -> dict:
-    """业务函数：处理 _audit_openai_compatible 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _audit_openai_compatible 对应的业务流程、校验或数据转换。
+
+    入参：model、image_url、criteria_text、system_prompt 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     config = _audit_config(model)
     generator = AiGeneratorService()
     chat_model = generator._create_chat_model(
@@ -130,7 +161,11 @@ def _audit_openai_compatible(model: dict, image_url: str, criteria_text: str, sy
 
 @tool
 def gemini_audit_request(model_name: str, api_key: str, image_url: str, criteria_text: str, system_prompt: str) -> dict:
-    """业务函数：处理 gemini_audit_request 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 gemini_audit_request 对应的业务流程、校验或数据转换。
+
+    入参：model_name、api_key、image_url、criteria_text、system_prompt 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Submit one Gemini quality-audit request and return the raw model text."""
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
     # Gemini 审核请求集中在工具边界内，方便质量门禁统一解析结果。
@@ -151,7 +186,11 @@ def gemini_audit_request(model_name: str, api_key: str, image_url: str, criteria
 
 
 def _audit_gemini(model: dict, image_url: str, criteria_text: str, system_prompt: str) -> dict:
-    """业务函数：处理 _audit_gemini 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _audit_gemini 对应的业务流程、校验或数据转换。
+
+    入参：model、image_url、criteria_text、system_prompt 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     result = gemini_audit_request.invoke({
         "model_name": model["model_name"],
         "api_key": model["api_key"],
@@ -163,7 +202,11 @@ def _audit_gemini(model: dict, image_url: str, criteria_text: str, system_prompt
 
 
 def _parse_audit_json(raw: str) -> dict:
-    """业务函数：处理 _parse_audit_json 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _parse_audit_json 对应的业务流程、校验或数据转换。
+
+    入参：raw 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     m = re.search(r'\{[\s\S]*\}', raw)
     if m:
         try:
@@ -185,7 +228,11 @@ def audit_image(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 audit_image 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 audit_image 对应的业务流程、校验或数据转换。
+
+    入参：body、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     model_config = _get_audit_model(db, body.audit_model_id)
     try:
         result = _do_audit(model_config, body.image_url, body.audit_criteria)
@@ -218,7 +265,11 @@ def audit_image(
 @router.get("/reports/{target_type}/{target_id}")
 def list_reports(target_type: str, target_id: str,
                  db: Session = Depends(get_db)):
-    """业务函数：处理 list_reports 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 list_reports 对应的业务流程、校验或数据转换。
+
+    入参：target_type、target_id、db 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     reports = db.query(AuditReport).filter(
         AuditReport.target_type == target_type,
         AuditReport.target_id == target_id,

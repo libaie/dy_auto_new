@@ -57,7 +57,11 @@ _REAL_PROVIDER_SCENE_KEYS = (
 
 
 def _required_schema() -> dict[str, list[str]]:
-    """业务函数：处理 _required_schema 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _required_schema 对应的业务流程、校验或数据转换。
+
+    入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return {
         model.__tablename__: [column.name for column in model.__table__.columns]
         for model in _REQUIRED_SCHEMA_MODELS
@@ -65,7 +69,11 @@ def _required_schema() -> dict[str, list[str]]:
 
 
 def _migration_health(db: Session) -> dict:
-    """业务函数：处理 _migration_health 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _migration_health 对应的业务流程、校验或数据转换。
+
+    入参：db 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     try:
         required_schema = _required_schema()
         inspector = inspect(db.get_bind())
@@ -104,7 +112,11 @@ def _migration_health(db: Session) -> dict:
 
 
 def _capability_for_model(model: AIModel) -> dict:
-    """业务函数：处理 _capability_for_model 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _capability_for_model 对应的业务流程、校验或数据转换。
+
+    入参：model 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     config_json = model.config_json if isinstance(model.config_json, dict) else {}
     return capability_from_model_config(
         {
@@ -116,12 +128,20 @@ def _capability_for_model(model: AIModel) -> dict:
 
 
 def _model_config(model: AIModel) -> dict:
-    """业务函数：处理 _model_config 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _model_config 对应的业务流程、校验或数据转换。
+
+    入参：model 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return model.config_json if isinstance(model.config_json, dict) else {}
 
 
 def _model_summary(model: AIModel, capability: dict | None = None) -> dict:
-    """业务函数：处理 _model_summary 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _model_summary 对应的业务流程、校验或数据转换。
+
+    入参：model、capability 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     payload = {
         "model_id": getattr(model, "id", None),
         "provider": getattr(model, "provider", None),
@@ -133,7 +153,11 @@ def _model_summary(model: AIModel, capability: dict | None = None) -> dict:
 
 
 def _positive_estimated_cost(model: AIModel) -> bool:
-    """业务函数：处理 _positive_estimated_cost 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _positive_estimated_cost 对应的业务流程、校验或数据转换。
+
+    入参：model 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     config = _model_config(model)
     candidates = [
         config.get("estimated_cost"),
@@ -155,7 +179,11 @@ def _positive_estimated_cost(model: AIModel) -> bool:
 
 
 def _worker_runtime_health() -> dict:
-    """业务函数：处理 _worker_runtime_health 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _worker_runtime_health 对应的业务流程、校验或数据转换。
+
+    入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     raw_count = os.getenv(PROVIDER_SUBMIT_WORKER_COUNT_ENV)
     status = "ok" if raw_count == "1" else "blocked"
     repair_actions = []
@@ -172,7 +200,11 @@ def _worker_runtime_health() -> dict:
 
 
 def _missing_real_provider_requirements(model: AIModel, capability: dict, scene_key: str | None = None) -> list[str]:
-    """业务函数：处理 _missing_real_provider_requirements 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _missing_real_provider_requirements 对应的业务流程、校验或数据转换。
+
+    入参：model、capability、scene_key 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     missing = [
         key for key in _PROVIDER_CAPABILITY_REQUIRED
         if capability.get(key) is not True
@@ -194,7 +226,11 @@ def _missing_real_provider_requirements(model: AIModel, capability: dict, scene_
 
 
 def _scene_readiness(models: list[AIModel]) -> dict[str, dict]:
-    """业务函数：处理 _scene_readiness 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _scene_readiness 对应的业务流程、校验或数据转换。
+
+    入参：models 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     readiness = {}
     for scene_key in _REAL_PROVIDER_SCENE_KEYS:
         scene_models = [
@@ -225,7 +261,11 @@ def _scene_readiness(models: list[AIModel]) -> dict[str, dict]:
 
 
 def _provider_capability_error(status: str, error: Exception, repair_action: str) -> dict:
-    """业务函数：处理 _provider_capability_error 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _provider_capability_error 对应的业务流程、校验或数据转换。
+
+    入参：status、error、repair_action 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return {
         "status": status,
         "checked_model_count": 0,
@@ -248,7 +288,11 @@ def _provider_capability_error(status: str, error: Exception, repair_action: str
 
 
 def _provider_capability_health(db: Session) -> dict:
-    """业务函数：处理 _provider_capability_health 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _provider_capability_health 对应的业务流程、校验或数据转换。
+
+    入参：db 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     try:
         models = db.query(AIModel).filter(AIModel.enabled == True).all()
         paid_ready = []
@@ -305,7 +349,11 @@ def _provider_capability_health(db: Session) -> dict:
 
 @router.get("/health")
 def system_health(db: Session = Depends(get_db), _user=Depends(verify_admin_token)):
-    """业务函数：处理 system_health 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 system_health 对应的业务流程、校验或数据转换。
+
+    入参：db、_user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     migration = _migration_health(db)
     provider_capability = _provider_capability_health(db)
     status = "ok"

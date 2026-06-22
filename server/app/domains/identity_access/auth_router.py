@@ -26,9 +26,10 @@ _MAX_TRACKED_IPS = 10000
 
 
 def _get_client_ip(http_request: Request) -> str:
-    """获取真实客户端 IP。
-    当直连 IP 为本地/私有地址时，说明前面有反向代理，信任 X-Forwarded-For 最左端 IP。
-    否则使用 request.client.host（TCP 层真实 IP）。
+    """业务函数：处理 _get_client_ip 对应的业务流程、校验或数据转换。
+
+    入参：http_request 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
     """
     import os
     host = http_request.client.host if http_request.client else ""
@@ -58,7 +59,11 @@ def _get_client_ip(http_request: Request) -> str:
 
 
 def _check_rate_limit(client_ip: str) -> None:
-    """业务函数：处理 _check_rate_limit 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _check_rate_limit 对应的业务流程、校验或数据转换。
+
+    入参：client_ip 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Raise 429 if too many failed attempts from this IP."""
     now = time.monotonic()
     with _rate_limit_lock:
@@ -77,14 +82,22 @@ def _check_rate_limit(client_ip: str) -> None:
 
 
 def _record_failure(client_ip: str) -> None:
-    """业务函数：处理 _record_failure 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _record_failure 对应的业务流程、校验或数据转换。
+
+    入参：client_ip 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Record a failed login attempt."""
     with _rate_limit_lock:
         _failed_attempts[client_ip].append(time.monotonic())
 
 
 def _clear_failures(client_ip: str) -> None:
-    """业务函数：处理 _clear_failures 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _clear_failures 对应的业务流程、校验或数据转换。
+
+    入参：client_ip 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Clear failed attempts after successful login."""
     with _rate_limit_lock:
         _failed_attempts.pop(client_ip, None)
@@ -92,7 +105,11 @@ def _clear_failures(client_ip: str) -> None:
 
 @router.post("/login")
 def login(request: LoginRequest, http_request: Request, db: Session = Depends(get_db)):
-    """业务函数：处理 login 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 login 对应的业务流程、校验或数据转换。
+
+    入参：request、http_request、db 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """User login — queries DB, verifies bcrypt hash, returns JWT with user_id + role."""
     client_ip = _get_client_ip(http_request)
     _check_rate_limit(client_ip)
@@ -120,7 +137,11 @@ def login(request: LoginRequest, http_request: Request, db: Session = Depends(ge
 
 @router.post("/device-login")
 def device_login(request: LoginRequest, http_request: Request, db: Session = Depends(get_db)):
-    """业务函数：处理 device_login 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 device_login 对应的业务流程、校验或数据转换。
+
+    入参：request、http_request、db 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Device login with account credentials — returns device_secret for binding."""
     client_ip = _get_client_ip(http_request)
     _check_rate_limit(client_ip)
@@ -157,7 +178,11 @@ def device_login(request: LoginRequest, http_request: Request, db: Session = Dep
 
 @router.post("/register")
 def register_user(request: RegisterRequest, user=Depends(require_role("admin")), db: Session = Depends(get_db)):
-    """业务函数：处理 register_user 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 register_user 对应的业务流程、校验或数据转换。
+
+    入参：request、user、db 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Create a new user (admin only)."""
     from app.db.models.identity_access import User
     import bcrypt
@@ -180,7 +205,11 @@ def register_user(request: RegisterRequest, user=Depends(require_role("admin")),
 
 @router.get("/users")
 def list_users(user=Depends(require_role("admin")), db: Session = Depends(get_db)):
-    """业务函数：处理 list_users 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 list_users 对应的业务流程、校验或数据转换。
+
+    入参：user、db 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """List all users (admin only)."""
     from app.db.models.identity_access import User
     users = db.query(User).order_by(User.created_at.desc()).all()

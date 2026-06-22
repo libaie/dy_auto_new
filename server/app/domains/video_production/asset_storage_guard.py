@@ -24,7 +24,11 @@ ALLOWED_VIDEO_MAGIC = (b"\x00\x00\x00", b"ftyp")
 
 
 def _storage_failed(asset: VideoProductionAsset, cause: str, message: str) -> ProductionRepairableError:
-    """业务函数：处理 _storage_failed 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _storage_failed 对应的业务流程、校验或数据转换。
+
+    入参：asset、cause、message 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return ProductionRepairableError(
         code=ProductionErrorCode.ASSET_STORAGE_FAILED,
         message=message,
@@ -37,7 +41,11 @@ def _storage_failed(asset: VideoProductionAsset, cause: str, message: str) -> Pr
 
 
 def _mark_storage_failed(db: Session, asset: VideoProductionAsset, error: ProductionRepairableError) -> None:
-    """业务函数：处理 _mark_storage_failed 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _mark_storage_failed 对应的业务流程、校验或数据转换。
+
+    入参：db、asset、error 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     asset.copy_status = "storage_failed"
     asset.status = "storage_failed"
     asset.storage_error_json = {
@@ -50,7 +58,11 @@ def _mark_storage_failed(db: Session, asset: VideoProductionAsset, error: Produc
 
 
 def _is_private_or_local_host(hostname: str | None) -> bool:
-    """业务函数：处理 _is_private_or_local_host 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _is_private_or_local_host 对应的业务流程、校验或数据转换。
+
+    入参：hostname 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if not hostname:
         return True
     host = hostname.strip().lower().strip("[]")
@@ -64,7 +76,11 @@ def _is_private_or_local_host(hostname: str | None) -> bool:
 
 
 def _validate_provider_url(asset: VideoProductionAsset) -> str:
-    """业务函数：处理 _validate_provider_url 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _validate_provider_url 对应的业务流程、校验或数据转换。
+
+    入参：asset 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     source_url = asset.source_url or asset.url or ""
     parsed = urlparse(source_url)
     if parsed.scheme not in ALLOWED_PROVIDER_SCHEMES:
@@ -75,7 +91,11 @@ def _validate_provider_url(asset: VideoProductionAsset) -> str:
 
 
 def _safe_source_from_local(asset: VideoProductionAsset, pixelle_output_root: Path) -> Path:
-    """业务函数：处理 _safe_source_from_local 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _safe_source_from_local 对应的业务流程、校验或数据转换。
+
+    入参：asset、pixelle_output_root 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     source = Path(asset.local_path or "").resolve()
     root = pixelle_output_root.resolve()
     if source != root and root not in source.parents:
@@ -86,7 +106,11 @@ def _safe_source_from_local(asset: VideoProductionAsset, pixelle_output_root: Pa
 
 
 def _looks_like_expected_asset(asset: VideoProductionAsset, path: Path) -> bool:
-    """业务函数：处理 _looks_like_expected_asset 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _looks_like_expected_asset 对应的业务流程、校验或数据转换。
+
+    入参：asset、path 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     head = path.read_bytes()[:16]
     if asset.asset_type == "image":
         return any(head.startswith(item) for item in ALLOWED_IMAGE_MAGIC)
@@ -96,7 +120,11 @@ def _looks_like_expected_asset(asset: VideoProductionAsset, path: Path) -> bool:
 
 
 def _checksum(path: Path) -> str:
-    """业务函数：处理 _checksum 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _checksum 对应的业务流程、校验或数据转换。
+
+    入参：path 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     digest = hashlib.sha256()
     with path.open("rb") as handle:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
@@ -105,7 +133,11 @@ def _checksum(path: Path) -> str:
 
 
 def _download_provider_url(asset: VideoProductionAsset, target: Path) -> None:
-    """业务函数：处理 _download_provider_url 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _download_provider_url 对应的业务流程、校验或数据转换。
+
+    入参：asset、target 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     source_url = _validate_provider_url(asset)
     try:
         # 外部素材先复制到项目可控存储，避免生产结果依赖临时链接。
@@ -125,7 +157,11 @@ def persist_provider_asset(
     output_root: str | Path,
     pixelle_output_root: str | Path | None = None,
 ) -> VideoProductionAsset:
-    """业务函数：处理 persist_provider_asset 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 persist_provider_asset 对应的业务流程、校验或数据转换。
+
+    入参：db、asset_id、output_root、pixelle_output_root 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     asset = db.query(VideoProductionAsset).filter_by(id=asset_id).one()
     output_root = Path(output_root).resolve()
     output_root.mkdir(parents=True, exist_ok=True)

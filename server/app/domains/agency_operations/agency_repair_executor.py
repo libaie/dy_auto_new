@@ -32,7 +32,11 @@ ACTIVE_DOWNSTREAM_JOB_STATUSES = {JOB_QUEUED, JOB_LEASED, JOB_RUNNING, JOB_RETRY
 
 
 async def execute_repair_job(db: Session, job: ProductionJob) -> ProductionActionResult:
-    """业务函数：处理 execute_repair_job 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 execute_repair_job 对应的业务流程、校验或数据转换。
+
+    入参：db、job 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     repair_type = job.stage.split(":", 1)[1] if ":" in job.stage else ""
     if repair_type == "storyboard_missing_references":
         if job.target_type == "production_segment":
@@ -64,7 +68,11 @@ async def _manual_paid_reference_block(
 ) -> ProductionActionResult:
     # Reference generation may call paid providers and existing helpers commit internally.
     # Keep this path manual until a caller-owned cost reservation path is available.
-    """业务函数：处理 _manual_paid_reference_block 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _manual_paid_reference_block 对应的业务流程、校验或数据转换。
+
+    入参：db、job、action_label、route 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     db.add(ProductionAuditEvent(
         event_type="agency_repair_manual_required",
         production_plan_id=job.plan_id,
@@ -86,7 +94,11 @@ async def _manual_paid_reference_block(
 
 
 def _mark_recheck_required(db: Session, job: ProductionJob, message: str) -> ProductionActionResult:
-    """业务函数：处理 _mark_recheck_required 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _mark_recheck_required 对应的业务流程、校验或数据转换。
+
+    入参：db、job、message 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     _mark_target_recheck_pending(db, job)
     db.add(ProductionAuditEvent(
         event_type="agency_repair_recheck_required",
@@ -109,7 +121,11 @@ def _mark_recheck_required(db: Session, job: ProductionJob, message: str) -> Pro
 
 
 def _micro_tune_segment_prompt(db: Session, job: ProductionJob, repair_type: str) -> ProductionActionResult:
-    """业务函数：处理 _micro_tune_segment_prompt 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _micro_tune_segment_prompt 对应的业务流程、校验或数据转换。
+
+    入参：db、job、repair_type 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     segment = db.query(ProductionSegment).filter(ProductionSegment.id == job.target_id).first()
     if not segment:
         return _mark_recheck_required(db, job, "已记录阶段返修请求，等待重新审查")
@@ -196,7 +212,11 @@ def _micro_tune_segment_prompt(db: Session, job: ProductionJob, repair_type: str
 
 
 def _run_for_repair_job(db: Session, job: ProductionJob) -> VideoProductionRun | None:
-    """业务函数：处理 _run_for_repair_job 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _run_for_repair_job 对应的业务流程、校验或数据转换。
+
+    入参：db、job 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     run_id = _run_id_from_repair_event(db, job)
     if run_id:
         run = db.query(VideoProductionRun).filter(VideoProductionRun.id == run_id).first()
@@ -211,7 +231,11 @@ def _run_for_repair_job(db: Session, job: ProductionJob) -> VideoProductionRun |
 
 
 def _run_id_from_repair_event(db: Session, job: ProductionJob) -> str | None:
-    """业务函数：处理 _run_id_from_repair_event 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _run_id_from_repair_event 对应的业务流程、校验或数据转换。
+
+    入参：db、job 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     events = (
         db.query(ProductionAuditEvent)
         .filter(ProductionAuditEvent.production_plan_id == job.plan_id)
@@ -230,13 +254,21 @@ def _run_id_from_repair_event(db: Session, job: ProductionJob) -> str | None:
 
 
 def _downstream_image_job_key(job: ProductionJob, segment_id: str, run: VideoProductionRun | None) -> str:
-    """业务函数：处理 _downstream_image_job_key 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _downstream_image_job_key 对应的业务流程、校验或数据转换。
+
+    入参：job、segment_id、run 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     owner_id = run.id if run else job.plan_id
     return f"{owner_id}:{segment_id}:agency_repair:{job.id}:image_generation"
 
 
 def _segment_has_reference_payload(segment: ProductionSegment) -> bool:
-    """业务函数：处理 _segment_has_reference_payload 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _segment_has_reference_payload 对应的业务流程、校验或数据转换。
+
+    入参：segment 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     for item in segment.reference_roles_json or []:
         if isinstance(item, dict) and str(item.get("url") or "").strip():
             return True
@@ -248,7 +280,11 @@ def _block_missing_segment_references(
     job: ProductionJob,
     segment: ProductionSegment,
 ) -> ProductionActionResult:
-    """业务函数：处理 _block_missing_segment_references 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _block_missing_segment_references 对应的业务流程、校验或数据转换。
+
+    入参：db、job、segment 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     run = _run_for_repair_job(db, job)
     repair_route = f"/video-production/{run.id}" if run else "/video-production"
     db.add(ProductionAuditEvent(
@@ -274,7 +310,11 @@ def _block_missing_segment_references(
 
 
 def _prompt_tune_suffix(repair_type: str) -> str:
-    """业务函数：处理 _prompt_tune_suffix 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _prompt_tune_suffix 对应的业务流程、校验或数据转换。
+
+    入参：repair_type 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if repair_type.startswith("video"):
         return "自动返修提示：上一轮视频审核未通过，先回退重做关键帧图像；保持角色、服装、场景和光线一致，修复主体畸变、跳帧、运动不连贯和画面崩坏。"
     if repair_type.startswith("storyboard"):
@@ -283,7 +323,11 @@ def _prompt_tune_suffix(repair_type: str) -> str:
 
 
 def _mark_target_recheck_pending(db: Session, job: ProductionJob) -> None:
-    """业务函数：处理 _mark_target_recheck_pending 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _mark_target_recheck_pending 对应的业务流程、校验或数据转换。
+
+    入参：db、job 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if job.target_type == "character":
         row = db.query(Character).filter(Character.id == job.target_id).first()
     elif job.target_type == "scene":
@@ -300,7 +344,11 @@ def _mark_target_recheck_pending(db: Session, job: ProductionJob) -> None:
 
 
 def _next_gate_for_job(job: ProductionJob) -> str:
-    """业务函数：处理 _next_gate_for_job 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _next_gate_for_job 对应的业务流程、校验或数据转换。
+
+    入参：job 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if job.target_type == "character":
         return "角色资产审查"
     if job.target_type == "scene":
@@ -313,5 +361,9 @@ def _next_gate_for_job(job: ProductionJob) -> str:
 
 
 def is_agency_repair_stage(stage: str) -> bool:
-    """业务函数：处理 is_agency_repair_stage 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 is_agency_repair_stage 对应的业务流程、校验或数据转换。
+
+    入参：stage 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return stage.startswith(f"{AUTO_REPAIR_STAGE}:") or stage == AUTO_REPAIR_STAGE

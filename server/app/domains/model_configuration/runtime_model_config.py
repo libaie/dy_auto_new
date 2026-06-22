@@ -10,12 +10,19 @@ from app.domains.system_configuration.crypto import decrypt
 
 
 class RuntimeModelConfigError(ValueError):
-    """业务类：承载 RuntimeModelConfigError 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 RuntimeModelConfigError 相关的数据结构、状态或业务协作。
+
+    类参数：无显式类参数 承载该类的业务配置、状态或数据字段。
+    """
     pass
 
 
 def _configured_scene_keys(model: AIModel) -> list[str]:
-    """业务函数：处理 _configured_scene_keys 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _configured_scene_keys 对应的业务流程、校验或数据转换。
+
+    入参：model 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     config = model.config_json or {}
     configured_scenes = config.get("scene_keys")
     if isinstance(configured_scenes, list):
@@ -25,12 +32,20 @@ def _configured_scene_keys(model: AIModel) -> list[str]:
 
 
 def _model_supports_scene(model: AIModel, scene_key: str) -> bool:
-    """业务函数：处理 _model_supports_scene 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _model_supports_scene 对应的业务流程、校验或数据转换。
+
+    入参：model、scene_key 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return scene_key in _configured_scene_keys(model)
 
 
 def resolve_runtime_model_config(db: Session, scene_key: str, explicit_model_id: str | None = None) -> dict:
-    """业务函数：处理 resolve_runtime_model_config 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 resolve_runtime_model_config 对应的业务流程、校验或数据转换。
+
+    入参：db、scene_key、explicit_model_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     query = db.query(AIModel).filter(AIModel.enabled == True)
     if explicit_model_id:
         query = query.filter(AIModel.id == explicit_model_id)
@@ -58,7 +73,11 @@ def resolve_runtime_model_config(db: Session, scene_key: str, explicit_model_id:
 
 
 def _model_supports_capability(model: AIModel, scene_key: str, capability_key: str) -> bool:
-    """业务函数：处理 _model_supports_capability 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _model_supports_capability 对应的业务流程、校验或数据转换。
+
+    入参：model、scene_key、capability_key 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     config = model.config_json or {}
     if not _model_supports_scene(model, scene_key):
         return False
@@ -80,7 +99,11 @@ def resolve_image_model_for_capability(
     capability_key: str,
     explicit_model_id: str | None = None,
 ) -> dict:
-    """业务函数：处理 resolve_image_model_for_capability 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 resolve_image_model_for_capability 对应的业务流程、校验或数据转换。
+
+    入参：db、scene_key、capability_key、explicit_model_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     query = db.query(AIModel).filter(AIModel.enabled == True, AIModel.model_type == "image")
     if explicit_model_id:
         query = query.filter(AIModel.id == explicit_model_id)
@@ -100,7 +123,11 @@ def resolve_image_model_for_capability(
 
 
 def redact_runtime_model_config(config: dict) -> dict:
-    """业务函数：处理 redact_runtime_model_config 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 redact_runtime_model_config 对应的业务流程、校验或数据转换。
+
+    入参：config 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     redacted = dict(config or {})
     redacted.pop("api_key", None)
     if isinstance(redacted.get("config"), dict):

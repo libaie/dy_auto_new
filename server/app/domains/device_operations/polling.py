@@ -29,7 +29,11 @@ async def poll_tasks(
     authed_device_id: Optional[str] = Depends(verify_device_secret),
 ):
     # Per-device secret: use the verified device_id, reject mismatch
-    """业务函数：处理 poll_tasks 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 poll_tasks 对应的业务流程、校验或数据转换。
+
+    入参：device_id、db、authed_device_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if authed_device_id and authed_device_id != device_id:
         raise HTTPException(status_code=403, detail="Device ID mismatch")
     if authed_device_id:

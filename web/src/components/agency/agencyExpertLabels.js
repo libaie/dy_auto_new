@@ -230,31 +230,43 @@ export const SKILL_TEXT = {
   reality_checker: '历史审计角色，仅用于查看旧流程记录，不参与当前视频生成编排。',
 }
 
+// 入参：id 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 isLegacyExpert 对应业务流程的处理结果。
 export function isLegacyExpert(id) {
   return LEGACY_EXPERT_IDS.has(id)
 }
 
 // 前端业务函数：协调 isCurrentExpert 对应的页面流程、接口调用或状态转换。
+// 入参：id 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 isCurrentExpert 对应业务流程的处理结果。
 export function isCurrentExpert(id) {
   return CURRENT_EXPERT_IDS.has(id)
 }
 
 // 前端业务函数：协调 isRawIdentifier 对应的页面流程、接口调用或状态转换。
+// 入参：value 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 isRawIdentifier 对应业务流程的处理结果。
 export function isRawIdentifier(value) {
   return /^[a-z][a-z0-9_]{2,}$/.test(String(value || ''))
 }
 
 // 前端业务函数：协调 expertName 对应的页面流程、接口调用或状态转换。
+// 入参：id、fallback 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 expertName 对应业务流程的处理结果。
 export function expertName(id, fallback = '') {
   const fallbackLabel = localizedText(fallback, '')
   if (fallbackLabel) return fallbackLabel
   return EXPERT_NAMES[id] || '未命名专家'
 }
 
+// 入参：id 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 expertAvatar 对应业务流程的处理结果。
 export function expertAvatar(id) {
   return EXPERT_AVATARS[id] || '专'
 }
 
+// 入参：phase、fallback 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 phaseLabel 对应业务流程的处理结果。
 export function phaseLabel(phase, fallback = '') {
   const key = String(phase || '').trim()
   if (PHASE_LABELS[key]) return PHASE_LABELS[key]
@@ -263,17 +275,23 @@ export function phaseLabel(phase, fallback = '') {
   return PHASE_LABELS[phase] || '未命名阶段'
 }
 
+// 入参：status 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 statusLabel 对应业务流程的处理结果。
 export function statusLabel(status) {
   const key = String(status || '').trim().toLowerCase()
   return STATUS_LABELS[key] || '未知状态'
 }
 
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 stepName 对应业务流程的处理结果。
 export function stepName(step = {}) {
   const id = String(step.id || '').trim()
   if (STEP_LABELS[id]) return STEP_LABELS[id]
   return localizedText(step.label, '已记录生产步骤')
 }
 
+// 入参：phases 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 phaseText 对应业务流程的处理结果。
 export function phaseText(phases) {
   const values = Array.isArray(phases) ? phases : [phases]
   const labels = values
@@ -282,6 +300,8 @@ export function phaseText(phases) {
   return labels.length ? labels.join(' / ') : '待配置阶段'
 }
 
+// 入参：expert 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 expertRoleGroup 对应业务流程的处理结果。
 export function expertRoleGroup(expert) {
   const explicit = String(expert?.role_type || '').toLowerCase()
   if (['core', 'quality', 'support'].includes(explicit)) return explicit
@@ -292,11 +312,15 @@ export function expertRoleGroup(expert) {
 }
 
 // 前端业务函数：协调 roleLabel 对应的页面流程、接口调用或状态转换。
+// 入参：role 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 roleLabel 对应业务流程的处理结果。
 export function roleLabel(role) {
   return ROLE_LABELS[String(role || '').toLowerCase()] || ''
 }
 
 // 前端业务函数：协调 skillText 对应的页面流程、接口调用或状态转换。
+// 入参：expert 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 skillText 对应业务流程的处理结果。
 export function skillText(expert) {
   return safeDisplayText(
     expert?.skill_summary || expert?.description || SKILL_TEXT[expert?.expert_id],
@@ -304,6 +328,8 @@ export function skillText(expert) {
   )
 }
 
+// 入参：value、fallback 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 safeDisplayText 对应业务流程的处理结果。
 export function safeDisplayText(value, fallback = '已记录专家结论') {
   if (value === null || value === undefined || value === '') return fallback
   const text = Array.isArray(value) ? value.join('；') : String(value)
@@ -320,6 +346,8 @@ export function safeDisplayText(value, fallback = '已记录专家结论') {
 }
 
 // 前端业务函数：协调 decisionLogText 对应的页面流程、接口调用或状态转换。
+// 入参：value、field、fallback 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 decisionLogText 对应业务流程的处理结果。
 export function decisionLogText(value, field = 'generic', fallback = '') {
   if (value === null || value === undefined || value === '') return fallback
   const text = String(value).trim()
@@ -340,6 +368,8 @@ export function decisionLogText(value, field = 'generic', fallback = '') {
 }
 
 // 前端业务函数：协调 localizedText 对应的页面流程、接口调用或状态转换。
+// 入参：value、fallback 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 localizedText 对应业务流程的处理结果。
 export function localizedText(value, fallback = '') {
   if (value === null || value === undefined || value === '') return fallback
   const text = String(value).trim()
@@ -358,6 +388,8 @@ export function localizedText(value, fallback = '') {
 }
 
 // 前端业务函数：协调 localizeEmbeddedEnglish 对应的页面流程、接口调用或状态转换。
+// 入参：value 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 localizeEmbeddedEnglish 对应业务流程的处理结果。
 export function localizeEmbeddedEnglish(value) {
   const original = String(value || '')
   if (!original || !/[A-Za-z_]/.test(original)) return ''
@@ -391,6 +423,8 @@ export function localizeEmbeddedEnglish(value) {
 }
 
 // 前端业务函数：协调 decisionDomainText 对应的页面流程、接口调用或状态转换。
+// 入参：text、field 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 decisionDomainText 对应业务流程的处理结果。
 function decisionDomainText(text, field) {
   const lower = text.toLowerCase()
   if (lower.includes('invalid json')) return '\u4e13\u5bb6\u8f93\u51fa\u683c\u5f0f\u65e0\u6548'
@@ -425,6 +459,8 @@ function decisionDomainText(text, field) {
 }
 
 // 前端业务函数：协调 translateDetailedEnglishText 对应的页面流程、接口调用或状态转换。
+// 入参：text 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 translateDetailedEnglishText 对应业务流程的处理结果。
 function translateDetailedEnglishText(text) {
   const clauses = String(text || '')
     .split(/[.;]\s*/)
@@ -438,6 +474,8 @@ function translateDetailedEnglishText(text) {
 }
 
 // 前端业务函数：协调 translateEnglishClause 对应的页面流程、接口调用或状态转换。
+// 入参：clause 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 translateEnglishClause 对应业务流程的处理结果。
 function translateEnglishClause(clause) {
   const lower = clause.toLowerCase()
   if (lower.includes('character face consistency') && lower.includes('front/profile')) {
@@ -466,6 +504,8 @@ function translateEnglishClause(clause) {
 }
 
 // 前端业务函数：协调 clauseWithKnownTerms 对应的页面流程、接口调用或状态转换。
+// 入参：clause、fallback 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 clauseWithKnownTerms 对应业务流程的处理结果。
 function clauseWithKnownTerms(clause, fallback) {
   const terms = []
   const lower = clause.toLowerCase()
@@ -484,6 +524,8 @@ function clauseWithKnownTerms(clause, fallback) {
 }
 
 // 前端业务函数：协调 extractParenthesizedChineseList 对应的页面流程、接口调用或状态转换。
+// 入参：text 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 extractParenthesizedChineseList 对应业务流程的处理结果。
 function extractParenthesizedChineseList(text) {
   const match = String(text).match(/[\uff08(]([^()\uff08\uff09]+)[\uff09)]/)
   if (!match) return []
@@ -494,6 +536,8 @@ function extractParenthesizedChineseList(text) {
 }
 
 // 前端业务函数：协调 compactChineseText 对应的页面流程、接口调用或状态转换。
+// 入参：value 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 compactChineseText 对应业务流程的处理结果。
 function compactChineseText(value) {
   return String(value || '')
     .replace(/\s*第\s*(\d+)\s*帧/g, '第 $1 帧')

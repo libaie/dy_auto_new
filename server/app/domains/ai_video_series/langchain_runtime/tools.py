@@ -16,7 +16,11 @@ from app.domains.ai_video_series.langchain_runtime.agent_runner import extract_j
 
 
 def series_context_payload(db: Session, series_id: str, episode_id: str | None = None) -> dict[str, Any]:
-    """业务函数：处理 series_context_payload 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 series_context_payload 对应的业务流程、校验或数据转换。
+
+    入参：db、series_id、episode_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     from app.db.models import Episode, Series
 
     series = db.query(Series).filter(Series.id == series_id).first()
@@ -53,18 +57,30 @@ def series_context_payload(db: Session, series_id: str, episode_id: str | None =
 
 
 def build_ai_video_tools(db: Session | None, allowed_tools: list[str] | None = None) -> list[Any]:
-    """业务函数：处理 build_ai_video_tools 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 build_ai_video_tools 对应的业务流程、校验或数据转换。
+
+    入参：db、allowed_tools 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     selected = set(["validate_json", "read_series_context"] if allowed_tools is None else allowed_tools)
 
     @tool
     def validate_json(raw: str) -> dict[str, Any]:
-        """业务函数：处理 validate_json 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 validate_json 对应的业务流程、校验或数据转换。
+
+        入参：raw 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         """Parse a JSON object from model text and return it."""
         return extract_json_object(raw)
 
     @tool
     async def read_series_context(series_id: str, episode_id: str | None = None) -> str:
-        """业务函数：处理 read_series_context 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 read_series_context 对应的业务流程、校验或数据转换。
+
+        入参：series_id、episode_id 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         """Read series and optional episode context as JSON."""
         if db is None:
             raise AgencyRuntimeError("AI_VIDEO_CONTEXT_NOT_FOUND", "Database session is required.")

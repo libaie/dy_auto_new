@@ -65,12 +65,16 @@ const toast = useToastStore()
 
 // --- WebSocket ---
 // 前端业务函数：协调 wsUrl 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 wsUrl 对应业务流程的处理结果。
 function wsUrl() {
   const token = localStorage.getItem('token') || ''
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
   return `${protocol}//${location.host}/api/devices/ws/pair-events?token=${encodeURIComponent(token)}`
 }
 useWebSocket(wsUrl, {
+  // 入参：msg 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 onMessage 对应业务流程的处理结果。
   onMessage(msg) {
     if (msg.event === 'account_groups_changed') fetchGroups()
   },
@@ -86,6 +90,8 @@ const columns = [
 ]
 
 // --- Fetch groups ---
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 fetchGroups 对应业务流程的处理结果。
 async function fetchGroups() {
   loading.value = true
   try {
@@ -103,6 +109,8 @@ async function fetchGroups() {
 }
 
 // 前端业务函数：协调 handlePageChange 对应的页面流程、接口调用或状态转换。
+// 入参：p 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handlePageChange 对应业务流程的处理结果。
 function handlePageChange(p) {
   page.value = p
   fetchGroups()
@@ -110,6 +118,8 @@ function handlePageChange(p) {
 
 // --- Open create dialog ---
 // 前端业务函数：协调 openCreateDialog 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 openCreateDialog 对应业务流程的处理结果。
 function openCreateDialog() {
   isEditing.value = false
   editingId.value = null
@@ -120,6 +130,8 @@ function openCreateDialog() {
 
 // --- Open edit dialog ---
 // 前端业务函数：协调 openEditDialog 对应的页面流程、接口调用或状态转换。
+// 入参：group 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 openEditDialog 对应业务流程的处理结果。
 function openEditDialog(group) {
   isEditing.value = true
   editingId.value = group.id
@@ -131,6 +143,8 @@ function openEditDialog(group) {
 
 // --- Save (create or update) ---
 // 前端业务函数：协调 handleSave 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleSave 对应业务流程的处理结果。
 async function handleSave() {
   if (!form.name.trim()) {
     formError.value = '分组名称不能为空'
@@ -165,12 +179,16 @@ async function handleSave() {
 
 // --- Delete ---
 // 前端业务函数：协调 openDeleteDialog 对应的页面流程、接口调用或状态转换。
+// 入参：group 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 openDeleteDialog 对应业务流程的处理结果。
 function openDeleteDialog(group) {
   deletingGroup.value = group
   showDeleteDialog.value = true
 }
 
 // 前端业务函数：协调 handleDelete 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleDelete 对应业务流程的处理结果。
 async function handleDelete() {
   if (!deletingGroup.value) return
   deleting.value = true
@@ -191,6 +209,8 @@ async function handleDelete() {
 
 // --- Member management ---
 // 前端业务函数：协调 openMembersDialog 对应的页面流程、接口调用或状态转换。
+// 入参：group 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 openMembersDialog 对应业务流程的处理结果。
 async function openMembersDialog(group) {
   managingGroupId.value = group.id
   managingGroupName.value = group.name
@@ -200,6 +220,8 @@ async function openMembersDialog(group) {
 }
 
 // 前端业务函数：协调 fetchMembers 对应的页面流程、接口调用或状态转换。
+// 入参：groupId 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 fetchMembers 对应业务流程的处理结果。
 async function fetchMembers(groupId) {
   membersLoading.value = true
   try {
@@ -214,6 +236,8 @@ async function fetchMembers(groupId) {
 }
 
 // 前端业务函数：协调 fetchAllAccounts 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 fetchAllAccounts 对应业务流程的处理结果。
 async function fetchAllAccounts() {
   try {
     const res = await listAccounts({ limit: 200 })
@@ -228,6 +252,8 @@ async function fetchAllAccounts() {
 const availableAccounts = ref([])
 
 // 前端业务函数：协调 updateAvailableAccounts 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 updateAvailableAccounts 对应业务流程的处理结果。
 function updateAvailableAccounts() {
   const memberIds = new Set(members.value.map(m => m.id))
   availableAccounts.value = allAccounts.value.filter(
@@ -236,6 +262,8 @@ function updateAvailableAccounts() {
 }
 
 // 前端业务函数：协调 handleAddMembers 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleAddMembers 对应业务流程的处理结果。
 async function handleAddMembers() {
   if (selectedAccountIds.value.length === 0) return
   try {
@@ -248,6 +276,8 @@ async function handleAddMembers() {
   }
 }
 
+// 入参：accountId 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleRemoveMember 对应业务流程的处理结果。
 async function handleRemoveMember(accountId) {
   try {
     await removeMembers(managingGroupId.value, [accountId])

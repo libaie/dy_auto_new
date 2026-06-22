@@ -12,15 +12,26 @@ OPENAI_CHAT_COMPLETIONS_PROTOCOL = "openai_chat_completions"
 
 
 class AgencyRuntimeError(RuntimeError):
-    """业务类：承载 AgencyRuntimeError 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 AgencyRuntimeError 相关的数据结构、状态或业务协作。
+
+    类参数：error_code、message 承载该类的业务配置、状态或数据字段。
+    """
     def __init__(self, error_code: str, message: str):
-        """初始化业务对象依赖，保存后续流程需要的运行上下文。"""
+        """初始化业务对象依赖，保存后续流程需要的运行上下文。
+
+        入参：error_code、message 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         super().__init__(message)
         self.error_code = error_code
 
 
 def runtime_setting(config: dict[str, Any], key: str, default: Any) -> Any:
-    """业务函数：处理 runtime_setting 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 runtime_setting 对应的业务流程、校验或数据转换。
+
+    入参：config、key、default 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     nested = config.get("config")
     if isinstance(nested, dict) and key in nested:
         return nested[key]

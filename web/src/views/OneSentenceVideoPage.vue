@@ -374,6 +374,8 @@ const nextGate = computed(() => {
   return status
 })
 
+// 入参：nextMode 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 setMode 对应业务流程的处理结果。
 function setMode(nextMode) {
   mode.value = nextMode
   if (nextMode === 'real_short_e2e') {
@@ -382,12 +384,16 @@ function setMode(nextMode) {
 }
 
 // 前端业务函数：协调 clampRealDuration 对应的页面流程、接口调用或状态转换。
+// 入参：value 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 clampRealDuration 对应业务流程的处理结果。
 function clampRealDuration(value) {
   const seconds = Number(value) || 60
   return Math.min(REAL_SHORT_MAX_SECONDS, Math.max(60, seconds))
 }
 
 // 前端业务函数：协调 submitDuration 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 submitDuration 对应业务流程的处理结果。
 function submitDuration() {
   const seconds = Number(form.target_duration_seconds) || 60
   if (mode.value === 'real_short_e2e') return clampRealDuration(seconds)
@@ -395,6 +401,8 @@ function submitDuration() {
 }
 
 // 前端业务函数：协调 isAfterImage 对应的页面流程、接口调用或状态转换。
+// 入参：status 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 isAfterImage 对应业务流程的处理结果。
 function isAfterImage(status) {
   return [
     'image_review_pending',
@@ -411,6 +419,8 @@ function isAfterImage(status) {
 }
 
 // 前端业务函数：协调 isAfterVideo 对应的页面流程、接口调用或状态转换。
+// 入参：status 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 isAfterVideo 对应业务流程的处理结果。
 function isAfterVideo(status) {
   return [
     'video_review_pending',
@@ -423,6 +433,8 @@ function isAfterVideo(status) {
 }
 
 // 前端业务函数：协调 stepStatus 对应的页面流程、接口调用或状态转换。
+// 入参：key、runStatus 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 stepStatus 对应业务流程的处理结果。
 function stepStatus(key, runStatus) {
   if (runStatus === 'reference_generation_running') {
     if (['prompt', 'series'].includes(key)) return 'done'
@@ -476,11 +488,15 @@ function stepStatus(key, runStatus) {
 }
 
 // 前端业务函数：协调 statusLabel 对应的页面流程、接口调用或状态转换。
+// 入参：status 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 statusLabel 对应业务流程的处理结果。
 function statusLabel(status) {
   return statusText[status] || status || '-'
 }
 
 // 前端业务函数：协调 stepClass 对应的页面流程、接口调用或状态转换。
+// 入参：status 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 stepClass 对应业务流程的处理结果。
 function stepClass(status) {
   if (['done', 'ready'].includes(status)) return 'border-emerald-500/40 bg-emerald-950/30 text-emerald-200'
   if (status === 'running') return 'border-sky-500/40 bg-sky-950/30 text-sky-200'
@@ -489,6 +505,8 @@ function stepClass(status) {
 }
 
 // 前端业务函数：协调 normalizeError 对应的页面流程、接口调用或状态转换。
+// 入参：e 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 normalizeError 对应业务流程的处理结果。
 function normalizeError(e) {
   const detail = e.response?.data?.detail
   if (detail && typeof detail === 'object') {
@@ -499,16 +517,22 @@ function normalizeError(e) {
   return detail || e.message || '操作失败'
 }
 
+// 入参：message 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 isProviderPendingError 对应业务流程的处理结果。
 function isProviderPendingError(message) {
   return String(message || '').toLowerCase().includes('not complete')
 }
 
 // 前端业务函数：协调 isRealProviderRun 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 isRealProviderRun 对应业务流程的处理结果。
 function isRealProviderRun() {
   return (result.value?.run?.run_type || mode.value) === 'real_short_e2e'
 }
 
 // 前端业务函数：协调 stopAutopilot 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 stopAutopilot 对应业务流程的处理结果。
 function stopAutopilot() {
   if (autopilotTimer) {
     clearInterval(autopilotTimer)
@@ -517,6 +541,8 @@ function stopAutopilot() {
 }
 
 // 前端业务函数：协调 refreshRun 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 refreshRun 对应业务流程的处理结果。
 async function refreshRun() {
   const runId = result.value?.run?.id
   if (!runId) return
@@ -529,6 +555,8 @@ async function refreshRun() {
 }
 
 // 前端业务函数：协调 driveAutopilotOnce 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 driveAutopilotOnce 对应业务流程的处理结果。
 async function driveAutopilotOnce() {
   const runId = result.value?.run?.id
   const status = result.value?.run?.status
@@ -602,6 +630,8 @@ async function driveAutopilotOnce() {
 }
 
 // 前端业务函数：协调 startAutopilot 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 startAutopilot 对应业务流程的处理结果。
 function startAutopilot() {
   stopAutopilot()
   driveAutopilotOnce()
@@ -609,6 +639,8 @@ function startAutopilot() {
 }
 
 // 前端业务函数：协调 submit 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 submit 对应业务流程的处理结果。
 async function submit() {
   submitting.value = true
   error.value = ''

@@ -42,7 +42,10 @@ MOJIBAKE_TOKENS = (
 
 
 class AutoRepairPolicy(BaseModel):
-    """业务类：承载 AutoRepairPolicy 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 AutoRepairPolicy 相关的数据结构、状态或业务协作。
+
+    类参数：allowed_stages、allowed_types、budget_limit、currency、enabled、max_rounds、requires_human_gate_after_repair 承载该类的业务配置、状态或数据字段。
+    """
     enabled: bool = False
     max_rounds: int = Field(default=MAX_AUTO_REPAIR_ROUNDS, ge=0, le=MAX_AUTO_REPAIR_ROUNDS)
     budget_limit: float = Field(default=0.0, ge=0.0)
@@ -53,7 +56,10 @@ class AutoRepairPolicy(BaseModel):
 
 
 class RepairTask(BaseModel):
-    """业务类：承载 RepairTask 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 RepairTask 相关的数据结构、状态或业务协作。
+
+    类参数：affected_ids、auto_execute、budget_authorized、estimated_cost、expected_result、metadata、priority、reason、repair_action_label、repair_route、requires_paid_provider、series_id、stage、target_id、target_type、type 承载该类的业务配置、状态或数据字段。
+    """
     type: str
     stage: str
     target_type: str = "manual"
@@ -74,13 +80,21 @@ class RepairTask(BaseModel):
     @field_validator("type")
     @classmethod
     def validate_type(cls, value: str) -> str:
-        """业务函数：处理 validate_type 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 validate_type 对应的业务流程、校验或数据转换。
+
+        入参：value 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         return value if value in ALLOWED_REPAIR_TYPES else "manual_incomplete_repair_task"
 
     @field_validator("reason", "expected_result", "repair_action_label")
     @classmethod
     def readable_text(cls, value: str) -> str:
-        """业务函数：处理 readable_text 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 readable_text 对应的业务流程、校验或数据转换。
+
+        入参：value 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         text = str(value or "").strip()
         if not text:
             return text
@@ -90,7 +104,10 @@ class RepairTask(BaseModel):
 
 
 class RepairClassificationResult(BaseModel):
-    """业务类：承载 RepairClassificationResult 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 RepairClassificationResult 相关的数据结构、状态或业务协作。
+
+    类参数：blocked_reason、manual_gate_required、repair_tasks、repairable 承载该类的业务配置、状态或数据字段。
+    """
     repairable: bool = False
     manual_gate_required: bool = False
     blocked_reason: str | None = None
@@ -98,7 +115,11 @@ class RepairClassificationResult(BaseModel):
 
 
 def looks_unreadable(text: str) -> bool:
-    """业务函数：处理 looks_unreadable 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 looks_unreadable 对应的业务流程、校验或数据转换。
+
+    入参：text 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     value = str(text or "")
     if not value.strip():
         return False
@@ -106,7 +127,11 @@ def looks_unreadable(text: str) -> bool:
 
 
 def action_for_task(task_type: str, target_type: str, target_id: str | None) -> tuple[str, str | None]:
-    """业务函数：处理 action_for_task 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 action_for_task 对应的业务流程、校验或数据转换。
+
+    入参：task_type、target_type、target_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if target_type == "character" and target_id:
         return "去角色资产补参考图", f"/characters/{target_id}"
     if target_type == "scene" and target_id:

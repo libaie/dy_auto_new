@@ -67,14 +67,22 @@ EPISODE_START_TEXT_ARTIFACTS = (
 
 
 def _style_lock(series: Series) -> dict:
-    """业务函数：处理 _style_lock 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _style_lock 对应的业务流程、校验或数据转换。
+
+    入参：series 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     story_bible = series.story_bible_json if isinstance(series.story_bible_json, dict) else {}
     style_lock = story_bible.get("style_lock") or {}
     return style_lock if isinstance(style_lock, dict) else {}
 
 
 def _production_episode_for_plan(db: Session, plan_id: str, episode_id: str) -> ProductionEpisode:
-    """业务函数：处理 _production_episode_for_plan 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _production_episode_for_plan 对应的业务流程、校验或数据转换。
+
+    入参：db、plan_id、episode_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return db.query(ProductionEpisode).filter(
         ProductionEpisode.plan_id == plan_id,
         ProductionEpisode.episode_id == episode_id,
@@ -82,7 +90,11 @@ def _production_episode_for_plan(db: Session, plan_id: str, episode_id: str) -> 
 
 
 def segment_count_for_episode(db: Session, production_episode_id: str) -> int:
-    """业务函数：处理 segment_count_for_episode 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 segment_count_for_episode 对应的业务流程、校验或数据转换。
+
+    入参：db、production_episode_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return (
         db.query(ProductionSegment)
         .join(ProductionShot, ProductionSegment.shot_plan_id == ProductionShot.id)
@@ -99,7 +111,11 @@ def create_linked_run(
     production_plan_id: str | None = None,
     run_type: str = LEGACY_EPISODE_RUN,
 ) -> VideoProductionRun:
-    """业务函数：处理 create_linked_run 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 create_linked_run 对应的业务流程、校验或数据转换。
+
+    入参：db、series_id、episode_id、production_plan_id、run_type 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     run_type = validate_run_type(run_type)
     query = (
         db.query(ProductionPlan)
@@ -160,7 +176,11 @@ def create_linked_run(
 
 
 def _assert_budget_allows_real_short_start(run_type: str, budget_limit: float | None) -> None:
-    """业务函数：处理 _assert_budget_allows_real_short_start 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _assert_budget_allows_real_short_start 对应的业务流程、校验或数据转换。
+
+    入参：run_type、budget_limit 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if run_type == REAL_SHORT_E2E and (budget_limit is None or float(budget_limit) <= 0):
         raise ProductionRepairableError(
             code=ProductionErrorCode.BUDGET_EXCEEDED,
@@ -173,7 +193,11 @@ def _assert_budget_allows_real_short_start(run_type: str, budget_limit: float | 
 
 
 def _target_duration_from_storyboard(storyboard: dict) -> int | None:
-    """业务函数：处理 _target_duration_from_storyboard 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _target_duration_from_storyboard 对应的业务流程、校验或数据转换。
+
+    入参：storyboard 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     frames = storyboard.get("frames") or []
     durations = []
     for frame in frames:
@@ -187,7 +211,11 @@ def _target_duration_from_storyboard(storyboard: dict) -> int | None:
 
 
 def _scale_frame_durations(frames: list[dict], target_duration_seconds: int | float) -> list[float]:
-    """业务函数：处理 _scale_frame_durations 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _scale_frame_durations 对应的业务流程、校验或数据转换。
+
+    入参：frames、target_duration_seconds 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     target = round(float(target_duration_seconds), 2)
     current = [
         max(0.01, float(frame.get("duration") or frame.get("duration_seconds") or PREFERRED_SHOT_SECONDS))
@@ -203,7 +231,11 @@ def _scale_frame_durations(frames: list[dict], target_duration_seconds: int | fl
 
 
 def _retime_storyboard_to_target(storyboard: dict, target_duration_seconds: int | None) -> dict:
-    """业务函数：处理 _retime_storyboard_to_target 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _retime_storyboard_to_target 对应的业务流程、校验或数据转换。
+
+    入参：storyboard、target_duration_seconds 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     storyboard = annotate_storyboard_with_timing(storyboard, default_duration_seconds=PREFERRED_SHOT_SECONDS)
     if target_duration_seconds is None:
         return storyboard
@@ -237,7 +269,11 @@ def _raise_if_latest_text_artifact_unapproved(
     series_id: str,
     episode_id: str,
 ) -> None:
-    """业务函数：处理 _raise_if_latest_text_artifact_unapproved 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _raise_if_latest_text_artifact_unapproved 对应的业务流程、校验或数据转换。
+
+    入参：service、series_id、episode_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     affected_ids: list[str] = []
     for artifact_type in SERIES_START_TEXT_ARTIFACTS:
         artifact = service.latest_version(
@@ -268,7 +304,11 @@ def _raise_if_latest_text_artifact_unapproved(
 
 
 def _storyboard_prompt_lines(storyboard: dict, key: str) -> list[str]:
-    """业务函数：处理 _storyboard_prompt_lines 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _storyboard_prompt_lines 对应的业务流程、校验或数据转换。
+
+    入参：storyboard、key 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     frames = storyboard.get("frames") or []
     if not isinstance(frames, list):
         return []
@@ -276,7 +316,11 @@ def _storyboard_prompt_lines(storyboard: dict, key: str) -> list[str]:
 
 
 def _storyboard_dialogue_lines(storyboard: dict) -> list[str]:
-    """业务函数：处理 _storyboard_dialogue_lines 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _storyboard_dialogue_lines 对应的业务流程、校验或数据转换。
+
+    入参：storyboard 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     frames = storyboard.get("frames") or []
     lines: list[str] = []
     if not isinstance(frames, list):
@@ -294,13 +338,21 @@ def _storyboard_dialogue_lines(storyboard: dict) -> list[str]:
 
 
 def _storyboard_content_text(storyboard: dict) -> str:
-    """业务函数：处理 _storyboard_content_text 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _storyboard_content_text 对应的业务流程、校验或数据转换。
+
+    入参：storyboard 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     timed_lines = timed_storyboard_lines(storyboard)
     return "\n".join(timed_lines or _storyboard_dialogue_lines(storyboard))
 
 
 def _episode_script_from_storyboard(series: Series, episode: Episode, storyboard: dict) -> dict:
-    """业务函数：处理 _episode_script_from_storyboard 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _episode_script_from_storyboard 对应的业务流程、校验或数据转换。
+
+    入参：series、episode、storyboard 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     frames = storyboard.get("frames") if isinstance(storyboard.get("frames"), list) else []
     script_frames = []
     for index, frame in enumerate(frames, start=1):
@@ -343,7 +395,11 @@ def _create_approved_import_artifact(
     content_text: str,
     episode_id: str | None = None,
 ) -> None:
-    """业务函数：处理 _create_approved_import_artifact 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _create_approved_import_artifact 对应的业务流程、校验或数据转换。
+
+    入参：service、series_id、target_type、target_id、artifact_type、content_json、content_text、episode_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     artifact = service.create_artifact(
         series_id=series_id,
         episode_id=episode_id,
@@ -368,7 +424,11 @@ def _ensure_episode_start_text_artifacts(
     episode: Episode,
     storyboard: dict,
 ) -> None:
-    """业务函数：处理 _ensure_episode_start_text_artifacts 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _ensure_episode_start_text_artifacts 对应的业务流程、校验或数据转换。
+
+    入参：db、service、series、episode、storyboard 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     ensure_series_continuity_artifacts(db, series.id)
     if not service.latest_approved(
         target_type="series",
@@ -472,7 +532,11 @@ def _ensure_episode_start_text_artifacts(
 
 
 def _real_short_storyboard_needs_reference_rebuild(storyboard: dict) -> bool:
-    """业务函数：处理 _real_short_storyboard_needs_reference_rebuild 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _real_short_storyboard_needs_reference_rebuild 对应的业务流程、校验或数据转换。
+
+    入参：storyboard 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     frames = storyboard.get("frames") or []
     if not frames:
         return True
@@ -485,13 +549,21 @@ def _real_short_storyboard_needs_reference_rebuild(storyboard: dict) -> bool:
 
 
 def _dedupe_refs(refs: list[str], limit: int | None = None) -> list[str]:
-    """业务函数：处理 _dedupe_refs 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _dedupe_refs 对应的业务流程、校验或数据转换。
+
+    入参：refs、limit 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     deduped = list(dict.fromkeys([ref for ref in refs if ref]))
     return deduped[:limit] if limit else deduped
 
 
 def _style_item_refs(items: list[dict], item_id: str | None) -> list[str]:
-    """业务函数：处理 _style_item_refs 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _style_item_refs 对应的业务流程、校验或数据转换。
+
+    入参：items、item_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     for item in items:
         if item.get("id") == item_id:
             return item.get("reference_urls") or []
@@ -499,7 +571,11 @@ def _style_item_refs(items: list[dict], item_id: str | None) -> list[str]:
 
 
 def _style_locked_reference_payload(series: Series, frame_index: int, frame: dict) -> dict:
-    """业务函数：处理 _style_locked_reference_payload 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _style_locked_reference_payload 对应的业务流程、校验或数据转换。
+
+    入参：series、frame_index、frame 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     style_lock = _style_lock(series)
     characters = style_lock.get("characters") if isinstance(style_lock.get("characters"), list) else []
     scenes = style_lock.get("scenes") if isinstance(style_lock.get("scenes"), list) else []
@@ -529,7 +605,11 @@ def _style_locked_reference_payload(series: Series, frame_index: int, frame: dic
 
 
 def _enrich_storyboard_with_style_refs(storyboard: dict, series: Series) -> dict:
-    """业务函数：处理 _enrich_storyboard_with_style_refs 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _enrich_storyboard_with_style_refs 对应的业务流程、校验或数据转换。
+
+    入参：storyboard、series 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     timed_storyboard = annotate_storyboard_with_timing(
         storyboard,
         default_duration_seconds=PREFERRED_SHOT_SECONDS,
@@ -554,7 +634,11 @@ def _enrich_storyboard_with_style_refs(storyboard: dict, series: Series) -> dict
 
 
 def _compact_artifact_content(value, *, max_chars: int = 1400) -> str:
-    """业务函数：处理 _compact_artifact_content 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _compact_artifact_content 对应的业务流程、校验或数据转换。
+
+    入参：value、max_chars 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if not value:
         return ""
     if isinstance(value, str):
@@ -569,7 +653,11 @@ def _compact_artifact_content(value, *, max_chars: int = 1400) -> str:
 
 
 def _approved_story_context(service: AITextArtifactService, series: Series, episode: Episode) -> str:
-    """业务函数：处理 _approved_story_context 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _approved_story_context 对应的业务流程、校验或数据转换。
+
+    入参：service、series、episode 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     specs = [
         ("series", series.id, "series_story_plan", "整季故事规划"),
         ("series", series.id, "season_arc", "季弧线"),
@@ -593,7 +681,11 @@ def _approved_story_context(service: AITextArtifactService, series: Series, epis
 
 
 def _style_lock_name_maps(series: Series) -> tuple[dict[str, str], dict[str, str]]:
-    """业务函数：处理 _style_lock_name_maps 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _style_lock_name_maps 对应的业务流程、校验或数据转换。
+
+    入参：series 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     style_lock = _style_lock(series)
     character_names: dict[str, str] = {}
     scene_names: dict[str, str] = {}
@@ -611,7 +703,11 @@ def _style_lock_name_maps(series: Series) -> tuple[dict[str, str], dict[str, str
 
 
 def _series_asset_pool_summary(series: Series) -> dict:
-    """业务函数：处理 _series_asset_pool_summary 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _series_asset_pool_summary 对应的业务流程、校验或数据转换。
+
+    入参：series 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     character_names, scene_names = _style_lock_name_maps(series)
     return {
         "characters": [{"id": asset_id, "name": name} for asset_id, name in character_names.items()],
@@ -620,7 +716,11 @@ def _series_asset_pool_summary(series: Series) -> dict:
 
 
 def _usage_items(asset_usage: dict, key: str, ids: list[str], names: dict[str, str]) -> list[dict]:
-    """业务函数：处理 _usage_items 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _usage_items 对应的业务流程、校验或数据转换。
+
+    入参：asset_usage、key、ids、names 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     raw_items = asset_usage.get(key) if isinstance(asset_usage.get(key), list) else []
     by_id = {
         str(item.get("id")): item
@@ -640,7 +740,11 @@ def _usage_items(asset_usage: dict, key: str, ids: list[str], names: dict[str, s
 
 
 def _episode_asset_scope_from_outline(service: AITextArtifactService, series: Series, episode: Episode) -> dict:
-    """业务函数：处理 _episode_asset_scope_from_outline 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _episode_asset_scope_from_outline 对应的业务流程、校验或数据转换。
+
+    入参：service、series、episode 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     artifact = service.latest_approved(
         target_type="episode",
         target_id=episode.id,
@@ -663,7 +767,11 @@ def _episode_asset_scope_from_outline(service: AITextArtifactService, series: Se
 
 
 def _script_episode_asset_scope(episode: Episode) -> dict:
-    """业务函数：处理 _script_episode_asset_scope 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _script_episode_asset_scope 对应的业务流程、校验或数据转换。
+
+    入参：episode 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     script = episode.script_json if isinstance(episode.script_json, dict) else {}
     scope = script.get("episode_asset_scope") if isinstance(script.get("episode_asset_scope"), dict) else {}
     character_ids = list(dict.fromkeys(str(item) for item in (scope.get("character_ids") or []) if item))
@@ -683,7 +791,11 @@ def _episode_asset_scope_for_production(
     series: Series,
     episode: Episode,
 ) -> dict:
-    """业务函数：处理 _episode_asset_scope_for_production 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _episode_asset_scope_for_production 对应的业务流程、校验或数据转换。
+
+    入参：service、series、episode 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     script_scope = _script_episode_asset_scope(episode)
     if script_scope:
         return script_scope
@@ -691,19 +803,31 @@ def _episode_asset_scope_for_production(
 
 
 def _scope_has_assets(scope: dict) -> bool:
-    """业务函数：处理 _scope_has_assets 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _scope_has_assets 对应的业务流程、校验或数据转换。
+
+    入参：scope 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return bool(scope.get("character_ids")) and bool(scope.get("scene_ids"))
 
 
 def _scope_needs_scene_mapping(scope: dict) -> bool:
-    """业务函数：处理 _scope_needs_scene_mapping 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _scope_needs_scene_mapping 对应的业务流程、校验或数据转换。
+
+    入参：scope 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     scene_ids = [str(item) for item in scope.get("scene_ids") or [] if item]
     scene_map = scope.get("scene_by_scene_number") if isinstance(scope.get("scene_by_scene_number"), dict) else {}
     return len(scene_ids) > 1 and not scene_map
 
 
 def _style_lock_ids(series: Series, key: str) -> set[str]:
-    """业务函数：处理 _style_lock_ids 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _style_lock_ids 对应的业务流程、校验或数据转换。
+
+    入参：series、key 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     rows = _style_lock(series).get(key) or []
     if not isinstance(rows, list):
         return set()
@@ -715,7 +839,11 @@ def _style_lock_ids(series: Series, key: str) -> set[str]:
 
 
 def _series_asset_ids(series: Series, relation_name: str, style_lock_key: str) -> set[str]:
-    """业务函数：处理 _series_asset_ids 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _series_asset_ids 对应的业务流程、校验或数据转换。
+
+    入参：series、relation_name、style_lock_key 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     related = getattr(series, relation_name, []) or []
     return {
         str(item.id)
@@ -732,7 +860,11 @@ def _raise_episode_asset_scope_missing(
     cause: str | None = None,
     affected_ids: list[str] | None = None,
 ) -> None:
-    """业务函数：处理 _raise_episode_asset_scope_missing 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _raise_episode_asset_scope_missing 对应的业务流程、校验或数据转换。
+
+    入参：series、episode、message、cause、affected_ids 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     raise ProductionRepairableError(
         code=ProductionErrorCode.EPISODE_ASSET_SCOPE_MISSING,
         message=message,
@@ -745,7 +877,11 @@ def _raise_episode_asset_scope_missing(
 
 
 def _validate_episode_asset_scope_ids(db: Session, series: Series, episode: Episode, scope: dict) -> None:
-    """业务函数：处理 _validate_episode_asset_scope_ids 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _validate_episode_asset_scope_ids 对应的业务流程、校验或数据转换。
+
+    入参：db、series、episode、scope 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if not _scope_has_assets(scope):
         return
     character_ids = [str(item) for item in scope.get("character_ids") or [] if item]
@@ -785,7 +921,11 @@ def _validate_episode_asset_scope_ids(db: Session, series: Series, episode: Epis
 
 
 def _apply_episode_asset_scope_to_storyboard(storyboard: dict, scope: dict) -> dict:
-    """业务函数：处理 _apply_episode_asset_scope_to_storyboard 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _apply_episode_asset_scope_to_storyboard 对应的业务流程、校验或数据转换。
+
+    入参：storyboard、scope 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if not _scope_has_assets(scope):
         return storyboard
     frames = storyboard.get("frames") if isinstance(storyboard.get("frames"), list) else []
@@ -822,7 +962,11 @@ def _apply_episode_asset_scope_to_storyboard(storyboard: dict, scope: dict) -> d
 
 
 def _storyboard_has_frame_asset_scope(storyboard: dict) -> bool:
-    """业务函数：处理 _storyboard_has_frame_asset_scope 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _storyboard_has_frame_asset_scope 对应的业务流程、校验或数据转换。
+
+    入参：storyboard 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     frames = storyboard.get("frames") if isinstance(storyboard.get("frames"), list) else []
     return bool(frames) and all(
         isinstance(frame, dict) and frame.get("scene_id") and frame.get("character_ids")
@@ -831,14 +975,22 @@ def _storyboard_has_frame_asset_scope(storyboard: dict) -> bool:
 
 
 def _ensure_episode_asset_scope_ready(series: Series, episode: Episode, storyboard: dict, scope: dict) -> None:
-    """业务函数：处理 _ensure_episode_asset_scope_ready 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _ensure_episode_asset_scope_ready 对应的业务流程、校验或数据转换。
+
+    入参：series、episode、storyboard、scope 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if _scope_has_assets(scope) and _storyboard_has_frame_asset_scope(storyboard):
         return
     _raise_episode_asset_scope_missing(series, episode)
 
 
 def _script_gate_statuses(trace: dict | None) -> list[str]:
-    """业务函数：处理 _script_gate_statuses 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _script_gate_statuses 对应的业务流程、校验或数据转换。
+
+    入参：trace 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if not isinstance(trace, dict):
         return []
     statuses: list[str] = []
@@ -852,7 +1004,11 @@ def _script_gate_statuses(trace: dict | None) -> list[str]:
 
 
 def _raise_if_script_generation_blocked(series: Series, episode: Episode, trace: dict | None) -> None:
-    """业务函数：处理 _raise_if_script_generation_blocked 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _raise_if_script_generation_blocked 对应的业务流程、校验或数据转换。
+
+    入参：series、episode、trace 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     statuses = _script_gate_statuses(trace)
     if not any(status in {"blocked", "failed"} for status in statuses):
         return
@@ -871,7 +1027,11 @@ def _raise_if_existing_script_inputs_blocked(
     series: Series,
     episode: Episode,
 ) -> None:
-    """业务函数：处理 _raise_if_existing_script_inputs_blocked 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _raise_if_existing_script_inputs_blocked 对应的业务流程、校验或数据转换。
+
+    入参：service、series、episode 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if isinstance(episode.script_json, dict):
         _raise_if_script_generation_blocked(series, episode, episode.script_json.get("agency_trace"))
     artifact = service.latest_approved(
@@ -888,7 +1048,11 @@ def _raise_if_existing_script_inputs_blocked(
     _raise_if_script_generation_blocked(series, episode, trace)
 
 def _episode_script_missing(service: AITextArtifactService, episode: Episode) -> bool:
-    """业务函数：处理 _episode_script_missing 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _episode_script_missing 对应的业务流程、校验或数据转换。
+
+    入参：service、episode 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if isinstance(episode.script_json, dict) and episode.script_json:
         return False
     return service.latest_approved(
@@ -905,7 +1069,11 @@ def _script_generation_source_prompt(
     *,
     episode_asset_scope: dict | None = None,
 ) -> str:
-    """业务函数：处理 _script_generation_source_prompt 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _script_generation_source_prompt 对应的业务流程、校验或数据转换。
+
+    入参：service、series、episode、episode_asset_scope 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     episode_scope = episode_asset_scope or _episode_asset_scope_from_outline(service, series, episode)
     parts = [
         f"系列标题: {series.title or ''}",
@@ -932,7 +1100,11 @@ def _script_generation_source_prompt(
 
 
 def _series_script_tags(series: Series) -> list[str]:
-    """业务函数：处理 _series_script_tags 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _series_script_tags 对应的业务流程、校验或数据转换。
+
+    入参：series 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     tags = []
     if series.genre:
         tags.append(str(series.genre))
@@ -951,7 +1123,11 @@ async def _try_generate_script_storyboard(
     artifact_service: AITextArtifactService,
     target_duration_seconds: int,
 ) -> tuple[dict | None, dict | None]:
-    """业务函数：处理 _try_generate_script_storyboard 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _try_generate_script_storyboard 对应的业务流程、校验或数据转换。
+
+    入参：db、series、episode、artifact_service、target_duration_seconds 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     episode_asset_scope = _episode_asset_scope_from_outline(artifact_service, series, episode)
     try:
         script = await PipelineManager().start_or_resume(
@@ -1000,7 +1176,11 @@ async def generate_episode_script_storyboard(
     episode_id: str,
     target_duration_seconds: int | None = None,
 ) -> dict:
-    """业务函数：处理 generate_episode_script_storyboard 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 generate_episode_script_storyboard 对应的业务流程、校验或数据转换。
+
+    入参：db、series_id、episode_id、target_duration_seconds 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     series = db.query(Series).filter(Series.id == series_id).first()
     if not series:
         raise ValueError("series_not_found")
@@ -1049,7 +1229,11 @@ def _fallback_story_beat(
     character_name: str,
     scene_name: str,
 ) -> dict[str, str]:
-    """业务函数：处理 _fallback_story_beat 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _fallback_story_beat 对应的业务流程、校验或数据转换。
+
+    入参：index、frame_count、time_range、series、episode、character_name、scene_name 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     premise = series.logline or series.title or "本集主线"
     episode_name = episode.title or f"第{episode.episode_number}集"
     templates = [
@@ -1096,7 +1280,11 @@ def _build_style_locked_storyboard(
     episode: Episode,
     target_duration_seconds: int | None,
 ) -> dict:
-    """业务函数：处理 _build_style_locked_storyboard 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _build_style_locked_storyboard 对应的业务流程、校验或数据转换。
+
+    入参：db、series、episode、target_duration_seconds 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     style_lock = _style_lock(series)
     characters = style_lock.get("characters") if isinstance(style_lock.get("characters"), list) else []
     scenes = style_lock.get("scenes") if isinstance(style_lock.get("scenes"), list) else []
@@ -1192,7 +1380,11 @@ def _build_style_locked_storyboard(
 
 
 def _assert_real_short_duration(run_type: str, duration_seconds: int | None) -> None:
-    """业务函数：处理 _assert_real_short_duration 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _assert_real_short_duration 对应的业务流程、校验或数据转换。
+
+    入参：run_type、duration_seconds 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if run_type != REAL_SHORT_E2E:
         return
     if duration_seconds is None or not REAL_SHORT_MIN_SECONDS <= int(duration_seconds) <= REAL_SHORT_MAX_SECONDS:
@@ -1225,7 +1417,11 @@ async def start_episode_production(
     prepare_text_artifacts: bool = False,
     episode_asset_scope_override: dict | None = None,
 ) -> VideoProductionRun:
-    """业务函数：处理 start_episode_production 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 start_episode_production 对应的业务流程、校验或数据转换。
+
+    入参：db、series_id、episode_id、target_duration_seconds、budget_limit、autostart_images、run_type、auto_repair_policy、prepare_text_artifacts、episode_asset_scope_override 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     run_type = validate_run_type(run_type)
     if run_type == MOCK_SERIES_SCALE:
         raise ProductionRepairableError(

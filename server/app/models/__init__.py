@@ -11,7 +11,10 @@ import uuid
 
 
 class TaskType(str, Enum):
-    """业务类：承载 TaskType 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 TaskType 相关的数据结构、状态或业务协作。
+
+    类参数：COLLECT、NURTURE、REPLY_COMMENT、SEARCH_COMMENT、SEARCH_DM、SEARCH_LIKE 承载该类的业务配置、状态或数据字段。
+    """
     NURTURE = "nurture"
     SEARCH_COMMENT = "search_comment"
     SEARCH_LIKE = "search_like"
@@ -21,7 +24,10 @@ class TaskType(str, Enum):
 
 
 class TaskStatus(str, Enum):
-    """业务类：承载 TaskStatus 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 TaskStatus 相关的数据结构、状态或业务协作。
+
+    类参数：CANCELLED、COMPLETED、FAILED、PENDING、RUNNING 承载该类的业务配置、状态或数据字段。
+    """
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -30,7 +36,10 @@ class TaskStatus(str, Enum):
 
 
 class Task(BaseModel):
-    """业务类：承载 Task 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 Task 相关的数据结构、状态或业务协作。
+
+    类参数：account_id、chain_instance_id、completed_at、created_at、device_id、id、lease_id、params、result、retry_count、scheduled_at、started_at、status、step_order、type 承载该类的业务配置、状态或数据字段。
+    """
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     type: TaskType
     account_id: str
@@ -49,7 +58,10 @@ class Task(BaseModel):
 
 
 class AccountConfig(BaseModel):
-    """业务类：承载 AccountConfig 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 AccountConfig 相关的数据结构、状态或业务协作。
+
+    类参数：daily_limits、douyin_id、id、nickname、status 承载该类的业务配置、状态或数据字段。
+    """
     id: str
     nickname: str
     douyin_id: str
@@ -64,7 +76,10 @@ class AccountConfig(BaseModel):
 
 
 class SelectorStrategy(BaseModel):
-    """业务类：承载 SelectorStrategy 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 SelectorStrategy 相关的数据结构、状态或业务协作。
+
+    类参数：priority、template、threshold、type、value、x_percent、y_percent 承载该类的业务配置、状态或数据字段。
+    """
     type: str  # text, id, desc, className, package, coordinate, image
     value: Optional[str] = None
     x_percent: Optional[float] = None
@@ -76,7 +91,10 @@ class SelectorStrategy(BaseModel):
 
 
 class SelectorConfig(BaseModel):
-    """业务类：承载 SelectorConfig 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 SelectorConfig 相关的数据结构、状态或业务协作。
+
+    类参数：action_name、platform_version、purpose、strategies、version 承载该类的业务配置、状态或数据字段。
+    """
     action_name: str
     platform_version: str = "default"
     strategies: list[SelectorStrategy]
@@ -85,7 +103,10 @@ class SelectorConfig(BaseModel):
 
 
 class TaskCreateRequest(BaseModel):
-    """业务类：承载 TaskCreateRequest 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 TaskCreateRequest 相关的数据结构、状态或业务协作。
+
+    类参数：account_id、device_id、params、scheduled_at、type 承载该类的业务配置、状态或数据字段。
+    """
     type: TaskType
     account_id: str
     device_id: Optional[str] = None
@@ -94,7 +115,10 @@ class TaskCreateRequest(BaseModel):
 
 
 class BatchTaskCreateRequest(BaseModel):
-    """业务类：承载 BatchTaskCreateRequest 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 BatchTaskCreateRequest 相关的数据结构、状态或业务协作。
+
+    类参数：account_ids、device_id、group_ids、params、scheduled_at、type 承载该类的业务配置、状态或数据字段。
+    """
     type: TaskType
     account_ids: Optional[list[str]] = None
     group_ids: Optional[list[str]] = None
@@ -104,7 +128,11 @@ class BatchTaskCreateRequest(BaseModel):
 
     @model_validator(mode="after")
     def check_at_least_one(self):
-        """业务函数：处理 check_at_least_one 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 check_at_least_one 对应的业务流程、校验或数据转换。
+
+        入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         if not self.account_ids and not self.group_ids:
             raise ValueError("account_ids 和 group_ids 至少提供一个")
         return self
@@ -113,13 +141,19 @@ class BatchTaskCreateRequest(BaseModel):
 # --- 任务参数校验模型 ---
 
 class ActionWeight(BaseModel):
-    """业务类：承载 ActionWeight 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 ActionWeight 相关的数据结构、状态或业务协作。
+
+    类参数：type、weight 承载该类的业务配置、状态或数据字段。
+    """
     type: str = Field(..., pattern="^(browse_feed|like|comment|follow)$")
     weight: int = Field(..., ge=0, le=100)
 
 
 class NurtureParams(BaseModel):
-    """业务类：承载 NurtureParams 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 NurtureParams 相关的数据结构、状态或业务协作。
+
+    类参数：actions、duration、prompt_template_id 承载该类的业务配置、状态或数据字段。
+    """
     duration: int = Field(default=30, ge=1, le=120, description="养号时长(分钟)")
     prompt_template_id: Optional[str] = Field(None, description="Prompt template ID")
     actions: list[ActionWeight] = Field(default_factory=lambda: [
@@ -130,7 +164,10 @@ class NurtureParams(BaseModel):
 
 
 class SearchCommentParams(BaseModel):
-    """业务类：承载 SearchCommentParams 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 SearchCommentParams 相关的数据结构、状态或业务协作。
+
+    类参数：content、content_template_id、count、keyword、keywords、max_age_days、max_age_unit、prompt_template_id、share_links、sort_by、video_count 承载该类的业务配置、状态或数据字段。
+    """
     keyword: str = Field("", min_length=0, max_length=200, description="搜索关键词（分享链接模式时可为空）")
     keywords: Optional[list[str]] = Field(None, description="批量关键词（通道模式）")
     share_links: Optional[list[str]] = Field(None, description="分享链接列表，每个链接对应一个视频")
@@ -146,7 +183,10 @@ class SearchCommentParams(BaseModel):
 
 
 class SearchLikeParams(BaseModel):
-    """业务类：承载 SearchLikeParams 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 SearchLikeParams 相关的数据结构、状态或业务协作。
+
+    类参数：count、keyword、keywords、prompt_template_id、sort_by 承载该类的业务配置、状态或数据字段。
+    """
     keyword: str = Field(..., min_length=1, max_length=50, description="搜索关键词")
     keywords: Optional[list[str]] = Field(None, description="批量关键词（通道模式）")
     prompt_template_id: Optional[str] = Field(None, description="提示词模板ID")
@@ -155,7 +195,10 @@ class SearchLikeParams(BaseModel):
 
 
 class SearchDMParams(BaseModel):
-    """业务类：承载 SearchDMParams 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 SearchDMParams 相关的数据结构、状态或业务协作。
+
+    类参数：content、content_template_id、count、dm_sequence_id、keyword、keywords、prompt_template_id、sort_by 承载该类的业务配置、状态或数据字段。
+    """
     keyword: str = Field(..., min_length=1, max_length=50, description="搜索关键词")
     keywords: Optional[list[str]] = Field(None, description="批量关键词（通道模式）")
     content: Optional[str] = Field(None, max_length=500, description="私信内容")
@@ -167,7 +210,10 @@ class SearchDMParams(BaseModel):
 
 
 class ReplyCommentParams(BaseModel):
-    """业务类：承载 ReplyCommentParams 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 ReplyCommentParams 相关的数据结构、状态或业务协作。
+
+    类参数：content、content_template_id、count、dm_sequence_id、keyword、keywords、max_age_days、max_age_unit、max_dms、max_follows、prompt_template_id、sort_by、video_count 承载该类的业务配置、状态或数据字段。
+    """
     keyword: str = Field(..., min_length=1, max_length=50, description="搜索关键词")
     keywords: Optional[list[str]] = Field(None, description="批量关键词（通道模式）")
     content: Optional[str] = Field(None, max_length=500, description="私信内容")
@@ -185,7 +231,11 @@ class ReplyCommentParams(BaseModel):
 
 
 def _validate_nurture_params(params: dict) -> dict:
-    """业务函数：处理 _validate_nurture_params 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _validate_nurture_params 对应的业务流程、校验或数据转换。
+
+    入参：params 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Accept both legacy (duration only) and V2 (sub_tasks) formats."""
     if "sub_tasks" in params:
         validated = NurtureParamsV2(**params)
@@ -207,7 +257,10 @@ TASK_PARAMS_VALIDATORS = {
 
 
 class TaskProgressReport(BaseModel):
-    """业务类：承载 TaskProgressReport 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 TaskProgressReport 相关的数据结构、状态或业务协作。
+
+    类参数：detail、lease_id、progress、step、task_id 承载该类的业务配置、状态或数据字段。
+    """
     task_id: str
     lease_id: Optional[str] = None
     step: str = ""          # 当前步骤描述，如 "处理视频 2/3"
@@ -216,7 +269,10 @@ class TaskProgressReport(BaseModel):
 
 
 class TaskResultReport(BaseModel):
-    """业务类：承载 TaskResultReport 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 TaskResultReport 相关的数据结构、状态或业务协作。
+
+    类参数：lease_id、result、status、task_id、ui_snapshot 承载该类的业务配置、状态或数据字段。
+    """
     task_id: str
     lease_id: Optional[str] = None
     status: TaskStatus
@@ -225,7 +281,10 @@ class TaskResultReport(BaseModel):
 
 
 class PollResponse(BaseModel):
-    """业务类：承载 PollResponse 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 PollResponse 相关的数据结构、状态或业务协作。
+
+    类参数：ai_config、anti_detect_config、anti_detect_config_version、cancelled_task_id、device_config、dm_sequences、prompt_templates_version、proxy、selectors_version、server_date、task 承载该类的业务配置、状态或数据字段。
+    """
     task: Optional[Task] = None
     selectors_version: int = 1
     prompt_templates_version: int = 1
@@ -240,7 +299,10 @@ class PollResponse(BaseModel):
 
 
 class DeviceRegisterRequest(BaseModel):
-    """业务类：承载 DeviceRegisterRequest 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 DeviceRegisterRequest 相关的数据结构、状态或业务协作。
+
+    类参数：app_version、device_id、device_model、display、hardware、manufacturer、name、os_version、product、screen_resolution、sdk_version、total_memory 承载该类的业务配置、状态或数据字段。
+    """
     device_id: str
     name: str
     os_version: str = ""
@@ -256,7 +318,10 @@ class DeviceRegisterRequest(BaseModel):
 
 
 class DeviceRegisterResponse(BaseModel):
-    """业务类：承载 DeviceRegisterResponse 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 DeviceRegisterResponse 相关的数据结构、状态或业务协作。
+
+    类参数：config、device_id、name、status 承载该类的业务配置、状态或数据字段。
+    """
     device_id: str
     name: str
     status: str
@@ -264,7 +329,10 @@ class DeviceRegisterResponse(BaseModel):
 
 
 class RiskReport(BaseModel):
-    """业务类：承载 RiskReport 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 RiskReport 相关的数据结构、状态或业务协作。
+
+    类参数：account_id、detail、device_id、risk_type、timestamp 承载该类的业务配置、状态或数据字段。
+    """
     account_id: str
     risk_type: str  # captcha, rate_limit, account_risk, security_check
     detail: dict[str, Any] = Field(default_factory=dict)
@@ -273,13 +341,19 @@ class RiskReport(BaseModel):
 
 
 class LoginRequest(BaseModel):
-    """业务类：承载 LoginRequest 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 LoginRequest 相关的数据结构、状态或业务协作。
+
+    类参数：password、username 承载该类的业务配置、状态或数据字段。
+    """
     username: str
     password: str
 
 
 class LoginResponse(BaseModel):
-    """业务类：承载 LoginResponse 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 LoginResponse 相关的数据结构、状态或业务协作。
+
+    类参数：expires_in、role、token、user_id 承载该类的业务配置、状态或数据字段。
+    """
     token: str
     expires_in: int  # seconds
     role: str = "admin"
@@ -287,7 +361,10 @@ class LoginResponse(BaseModel):
 
 
 class RegisterRequest(BaseModel):
-    """业务类：承载 RegisterRequest 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 RegisterRequest 相关的数据结构、状态或业务协作。
+
+    类参数：nickname、password、role、username 承载该类的业务配置、状态或数据字段。
+    """
     username: str = Field(..., min_length=2, max_length=50)
     password: str = Field(..., min_length=6, max_length=100)
     role: Optional[str] = "operator"
@@ -295,12 +372,18 @@ class RegisterRequest(BaseModel):
 
 
 class AdminUser(BaseModel):
-    """业务类：承载 AdminUser 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 AdminUser 相关的数据结构、状态或业务协作。
+
+    类参数：username 承载该类的业务配置、状态或数据字段。
+    """
     username: str
 
 
 class ContentTemplateCreate(BaseModel):
-    """业务类：承载 ContentTemplateCreate 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 ContentTemplateCreate 相关的数据结构、状态或业务协作。
+
+    类参数：body、category、name、variables 承载该类的业务配置、状态或数据字段。
+    """
     name: str = Field(..., min_length=1, max_length=100)
     category: str = Field(default="comment", pattern="^(comment|dm|reply)$")
     body: str = Field(..., min_length=1)
@@ -308,7 +391,10 @@ class ContentTemplateCreate(BaseModel):
 
 
 class ContentTemplateUpdate(BaseModel):
-    """业务类：承载 ContentTemplateUpdate 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 ContentTemplateUpdate 相关的数据结构、状态或业务协作。
+
+    类参数：body、category、is_active、name、variables 承载该类的业务配置、状态或数据字段。
+    """
     name: Optional[str] = Field(None, min_length=1, max_length=100)
     category: Optional[str] = Field(None, pattern="^(comment|dm|reply)$")
     body: Optional[str] = Field(None, min_length=1)
@@ -317,7 +403,10 @@ class ContentTemplateUpdate(BaseModel):
 
 
 class ContentTemplateResponse(BaseModel):
-    """业务类：承载 ContentTemplateResponse 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 ContentTemplateResponse 相关的数据结构、状态或业务协作。
+
+    类参数：body、category、created_at、id、is_active、name、updated_at、variables 承载该类的业务配置、状态或数据字段。
+    """
     id: str
     name: str
     category: str
@@ -329,55 +418,82 @@ class ContentTemplateResponse(BaseModel):
 
 
 class SensitiveWordCreate(BaseModel):
-    """业务类：承载 SensitiveWordCreate 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 SensitiveWordCreate 相关的数据结构、状态或业务协作。
+
+    类参数：word 承载该类的业务配置、状态或数据字段。
+    """
     word: str = Field(..., min_length=1, max_length=100)
 
 
 class SensitiveWordResponse(BaseModel):
-    """业务类：承载 SensitiveWordResponse 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 SensitiveWordResponse 相关的数据结构、状态或业务协作。
+
+    类参数：created_at、id、word 承载该类的业务配置、状态或数据字段。
+    """
     id: str
     word: str
     created_at: Optional[datetime] = None
 
 
 class GenerateRequest(BaseModel):
-    """业务类：承载 GenerateRequest 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 GenerateRequest 相关的数据结构、状态或业务协作。
+
+    类参数：context、template_id 承载该类的业务配置、状态或数据字段。
+    """
     template_id: str
     context: dict[str, Any] = Field(default_factory=dict)  # {"keyword": "...", "username": "...", "video_title": "..."}
 
 
 class GenerateResponse(BaseModel):
-    """业务类：承载 GenerateResponse 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 GenerateResponse 相关的数据结构、状态或业务协作。
+
+    类参数：content、template_id 承载该类的业务配置、状态或数据字段。
+    """
     content: str
     template_id: str
 
 
 class DeviceGenerateRequest(BaseModel):
-    """业务类：承载 DeviceGenerateRequest 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 DeviceGenerateRequest 相关的数据结构、状态或业务协作。
+
+    类参数：context、template_id 承载该类的业务配置、状态或数据字段。
+    """
     template_id: str
     context: dict[str, str] = Field(default_factory=dict)
 
 
 class DeviceGenerateResponse(BaseModel):
-    """业务类：承载 DeviceGenerateResponse 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 DeviceGenerateResponse 相关的数据结构、状态或业务协作。
+
+    类参数：content、template_id 承载该类的业务配置、状态或数据字段。
+    """
     content: str
     template_id: str
 
 
 class DeviceAIProxyRequest(BaseModel):
-    """业务类：承载 DeviceAIProxyRequest 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 DeviceAIProxyRequest 相关的数据结构、状态或业务协作。
+
+    类参数：max_tokens、prompt、temperature 承载该类的业务配置、状态或数据字段。
+    """
     prompt: str
     max_tokens: int = 4096
     temperature: float = 0.7
 
 
 class DeviceAIProxyResponse(BaseModel):
-    """业务类：承载 DeviceAIProxyResponse 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 DeviceAIProxyResponse 相关的数据结构、状态或业务协作。
+
+    类参数：content 承载该类的业务配置、状态或数据字段。
+    """
     content: str
 
 
 class PairRequestCreate(BaseModel):
-    """业务类：承载 PairRequestCreate 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 PairRequestCreate 相关的数据结构、状态或业务协作。
+
+    类参数：app_version、device_id、device_model、device_name、display、hardware、manufacturer、os_version、product、screen_resolution、sdk_version、total_memory 承载该类的业务配置、状态或数据字段。
+    """
     device_id: str
     device_name: str
     os_version: str = ""
@@ -393,13 +509,19 @@ class PairRequestCreate(BaseModel):
 
 
 class PairRequestResponse(BaseModel):
-    """业务类：承载 PairRequestResponse 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 PairRequestResponse 相关的数据结构、状态或业务协作。
+
+    类参数：pairing_token、status 承载该类的业务配置、状态或数据字段。
+    """
     pairing_token: str
     status: str = "pending"
 
 
 class PairStatusResponse(BaseModel):
-    """业务类：承载 PairStatusResponse 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 PairStatusResponse 相关的数据结构、状态或业务协作。
+
+    类参数：config、pairing_token、secret、status 承载该类的业务配置、状态或数据字段。
+    """
     status: str  # pending, approved, rejected
     pairing_token: Optional[str] = None  # only for pending (from pair-request)
     secret: Optional[str] = None
@@ -409,19 +531,28 @@ class PairStatusResponse(BaseModel):
 # --- 账号分组 ---
 
 class AccountGroupCreate(BaseModel):
-    """业务类：承载 AccountGroupCreate 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 AccountGroupCreate 相关的数据结构、状态或业务协作。
+
+    类参数：description、name 承载该类的业务配置、状态或数据字段。
+    """
     name: str = Field(..., min_length=1, max_length=100)
     description: str = Field(default="", max_length=500)
 
 
 class AccountGroupUpdate(BaseModel):
-    """业务类：承载 AccountGroupUpdate 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 AccountGroupUpdate 相关的数据结构、状态或业务协作。
+
+    类参数：description、name 承载该类的业务配置、状态或数据字段。
+    """
     name: Optional[str] = Field(None, min_length=1, max_length=100)
     description: Optional[str] = Field(None, max_length=500)
 
 
 class AccountGroupResponse(BaseModel):
-    """业务类：承载 AccountGroupResponse 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 AccountGroupResponse 相关的数据结构、状态或业务协作。
+
+    类参数：created_at、description、id、member_count、name、updated_at 承载该类的业务配置、状态或数据字段。
+    """
     id: str
     name: str
     description: str
@@ -431,14 +562,20 @@ class AccountGroupResponse(BaseModel):
 
 
 class AccountGroupMemberRequest(BaseModel):
-    """业务类：承载 AccountGroupMemberRequest 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 AccountGroupMemberRequest 相关的数据结构、状态或业务协作。
+
+    类参数：account_ids 承载该类的业务配置、状态或数据字段。
+    """
     account_ids: list[str] = Field(..., min_length=1)
 
 
 # --- 任务链 ---
 
 class ChainStep(BaseModel):
-    """业务类：承载 ChainStep 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 ChainStep 相关的数据结构、状态或业务协作。
+
+    类参数：label、params、step_order、type 承载该类的业务配置、状态或数据字段。
+    """
     step_order: int = Field(..., ge=1)
     type: TaskType
     label: str = Field(default="", max_length=100)
@@ -446,21 +583,30 @@ class ChainStep(BaseModel):
 
 
 class ChainTemplateCreate(BaseModel):
-    """业务类：承载 ChainTemplateCreate 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 ChainTemplateCreate 相关的数据结构、状态或业务协作。
+
+    类参数：description、name、steps 承载该类的业务配置、状态或数据字段。
+    """
     name: str = Field(..., min_length=1, max_length=100)
     description: str = Field(default="", max_length=500)
     steps: list[ChainStep] = Field(..., min_length=1)
 
 
 class ChainTemplateUpdate(BaseModel):
-    """业务类：承载 ChainTemplateUpdate 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 ChainTemplateUpdate 相关的数据结构、状态或业务协作。
+
+    类参数：description、name、steps 承载该类的业务配置、状态或数据字段。
+    """
     name: Optional[str] = Field(None, min_length=1, max_length=100)
     description: Optional[str] = Field(None, max_length=500)
     steps: Optional[list[ChainStep]] = None
 
 
 class ChainTemplateResponse(BaseModel):
-    """业务类：承载 ChainTemplateResponse 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 ChainTemplateResponse 相关的数据结构、状态或业务协作。
+
+    类参数：created_at、description、id、name、steps、updated_at 承载该类的业务配置、状态或数据字段。
+    """
     id: str
     name: str
     description: str
@@ -470,7 +616,10 @@ class ChainTemplateResponse(BaseModel):
 
 
 class ChainInstanceCreateRequest(BaseModel):
-    """业务类：承载 ChainInstanceCreateRequest 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 ChainInstanceCreateRequest 相关的数据结构、状态或业务协作。
+
+    类参数：account_ids、device_id、group_ids、template_id 承载该类的业务配置、状态或数据字段。
+    """
     template_id: str
     account_ids: Optional[list[str]] = None
     group_ids: Optional[list[str]] = None
@@ -478,14 +627,21 @@ class ChainInstanceCreateRequest(BaseModel):
 
     @model_validator(mode="after")
     def check_at_least_one(self):
-        """业务函数：处理 check_at_least_one 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 check_at_least_one 对应的业务流程、校验或数据转换。
+
+        入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         if not self.account_ids and not self.group_ids:
             raise ValueError("account_ids 和 group_ids 至少提供一个")
         return self
 
 
 class ChainInstanceResponse(BaseModel):
-    """业务类：承载 ChainInstanceResponse 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 ChainInstanceResponse 相关的数据结构、状态或业务协作。
+
+    类参数：account_id、account_nickname、completed_at、created_at、current_step、device_id、id、started_at、status、template_id、template_name、total_steps 承载该类的业务配置、状态或数据字段。
+    """
     id: str
     template_id: str
     template_name: str = ""
@@ -503,14 +659,20 @@ class ChainInstanceResponse(BaseModel):
 # --- 养号 V2 ---
 
 class NurtureSubTask(BaseModel):
-    """业务类：承载 NurtureSubTask 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 NurtureSubTask 相关的数据结构、状态或业务协作。
+
+    类参数：content_template_id、count、type 承载该类的业务配置、状态或数据字段。
+    """
     type: str = Field(..., pattern="^(browse|watch|like|comment|follow)$")
     count: int = Field(default=1, ge=1, le=100)
     content_template_id: Optional[str] = None
 
 
 class NurtureParamsV2(BaseModel):
-    """业务类：承载 NurtureParamsV2 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 NurtureParamsV2 相关的数据结构、状态或业务协作。
+
+    类参数：completion_mode、duration、expand_count、keyword_matrix、keywords、prompt_template_id、sub_tasks 承载该类的业务配置、状态或数据字段。
+    """
     sub_tasks: list[NurtureSubTask] = Field(..., min_length=1)
     completion_mode: str = Field(default="all", pattern="^(all|any)$")
     duration: int = Field(default=60, ge=1, le=240, description="最大时长(分钟)")
@@ -523,32 +685,47 @@ class NurtureParamsV2(BaseModel):
 # --- 关键词矩阵 ---
 
 class KeywordMatrixRequest(BaseModel):
-    """业务类：承载 KeywordMatrixRequest 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 KeywordMatrixRequest 相关的数据结构、状态或业务协作。
+
+    类参数：count、keyword 承载该类的业务配置、状态或数据字段。
+    """
     keyword: str = Field(..., min_length=1, max_length=50)
     count: int = Field(default=10, ge=1, le=30)
 
 
 class GenerateRegexRequest(BaseModel):
-    """业务类：承载 GenerateRegexRequest 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 GenerateRegexRequest 相关的数据结构、状态或业务协作。
+
+    类参数：description 承载该类的业务配置、状态或数据字段。
+    """
     description: str = Field(..., min_length=1, max_length=5000)
 
 
 class GenerateCleanPromptRequest(BaseModel):
-    """业务类：承载 GenerateCleanPromptRequest 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 GenerateCleanPromptRequest 相关的数据结构、状态或业务协作。
+
+    类参数：description 承载该类的业务配置、状态或数据字段。
+    """
     description: str = Field(..., min_length=1, max_length=5000)
 
 
 # --- 系统设置 ---
 
 class SettingUpdate(BaseModel):
-    """业务类：承载 SettingUpdate 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 SettingUpdate 相关的数据结构、状态或业务协作。
+
+    类参数：settings 承载该类的业务配置、状态或数据字段。
+    """
     settings: dict[str, str]
 
 
 # --- 通道 (Channel) ---
 
 class ChannelCreate(BaseModel):
-    """业务类：承载 ChannelCreate 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 ChannelCreate 相关的数据结构、状态或业务协作。
+
+    类参数：account_id、account_mode、cooldown_seconds、delay_range、group_id、keywords、params_template、task_type 承载该类的业务配置、状态或数据字段。
+    """
     group_id: str
     task_type: TaskType
     account_mode: str = Field(default="round_robin", pattern="^(single_account|round_robin)$")
@@ -560,7 +737,11 @@ class ChannelCreate(BaseModel):
 
     @model_validator(mode="after")
     def validate_single_account(self):
-        """业务函数：处理 validate_single_account 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 validate_single_account 对应的业务流程、校验或数据转换。
+
+        入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         if self.account_mode == "single_account" and not self.account_id:
             raise ValueError("single_account 模式下 account_id 必填")
         if len(self.delay_range) != 2 or self.delay_range[0] >= self.delay_range[1]:
@@ -569,22 +750,34 @@ class ChannelCreate(BaseModel):
 
 
 class ChannelUpdate(BaseModel):
-    """业务类：承载 ChannelUpdate 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 ChannelUpdate 相关的数据结构、状态或业务协作。
+
+    类参数：status 承载该类的业务配置、状态或数据字段。
+    """
     status: Optional[str] = Field(None, pattern="^(paused|active|cancelled)$")
 
 
 class ChannelItemUpdate(BaseModel):
-    """业务类：承载 ChannelItemUpdate 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 ChannelItemUpdate 相关的数据结构、状态或业务协作。
+
+    类参数：status 承载该类的业务配置、状态或数据字段。
+    """
     status: Optional[str] = Field(None, pattern="^(skipped|pending)$")
 
 
 class ChannelAppendItems(BaseModel):
-    """业务类：承载 ChannelAppendItems 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 ChannelAppendItems 相关的数据结构、状态或业务协作。
+
+    类参数：keywords 承载该类的业务配置、状态或数据字段。
+    """
     keywords: list[str] = Field(..., min_length=1, max_length=500)
 
 
 class ChannelEditRequest(BaseModel):
-    """业务类：承载 ChannelEditRequest 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 ChannelEditRequest 相关的数据结构、状态或业务协作。
+
+    类参数：account_id、account_mode、cooldown_seconds、group_id、params_template、sync_to_items 承载该类的业务配置、状态或数据字段。
+    """
     """PUT /api/channels/{id} — edit channel metadata (all fields optional)"""
     group_id: Optional[str] = None
     account_mode: Optional[str] = Field(None, pattern="^(single_account|round_robin)$")
@@ -595,7 +788,10 @@ class ChannelEditRequest(BaseModel):
 
 
 class ChannelItemEditRequest(BaseModel):
-    """业务类：承载 ChannelItemEditRequest 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 ChannelItemEditRequest 相关的数据结构、状态或业务协作。
+
+    类参数：account_id、assigned_device_id、keyword 承载该类的业务配置、状态或数据字段。
+    """
     """PUT /api/channel-items/{item_id} — edit a single pending/assigned item"""
     account_id: Optional[str] = None
     assigned_device_id: Optional[str] = None
@@ -603,7 +799,10 @@ class ChannelItemEditRequest(BaseModel):
 
 
 class BatchEditRequest(BaseModel):
-    """业务类：承载 BatchEditRequest 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 BatchEditRequest 相关的数据结构、状态或业务协作。
+
+    类参数：account_id、assigned_device_id、item_ids 承载该类的业务配置、状态或数据字段。
+    """
     """PUT /api/channel-items/batch — batch edit pending/assigned items"""
     item_ids: list[str] = Field(..., min_length=1, max_length=500)
     account_id: Optional[str] = None
@@ -611,7 +810,10 @@ class BatchEditRequest(BaseModel):
 
 
 class ChannelItemResponse(BaseModel):
-    """业务类：承载 ChannelItemResponse 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 ChannelItemResponse 相关的数据结构、状态或业务协作。
+
+    类参数：account_id、account_nickname、assigned_device_id、completed_at、created_at、device_name、id、keyword、queue_position、status、task_id 承载该类的业务配置、状态或数据字段。
+    """
     id: str
     keyword: str
     account_id: str
@@ -626,7 +828,10 @@ class ChannelItemResponse(BaseModel):
 
 
 class ChannelResponse(BaseModel):
-    """业务类：承载 ChannelResponse 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 ChannelResponse 相关的数据结构、状态或业务协作。
+
+    类参数：account_id、account_mode、assigned、completed、completed_at、cooldown_seconds、created_at、delay_range、failed、group_id、group_name、id、params_template、pending、skipped、status、task_type、total 承载该类的业务配置、状态或数据字段。
+    """
     id: str
     group_id: str
     group_name: str = ""
@@ -648,13 +853,19 @@ class ChannelResponse(BaseModel):
 
 
 class ChannelDetailResponse(ChannelResponse):
-    """业务类：承载 ChannelDetailResponse 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 ChannelDetailResponse 相关的数据结构、状态或业务协作。
+
+    类参数：items 承载该类的业务配置、状态或数据字段。
+    """
     items: list[ChannelItemResponse] = []
 
 # --- 采集上报 ---
 
 class CollectCommentData(BaseModel):
-    """业务类：承载 CollectCommentData 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 CollectCommentData 相关的数据结构、状态或业务协作。
+
+    类参数：ai_reply、content、dislike_count、intended_attraction、intended_city、intended_province、is_author、like_count、location、nickname、reply_count、time_str 承载该类的业务配置、状态或数据字段。
+    """
     nickname: str
     content: str
     time_str: str = ""
@@ -670,7 +881,10 @@ class CollectCommentData(BaseModel):
 
 
 class CollectUserData(BaseModel):
-    """业务类：承载 CollectUserData 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 CollectUserData 相关的数据结构、状态或业务协作。
+
+    类参数：age、douyin_id、fans_count、follow_count、gender、ip_location、is_private、likes_count、nickname、works_count 承载该类的业务配置、状态或数据字段。
+    """
     nickname: str
     douyin_id: str = ""
     likes_count: str = ""
@@ -684,7 +898,10 @@ class CollectUserData(BaseModel):
 
 
 class CollectReportRequest(BaseModel):
-    """业务类：承载 CollectReportRequest 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 CollectReportRequest 相关的数据结构、状态或业务协作。
+
+    类参数：comment、data_source_type、keyword、task_id、user 承载该类的业务配置、状态或数据字段。
+    """
     task_id: str
     keyword: str
     comment: CollectCommentData
@@ -693,7 +910,10 @@ class CollectReportRequest(BaseModel):
 
 
 class StatsIncrementRequest(BaseModel):
-    """设备端增量统计上报——每个子操作完成后调用，idempotent per (task,device,type,target,index)"""
+    """业务类：承载 StatsIncrementRequest 相关的数据结构、状态或业务协作。
+
+    类参数：account_id、count、op_index、target_id、task_id、task_type 承载该类的业务配置、状态或数据字段。
+    """
     task_id: str
     account_id: str
     task_type: str                          # search_like / search_comment / reply_comment / follow / search_dm / nurture / collect
@@ -705,20 +925,29 @@ class StatsIncrementRequest(BaseModel):
 # --- DM / Conversation models ---
 
 class DMClaimRecipientRequest(BaseModel):
-    """业务类：承载 DMClaimRecipientRequest 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 DMClaimRecipientRequest 相关的数据结构、状态或业务协作。
+
+    类参数：account_id、recipient_douyin_id、recipient_nickname 承载该类的业务配置、状态或数据字段。
+    """
     account_id: str
     recipient_douyin_id: str
     recipient_nickname: str
 
 
 class DMClaimRecipientResponse(BaseModel):
-    """业务类：承载 DMClaimRecipientResponse 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 DMClaimRecipientResponse 相关的数据结构、状态或业务协作。
+
+    类参数：claimed、conversation_id 承载该类的业务配置、状态或数据字段。
+    """
     claimed: bool
     conversation_id: str | None = None
 
 
 class DMSendReportRequest(BaseModel):
-    """业务类：承载 DMSendReportRequest 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 DMSendReportRequest 相关的数据结构、状态或业务协作。
+
+    类参数：content、conversation_id、dm_sequence_id、error_message、intent、keyword、message_key、message_order、stage、status、task_id 承载该类的业务配置、状态或数据字段。
+    """
     conversation_id: str
     task_id: str | None = None
     stage: str = "qualifying"
@@ -732,12 +961,18 @@ class DMSendReportRequest(BaseModel):
     error_message: str | None = None
 
 class DMReleaseRecipientRequest(BaseModel):
-    """业务类：承载 DMReleaseRecipientRequest 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 DMReleaseRecipientRequest 相关的数据结构、状态或业务协作。
+
+    类参数：conversation_id 承载该类的业务配置、状态或数据字段。
+    """
     conversation_id: str
 
 
 class DMReleaseRecipientResponse(BaseModel):
-    """业务类：承载 DMReleaseRecipientResponse 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 DMReleaseRecipientResponse 相关的数据结构、状态或业务协作。
+
+    类参数：released 承载该类的业务配置、状态或数据字段。
+    """
     released: bool
 
 from app.models.script import (

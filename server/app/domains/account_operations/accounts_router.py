@@ -18,7 +18,10 @@ router = APIRouter(prefix="/api/accounts", tags=["accounts"])
 
 
 class AccountCreateRequest(BaseModel):
-    """业务类：承载 AccountCreateRequest 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 AccountCreateRequest 相关的数据结构、状态或业务协作。
+
+    类参数：daily_limits、douyin_id、group、nickname、status 承载该类的业务配置、状态或数据字段。
+    """
     nickname: str
     douyin_id: str = ""
     group: str = "default"
@@ -27,7 +30,10 @@ class AccountCreateRequest(BaseModel):
 
 
 class AccountUpdateRequest(BaseModel):
-    """业务类：承载 AccountUpdateRequest 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 AccountUpdateRequest 相关的数据结构、状态或业务协作。
+
+    类参数：cookie、daily_limits、douyin_id、group、nickname、status 承载该类的业务配置、状态或数据字段。
+    """
     nickname: Optional[str] = None
     douyin_id: Optional[str] = None
     group: Optional[str] = None
@@ -42,7 +48,11 @@ async def create_account(
     db: Session = Depends(get_db),
     user = Depends(require_role("admin")),
 ):
-    """业务函数：处理 create_account 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 create_account 对应的业务流程、校验或数据转换。
+
+    入参：request、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     user_id, _ = user
     account = account_use_cases.create_account(db, request, user_id)
     await realtime_events.broadcast_accounts_changed()
@@ -57,7 +67,11 @@ def list_accounts(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 list_accounts 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 list_accounts 对应的业务流程、校验或数据转换。
+
+    入参：skip、limit、include_deleted、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return account_use_cases.list_accounts(db, skip, limit, include_deleted, user)
 
 
@@ -68,7 +82,11 @@ def get_account(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 get_account 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 get_account 对应的业务流程、校验或数据转换。
+
+    入参：account_id、include_deleted、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     try:
         return account_use_cases.get_account(db, account_id, include_deleted, user)
     except LookupError:
@@ -82,7 +100,11 @@ async def update_account(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 update_account 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 update_account 对应的业务流程、校验或数据转换。
+
+    入参：account_id、request、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     try:
         account = account_use_cases.update_account(db, account_id, request, user)
     except LookupError:
@@ -97,7 +119,11 @@ async def delete_account(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 delete_account 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 delete_account 对应的业务流程、校验或数据转换。
+
+    入参：account_id、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     try:
         result = account_use_cases.delete_account(db, account_id, user)
     except LookupError:

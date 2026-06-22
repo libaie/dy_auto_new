@@ -39,7 +39,11 @@
 import { ref } from 'vue'
 const plan = ref(null)
 // 前端业务函数：协调 shotBg 对应的页面流程、接口调用或状态转换。
+// 入参：t 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 shotBg 对应业务流程的处理结果。
 function shotBg(t) { return { close_up: 'bg-red-900/40 text-red-400', medium: 'bg-sky-900/40 text-sky-400', wide: 'bg-emerald-900/40 text-emerald-400', aerial: 'bg-purple-900/40 text-purple-400', climax: 'bg-orange-900/40 text-orange-400' }[t] || 'bg-gray-800 text-slate-400' }
 // 前端业务函数：协调 audioBg 对应的页面流程、接口调用或状态转换。
+// 入参：m 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 audioBg 对应业务流程的处理结果。
 function audioBg(m) { return { tts: 'bg-sky-900/40 text-sky-400', seedance_native: 'bg-emerald-900/40 text-emerald-400', bgm_only: 'bg-yellow-900/40 text-yellow-400', silent: 'bg-gray-800 text-slate-400' }[m] || 'bg-gray-800 text-slate-400' }
 </script>

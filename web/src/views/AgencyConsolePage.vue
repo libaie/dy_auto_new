@@ -305,32 +305,44 @@ const commandMetrics = computed(() => [
   },
 ])
 
+// 入参：expertId 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 openExpert 对应业务流程的处理结果。
 function openExpert(expertId) {
   selectedExpertId.value = expertId
 }
 
 // 前端业务函数：协调 scrollToDecisionLog 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 scrollToDecisionLog 对应业务流程的处理结果。
 function scrollToDecisionLog() {
   document.getElementById('agency-decision-log')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 // 前端业务函数：协调 stageLabel 对应的页面流程、接口调用或状态转换。
+// 入参：stage 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 stageLabel 对应业务流程的处理结果。
 function stageLabel(stage) {
   return phaseLabel(stage?.stage, stage?.label)
 }
 
 // 前端业务函数：协调 stepLabel 对应的页面流程、接口调用或状态转换。
+// 入参：step 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 stepLabel 对应业务流程的处理结果。
 function stepLabel(step) {
   return stepName(step)
 }
 
 // 前端业务函数：协调 stepSummary 对应的页面流程、接口调用或状态转换。
+// 入参：step 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 stepSummary 对应业务流程的处理结果。
 function stepSummary(step) {
   const text = step.summary || step.next_action || ''
   if (!text) return '等待该步骤产生记录。'
   return safeDisplayText(text, '该步骤已记录运行摘要。')
 }
 
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 load 对应业务流程的处理结果。
 async function load(options = {}) {
   if (disposed) return
   const silent = options?.silent === true
@@ -359,6 +371,8 @@ async function load(options = {}) {
 }
 
 // 前端业务函数：协调 refreshCreativePatches 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 refreshCreativePatches 对应业务流程的处理结果。
 async function refreshCreativePatches() {
   if (disposed) return
   patchLoading.value = true
@@ -386,6 +400,8 @@ async function refreshCreativePatches() {
 }
 
 // 前端业务函数：协调 normalizeRepairTask 对应的页面流程、接口调用或状态转换。
+// 入参：task 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 normalizeRepairTask 对应业务流程的处理结果。
 function normalizeRepairTask(task) {
   const retryActions = { ...(task?.retry_actions || {}) }
   if (retryActions.paid_authorization_required === undefined && retryActions.paid_authorize_required !== undefined) {
@@ -395,6 +411,8 @@ function normalizeRepairTask(task) {
 }
 
 // 前端业务函数：协调 repairTaskParams 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 repairTaskParams 对应业务流程的处理结果。
 function repairTaskParams() {
   const params = { series_id: route.params.seriesId, page: 1, page_size: 20 }
   const runId = consoleData.value?.latest_run?.id
@@ -403,6 +421,8 @@ function repairTaskParams() {
 }
 
 // 前端业务函数：协调 refreshRepairTasks 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 refreshRepairTasks 对应业务流程的处理结果。
 async function refreshRepairTasks() {
   if (disposed || !consoleData.value) return
   repairLoading.value = true
@@ -424,6 +444,8 @@ async function refreshRepairTasks() {
 }
 
 // 前端业务函数：协调 handleCreativePatchAction 对应的页面流程、接口调用或状态转换。
+// 入参：patch、action 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleCreativePatchAction 对应业务流程的处理结果。
 async function handleCreativePatchAction(patch, action) {
   if (!patch?.id) return
   patchBusyId.value = patch.id
@@ -440,30 +462,42 @@ async function handleCreativePatchAction(patch, action) {
 }
 
 // 前端业务函数：协调 saveCreativePatch 对应的页面流程、接口调用或状态转换。
+// 入参：patch 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 saveCreativePatch 对应业务流程的处理结果。
 function saveCreativePatch(patch) {
   return handleCreativePatchAction(patch, () => updateAgencyCreativePatch(patch.id, { after: patch.after || {} }))
 }
 
 // 前端业务函数：协调 approveCreativePatch 对应的页面流程、接口调用或状态转换。
+// 入参：patch 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 approveCreativePatch 对应业务流程的处理结果。
 function approveCreativePatch(patch) {
   return handleCreativePatchAction(patch, () => approveAgencyCreativePatch(patch.id))
 }
 
 // 前端业务函数：协调 rejectCreativePatch 对应的页面流程、接口调用或状态转换。
+// 入参：patch 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 rejectCreativePatch 对应业务流程的处理结果。
 function rejectCreativePatch(patch) {
   return handleCreativePatchAction(patch, () => rejectAgencyCreativePatch(patch.id, { reason: '人工拒绝该补丁' }))
 }
 
+// 入参：patch 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 applyCreativePatch 对应业务流程的处理结果。
 function applyCreativePatch(patch) {
   return handleCreativePatchAction(patch, () => applyAgencyCreativePatch(patch.id))
 }
 
 // 前端业务函数：协调 openPatchInvocation 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 openPatchInvocation 对应业务流程的处理结果。
 function openPatchInvocation() {
   activeTab.value = 'control'
 }
 
 // 前端业务函数：协调 handleRepairManualAction 对应的页面流程、接口调用或状态转换。
+// 入参：task 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleRepairManualAction 对应业务流程的处理结果。
 function handleRepairManualAction(task) {
   if (!task?.repair_route) return
   if (String(task.repair_route).startsWith('/')) {
@@ -474,6 +508,8 @@ function handleRepairManualAction(task) {
 }
 
 // 前端业务函数：协调 retryRepairTask 对应的页面流程、接口调用或状态转换。
+// 入参：task、authorizationPayload 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 retryRepairTask 对应业务流程的处理结果。
 async function retryRepairTask(task, authorizationPayload = null) {
   if (!task?.id || repairBusyId.value) return
   repairBusyId.value = task.id
@@ -494,12 +530,16 @@ async function retryRepairTask(task, authorizationPayload = null) {
 }
 
 // 前端业务函数：协调 shouldPollConsole 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 shouldPollConsole 对应业务流程的处理结果。
 function shouldPollConsole() {
   const status = consoleData.value?.latest_run?.status
   return Boolean(status && !TERMINAL_RUN_STATUSES.has(status))
 }
 
 // 前端业务函数：协调 scheduleConsolePoll 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 scheduleConsolePoll 对应业务流程的处理结果。
 function scheduleConsolePoll() {
   if (consolePollTimer) {
     clearTimeout(consolePollTimer)

@@ -26,7 +26,11 @@ GENERIC_FINDING_PHRASES = (
 
 
 def _manual_task(stage: str, series_id: str | None, *, reason: str = READABILITY_FALLBACK_REASON) -> RepairTask:
-    """业务函数：处理 _manual_task 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _manual_task 对应的业务流程、校验或数据转换。
+
+    入参：stage、series_id、reason 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     label, route = action_for_task("manual_incomplete_repair_task", "manual", None)
     return RepairTask(
         type="manual_incomplete_repair_task",
@@ -48,7 +52,11 @@ def classify_repair_tasks(
     stage: str,
     series_id: str | None,
 ) -> RepairClassificationResult:
-    """业务函数：处理 classify_repair_tasks 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 classify_repair_tasks 对应的业务流程、校验或数据转换。
+
+    入参：output_summary、stage、series_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     output = output_summary or {}
     raw_tasks = output.get("repair_tasks") or []
     tasks: list[RepairTask] = []
@@ -94,7 +102,11 @@ def classify_repair_tasks(
 
 
 def _result(tasks: list[RepairTask]) -> RepairClassificationResult:
-    """业务函数：处理 _result 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _result 对应的业务流程、校验或数据转换。
+
+    入参：tasks 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     auto_tasks = [task for task in tasks if task.auto_execute]
     return RepairClassificationResult(
         repairable=bool(auto_tasks),
@@ -105,7 +117,11 @@ def _result(tasks: list[RepairTask]) -> RepairClassificationResult:
 
 
 def _summary_text(output: dict[str, Any]) -> str:
-    """业务函数：处理 _summary_text 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _summary_text 对应的业务流程、校验或数据转换。
+
+    入参：output 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     values: list[str] = []
     for key in ("decision", "summary", "finding", "findings", "required_changes", "next_action"):
         value = output.get(key)
@@ -117,7 +133,11 @@ def _summary_text(output: dict[str, Any]) -> str:
 
 
 def _needs_manual_from_summary(summary: str) -> bool:
-    """业务函数：处理 _needs_manual_from_summary 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _needs_manual_from_summary 对应的业务流程、校验或数据转换。
+
+    入参：summary 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if not summary:
         return False
     if looks_unreadable(summary):

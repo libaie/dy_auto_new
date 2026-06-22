@@ -36,6 +36,8 @@ defineProps({
 })
 
 // 前端业务函数：协调 stageClass 对应的页面流程、接口调用或状态转换。
+// 入参：status 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 stageClass 对应业务流程的处理结果。
 function stageClass(status) {
   const normalized = normalizeStatus(status)
   if (['running', 'in_progress', 'image_batch_running', 'video_batch_running', 'composing'].includes(normalized)) return 'border-cyan-400/40 bg-cyan-950/30'
@@ -45,6 +47,8 @@ function stageClass(status) {
 }
 
 // 前端业务函数：协调 markerClass 对应的页面流程、接口调用或状态转换。
+// 入参：status 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 markerClass 对应业务流程的处理结果。
 function markerClass(status) {
   const normalized = normalizeStatus(status)
   if (['running', 'in_progress', 'image_batch_running', 'video_batch_running', 'composing'].includes(normalized)) return 'border-cyan-300/60 bg-cyan-300/10 text-cyan-100'
@@ -54,11 +58,15 @@ function markerClass(status) {
 }
 
 // 前端业务函数：协调 stageLabel 对应的页面流程、接口调用或状态转换。
+// 入参：stage 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 stageLabel 对应业务流程的处理结果。
 function stageLabel(stage) {
   return phaseLabel(stage.stage, stage.label)
 }
 
 // 前端业务函数：协调 normalizeStatus 对应的页面流程、接口调用或状态转换。
+// 入参：status 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 normalizeStatus 对应业务流程的处理结果。
 function normalizeStatus(status) {
   return String(status || '').trim().toLowerCase()
 }

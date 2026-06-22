@@ -2,6 +2,8 @@
  * 贝塞尔曲线计算 — 用于生成拟人滑动轨迹
  */
 
+// 入参：n 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 factorial 对应业务流程的处理结果。
 function factorial(n) {
   var result = 1;
   for (var i = 2; i <= n; i++) result *= i;
@@ -9,6 +11,8 @@ function factorial(n) {
 }
 
 // 设备业务函数：处理 bernstein 对应的抖音自动化动作、状态或安全边界。
+// 入参：t、i、n 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 bernstein 对应业务流程的处理结果。
 function bernstein(t, i, n) {
   return (
     (factorial(n) / (factorial(i) * factorial(n - i))) *
@@ -23,6 +27,8 @@ function bernstein(t, i, n) {
  * @param {number} t - 参数 (0-1)
  * @returns {{x: number, y: number}}
  */
+// 入参：controlPoints、t 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 bezierPoint 对应业务流程的处理结果。
 function bezierPoint(controlPoints, t) {
   var n = controlPoints.length - 1;
   var x = 0, y = 0;
@@ -43,6 +49,8 @@ function bezierPoint(controlPoints, t) {
  * @param {number} steps - 轨迹点数 (默认 10-20 之间的随机值)
  * @returns {Array} 轨迹点数组 [{x, y, duration}, ...]
  */
+// 入参：startX、startY、endX、endY、steps 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 generateSwipePath 对应业务流程的处理结果。
 function generateSwipePath(startX, startY, endX, endY, steps) {
   steps = steps || (Math.floor(Math.random() * 11) + 10); // 10-20
 

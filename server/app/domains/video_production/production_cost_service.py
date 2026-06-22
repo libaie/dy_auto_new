@@ -14,7 +14,11 @@ from app.domains.video_production.production_status import JOB_BLOCKED, JOB_QUEU
 
 
 def _get_plan(db: Session, plan_id: str) -> ProductionPlan:
-    """业务函数：处理 _get_plan 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _get_plan 对应的业务流程、校验或数据转换。
+
+    入参：db、plan_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     plan = db.query(ProductionPlan).filter(ProductionPlan.id == plan_id).first()
     if not plan:
         raise ValueError("Production plan not found")
@@ -22,7 +26,11 @@ def _get_plan(db: Session, plan_id: str) -> ProductionPlan:
 
 
 def assert_budget_available(db: Session, plan_id: str, estimated_cost: float) -> None:
-    """业务函数：处理 assert_budget_available 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 assert_budget_available 对应的业务流程、校验或数据转换。
+
+    入参：db、plan_id、estimated_cost 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     plan = _get_plan(db, plan_id)
     if plan.budget_limit is None:
         return
@@ -49,7 +57,11 @@ def record_cost_event(
     config_version: int = 1,
     provider_task_id: str | None = None,
 ) -> ProductionCostEvent:
-    """业务函数：处理 record_cost_event 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 record_cost_event 对应的业务流程、校验或数据转换。
+
+    入参：db、plan_id、stage、provider、model_name、estimated_cost、actual_cost、currency、units_json、episode_plan_id、segment_id、model_config_id、config_version、provider_task_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     plan = _get_plan(db, plan_id)
     actual_cost_value = float(actual_cost or 0.0)
     event = ProductionCostEvent(
@@ -83,7 +95,11 @@ def record_cost_event(
 
 
 def pause_plan_for_budget(db: Session, plan_id: str, reason: str = "budget_exceeded") -> int:
-    """业务函数：处理 pause_plan_for_budget 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 pause_plan_for_budget 对应的业务流程、校验或数据转换。
+
+    入参：db、plan_id、reason 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     plan = _get_plan(db, plan_id)
     now = bj_now()
     blocked_count = (

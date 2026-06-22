@@ -190,12 +190,16 @@ const editCatLabel = ref('')
 const deletingCat = ref(null)
 
 // 前端业务函数：协调 startAddCat 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 startAddCat 对应业务流程的处理结果。
 function startAddCat() {
   addingCat.value = true
   nextTick(() => catLabelInput.value?.focus())
 }
 
 // 前端业务函数：协调 loadCategories 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 loadCategories 对应业务流程的处理结果。
 async function loadCategories() {
   const { data } = await listCategories()
   if (data.ok) {
@@ -207,6 +211,8 @@ async function loadCategories() {
 }
 
 // 前端业务函数：协调 addCategory 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 addCategory 对应业务流程的处理结果。
 async function addCategory() {
   if (!newCatLabel.value.trim()) return
   const key = newCatKey.value.trim() || newCatLabel.value.trim()
@@ -216,11 +222,15 @@ async function addCategory() {
 }
 
 // 前端业务函数：协调 cancelAddCat 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 cancelAddCat 对应业务流程的处理结果。
 function cancelAddCat() {
   newCatKey.value = ''; newCatLabel.value = ''; addingCat.value = false
 }
 
 // 前端业务函数：协调 startEditCat 对应的页面流程、接口调用或状态转换。
+// 入参：cat 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 startEditCat 对应业务流程的处理结果。
 function startEditCat(cat) {
   editingCat.value = cat
   editCatKey.value = cat.key
@@ -228,11 +238,15 @@ function startEditCat(cat) {
 }
 
 // 前端业务函数：协调 cancelEditCat 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 cancelEditCat 对应业务流程的处理结果。
 function cancelEditCat() {
   editingCat.value = null
 }
 
 // 前端业务函数：协调 saveCategory 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 saveCategory 对应业务流程的处理结果。
 async function saveCategory() {
   if (!editingCat.value) return
   await updateCategory(editingCat.value.id, { key: editCatKey.value, label: editCatLabel.value })
@@ -241,11 +255,15 @@ async function saveCategory() {
 }
 
 // 前端业务函数：协调 confirmDeleteCat 对应的页面流程、接口调用或状态转换。
+// 入参：cat 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 confirmDeleteCat 对应业务流程的处理结果。
 function confirmDeleteCat(cat) {
   deletingCat.value = cat
 }
 
 // 前端业务函数：协调 doDeleteCat 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 doDeleteCat 对应业务流程的处理结果。
 async function doDeleteCat() {
   if (!deletingCat.value) return
   const cat = deletingCat.value
@@ -259,6 +277,8 @@ async function doDeleteCat() {
 }
 
 // 前端业务函数：协调 load 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 load 对应业务流程的处理结果。
 async function load() {
   if (!currentCat.value) { items.value = []; return }
   const { data } = await listAllItems(currentCat.value)
@@ -266,6 +286,8 @@ async function load() {
 }
 
 // 前端业务函数：协调 addItem 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 addItem 对应业务流程的处理结果。
 async function addItem() {
   if (!newLabel.value.trim()) return
   await createItem({
@@ -279,16 +301,22 @@ async function addItem() {
 }
 
 // 前端业务函数：协调 saveLabel 对应的页面流程、接口调用或状态转换。
+// 入参：item、newLabel 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 saveLabel 对应业务流程的处理结果。
 async function saveLabel(item, newLabel) {
   if (newLabel !== item.label) { await updateItem(item.id, { label: newLabel }); item.label = newLabel }
 }
 
 // 前端业务函数：协调 toggleItem 对应的页面流程、接口调用或状态转换。
+// 入参：item 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 toggleItem 对应业务流程的处理结果。
 async function toggleItem(item) {
   await updateItem(item.id, { enabled: !item.enabled }); await load()
 }
 
 // 前端业务函数：协调 removeItem 对应的页面流程、接口调用或状态转换。
+// 入参：item 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 removeItem 对应业务流程的处理结果。
 async function removeItem(item) {
   await deleteItem(item.id); await load()
 }

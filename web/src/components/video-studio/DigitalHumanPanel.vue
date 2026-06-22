@@ -17,11 +17,17 @@ const result = ref(null)
 const videoUrl = ref('')
 
 // 前端业务函数：协调 handleCharacters 对应的页面流程、接口调用或状态转换。
+// 入参：e 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleCharacters 对应业务流程的处理结果。
 function handleCharacters(e) { characterFiles.value = Array.from(e.target.files || []) }
 // 前端业务函数：协调 handleGoods 对应的页面流程、接口调用或状态转换。
+// 入参：e 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleGoods 对应业务流程的处理结果。
 function handleGoods(e) { goodsFiles.value = Array.from(e.target.files || []) }
 
 // 前端业务函数：协调 handleGenerate 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleGenerate 对应业务流程的处理结果。
 async function handleGenerate() {
   if (characterFiles.value.length === 0) return
   generating.value = true; result.value = null; videoUrl.value = ''

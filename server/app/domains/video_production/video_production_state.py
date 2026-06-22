@@ -15,13 +15,21 @@ HUMAN_BLOCKING_ASSET_STATUSES = {"failed", "rejected"}
 
 
 def storyboard_frame_ids(run: VideoProductionRun) -> list[str]:
-    """业务函数：处理 storyboard_frame_ids 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 storyboard_frame_ids 对应的业务流程、校验或数据转换。
+
+    入参：run 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     frames = (run.storyboard_json or {}).get("frames") or []
     return [str(frame.get("frame_id") or frame.get("id") or f"frame-{index + 1:03d}") for index, frame in enumerate(frames)]
 
 
 def _is_linked_run(run: VideoProductionRun) -> bool:
-    """业务函数：处理 _is_linked_run 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _is_linked_run 对应的业务流程、校验或数据转换。
+
+    入参：run 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return bool(
         run.production_plan_id
         and run.production_episode_id
@@ -30,7 +38,11 @@ def _is_linked_run(run: VideoProductionRun) -> bool:
 
 
 def production_segment_frame_ids(db: Session, run: VideoProductionRun) -> list[str]:
-    """业务函数：处理 production_segment_frame_ids 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 production_segment_frame_ids 对应的业务流程、校验或数据转换。
+
+    入参：db、run 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     from app.db.models.video_production import ProductionScene, ProductionSegment, ProductionShot
 
     if not _is_linked_run(run):
@@ -52,7 +64,11 @@ def production_segment_frame_ids(db: Session, run: VideoProductionRun) -> list[s
 
 
 def latest_assets_by_frame(db: Session, run_id: str, asset_type: str) -> dict[str, VideoProductionAsset]:
-    """业务函数：处理 latest_assets_by_frame 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 latest_assets_by_frame 对应的业务流程、校验或数据转换。
+
+    入参：db、run_id、asset_type 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     rows = db.query(VideoProductionAsset).filter(
         VideoProductionAsset.run_id == run_id,
         VideoProductionAsset.asset_type == asset_type,
@@ -64,7 +80,11 @@ def latest_assets_by_frame(db: Session, run_id: str, asset_type: str) -> dict[st
 
 
 def missing_or_unapproved_frames(db: Session, run: VideoProductionRun, asset_type: str) -> list[str]:
-    """业务函数：处理 missing_or_unapproved_frames 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 missing_or_unapproved_frames 对应的业务流程、校验或数据转换。
+
+    入参：db、run、asset_type 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     latest = latest_assets_by_frame(db, run.id, asset_type)
     missing: list[str] = []
     for frame_id in production_segment_frame_ids(db, run):
@@ -75,7 +95,11 @@ def missing_or_unapproved_frames(db: Session, run: VideoProductionRun, asset_typ
 
 
 def assert_can_start_images(run: VideoProductionRun) -> None:
-    """业务函数：处理 assert_can_start_images 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 assert_can_start_images 对应的业务流程、校验或数据转换。
+
+    入参：run 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if run.status not in {"draft", "storyboard_ready"}:
         raise ValueError("Image stage already started")
     if run.pixelle_stage_task_id:
@@ -83,7 +107,11 @@ def assert_can_start_images(run: VideoProductionRun) -> None:
 
 
 def assert_can_start_videos(db: Session, run: VideoProductionRun) -> None:
-    """业务函数：处理 assert_can_start_videos 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 assert_can_start_videos 对应的业务流程、校验或数据转换。
+
+    入参：db、run 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if run.status == "video_batch_running":
         raise ValueError("Video stage already started")
     video_gate_retry = (
@@ -101,7 +129,11 @@ def assert_can_start_videos(db: Session, run: VideoProductionRun) -> None:
 
 
 def assert_can_compose(db: Session, run: VideoProductionRun) -> None:
-    """业务函数：处理 assert_can_compose 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 assert_can_compose 对应的业务流程、校验或数据转换。
+
+    入参：db、run 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if run.status == "composing":
         raise ValueError("Compose stage already started")
     if run.status != VIDEO_READY_STATUS:
@@ -112,7 +144,11 @@ def assert_can_compose(db: Session, run: VideoProductionRun) -> None:
 
 
 def record_stage_task(run: VideoProductionRun, stage: str, task_id: str, status: str = "submitted") -> None:
-    """业务函数：处理 record_stage_task 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 record_stage_task 对应的业务流程、校验或数据转换。
+
+    入参：run、stage、task_id、status 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     trace = dict(run.model_trace_json or {})
     stage_tasks = dict(trace.get("stage_tasks") or {})
     stage_tasks[stage] = {
@@ -125,7 +161,11 @@ def record_stage_task(run: VideoProductionRun, stage: str, task_id: str, status:
 
 
 def recompute_run_gate(db: Session, run_id: str, asset_type: str) -> VideoProductionRun:
-    """业务函数：处理 recompute_run_gate 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 recompute_run_gate 对应的业务流程、校验或数据转换。
+
+    入参：db、run_id、asset_type 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     run = db.query(VideoProductionRun).filter(VideoProductionRun.id == run_id).first()
     if not run:
         raise ValueError("Run not found")

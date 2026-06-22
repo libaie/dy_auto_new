@@ -68,12 +68,16 @@ const toast = useToastStore()
 
 // --- WebSocket ---
 // 前端业务函数：协调 wsUrl 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 wsUrl 对应业务流程的处理结果。
 function wsUrl() {
   const token = localStorage.getItem('token') || ''
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
   return `${protocol}//${location.host}/api/devices/ws/pair-events?token=${encodeURIComponent(token)}`
 }
 useWebSocket(wsUrl, {
+  // 入参：msg 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 onMessage 对应业务流程的处理结果。
   onMessage(msg) {
     if (msg.event === 'accounts_changed') fetchAccounts()
   },
@@ -97,6 +101,8 @@ const columns = [
 ]
 
 // --- Fetch accounts ---
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 fetchAccounts 对应业务流程的处理结果。
 async function fetchAccounts() {
   loading.value = true
   try {
@@ -114,6 +120,8 @@ async function fetchAccounts() {
 }
 
 // 前端业务函数：协调 handlePageChange 对应的页面流程、接口调用或状态转换。
+// 入参：p 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handlePageChange 对应业务流程的处理结果。
 function handlePageChange(p) {
   page.value = p
   fetchAccounts()
@@ -121,6 +129,8 @@ function handlePageChange(p) {
 
 // --- Open create dialog ---
 // 前端业务函数：协调 openCreateDialog 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 openCreateDialog 对应业务流程的处理结果。
 function openCreateDialog() {
   isEditing.value = false
   editingId.value = null
@@ -133,6 +143,8 @@ function openCreateDialog() {
 
 // --- Open edit dialog ---
 // 前端业务函数：协调 openEditDialog 对应的页面流程、接口调用或状态转换。
+// 入参：account 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 openEditDialog 对应业务流程的处理结果。
 function openEditDialog(account) {
   isEditing.value = true
   editingId.value = account.id
@@ -160,6 +172,8 @@ function openEditDialog(account) {
 
 // --- Save (create or update) ---
 // 前端业务函数：协调 handleSave 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleSave 对应业务流程的处理结果。
 async function handleSave() {
   if (!form.nickname.trim()) {
     formError.value = '昵称不能为空'
@@ -197,12 +211,16 @@ async function handleSave() {
 
 // --- Delete ---
 // 前端业务函数：协调 openDeleteDialog 对应的页面流程、接口调用或状态转换。
+// 入参：account 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 openDeleteDialog 对应业务流程的处理结果。
 function openDeleteDialog(account) {
   deletingAccount.value = account
   showDeleteDialog.value = true
 }
 
 // 前端业务函数：协调 handleDelete 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleDelete 对应业务流程的处理结果。
 async function handleDelete() {
   if (!deletingAccount.value) return
   deleting.value = true

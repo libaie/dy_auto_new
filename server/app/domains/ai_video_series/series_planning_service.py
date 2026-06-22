@@ -25,7 +25,10 @@ REPLACEABLE_SOURCE_TYPES = {"system_backfill", "legacy_run_backfill"}
 
 @dataclass(frozen=True)
 class EpisodePlaceholderResult:
-    """业务类：承载 EpisodePlaceholderResult 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 EpisodePlaceholderResult 相关的数据结构、状态或业务协作。
+
+    类参数：created_episode_numbers、existing_episode_numbers、series_id、target_episode_count 承载该类的业务配置、状态或数据字段。
+    """
     series_id: str
     target_episode_count: int
     existing_episode_numbers: list[int]
@@ -34,7 +37,10 @@ class EpisodePlaceholderResult:
 
 @dataclass(frozen=True)
 class ContinuityArtifactResult:
-    """业务类：承载 ContinuityArtifactResult 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 ContinuityArtifactResult 相关的数据结构、状态或业务协作。
+
+    类参数：created_continuity_ledger、created_outline_episode_numbers、series_id 承载该类的业务配置、状态或数据字段。
+    """
     series_id: str
     created_continuity_ledger: bool
     created_outline_episode_numbers: list[int]
@@ -42,7 +48,10 @@ class ContinuityArtifactResult:
 
 @dataclass(frozen=True)
 class SeriesStoryPlanResult:
-    """业务类：承载 SeriesStoryPlanResult 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 SeriesStoryPlanResult 相关的数据结构、状态或业务协作。
+
+    类参数：artifacts、created_episode_numbers、model_trace、preserved_outline_episode_numbers、replaced_outline_episode_numbers、series_id、target_episode_count 承载该类的业务配置、状态或数据字段。
+    """
     series_id: str
     target_episode_count: int
     created_episode_numbers: list[int]
@@ -53,19 +62,31 @@ class SeriesStoryPlanResult:
 
 
 def _target_episode_count(series: Series) -> int:
-    """业务函数：处理 _target_episode_count 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _target_episode_count 对应的业务流程、校验或数据转换。
+
+    入参：series 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return max(1, int(series.total_episodes or 1))
 
 
 def _style_lock(series: Series) -> dict[str, Any]:
-    """业务函数：处理 _style_lock 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _style_lock 对应的业务流程、校验或数据转换。
+
+    入参：series 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     story_bible = series.story_bible_json if isinstance(series.story_bible_json, dict) else {}
     style_lock = story_bible.get("style_lock") or {}
     return style_lock if isinstance(style_lock, dict) else {}
 
 
 def _ids_from_style_lock(series: Series, key: str, relation_name: str) -> list[str]:
-    """业务函数：处理 _ids_from_style_lock 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _ids_from_style_lock 对应的业务流程、校验或数据转换。
+
+    入参：series、key、relation_name 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     style_lock = _style_lock(series)
     rows = style_lock.get(key) or []
     ids = []
@@ -85,7 +106,11 @@ def _episode_outline(
     character_ids: list[str],
     scene_ids: list[str],
 ) -> dict[str, Any]:
-    """业务函数：处理 _episode_outline 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _episode_outline 对应的业务流程、校验或数据转换。
+
+    入参：series、episode、total_episodes、character_ids、scene_ids 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     episode_number = int(episode.episode_number)
     mainline = series.logline or series.title
     previous_handoff = "" if episode_number == 1 else f"承接第 {episode_number - 1} 集的人物状态、未解线索和情绪余波。"
@@ -131,7 +156,11 @@ def _continuity_ledger(
     character_ids: list[str],
     scene_ids: list[str],
 ) -> dict[str, Any]:
-    """业务函数：处理 _continuity_ledger 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _continuity_ledger 对应的业务流程、校验或数据转换。
+
+    入参：series、episodes、character_ids、scene_ids 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     total_episodes = _target_episode_count(series)
     return {
         "schema_version": "series.continuity_ledger.v1",
@@ -180,7 +209,11 @@ def _series_story_plan(
     character_ids: list[str],
     scene_ids: list[str],
 ) -> dict[str, Any]:
-    """业务函数：处理 _series_story_plan 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _series_story_plan 对应的业务流程、校验或数据转换。
+
+    入参：series、episodes、character_ids、scene_ids 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     mainline = series.logline or series.title
     return {
         "schema_version": "series.story_plan.v1",
@@ -197,7 +230,11 @@ def _series_story_plan(
 
 
 def _season_arc(series: Series, episodes: list[Episode]) -> dict[str, Any]:
-    """业务函数：处理 _season_arc 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _season_arc 对应的业务流程、校验或数据转换。
+
+    入参：series、episodes 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     total = _target_episode_count(series)
     mainline = series.logline or series.title
     return {
@@ -222,7 +259,11 @@ def _season_arc(series: Series, episodes: list[Episode]) -> dict[str, Any]:
 
 
 def _planning_system_prompt() -> str:
-    """业务函数：处理 _planning_system_prompt 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _planning_system_prompt 对应的业务流程、校验或数据转换。
+
+    入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return (
         "你是短剧整季故事规划助手。必须只输出可解析 JSON，不要 Markdown。"
         "JSON 必须包含 series_story_plan、season_arc、episode_outlines。"
@@ -240,7 +281,11 @@ def _planning_user_prompt(
     scene_ids: list[str],
     existing_artifacts: list[dict[str, Any]],
 ) -> str:
-    """业务函数：处理 _planning_user_prompt 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _planning_user_prompt 对应的业务流程、校验或数据转换。
+
+    入参：series、episodes、character_ids、scene_ids、existing_artifacts 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     context = {
         "series": {
             "id": series.id,
@@ -274,7 +319,11 @@ def _existing_artifact_context(
     series: Series,
     episodes: list[Episode],
 ) -> list[dict[str, Any]]:
-    """业务函数：处理 _existing_artifact_context 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _existing_artifact_context 对应的业务流程、校验或数据转换。
+
+    入参：service、series、episodes 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     artifacts: list[dict[str, Any]] = []
     for artifact_type in ("series_bible", "series_story_plan", "season_arc", "continuity_ledger"):
         artifact = service.latest_approved(
@@ -298,7 +347,11 @@ def _existing_artifact_context(
 
 
 def _parse_planning_json(raw_text: str) -> dict[str, Any]:
-    """业务函数：处理 _parse_planning_json 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _parse_planning_json 对应的业务流程、校验或数据转换。
+
+    入参：raw_text 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if not isinstance(raw_text, str) or not raw_text.strip():
         raise ValueError("AI output was empty")
     text = raw_text.strip()
@@ -333,7 +386,11 @@ def _parse_planning_json(raw_text: str) -> dict[str, Any]:
 
 
 def _episode_outline_sources(parsed: dict[str, Any]) -> dict[int, dict[str, Any]]:
-    """业务函数：处理 _episode_outline_sources 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _episode_outline_sources 对应的业务流程、校验或数据转换。
+
+    入参：parsed 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     rows = (
         parsed.get("episode_outlines")
         or parsed.get("episodes")
@@ -359,7 +416,11 @@ def _episode_outline_sources(parsed: dict[str, Any]) -> dict[int, dict[str, Any]
 
 
 def _merge_series_payload(fallback: dict[str, Any], parsed: dict[str, Any], *keys: str) -> dict[str, Any]:
-    """业务函数：处理 _merge_series_payload 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _merge_series_payload 对应的业务流程、校验或数据转换。
+
+    入参：fallback、parsed、keys 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     merged = dict(fallback)
     for key in keys:
         value = parsed.get(key)
@@ -380,7 +441,11 @@ def _normalize_episode_outline(
     character_ids: list[str],
     scene_ids: list[str],
 ) -> dict[str, Any]:
-    """业务函数：处理 _normalize_episode_outline 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _normalize_episode_outline 对应的业务流程、校验或数据转换。
+
+    入参：series、episode、source、total_episodes、character_ids、scene_ids 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     fallback = _episode_outline(
         series,
         episode,
@@ -445,7 +510,11 @@ def _normalize_and_scope_episode_outline(
     scene_ids: list[str],
     source_type: str,
 ) -> dict[str, Any]:
-    """业务函数：处理 _normalize_and_scope_episode_outline 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _normalize_and_scope_episode_outline 对应的业务流程、校验或数据转换。
+
+    入参：db、series、episode、source、total_episodes、character_ids、scene_ids、source_type 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     scoped_character_ids = character_ids if _source_has_ids(source, "character_ids") else []
     scoped_scene_ids = scene_ids if _source_has_ids(source, "scene_ids") else []
     outline = _normalize_episode_outline(
@@ -466,7 +535,11 @@ def _normalize_and_scope_episode_outline(
 
 
 def _source_has_ids(source: dict[str, Any] | None, key: str) -> bool:
-    """业务函数：处理 _source_has_ids 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _source_has_ids 对应的业务流程、校验或数据转换。
+
+    入参：source、key 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if not isinstance(source, dict):
         return False
     value = source.get(key)
@@ -480,7 +553,11 @@ def _normalize_existing_episode_outline(
     episode: Episode,
     artifact: Any,
 ) -> None:
-    """业务函数：处理 _normalize_existing_episode_outline 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _normalize_existing_episode_outline 对应的业务流程、校验或数据转换。
+
+    入参：db、series、episode、artifact 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     content = artifact.content_json if isinstance(artifact.content_json, dict) else {}
     normalized = normalize_episode_asset_scope(
         db,
@@ -498,14 +575,22 @@ def _normalize_existing_episode_outline(
 
 
 def _should_create_or_replace(artifact: Any | None, *, force: bool) -> bool:
-    """业务函数：处理 _should_create_or_replace 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _should_create_or_replace 对应的业务流程、校验或数据转换。
+
+    入参：artifact、force 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if artifact is None:
         return True
     return force or artifact.source_type in REPLACEABLE_SOURCE_TYPES
 
 
 def _content_text(content: dict[str, Any], *preferred_keys: str) -> str:
-    """业务函数：处理 _content_text 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _content_text 对应的业务流程、校验或数据转换。
+
+    入参：content、preferred_keys 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     for key in preferred_keys:
         value = content.get(key)
         if isinstance(value, str) and value.strip():
@@ -514,7 +599,11 @@ def _content_text(content: dict[str, Any], *preferred_keys: str) -> str:
 
 
 def _artifact_summary(artifact: Any) -> dict[str, Any]:
-    """业务函数：处理 _artifact_summary 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _artifact_summary 对应的业务流程、校验或数据转换。
+
+    入参：artifact 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return {
         "id": artifact.id,
         "artifact_type": artifact.artifact_type,
@@ -532,7 +621,11 @@ def _approved_story_artifact_summaries(
     series: Series,
     episodes: list[Episode],
 ) -> list[dict[str, Any]]:
-    """业务函数：处理 _approved_story_artifact_summaries 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _approved_story_artifact_summaries 对应的业务流程、校验或数据转换。
+
+    入参：service、series、episodes 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     artifacts: list[dict[str, Any]] = []
     for artifact_type in ("series_story_plan", "season_arc", "continuity_ledger"):
         artifact = service.latest_approved(
@@ -561,7 +654,11 @@ def ensure_episode_placeholders(
     *,
     commit: bool = True,
 ) -> EpisodePlaceholderResult:
-    """业务函数：处理 ensure_episode_placeholders 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 ensure_episode_placeholders 对应的业务流程、校验或数据转换。
+
+    入参：db、series_id、commit 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     series = db.query(Series).filter(Series.id == series_id).first()
     if not series:
         raise ValueError("series_not_found")
@@ -606,7 +703,11 @@ def ensure_series_continuity_artifacts(
     db: Session,
     series_id: str,
 ) -> ContinuityArtifactResult:
-    """业务函数：处理 ensure_series_continuity_artifacts 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 ensure_series_continuity_artifacts 对应的业务流程、校验或数据转换。
+
+    入参：db、series_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     series = db.query(Series).filter(Series.id == series_id).first()
     if not series:
         raise ValueError("series_not_found")
@@ -694,7 +795,11 @@ async def generate_series_story_plan(
     series_id: str,
     force: bool = False,
 ) -> SeriesStoryPlanResult:
-    """业务函数：处理 generate_series_story_plan 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 generate_series_story_plan 对应的业务流程、校验或数据转换。
+
+    入参：db、series_id、force 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     placeholder_result = ensure_episode_placeholders(db, series_id)
     series = db.query(Series).filter(Series.id == series_id).first()
     if not series:
@@ -874,7 +979,11 @@ async def generate_series_story_plan(
 
 
 def is_series_completed(db: Session, series_id: str) -> bool:
-    """业务函数：处理 is_series_completed 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 is_series_completed 对应的业务流程、校验或数据转换。
+
+    入参：db、series_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     series = db.query(Series).filter(Series.id == series_id).first()
     if not series:
         raise ValueError("series_not_found")
@@ -886,7 +995,11 @@ def is_series_completed(db: Session, series_id: str) -> bool:
 
 
 def next_episode_number(db: Session, series_id: str) -> int | None:
-    """业务函数：处理 next_episode_number 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 next_episode_number 对应的业务流程、校验或数据转换。
+
+    入参：db、series_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     series = db.query(Series).filter(Series.id == series_id).first()
     if not series:
         raise ValueError("series_not_found")

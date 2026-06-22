@@ -485,22 +485,32 @@ const activeVideoRunStatuses = new Set([
   'composition',
 ])
 // 前端业务函数：协调 episodeHasActiveVideoRun 对应的页面流程、接口调用或状态转换。
+// 入参：ep 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 episodeHasActiveVideoRun 对应业务流程的处理结果。
 function episodeHasActiveVideoRun(ep) {
   return Boolean(ep.active_video_run_id) || activeVideoRunStatuses.has(ep.video_run_status)
 }
 // 前端业务函数：协调 episodeHasProducingVideoRun 对应的页面流程、接口调用或状态转换。
+// 入参：ep 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 episodeHasProducingVideoRun 对应业务流程的处理结果。
 function episodeHasProducingVideoRun(ep) {
   return activeVideoRunStatuses.has(ep.video_run_status) && !plannedVideoRunStatuses.has(ep.video_run_status)
 }
 // 前端业务函数：协调 episodeIsBusy 对应的页面流程、接口调用或状态转换。
+// 入参：ep 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 episodeIsBusy 对应业务流程的处理结果。
 function episodeIsBusy(ep) {
   return busyEpisodeStatuses.has(ep.status) || episodeHasActiveVideoRun(ep)
 }
 // 前端业务函数：协调 episodeVideoRunRoute 对应的页面流程、接口调用或状态转换。
+// 入参：ep 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 episodeVideoRunRoute 对应业务流程的处理结果。
 function episodeVideoRunRoute(ep) {
   return ep?.video_run_route || (ep?.active_video_run_id ? `/video-production/${ep.active_video_run_id}` : '')
 }
 // 前端业务函数：协调 episodeStoryboardImageParams 对应的页面流程、接口调用或状态转换。
+// 入参：ep 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 episodeStoryboardImageParams 对应业务流程的处理结果。
 function episodeStoryboardImageParams(ep) {
   const params = { series_id: series.value.id }
   if (ep?.active_video_run_id) params.run_id = ep.active_video_run_id
@@ -574,6 +584,8 @@ const storyPlanSourceText = computed(() => {
   return artifact.source_type || '故事规划已生成'
 })
 const storyPlanSourceClass = computed(() => storyPlanSourceText.value.includes('回退') ? 'text-amber-300' : 'text-cyan-300')
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 load 对应业务流程的处理结果。
 async function load() {
   loading.value = true; error.value = ''
   try {
@@ -595,10 +607,14 @@ async function load() {
   } catch (e) { error.value = e.message || '加载失败' } finally { loading.value = false }
   await maybeAutostartProduction()
 }
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 nextEpisode 对应业务流程的处理结果。
 function nextEpisode() {
   return runnableEpisode.value
 }
 // 前端业务函数：协调 beginEditSeries 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 beginEditSeries 对应业务流程的处理结果。
 function beginEditSeries() {
   Object.assign(seriesForm, {
     title: series.value?.title || '',
@@ -612,15 +628,21 @@ function beginEditSeries() {
   editingSeries.value = true
 }
 // 前端业务函数：协调 errorMessage 对应的页面流程、接口调用或状态转换。
+// 入参：e、fallback 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 errorMessage 对应业务流程的处理结果。
 function errorMessage(e, fallback) {
   const detail = e.response?.data?.detail
   return detail?.message || detail || e.message || fallback
 }
 // 前端业务函数：协调 isManagedImagePath 对应的页面流程、接口调用或状态转换。
+// 入参：path 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 isManagedImagePath 对应业务流程的处理结果。
 function isManagedImagePath(path) {
   return MANAGED_IMAGE_PREFIXES.some((prefix) => String(path || '').startsWith(prefix))
 }
 // 前端业务函数：协调 tosSignedUrlExpired 对应的页面流程、接口调用或状态转换。
+// 入参：value 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 tosSignedUrlExpired 对应业务流程的处理结果。
 function tosSignedUrlExpired(value) {
   const trimmed = String(value || '').trim()
   if (!trimmed) return false
@@ -639,6 +661,8 @@ function tosSignedUrlExpired(value) {
   return Date.now() >= issuedAt + expires * 1000
 }
 // 前端业务函数：协调 safeReferenceUrl 对应的页面流程、接口调用或状态转换。
+// 入参：value 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 safeReferenceUrl 对应业务流程的处理结果。
 function safeReferenceUrl(value) {
   if (typeof value !== 'string') return ''
   const trimmed = value.trim()
@@ -655,30 +679,42 @@ function safeReferenceUrl(value) {
   }
 }
 // 前端业务函数：协调 linkedReferences 对应的页面流程、接口调用或状态转换。
+// 入参：item、slotDefs 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 linkedReferences 对应业务流程的处理结果。
 function linkedReferences(item, slotDefs) {
   return slotDefs
     .map((slot) => ({ ...slot, url: item?.[slot.key] || '', src: safeReferenceUrl(item?.[slot.key]) }))
     .filter((slot) => slot.src)
 }
 // 前端业务函数：协调 linkedCharacterReferences 对应的页面流程、接口调用或状态转换。
+// 入参：character 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 linkedCharacterReferences 对应业务流程的处理结果。
 function linkedCharacterReferences(character) {
   return linkedReferences(character, CHARACTER_REFERENCE_SLOT_DEFS)
 }
 // 前端业务函数：协调 linkedSceneReferences 对应的页面流程、接口调用或状态转换。
+// 入参：scene 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 linkedSceneReferences 对应业务流程的处理结果。
 function linkedSceneReferences(scene) {
   return linkedReferences(scene, SCENE_REFERENCE_SLOT_DEFS)
 }
 // 前端业务函数：协调 hasRawReference 对应的页面流程、接口调用或状态转换。
+// 入参：item、slotDefs 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 hasRawReference 对应业务流程的处理结果。
 function hasRawReference(item, slotDefs) {
   return slotDefs.some((slot) => Boolean(String(item?.[slot.key] || '').trim()))
 }
 // 前端业务函数：协调 validProgressSlot 对应的页面流程、接口调用或状态转换。
+// 入参：assetType、slot 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 validProgressSlot 对应业务流程的处理结果。
 function validProgressSlot(assetType, slot) {
   if (assetType === 'character') return CHARACTER_REFERENCE_SLOT_KEYS.has(slot)
   if (assetType === 'scene') return SCENE_REFERENCE_SLOT_KEYS.has(slot)
   return false
 }
 // 前端业务函数：协调 progressReferencePatch 对应的页面流程、接口调用或状态转换。
+// 入参：item 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 progressReferencePatch 对应业务流程的处理结果。
 function progressReferencePatch(item) {
   const patch = {
     status: item.status,
@@ -690,6 +726,8 @@ function progressReferencePatch(item) {
   return patch
 }
 // 前端业务函数：协调 toggleEpisodeText 对应的页面流程、接口调用或状态转换。
+// 入参：episodeId 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 toggleEpisodeText 对应业务流程的处理结果。
 async function toggleEpisodeText(episodeId) {
   expandedEpisodeId.value = expandedEpisodeId.value === episodeId ? '' : episodeId
   if (expandedEpisodeId.value) {
@@ -698,6 +736,8 @@ async function toggleEpisodeText(episodeId) {
   }
 }
 // 前端业务函数：协调 refreshEpisodeTextArtifacts 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 refreshEpisodeTextArtifacts 对应业务流程的处理结果。
 async function refreshEpisodeTextArtifacts() {
   try {
     const { data } = await listAITextArtifacts({ series_id: route.params.id }, { silent: true })
@@ -708,48 +748,68 @@ async function refreshEpisodeTextArtifacts() {
     aiTextArtifactsError.value = errorMessage(e, 'AI 文本加载失败')
   }
 }
+// 入参：value 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 isNonEmptyObject 对应业务流程的处理结果。
 function isNonEmptyObject(value) {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length)
 }
 // 前端业务函数：协调 isNonEmptyArray 对应的页面流程、接口调用或状态转换。
+// 入参：value 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 isNonEmptyArray 对应业务流程的处理结果。
 function isNonEmptyArray(value) {
   return Array.isArray(value) && value.length > 0
 }
 // 前端业务函数：协调 artifactTimestamp 对应的页面流程、接口调用或状态转换。
+// 入参：artifact 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 artifactTimestamp 对应业务流程的处理结果。
 function artifactTimestamp(artifact) {
   return Date.parse(artifact?.approved_at || artifact?.created_at || '') || 0
 }
 // 前端业务函数：协调 latestEpisodeArtifact 对应的页面流程、接口调用或状态转换。
+// 入参：ep、artifactType 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 latestEpisodeArtifact 对应业务流程的处理结果。
 function latestEpisodeArtifact(ep, artifactType) {
   return [...aiTextArtifacts.value]
     .filter(item => item?.episode_id === ep.id && item.artifact_type === artifactType && item.status === 'approved')
     .sort((a, b) => artifactTimestamp(b) - artifactTimestamp(a) || Number(b.version || 0) - Number(a.version || 0))[0] || null
 }
 // 前端业务函数：协调 latestSeriesArtifact 对应的页面流程、接口调用或状态转换。
+// 入参：artifactType 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 latestSeriesArtifact 对应业务流程的处理结果。
 function latestSeriesArtifact(artifactType) {
   return [...aiTextArtifacts.value]
     .filter(item => item?.target_type === 'series' && item.artifact_type === artifactType && item.status === 'approved')
     .sort((a, b) => artifactTimestamp(b) - artifactTimestamp(a) || Number(b.version || 0) - Number(a.version || 0))[0] || null
 }
 // 前端业务函数：协调 artifactContent 对应的页面流程、接口调用或状态转换。
+// 入参：artifact 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 artifactContent 对应业务流程的处理结果。
 function artifactContent(artifact) {
   if (!artifact) return null
   if (isNonEmptyObject(artifact.content_json) || isNonEmptyArray(artifact.content_json)) return artifact.content_json
   return artifact.content_text || null
 }
 // 前端业务函数：协调 scriptSource 对应的页面流程、接口调用或状态转换。
+// 入参：ep 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 scriptSource 对应业务流程的处理结果。
 function scriptSource(ep) {
   return artifactContent(latestEpisodeArtifact(ep, 'episode_script')) || (isNonEmptyObject(ep?.script_json) ? ep.script_json : null)
 }
 // 前端业务函数：协调 storyboardSource 对应的页面流程、接口调用或状态转换。
+// 入参：ep 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 storyboardSource 对应业务流程的处理结果。
 function storyboardSource(ep) {
   return artifactContent(latestEpisodeArtifact(ep, 'storyboard')) || (isNonEmptyObject(ep?.storyboard_json) ? ep.storyboard_json : null)
 }
 // 前端业务函数：协调 outlineSource 对应的页面流程、接口调用或状态转换。
+// 入参：ep 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 outlineSource 对应业务流程的处理结果。
 function outlineSource(ep) {
   return artifactContent(latestEpisodeArtifact(ep, 'episode_outline'))
 }
 // 前端业务函数：协调 formatContent 对应的页面流程、接口调用或状态转换。
+// 入参：value 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 formatContent 对应业务流程的处理结果。
 function formatContent(value) {
   if (!value) return ''
   if (typeof value === 'string') return value
@@ -758,34 +818,48 @@ function formatContent(value) {
   return JSON.stringify(value, null, 2)
 }
 // 前端业务函数：协调 episodeScriptText 对应的页面流程、接口调用或状态转换。
+// 入参：ep 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 episodeScriptText 对应业务流程的处理结果。
 function episodeScriptText(ep) {
   return formatContent(scriptSource(ep))
 }
 // 前端业务函数：协调 episodeOutlineText 对应的页面流程、接口调用或状态转换。
+// 入参：ep 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 episodeOutlineText 对应业务流程的处理结果。
 function episodeOutlineText(ep) {
   return formatContent(outlineSource(ep))
 }
 // 前端业务函数：协调 episodeAssetScope 对应的页面流程、接口调用或状态转换。
+// 入参：ep 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 episodeAssetScope 对应业务流程的处理结果。
 function episodeAssetScope(ep) {
   return ep?.asset_scope && typeof ep.asset_scope === 'object' ? ep.asset_scope : {}
 }
 // 前端业务函数：协调 episodeAssetCharacters 对应的页面流程、接口调用或状态转换。
+// 入参：ep 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 episodeAssetCharacters 对应业务流程的处理结果。
 function episodeAssetCharacters(ep) {
   const scope = episodeAssetScope(ep)
   if (Array.isArray(scope.characters) && scope.characters.length) return scope.characters
   return Array.isArray(scope.character_ids) ? scope.character_ids.map(id => ({ id, name: id, source: 'existing' })) : []
 }
 // 前端业务函数：协调 episodeAssetScenes 对应的页面流程、接口调用或状态转换。
+// 入参：ep 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 episodeAssetScenes 对应业务流程的处理结果。
 function episodeAssetScenes(ep) {
   const scope = episodeAssetScope(ep)
   if (Array.isArray(scope.scenes) && scope.scenes.length) return scope.scenes
   return Array.isArray(scope.scene_ids) ? scope.scene_ids.map(id => ({ id, name: id, source: 'existing' })) : []
 }
 // 前端业务函数：协调 episodeAssetMissing 对应的页面流程、接口调用或状态转换。
+// 入参：ep 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 episodeAssetMissing 对应业务流程的处理结果。
 function episodeAssetMissing(ep) {
   return !episodeAssetCharacters(ep).length || !episodeAssetScenes(ep).length
 }
 // 前端业务函数：协调 episodeGeneratedAssets 对应的页面流程、接口调用或状态转换。
+// 入参：ep 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 episodeGeneratedAssets 对应业务流程的处理结果。
 function episodeGeneratedAssets(ep) {
   const generated = []
   for (const item of [...episodeAssetCharacters(ep), ...episodeAssetScenes(ep)]) {
@@ -794,26 +868,36 @@ function episodeGeneratedAssets(ep) {
   return [...new Set(generated)]
 }
 // 前端业务函数：协调 storyboardFrames 对应的页面流程、接口调用或状态转换。
+// 入参：ep 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 storyboardFrames 对应业务流程的处理结果。
 function storyboardFrames(ep) {
   const storyboard = storyboardSource(ep)
   return Array.isArray(storyboard?.frames) ? storyboard.frames : []
 }
 // 前端业务函数：协调 storyboardFrameIdentity 对应的页面流程、接口调用或状态转换。
+// 入参：frame、index 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 storyboardFrameIdentity 对应业务流程的处理结果。
 function storyboardFrameIdentity(frame, index) {
   return frame?.frame_id || frame?.shot_id || frame?.id || `frame-${String(index + 1).padStart(3, '0')}`
 }
 // 前端业务函数：协调 storyboardImageForFrame 对应的页面流程、接口调用或状态转换。
+// 入参：ep、frame、index 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 storyboardImageForFrame 对应业务流程的处理结果。
 function storyboardImageForFrame(ep, frame, index) {
   const state = storyboardImageState.value[ep.id] || {}
   const frameId = storyboardFrameIdentity(frame, index)
   return state.frames_by_id?.[frameId] || null
 }
 // 前端业务函数：协调 storyboardImageUrl 对应的页面流程、接口调用或状态转换。
+// 入参：ep、frame、index 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 storyboardImageUrl 对应业务流程的处理结果。
 function storyboardImageUrl(ep, frame, index) {
   const item = storyboardImageForFrame(ep, frame, index)
   return safeReferenceUrl(item?.asset?.thumbnail_url) || safeReferenceUrl(item?.asset?.url)
 }
 // 前端业务函数：协调 storyboardImageStatusLabel 对应的页面流程、接口调用或状态转换。
+// 入参：status 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 storyboardImageStatusLabel 对应业务流程的处理结果。
 function storyboardImageStatusLabel(status) {
   return {
     approved: '已通过',
@@ -823,6 +907,8 @@ function storyboardImageStatusLabel(status) {
     missing: '未生成',
   }[status || 'missing'] || '未生成'
 }
+// 入参：status 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 storyboardImageStatusClass 对应业务流程的处理结果。
 function storyboardImageStatusClass(status) {
   if (status === 'approved') return 'text-emerald-300'
   if (status === 'pending' || status === 'running') return 'text-amber-300'
@@ -830,6 +916,8 @@ function storyboardImageStatusClass(status) {
   return 'text-slate-500'
 }
 // 前端业务函数：协调 loadStoryboardImages 对应的页面流程、接口调用或状态转换。
+// 入参：ep 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 loadStoryboardImages 对应业务流程的处理结果。
 async function loadStoryboardImages(ep) {
   if (!ep?.id || !series.value?.id) return
   try {
@@ -843,6 +931,8 @@ async function loadStoryboardImages(ep) {
     storyboardImageErrors[ep.id] = errorMessage(e, '分镜图状态加载失败')
   }
 }
+// 入参：ep 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 generateMissingFrameImages 对应业务流程的处理结果。
 async function generateMissingFrameImages(ep) {
   if (!ep?.id || !series.value?.id || storyboardImageBusy[ep.id] === 'batch') return
   storyboardImageBusy[ep.id] = 'batch'
@@ -855,6 +945,8 @@ async function generateMissingFrameImages(ep) {
     delete storyboardImageBusy[ep.id]
   }
 }
+// 入参：ep、frame、index 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 generateFrameImage 对应业务流程的处理结果。
 async function generateFrameImage(ep, frame, index) {
   const frameId = storyboardFrameIdentity(frame, index)
   const busyKey = `${ep.id}:${frameId}`
@@ -869,6 +961,8 @@ async function generateFrameImage(ep, frame, index) {
     delete storyboardImageBusy[busyKey]
   }
 }
+// 入参：ep 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 generateScriptForEpisode 对应业务流程的处理结果。
 async function generateScriptForEpisode(ep) {
   if (!ep?.id || !series.value?.id || episodeScriptGenerating[ep.id]) return
   episodeScriptGenerating[ep.id] = true
@@ -885,22 +979,32 @@ async function generateScriptForEpisode(ep) {
     delete episodeScriptGenerating[ep.id]
   }
 }
+// 入参：ep 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 storyboardFrameCount 对应业务流程的处理结果。
 function storyboardFrameCount(ep) {
   return storyboardFrames(ep).length
 }
 // 前端业务函数：协调 episodeStoryboardText 对应的页面流程、接口调用或状态转换。
+// 入参：ep 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 episodeStoryboardText 对应业务流程的处理结果。
 function episodeStoryboardText(ep) {
   return formatContent(storyboardSource(ep))
 }
 // 前端业务函数：协调 hasEpisodeScript 对应的页面流程、接口调用或状态转换。
+// 入参：ep 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 hasEpisodeScript 对应业务流程的处理结果。
 function hasEpisodeScript(ep) {
   return Boolean(episodeScriptText(ep))
 }
 // 前端业务函数：协调 episodeTextReady 对应的页面流程、接口调用或状态转换。
+// 入参：ep 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 episodeTextReady 对应业务流程的处理结果。
 function episodeTextReady(ep) {
   return hasEpisodeScript(ep) && storyboardFrameCount(ep) > 0
 }
 // 前端业务函数：协调 applyStyleLockReferenceProgress 对应的页面流程、接口调用或状态转换。
+// 入参：lock 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 applyStyleLockReferenceProgress 对应业务流程的处理结果。
 function applyStyleLockReferenceProgress(lock) {
   if (!series.value || !Array.isArray(lock?.reference_progress)) return
   const characters = Array.isArray(series.value.characters) ? [...series.value.characters] : []
@@ -945,6 +1049,8 @@ function applyStyleLockReferenceProgress(lock) {
   }
 }
 // 前端业务函数：协调 saveSeries 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 saveSeries 对应业务流程的处理结果。
 async function saveSeries() {
   savingSeries.value = true; saveError.value = ''
   try {
@@ -955,6 +1061,8 @@ async function saveSeries() {
     saveError.value = errorMessage(e, '保存系列失败')
   } finally { savingSeries.value = false }
 }
+// 入参：characterId 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 removeCharacter 对应业务流程的处理结果。
 async function removeCharacter(characterId) {
   unlinkErrors.character = ''
   try {
@@ -964,6 +1072,8 @@ async function removeCharacter(characterId) {
     unlinkErrors.character = errorMessage(e, '取消角色关联失败')
   }
 }
+// 入参：sceneId 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 removeScene 对应业务流程的处理结果。
 async function removeScene(sceneId) {
   unlinkErrors.scene = ''
   try {
@@ -973,6 +1083,8 @@ async function removeScene(sceneId) {
     unlinkErrors.scene = errorMessage(e, '取消场景关联失败')
   }
 }
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 removeSeries 对应业务流程的处理结果。
 async function removeSeries() {
   if (deletingSeries.value) return
   deletingSeries.value = true; deleteError.value = ''; deleteResult.value = ''
@@ -987,6 +1099,8 @@ async function removeSeries() {
     deleteError.value = errorMessage(e, '安全归档失败')
   } finally { deletingSeries.value = false }
 }
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 generateStoryPlan 对应业务流程的处理结果。
 async function generateStoryPlan() {
   if (storyPlanButtonDisabled.value) return
   storyPlanning.value = true
@@ -1011,6 +1125,8 @@ async function generateStoryPlan() {
     storyPlanning.value = false
   }
 }
+// 入参：rethrow 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 lockStyle 对应业务流程的处理结果。
 async function lockStyle(rethrow = false) {
   if (styleLockInProgress.value) return
   const shouldRethrow = rethrow === true
@@ -1030,6 +1146,8 @@ async function lockStyle(rethrow = false) {
     if (shouldRethrow) throw e
   } finally { styleLocking.value = false }
 }
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 refreshStyleLock 对应业务流程的处理结果。
 async function refreshStyleLock() {
   try {
     const { data } = await getStyleLock(route.params.id)
@@ -1043,6 +1161,8 @@ async function refreshStyleLock() {
   scheduleStyleLockPoll()
 }
 // 前端业务函数：协调 scheduleStyleLockPoll 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 scheduleStyleLockPoll 对应业务流程的处理结果。
 function scheduleStyleLockPoll() {
   if (styleLockPollTimer.value) {
     clearTimeout(styleLockPollTimer.value)
@@ -1053,6 +1173,8 @@ function scheduleStyleLockPoll() {
   }
 }
 // 前端业务函数：协调 refreshStoryPlan 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 refreshStoryPlan 对应业务流程的处理结果。
 async function refreshStoryPlan() {
   try {
     await load()
@@ -1064,6 +1186,8 @@ async function refreshStoryPlan() {
   }
 }
 // 前端业务函数：协调 scheduleStoryPlanPoll 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 scheduleStoryPlanPoll 对应业务流程的处理结果。
 function scheduleStoryPlanPoll() {
   if (storyPlanPollTimer.value) {
     clearTimeout(storyPlanPollTimer.value)
@@ -1078,6 +1202,8 @@ onBeforeUnmount(() => {
   if (storyPlanPollTimer.value) clearTimeout(storyPlanPollTimer.value)
 })
 // 前端业务函数：协调 startPipelineRun 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 startPipelineRun 对应业务流程的处理结果。
 async function startPipelineRun() {
   if (!runnableEpisode.value && activeProductionRoute.value) {
     router.push(activeProductionRoute.value)
@@ -1124,6 +1250,8 @@ async function startPipelineRun() {
     error.value = detail?.message || detail || e.message || '启动失败'
   } finally { pipelineStarting.value = false }
 }
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 maybeAutostartProduction 对应业务流程的处理结果。
 async function maybeAutostartProduction() {
   if (!autostartRequested.value || autostartRunning.value || pipelineStarting.value) return
   if (!series.value) return
@@ -1145,6 +1273,8 @@ async function maybeAutostartProduction() {
   }
 }
 // 前端业务函数：协调 autoGenerate 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 autoGenerate 对应业务流程的处理结果。
 async function autoGenerate() {
   autoGenerating.value = true; autoGenResult.value = null; error.value = ''
   try {
@@ -1160,7 +1290,11 @@ async function autoGenerate() {
     autoGenerating.value = false
   } finally { autoGenerating.value = false }
 }
+// 入参：s 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 epStatusClass 对应业务流程的处理结果。
 function epStatusClass(s) { return { pending: 'bg-gray-800 text-slate-400', rendering: 'bg-yellow-900/40 text-yellow-400', done: 'bg-emerald-900/40 text-emerald-400', failed: 'bg-red-900/40 text-red-400' }[s] || 'bg-gray-800 text-slate-400' }
+// 入参：s 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 runStatusClass 对应业务流程的处理结果。
 function runStatusClass(s) { return { running: 'bg-sky-900/40 text-sky-400', completed: 'bg-emerald-900/40 text-emerald-400', failed: 'bg-red-900/40 text-red-400', pending: 'bg-gray-800 text-slate-400' }[s] || 'bg-gray-800 text-slate-400' }
 onMounted(load)
 </script>

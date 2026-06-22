@@ -15,6 +15,8 @@ var promptTemplateLoader = global.__promptTemplateLoader || {
   /**
    * 初始化 — 从服务端拉取全量模板
    */
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 init 对应业务流程的处理结果。
   init: function () {
     var maxRetries = 3;
     for (var attempt = 1; attempt <= maxRetries; attempt++) {
@@ -44,6 +46,8 @@ var promptTemplateLoader = global.__promptTemplateLoader || {
   /**
    * 增量更新
    */
+  // 入参：serverVersion 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 checkAndUpdate 对应业务流程的处理结果。
   checkAndUpdate: function (serverVersion) {
     if (serverVersion > this._version) {
       logger.info(TAG, "模板已过期 (本地=" + this._version + ", 服务端=" + serverVersion + "), 更新中...");
@@ -61,6 +65,8 @@ var promptTemplateLoader = global.__promptTemplateLoader || {
    * @param {string} [id] — 模板 ID，不传则返回默认模板
    * @returns {Object|null} { id, name, industry, content }
    */
+  // 入参：id 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 get 对应业务流程的处理结果。
   get: function (id) {
     if (id) return this._cache[id] || null;
     // 查找默认模板
@@ -79,6 +85,8 @@ var promptTemplateLoader = global.__promptTemplateLoader || {
    * @param {string} industry — "health" / "travel"
    * @returns {Array}
    */
+  // 入参：industry 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 listByIndustry 对应业务流程的处理结果。
   listByIndustry: function (industry) {
     var result = [];
     var keys = Object.keys(this._cache);
@@ -90,6 +98,8 @@ var promptTemplateLoader = global.__promptTemplateLoader || {
   },
 
   // 设备业务函数：处理 _applyTemplates 对应的抖音自动化动作、状态或安全边界。
+  // 入参：templates 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _applyTemplates 对应业务流程的处理结果。
   _applyTemplates: function (templates) {
     for (var i = 0; i < templates.length; i++) {
       var t = templates[i];
@@ -99,6 +109,8 @@ var promptTemplateLoader = global.__promptTemplateLoader || {
     logger.debug(TAG, "已应用模板，当前缓存 " + Object.keys(this._cache).length + " 个");
   },
 
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 getVersion 对应业务流程的处理结果。
   getVersion: function () {
     return this._version;
   },

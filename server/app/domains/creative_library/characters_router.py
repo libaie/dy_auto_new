@@ -21,7 +21,10 @@ router = APIRouter(prefix="/api/characters", tags=["characters"])
 
 
 class CharacterCreate(BaseModel):
-    """业务类：承载 CharacterCreate 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 CharacterCreate 相关的数据结构、状态或业务协作。
+
+    类参数：age_range、appearance_desc、default_voice_id、gender、name、outfit_desc、personality、role_type 承载该类的业务配置、状态或数据字段。
+    """
     name: str
     role_type: str = "protagonist"
     gender: str = "male"
@@ -33,19 +36,28 @@ class CharacterCreate(BaseModel):
 
 
 class AutoGenerateInput(BaseModel):
-    """业务类：承载 AutoGenerateInput 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 AutoGenerateInput 相关的数据结构、状态或业务协作。
+
+    类参数：count、genre、text 承载该类的业务配置、状态或数据字段。
+    """
     text: str = Field(..., min_length=10, max_length=5000)
     genre: str = "drama"
     count: int = Field(default=4, ge=1, le=10)
 
 
 class ReferenceGenerateInput(BaseModel):
-    """业务类：承载 ReferenceGenerateInput 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 ReferenceGenerateInput 相关的数据结构、状态或业务协作。
+
+    类参数：slot 承载该类的业务配置、状态或数据字段。
+    """
     slot: str = "all"
 
 
 class AiRewriteInput(BaseModel):
-    """业务类：承载 AiRewriteInput 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 AiRewriteInput 相关的数据结构、状态或业务协作。
+
+    类参数：instruction 承载该类的业务配置、状态或数据字段。
+    """
     instruction: str = ""
 
 CHARACTER_GEN_SYSTEM = """你是一位资深的编剧和角色设计师。根据用户提供的故事概要，生成详细的角色档案。
@@ -62,7 +74,11 @@ CHARACTER_GEN_SYSTEM = """你是一位资深的编剧和角色设计师。根据
 def list_characters(db: Session = Depends(get_db),
                     include_archived: bool = Query(False),
                     _: str = Depends(verify_admin_token)):
-    """业务函数：处理 list_characters 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 list_characters 对应的业务流程、校验或数据转换。
+
+    入参：db、include_archived、_ 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     characters = db.query(Character).all()
     if not include_archived:
         characters = [c for c in characters if not (c.meta_json or {}).get("archived")]
@@ -72,7 +88,11 @@ def list_characters(db: Session = Depends(get_db),
 @router.post("")
 def create_character(body: CharacterCreate, db: Session = Depends(get_db),
                      user = Depends(verify_admin_token)):
-    """业务函数：处理 create_character 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 create_character 对应的业务流程、校验或数据转换。
+
+    入参：body、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     c = Character(**body.model_dump())
     db.add(c); db.commit(); db.refresh(c)
     return {"ok": True, "character": _to_dict(c)}
@@ -81,7 +101,11 @@ def create_character(body: CharacterCreate, db: Session = Depends(get_db),
 @router.put("/{character_id}")
 def update_character(character_id: str, body: dict, db: Session = Depends(get_db),
                      user = Depends(verify_admin_token)):
-    """业务函数：处理 update_character 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 update_character 对应的业务流程、校验或数据转换。
+
+    入参：character_id、body、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     c = db.query(Character).filter(Character.id == character_id).first()
     if not c:
         raise HTTPException(404, "Character not found")
@@ -95,7 +119,11 @@ def update_character(character_id: str, body: dict, db: Session = Depends(get_db
 @router.delete("/{character_id}")
 def delete_character(character_id: str, db: Session = Depends(get_db),
                      user = Depends(verify_admin_token)):
-    """业务函数：处理 delete_character 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 delete_character 对应的业务流程、校验或数据转换。
+
+    入参：character_id、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     try:
         result = archive_character_or_scene(db, "character", character_id)
     except AssetLifecycleError as exc:
@@ -105,7 +133,11 @@ def delete_character(character_id: str, db: Session = Depends(get_db),
 
 
 def _reference_asset_http_error(exc: ReferenceAssetError) -> HTTPException:
-    """业务函数：处理 _reference_asset_http_error 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _reference_asset_http_error 对应的业务流程、校验或数据转换。
+
+    入参：exc 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     status_code = 400
     if exc.code == "CHARACTER_NOT_FOUND":
         status_code = 404
@@ -117,7 +149,11 @@ def _reference_asset_http_error(exc: ReferenceAssetError) -> HTTPException:
 
 
 def _ai_rewrite_http_error(exc: AssetAiRewriteError) -> HTTPException:
-    """业务函数：处理 _ai_rewrite_http_error 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _ai_rewrite_http_error 对应的业务流程、校验或数据转换。
+
+    入参：exc 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     status_code = 409
     if exc.code == "CHARACTER_NOT_FOUND":
         status_code = 404
@@ -133,7 +169,11 @@ async def generate_character_reference_images_endpoint(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 generate_character_reference_images_endpoint 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 generate_character_reference_images_endpoint 对应的业务流程、校验或数据转换。
+
+    入参：character_id、body、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     try:
         return await generate_character_reference_images(db, character_id, slot=(body.slot if body else "all"))
     except ReferenceAssetError as exc:
@@ -148,7 +188,11 @@ async def generate_character_ai_rewrite_endpoint(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 generate_character_ai_rewrite_endpoint 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 generate_character_ai_rewrite_endpoint 对应的业务流程、校验或数据转换。
+
+    入参：character_id、body、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     try:
         return await generate_character_rewrite_candidate(
             db, character_id, instruction=(body.instruction if body else "")
@@ -170,7 +214,11 @@ async def generate_character_ai_rewrite_endpoint(
 @router.post("/auto-generate")
 async def auto_generate_characters(body: AutoGenerateInput, db: Session = Depends(get_db),
                                    user = Depends(verify_admin_token)):
-    """AI 根据故事文本自动生成角色档案。返回角色列表（不持久化），前端确认后逐个创建。"""
+    """业务函数：处理 auto_generate_characters 对应的业务流程、校验或数据转换。
+
+    入参：body、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     user_prompt = f"""故事概要：{body.text}
 类型：{body.genre}
 需要生成的角色数量：{body.count}
@@ -197,7 +245,11 @@ async def auto_generate_characters(body: AutoGenerateInput, db: Session = Depend
 
 
 def _parse_characters_json(raw: str) -> dict:
-    """业务函数：处理 _parse_characters_json 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _parse_characters_json 对应的业务流程、校验或数据转换。
+
+    入参：raw 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Parse LLM JSON output with fallback strategies."""
     # Strategy 1: direct parse
     try:
@@ -223,5 +275,9 @@ def _parse_characters_json(raw: str) -> dict:
 
 
 def _to_dict(c: Character) -> dict:
-    """业务函数：处理 _to_dict 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _to_dict 对应的业务流程、校验或数据转换。
+
+    入参：c 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return {col.name: getattr(c, col.name) for col in Character.__table__.columns}

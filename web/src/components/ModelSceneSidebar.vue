@@ -32,6 +32,8 @@ const props = defineProps({
 defineEmits(['select-scene'])
 
 // 前端业务函数：协调 modelCount 对应的页面流程、接口调用或状态转换。
+// 入参：key 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 modelCount 对应业务流程的处理结果。
 function modelCount(key) {
   const scene = props.scenes.find(s => s.key === key)
   if (!scene) return 0
@@ -39,11 +41,15 @@ function modelCount(key) {
 }
 
 // 前端业务函数：协调 statusClass 对应的页面流程、接口调用或状态转换。
+// 入参：key 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 statusClass 对应业务流程的处理结果。
 function statusClass(key) {
   return props.sceneStatus[key] || 'red'
 }
 
 // 前端业务函数：协调 statusLabel 对应的页面流程、接口调用或状态转换。
+// 入参：key 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 statusLabel 对应业务流程的处理结果。
 function statusLabel(key) {
   const map = { green: '就绪', amber: '待配置', red: '未配置' }
   return map[props.sceneStatus[key]] || '未知'

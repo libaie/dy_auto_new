@@ -23,12 +23,16 @@ const toast = useToastStore()
 
 // --- WebSocket ---
 // 前端业务函数：协调 wsUrl 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 wsUrl 对应业务流程的处理结果。
 function wsUrl() {
   const token = localStorage.getItem('token') || ''
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
   return `${protocol}//${location.host}/api/devices/ws/pair-events?token=${encodeURIComponent(token)}`
 }
 useWebSocket(wsUrl, {
+  // 入参：msg 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 onMessage 对应业务流程的处理结果。
   onMessage(msg) {
     if (msg.event === 'prompt_templates_changed') fetchTemplates()
   },
@@ -53,6 +57,8 @@ const deletingName = ref(null)
 
 // ---- helpers ----
 // 前端业务函数：协调 scenePreview 对应的页面流程、接口调用或状态转换。
+// 入参：content 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 scenePreview 对应业务流程的处理结果。
 function scenePreview(content) {
   if (!content) return []
   const parts = []
@@ -63,8 +69,12 @@ function scenePreview(content) {
 }
 
 const industryLabels = { health: '大健康', travel: '旅游', education: '教育', finance: '金融', beauty: '美妆', realestate: '房产', auto: '汽车' }
+// 入参：val 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 industryLabel 对应业务流程的处理结果。
 function industryLabel(val) { return industryLabels[val] || val }
 
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 resetRewriteState 对应业务流程的处理结果。
 function resetRewriteState() {
   rewriteStatus.value = ''
   rewriteRestoreContent.value = ''
@@ -72,12 +82,16 @@ function resetRewriteState() {
 }
 
 // 前端业务函数：协调 closeDialog 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 closeDialog 对应业务流程的处理结果。
 function closeDialog() {
   if (generating.value || rewriting.value) return
   dialogOpen.value = false
 }
 
 // 前端业务函数：协调 restoreLastRewrite 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 restoreLastRewrite 对应业务流程的处理结果。
 function restoreLastRewrite() {
   if (!rewriteHasRestore.value) return
   form.value.contentJson = rewriteRestoreContent.value
@@ -86,6 +100,8 @@ function restoreLastRewrite() {
   toast.success('已恢复 AI 修改前内容')
 }
 
+// 入参：iso 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 formatDate 对应业务流程的处理结果。
 function formatDate(iso) {
   if (!iso) return '-'
   const d = new Date(iso)
@@ -94,12 +110,16 @@ function formatDate(iso) {
   if (diff < 60000) return '刚刚'
   if (diff < 3600000) return Math.floor(diff / 60000) + ' 分钟前'
   if (diff < 86400000) return Math.floor(diff / 3600000) + ' 小时前'
+  // 入参：n 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 pad 对应业务流程的处理结果。
   const pad = (n) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
 // ---- data ----
 // 前端业务函数：协调 fetchTemplates 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 fetchTemplates 对应业务流程的处理结果。
 async function fetchTemplates() {
   loading.value = true
   try {
@@ -113,6 +133,8 @@ async function fetchTemplates() {
 }
 
 // 前端业务函数：协调 openCreate 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 openCreate 对应业务流程的处理结果。
 function openCreate() {
   isEditing.value = false
   generatingStatus.value = ''
@@ -122,6 +144,8 @@ function openCreate() {
 }
 
 // 前端业务函数：协调 handleGenerate 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleGenerate 对应业务流程的处理结果。
 async function handleGenerate() {
   if (generating.value) return
   if (!aiDesc.value.trim()) { toast.error('请输入模板需求描述'); return }
@@ -164,6 +188,8 @@ async function handleGenerate() {
   } finally { generating.value = false }
 }
 
+// 入参：row 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 openEdit 对应业务流程的处理结果。
 function openEdit(row) {
   isEditing.value = true
   generatingStatus.value = ''
@@ -178,6 +204,8 @@ function openEdit(row) {
 }
 
 // 前端业务函数：协调 handleRewrite 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleRewrite 对应业务流程的处理结果。
 async function handleRewrite() {
   if (rewriting.value) return
   const instruction = rewriteInstruction.value.trim()
@@ -243,6 +271,8 @@ async function handleRewrite() {
 }
 
 // 前端业务函数：协调 handleSave 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleSave 对应业务流程的处理结果。
 async function handleSave() {
   if (generating.value || rewriting.value) return
   let content
@@ -264,6 +294,8 @@ async function handleSave() {
   } finally { saving.value = false }
 }
 
+// 入参：row、enabled 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleToggle 对应业务流程的处理结果。
 async function handleToggle(row, enabled) {
   const prev = row.enabled
   row.enabled = enabled  // optimistic update
@@ -276,9 +308,13 @@ async function handleToggle(row, enabled) {
   }
 }
 
+// 入参：row 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 openDeleteConfirm 对应业务流程的处理结果。
 function openDeleteConfirm(row) { deletingName.value = row.name; showDeleteDialog.value = true }
 
 // 前端业务函数：协调 handleDelete 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleDelete 对应业务流程的处理结果。
 async function handleDelete() {
   try {
     await api.deleteTemplate(deletingName.value)

@@ -12,7 +12,10 @@ from typing import Any
 
 @dataclass(frozen=True)
 class ExpertPrompt:
-    """业务类：承载 ExpertPrompt 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 ExpertPrompt 相关的数据结构、状态或业务协作。
+
+    类参数：system_prompt、user_prompt 承载该类的业务配置、状态或数据字段。
+    """
     system_prompt: str
     user_prompt: str | list[dict[str, Any]]
 
@@ -26,7 +29,11 @@ def build_expert_prompt(
     stage_context: dict[str, Any],
     output_schema: dict[str, Any],
 ) -> ExpertPrompt:
-    """业务函数：处理 build_expert_prompt 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 build_expert_prompt 对应的业务流程、校验或数据转换。
+
+    入参：expert_id、expert_markdown、stage、role、stage_context、output_schema 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     system_prompt = "\n".join(
         [
             "dy_auto system safety rules:",
@@ -74,7 +81,11 @@ def build_expert_prompt(
 
 
 def _user_payload(*, stage: str, role: str, stage_context: dict[str, Any], expert_markdown: str) -> dict[str, Any]:
-    """业务函数：处理 _user_payload 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _user_payload 对应的业务流程、校验或数据转换。
+
+    入参：stage、role、stage_context、expert_markdown 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return {
         "stage": stage,
         "role": role,
@@ -84,7 +95,11 @@ def _user_payload(*, stage: str, role: str, stage_context: dict[str, Any], exper
 
 
 def _media_inputs(stage_context: dict[str, Any]) -> list[dict[str, Any]]:
-    """业务函数：处理 _media_inputs 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _media_inputs 对应的业务流程、校验或数据转换。
+
+    入参：stage_context 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     asset_review = stage_context.get("asset_review")
     if not isinstance(asset_review, dict):
         return []

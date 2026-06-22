@@ -285,11 +285,15 @@ const characterReferenceSlotsWithProgress = computed(() => characterReferenceSlo
 })))
 
 // 前端业务函数：协调 referenceProgress 对应的页面流程、接口调用或状态转换。
+// 入参：character、slot 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 referenceProgress 对应业务流程的处理结果。
 function referenceProgress(character, slot) {
   return character?.meta_json?.reference_generation?.[slot] || null
 }
 
 // 前端业务函数：协调 hasActiveReferenceProgress 对应的页面流程、接口调用或状态转换。
+// 入参：items 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 hasActiveReferenceProgress 对应业务流程的处理结果。
 function hasActiveReferenceProgress(items) {
   return items.some((character) => Object.values(character?.meta_json?.reference_generation || {}).some((progress) => (
     ['pending', 'generating'].includes(progress?.status)
@@ -297,6 +301,8 @@ function hasActiveReferenceProgress(items) {
 }
 
 // 前端业务函数：协调 scheduleReferencePoll 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 scheduleReferencePoll 对应业务流程的处理结果。
 function scheduleReferencePoll() {
   if (referencePollTimer.value) {
     clearTimeout(referencePollTimer.value)
@@ -308,11 +314,15 @@ function scheduleReferencePoll() {
 }
 
 // 前端业务函数：协调 messageFromError 对应的页面流程、接口调用或状态转换。
+// 入参：errorValue、fallback 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 messageFromError 对应业务流程的处理结果。
 function messageFromError(errorValue, fallback) {
   return errorValue?.response?.data?.detail || errorValue?.message || fallback
 }
 
 // 前端业务函数：协调 pickAllowed 对应的页面流程、接口调用或状态转换。
+// 入参：source、fields 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 pickAllowed 对应业务流程的处理结果。
 function pickAllowed(source, fields) {
   return fields.reduce((payload, field) => {
     payload[field] = source?.[field] ?? ''
@@ -321,6 +331,8 @@ function pickAllowed(source, fields) {
 }
 
 // 前端业务函数：协调 pickCandidateFields 对应的页面流程、接口调用或状态转换。
+// 入参：candidate、fields 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 pickCandidateFields 对应业务流程的处理结果。
 function pickCandidateFields(candidate, fields) {
   return fields.reduce((payload, field) => {
     if (Object.prototype.hasOwnProperty.call(candidate || {}, field) && candidate[field] !== undefined) {
@@ -331,6 +343,8 @@ function pickCandidateFields(candidate, fields) {
 }
 
 // 前端业务函数：协调 mergeAllowedDraft 对应的页面流程、接口调用或状态转换。
+// 入参：draft、candidate 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 mergeAllowedDraft 对应业务流程的处理结果。
 function mergeAllowedDraft(draft, candidate) {
   return {
     ...pickAllowed(draft, CHARACTER_EDIT_FIELDS),
@@ -339,6 +353,8 @@ function mergeAllowedDraft(draft, candidate) {
 }
 
 // 前端业务函数：协调 loadRoles 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 loadRoles 对应业务流程的处理结果。
 async function loadRoles() {
   try {
     const { data } = await listItems('character_role')
@@ -352,6 +368,8 @@ async function loadRoles() {
 }
 
 // 前端业务函数：协调 loadGenres 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 loadGenres 对应业务流程的处理结果。
 async function loadGenres() {
   try {
     const { data } = await listItems('series_genre')
@@ -362,6 +380,8 @@ async function loadGenres() {
 }
 
 // 前端业务函数：协调 load 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 load 对应业务流程的处理结果。
 async function load() {
   loading.value = true
   error.value = ''
@@ -378,6 +398,8 @@ async function load() {
 }
 
 // 前端业务函数：协调 syncSelected 对应的页面流程、接口调用或状态转换。
+// 入参：id 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 syncSelected 对应业务流程的处理结果。
 function syncSelected(id) {
   const fresh = characters.value.find((c) => c.id === id) || null
   selectedCharacter.value = fresh
@@ -388,6 +410,8 @@ function syncSelected(id) {
 }
 
 // 前端业务函数：协调 openCharacter 对应的页面流程、接口调用或状态转换。
+// 入参：character 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 openCharacter 对应业务流程的处理结果。
 function openCharacter(character) {
   drawerError.value = ''
   selectedCharacter.value = character
@@ -396,6 +420,8 @@ function openCharacter(character) {
 }
 
 // 前端业务函数：协调 closeCharacter 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 closeCharacter 对应业务流程的处理结果。
 function closeCharacter() {
   selectedCharacter.value = null
   drawerError.value = ''
@@ -404,6 +430,8 @@ function closeCharacter() {
 }
 
 // 前端业务函数：协调 saveCharacter 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 saveCharacter 对应业务流程的处理结果。
 async function saveCharacter() {
   if (!selectedCharacter.value) return
   const id = selectedCharacter.value.id
@@ -421,6 +449,8 @@ async function saveCharacter() {
 }
 
 // 前端业务函数：协调 regenerateCharacterReference 对应的页面流程、接口调用或状态转换。
+// 入参：slot 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 regenerateCharacterReference 对应业务流程的处理结果。
 async function regenerateCharacterReference(slot) {
   if (!selectedCharacter.value) return
   const id = selectedCharacter.value.id
@@ -438,6 +468,8 @@ async function regenerateCharacterReference(slot) {
 }
 
 // 前端业务函数：协调 replaceCharacterReference 对应的页面流程、接口调用或状态转换。
+// 入参：slot、url 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 replaceCharacterReference 对应业务流程的处理结果。
 async function replaceCharacterReference(slot, url) {
   if (!selectedCharacter.value) return
   const id = selectedCharacter.value.id
@@ -451,6 +483,8 @@ async function replaceCharacterReference(slot, url) {
   }
 }
 
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 requestCharacterRewrite 对应业务流程的处理结果。
 async function requestCharacterRewrite() {
   if (!selectedCharacter.value) return
   drawerError.value = ''
@@ -466,6 +500,8 @@ async function requestCharacterRewrite() {
   }
 }
 
+// 入参：candidate 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 applyCharacterRewrite 对应业务流程的处理结果。
 async function applyCharacterRewrite(candidate) {
   if (!selectedCharacter.value) return
   const id = selectedCharacter.value.id
@@ -480,6 +516,8 @@ async function applyCharacterRewrite(candidate) {
   }
 }
 
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 confirmDeleteCharacter 对应业务流程的处理结果。
 async function confirmDeleteCharacter() {
   if (!selectedCharacter.value) return
   drawerError.value = ''
@@ -492,6 +530,8 @@ async function confirmDeleteCharacter() {
   }
 }
 
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 doCreate 对应业务流程的处理结果。
 async function doCreate() {
   error.value = ''
   try {
@@ -503,6 +543,8 @@ async function doCreate() {
   }
 }
 
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 doAiGenerate 对应业务流程的处理结果。
 async function doAiGenerate() {
   aiGenerating.value = true
   aiResult.value = []
@@ -519,6 +561,8 @@ async function doAiGenerate() {
 }
 
 // 前端业务函数：协调 doBatchCreate 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 doBatchCreate 对应业务流程的处理结果。
 async function doBatchCreate() {
   const selected = aiResult.value.filter((c) => c._selected)
   if (!selected.length) return
@@ -548,6 +592,8 @@ async function doBatchCreate() {
 }
 
 // 前端业务函数：协调 roleClass 对应的页面流程、接口调用或状态转换。
+// 入参：role 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 roleClass 对应业务流程的处理结果。
 function roleClass(role) {
   return {
     protagonist: 'bg-sky-900/40 text-sky-300',
@@ -558,10 +604,14 @@ function roleClass(role) {
 }
 
 // 前端业务函数：协调 roleLabel 对应的页面流程、接口调用或状态转换。
+// 入参：value 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 roleLabel 对应业务流程的处理结果。
 function roleLabel(value) {
   return roleOptions.value.find((item) => item.value === value)?.label || value || '未设置'
 }
 
+// 入参：value 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 genderLabel 对应业务流程的处理结果。
 function genderLabel(value) {
   return value === 'male' ? '男' : value === 'female' ? '女' : value || '未设置'
 }

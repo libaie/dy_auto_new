@@ -27,5 +27,7 @@
 <script setup>
 const props = defineProps({ entries: { type: Array, default: () => [] } })
 // 前端业务函数：协调 typeColor 对应的页面流程、接口调用或状态转换。
+// 入参：t 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 typeColor 对应业务流程的处理结果。
 function typeColor(t) { return { llm: 'bg-sky-900/40 text-sky-400', render: 'bg-purple-900/40 text-purple-400', audit: 'bg-emerald-900/40 text-emerald-400', tts: 'bg-yellow-900/40 text-yellow-400', image: 'bg-orange-900/40 text-orange-400' }[t] || 'bg-gray-800 text-slate-400' }
 </script>

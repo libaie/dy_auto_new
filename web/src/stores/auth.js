@@ -13,6 +13,8 @@ export const useAuthStore = defineStore('auth', () => {
   const isAdmin = computed(() => role.value === 'admin')
 
   // 前端业务函数：协调 login 对应的页面流程、接口调用或状态转换。
+  // 入参：user、password 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 login 对应业务流程的处理结果。
   async function login(user, password) {
     const response = await loginApi(user, password)
     const data = response.data
@@ -27,6 +29,8 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   // 前端业务函数：协调 logout 对应的页面流程、接口调用或状态转换。
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 logout 对应业务流程的处理结果。
   function logout() {
     token.value = ''
     username.value = ''

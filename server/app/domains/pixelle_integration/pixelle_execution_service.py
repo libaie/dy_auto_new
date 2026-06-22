@@ -17,7 +17,11 @@ from app.domains.video_production.production_status import (
 
 
 def _as_float(value: Any, default: float) -> float:
-    """业务函数：处理 _as_float 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _as_float 对应的业务流程、校验或数据转换。
+
+    入参：value、default 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     try:
         return float(value)
     except (TypeError, ValueError):
@@ -25,7 +29,11 @@ def _as_float(value: Any, default: float) -> float:
 
 
 def _priority(value: Any, fallback: int) -> int:
-    """业务函数：处理 _priority 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _priority 对应的业务流程、校验或数据转换。
+
+    入参：value、fallback 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     try:
         return int(value)
     except (TypeError, ValueError):
@@ -33,7 +41,11 @@ def _priority(value: Any, fallback: int) -> int:
 
 
 def _reference_roles(segment: dict[str, Any], continuity_mode: str) -> list[dict[str, Any]]:
-    """业务函数：处理 _reference_roles 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _reference_roles 对应的业务流程、校验或数据转换。
+
+    入参：segment、continuity_mode 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     raw_roles = segment.get("reference_roles") or segment.get("reference_roles_json") or []
     roles: list[dict[str, Any]] = []
     if not isinstance(raw_roles, list):
@@ -53,13 +65,21 @@ def _reference_roles(segment: dict[str, Any], continuity_mode: str) -> list[dict
 
 
 def _next_priority(roles: list[dict[str, Any]]) -> int:
-    """业务函数：处理 _next_priority 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _next_priority 对应的业务流程、校验或数据转换。
+
+    入参：roles 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     priorities = [_priority(role.get("priority"), 0) for role in roles]
     return max(priorities, default=0) + 1
 
 
 def _dedupe_urls(urls: list[str]) -> list[str]:
-    """业务函数：处理 _dedupe_urls 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _dedupe_urls 对应的业务流程、校验或数据转换。
+
+    入参：urls 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     seen: set[str] = set()
     deduped: list[str] = []
     for url in urls:
@@ -72,7 +92,11 @@ def _dedupe_urls(urls: list[str]) -> list[str]:
 
 
 def _reference_urls(roles: list[dict[str, Any]], segment: dict[str, Any]) -> list[str]:
-    """业务函数：处理 _reference_urls 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _reference_urls 对应的业务流程、校验或数据转换。
+
+    入参：roles、segment 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     raw_roles = segment.get("reference_roles") or segment.get("reference_roles_json") or []
     has_typed_roles = isinstance(raw_roles, list) and any(isinstance(item, dict) for item in raw_roles)
     continuity_mode = str(segment.get("continuity_mode") or CONTINUITY_NARRATIVE_CUT)
@@ -88,7 +112,11 @@ def _reference_urls(roles: list[dict[str, Any]], segment: dict[str, Any]) -> lis
 
 
 def build_video_stage_frame(segment: dict[str, Any], approved_image_url: str) -> dict:
-    """业务函数：处理 build_video_stage_frame 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 build_video_stage_frame 对应的业务流程、校验或数据转换。
+
+    入参：segment、approved_image_url 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Build the Pixelle /api/stages/videos/batch frame payload for one segment."""
     continuity_mode = str(segment.get("continuity_mode") or CONTINUITY_NARRATIVE_CUT)
     previous_end_frame_url = str(segment.get("previous_end_frame_url") or "").strip()

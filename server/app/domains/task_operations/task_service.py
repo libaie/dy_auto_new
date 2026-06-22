@@ -22,7 +22,11 @@ DBTask = Task
 
 
 def _db_task_to_pydantic(task: DBTask, params_override: Optional[dict] = None) -> PydanticTask:
-    """业务函数：处理 _db_task_to_pydantic 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _db_task_to_pydantic 对应的业务流程、校验或数据转换。
+
+    入参：task、params_override 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Convert SQLAlchemy Task to Pydantic Task for API responses."""
     return PydanticTask(
         id=task.id,
@@ -44,7 +48,10 @@ def _db_task_to_pydantic(task: DBTask, params_override: Optional[dict] = None) -
 
 
 class TaskService:
-    """业务类：承载 TaskService 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 TaskService 相关的数据结构、状态或业务协作。
+
+    类参数：无显式类参数 承载该类的业务配置、状态或数据字段。
+    """
     """Task scheduling service — DB-backed."""
 
     def create_task(
@@ -57,7 +64,11 @@ class TaskService:
         device_id: Optional[str] = None,
         user_id: Optional[str] = None,
     ) -> PydanticTask:
-        """业务函数：处理 create_task 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 create_task 对应的业务流程、校验或数据转换。
+
+        入参：db、task_type、account_id、params、scheduled_at、device_id、user_id 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         db_task = DBTask(
             type=task_type.value,
             account_id=account_id,
@@ -73,14 +84,22 @@ class TaskService:
         return _db_task_to_pydantic(db_task)
 
     def get_task(self, db: Session, task_id: str) -> Optional[PydanticTask]:
-        """业务函数：处理 get_task 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 get_task 对应的业务流程、校验或数据转换。
+
+        入参：db、task_id 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         db_task = db.query(DBTask).filter(DBTask.id == task_id).first()
         if not db_task:
             return None
         return _db_task_to_pydantic(db_task)
 
     def get_pending_task(self, db: Session, device_id: str) -> Optional[PydanticTask]:
-        """业务函数：处理 get_pending_task 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 get_pending_task 对应的业务流程、校验或数据转换。
+
+        入参：db、device_id 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         """Claim a pending task using optimistic locking, respecting daily quotas and device routing.
 
         Routing rules:
@@ -251,7 +270,11 @@ class TaskService:
         result: Optional[dict] = None,
         ui_snapshot: Optional[dict] = None,
     ) -> tuple[PydanticTask, Optional[dict]]:
-        """业务函数：处理 report_result 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 report_result 对应的业务流程、校验或数据转换。
+
+        入参：db、task_id、status、result、ui_snapshot 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         db_task = db.query(DBTask).filter(DBTask.id == task_id).first()
         if not db_task:
             raise ValueError(f"Task {task_id} not found")
@@ -359,7 +382,11 @@ class TaskService:
     def list_tasks(self, db: Session, status=None, task_type: str = None, search: str = None,
                    sort_by: str = "created_at", sort_order: str = "desc",
                    skip: int = 0, limit: int = 50, current_user_id: str = None) -> list[PydanticTask]:
-        """业务函数：处理 list_tasks 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 list_tasks 对应的业务流程、校验或数据转换。
+
+        入参：db、status、task_type、search、sort_by、sort_order、skip、limit、current_user_id 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         query = db.query(DBTask)
         if status:
             query = query.filter(DBTask.status == (status.value if hasattr(status, 'value') else status))
@@ -380,7 +407,11 @@ class TaskService:
         return [_db_task_to_pydantic(t) for t in db_tasks]
 
     def count_tasks(self, db: Session, status=None, task_type: str = None, search: str = None, current_user_id: str = None) -> int:
-        """业务函数：处理 count_tasks 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 count_tasks 对应的业务流程、校验或数据转换。
+
+        入参：db、status、task_type、search、current_user_id 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         query = db.query(DBTask)
         if status:
             query = query.filter(DBTask.status == (status.value if hasattr(status, 'value') else status))
@@ -398,7 +429,11 @@ class TaskService:
         return query.count()
 
     def cancel_task(self, db: Session, task_id: str):
-        """业务函数：处理 cancel_task 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 cancel_task 对应的业务流程、校验或数据转换。
+
+        入参：db、task_id 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         """Cancel a pending or running task.
 
         Keeps device_id so the cancellation can be delivered to the running
@@ -432,7 +467,11 @@ class TaskService:
         return _db_task_to_pydantic(task)
 
     def delete_task(self, db: Session, task_id: str) -> bool:
-        """业务函数：处理 delete_task 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 delete_task 对应的业务流程、校验或数据转换。
+
+        入参：db、task_id 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         """Delete a task. Only non-running tasks can be deleted. Resets ChannelItem."""
         task = db.query(DBTask).filter(DBTask.id == task_id).first()
         if not task:
@@ -464,7 +503,11 @@ class TaskService:
         return True
 
     def delete_tasks_batch(self, db: Session, task_ids: list[str]) -> int:
-        """业务函数：处理 delete_tasks_batch 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 delete_tasks_batch 对应的业务流程、校验或数据转换。
+
+        入参：db、task_ids 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         """Delete multiple tasks in batch. Returns count of deleted tasks."""
         if not task_ids:
             return 0
@@ -505,7 +548,11 @@ class TaskService:
         return result
 
     def check_cancelled_running(self, db: Session, device_id: str) -> Optional[PydanticTask]:
-        """业务函数：处理 check_cancelled_running 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 check_cancelled_running 对应的业务流程、校验或数据转换。
+
+        入参：db、device_id 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         """Check if device has a running task that was recently cancelled.
 
         Only returns tasks cancelled within the last 5 minutes — older ones are

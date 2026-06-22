@@ -98,11 +98,15 @@ watch(
 )
 
 // 前端业务函数：协调 selectPatch 对应的页面流程、接口调用或状态转换。
+// 入参：patch 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 selectPatch 对应业务流程的处理结果。
 function selectPatch(patch) {
   selectedId.value = patch.id
 }
 
 // 前端业务函数：协调 emitSave 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 emitSave 对应业务流程的处理结果。
 function emitSave() {
   if (!selectedPatch.value) return
   emit('save', { ...selectedPatch.value, after: { ...editableAfter.value } })

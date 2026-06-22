@@ -58,6 +58,8 @@ export const AUTO_REPAIR_COPY = {
   paidConfirmMissingReason: '请填写确认原因',
 }
 
+// 入参：value、fallback 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 safeAutoRepairText 对应业务流程的处理结果。
 export function safeAutoRepairText(value, fallback = '信息待补充') {
   const text = String(value ?? '').trim()
   if (!text || MOJIBAKE_PATTERN.test(text)) return fallback
@@ -65,14 +67,20 @@ export function safeAutoRepairText(value, fallback = '信息待补充') {
 }
 
 // 前端业务函数：协调 autoRepairStatusLabel 对应的页面流程、接口调用或状态转换。
+// 入参：status 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 autoRepairStatusLabel 对应业务流程的处理结果。
 export function autoRepairStatusLabel(status) {
   return AUTO_REPAIR_STATUS_LABELS[String(status || '').toLowerCase()] || safeAutoRepairText(status, '未知状态')
 }
 
+// 入参：type 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 autoRepairTypeLabel 对应业务流程的处理结果。
 export function autoRepairTypeLabel(type) {
   return AUTO_REPAIR_TYPE_LABELS[String(type || '').toLowerCase()] || safeAutoRepairText(type, '返修任务')
 }
 
+// 入参：value 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 formatRepairCost 对应业务流程的处理结果。
 export function formatRepairCost(value) {
   const numberValue = Number(value || 0)
   if (!Number.isFinite(numberValue) || numberValue <= 0) return AUTO_REPAIR_COPY.noExtraCost

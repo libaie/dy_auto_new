@@ -19,6 +19,8 @@ var aiAnalyzer = {
    * 不传 id 或找不到时回退到 prompts-config.js 本地配置
    * @param {string} [id] — 模板 ID
    */
+  // 入参：id、fallbackIndustry 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 useTemplate 对应业务流程的处理结果。
   useTemplate: function (id, fallbackIndustry) {
     fallbackIndustry = fallbackIndustry || "health";
     var loader = require("./prompt-template-loader");
@@ -46,12 +48,16 @@ var aiAnalyzer = {
    * 切换行业（本地配置）
    * @param {string} name — 行业标识，如 "health" / "travel"
    */
+  // 入参：name 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 setIndustry 对应业务流程的处理结果。
   setIndustry: function (name) {
     if (promptsConfig.industry !== name) this._destCache = {};
     promptsConfig.setIndustry(name);
     logger.info(TAG, "切换行业: " + (promptsConfig.get().name || name));
   },
 
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 getIndustry 对应业务流程的处理结果。
   getIndustry: function () {
     return promptsConfig.industry;
   },
@@ -59,6 +65,8 @@ var aiAnalyzer = {
   _destCache: {},
 
   // 设备业务函数：处理 resolveDestination 对应的抖音自动化动作、状态或安全边界。
+  // 入参：keyword 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 resolveDestination 对应业务流程的处理结果。
   resolveDestination: function (keyword) {
     if (promptsConfig.industry !== "travel") return null;
     if (!keyword) return null;
@@ -93,6 +101,8 @@ var aiAnalyzer = {
   /**
    * 调用服务端 AI 代理
    */
+  // 入参：prompt、maxTokens、temperature 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _callAI 对应业务流程的处理结果。
   _callAI: function (prompt, maxTokens, temperature) {
     if (!config.serverUrl || !config.deviceSecret) {
       logger.error(TAG, "设备未配对，无法调用 AI");
@@ -120,6 +130,8 @@ var aiAnalyzer = {
   /**
    * 分析单条评论
    */
+  // 入参：params 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 analyzeComment 对应业务流程的处理结果。
   analyzeComment: function (params) {
     var searchKeyword = params.searchKeyword;
     var nickname = params.nickname;
@@ -151,6 +163,8 @@ var aiAnalyzer = {
   /**
    * 解析 AI 分析响应
    */
+  // 入参：content 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _parseAnalysisResponse 对应业务流程的处理结果。
   _parseAnalysisResponse: function (content) {
     try {
       var jsonMatch = content.match(/\{[\s\S]*\}/);
@@ -177,6 +191,8 @@ var aiAnalyzer = {
   /**
    * 本地关键词预过滤
    */
+  // 入参：text 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _localRelevanceCheck 对应业务流程的处理结果。
   _localRelevanceCheck: function (text) {
     if (!text) return null;
     var t = text.toLowerCase();
@@ -198,6 +214,8 @@ var aiAnalyzer = {
   /**
    * 检查当前内容是否与目标领域相关
    */
+  // 入参：contentText、domain 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 checkRelevance 对应业务流程的处理结果。
   checkRelevance: function (contentText, domain) {
     if (!contentText || contentText.length < 2) return true;
 
@@ -233,6 +251,8 @@ var aiAnalyzer = {
   },
 
   // 兼容旧方法名
+  // 入参：contentText、domain 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 checkHealthRelevance 对应业务流程的处理结果。
   checkHealthRelevance: function (contentText, domain) {
     return this.checkRelevance(contentText, domain);
   },
@@ -240,6 +260,8 @@ var aiAnalyzer = {
   /**
    * 根据视频内容生成评论
    */
+  // 入参：videoText 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 generateVideoComment 对应业务流程的处理结果。
   generateVideoComment: function (videoText) {
     if (!videoText || videoText.length < 2) {
       logger.warn(TAG, "视频文本太短，无法生成评论");
@@ -268,6 +290,8 @@ var aiAnalyzer = {
   /**
    * 生成私信 — opener 阶段（破冰）
    */
+  // 入参：params 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 generateDM 对应业务流程的处理结果。
   generateDM: function (params) {
     var searchKeyword = params.searchKeyword || "";
     var nickname = params.nickname || "";
@@ -325,6 +349,8 @@ var aiAnalyzer = {
   /**
    * 根据视频内容生成私信（兼容旧接口）
    */
+  // 入参：videoText 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 generateVideoDM 对应业务流程的处理结果。
   generateVideoDM: function (videoText) {
     return this.generateDM({ videoText: videoText });
   },
@@ -332,6 +358,8 @@ var aiAnalyzer = {
   /**
    * 多阶段私信生成
    */
+  // 入参：stage、params 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 generateDMStage 对应业务流程的处理结果。
   generateDMStage: function (stage, params) {
     var stages = promptsConfig.get().dmStages;
     var cfg = stages[stage];
@@ -365,6 +393,8 @@ var aiAnalyzer = {
   /**
    * 构建五维度分析提示词 — 从 prompts-config 拼接
    */
+  // 入参：searchKeyword、nickname、commentText 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _buildAnalysisPrompt 对应业务流程的处理结果。
   _buildAnalysisPrompt: function (searchKeyword, nickname, commentText) {
     var p = promptsConfig.get();
     var id = p.identity;

@@ -21,6 +21,8 @@ var SearchCommentHandler = Object.create(SearchBaseHandler);
  * 对当前视频发表评论
  * 优先使用 params.content，留空则 AI 根据视频内容自动生成
  */
+// 入参：content、stats 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 SearchCommentHandler._interactWithVideo 对应业务流程的处理结果。
 SearchCommentHandler._interactWithVideo = function (content, stats) {
   // 如果没有提供评论内容，提取视频文本并 AI 生成
   if (!content) {

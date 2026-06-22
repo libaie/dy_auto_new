@@ -23,12 +23,19 @@ router = APIRouter(prefix="/api/storyboard-images", tags=["storyboard-images"])
 
 
 def _auth_user_id(user) -> str | None:
-    """业务函数：处理 _auth_user_id 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _auth_user_id 对应的业务流程、校验或数据转换。
+
+    入参：user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return user[0] if isinstance(user, tuple) else None
 
 
 class StoryboardImageTaskRequest(BaseModel):
-    """业务类：承载 StoryboardImageTaskRequest 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 StoryboardImageTaskRequest 相关的数据结构、状态或业务协作。
+
+    类参数：count、force、run_id、series_id、size 承载该类的业务配置、状态或数据字段。
+    """
     series_id: str
     run_id: str | None = None
     force: bool = False
@@ -37,7 +44,10 @@ class StoryboardImageTaskRequest(BaseModel):
 
 
 class PromoteStoryboardImageRequest(BaseModel):
-    """业务类：承载 PromoteStoryboardImageRequest 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 PromoteStoryboardImageRequest 相关的数据结构、状态或业务协作。
+
+    类参数：asset_version、episode_id、frame_id、run_id 承载该类的业务配置、状态或数据字段。
+    """
     run_id: str
     frame_id: str
     episode_id: str | None = None
@@ -52,7 +62,11 @@ async def create_frame_task(
     db: Session = Depends(get_db),
     user=Depends(require_role("admin")),
 ):
-    """业务函数：处理 create_frame_task 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 create_frame_task 对应的业务流程、校验或数据转换。
+
+    入参：episode_id、frame_id、body、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return await create_storyboard_frame_image_task(
         db,
         series_id=body.series_id,
@@ -73,7 +87,11 @@ async def create_missing_tasks(
     db: Session = Depends(get_db),
     user=Depends(require_role("admin")),
 ):
-    """业务函数：处理 create_missing_tasks 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 create_missing_tasks 对应的业务流程、校验或数据转换。
+
+    入参：episode_id、body、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return await create_missing_storyboard_image_tasks(
         db,
         series_id=body.series_id,
@@ -94,7 +112,11 @@ def read_storyboard_images(
     db: Session = Depends(get_db),
     _=Depends(require_role("admin")),
 ):
-    """业务函数：处理 read_storyboard_images 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 read_storyboard_images 对应的业务流程、校验或数据转换。
+
+    入参：episode_id、series_id、run_id、db、_ 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return list_storyboard_image_state(db, series_id=series_id, episode_id=episode_id, run_id=run_id)
 
 
@@ -105,7 +127,11 @@ def promote_asset(
     db: Session = Depends(get_db),
     user=Depends(require_role("admin")),
 ):
-    """业务函数：处理 promote_asset 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 promote_asset 对应的业务流程、校验或数据转换。
+
+    入参：asset_id、body、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return promote_storyboard_image_asset(
         db,
         asset_id=asset_id,

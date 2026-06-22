@@ -16,10 +16,10 @@ async def upload_to_oss(local_path: str, remote_key: str = "",
                         provider: str = "local",
                         endpoint: str = "", bucket: str = "",
                         access_key: str = "", secret_key: str = "") -> str:
-    """
-    上传文件到 OSS，返回公网 URL.
+    """业务函数：处理 upload_to_oss 对应的业务流程、校验或数据转换。
 
-    Provider: local | minio | aliyun_oss
+    入参：local_path、remote_key、provider、endpoint、bucket、access_key、secret_key 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
     """
     if not os.path.exists(local_path):
         raise FileNotFoundError(f"Local file not found: {local_path}")

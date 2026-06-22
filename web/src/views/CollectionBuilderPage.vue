@@ -37,6 +37,8 @@ const acting = ref(false)
 const error = ref('')
 
 // 前端业务函数：协调 create 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 create 对应业务流程的处理结果。
 async function create() {
   acting.value = true
   error.value = ''

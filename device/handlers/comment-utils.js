@@ -15,6 +15,8 @@ var commentUtils = {
    * 打开评论区 — 统一实现，合并 search-collect 和 reply-comment 的最佳行为
    * @returns {boolean}
    */
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 openComments 对应业务流程的处理结果。
   openComments: function () {
     // 1. 先检测评论区是否已打开
     var items = uiOperator.findElements("comment_list", 500, true);
@@ -57,6 +59,8 @@ var commentUtils = {
    * @param {UiObject} commentBtn
    * @returns {{count: number, rawDesc: string}} count=-1 表示未知
    */
+  // 入参：commentBtn 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 preCheckCommentCount 对应业务流程的处理结果。
   preCheckCommentCount: function (commentBtn) {
     var result = { count: -1, rawDesc: "" };
     if (!commentBtn || commentBtn.isImage || commentBtn.isCoordinate) return result;
@@ -78,6 +82,8 @@ var commentUtils = {
    * @param {Object} [handler] - 可选，BaseHandler 实例
    * @returns {Object|null}
    */
+  // 入参：item、handler 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 parseCommentItem 对应业务流程的处理结果。
   parseCommentItem: function (item, handler) {
     var findChild = (handler && handler._findChildBySelector)
       ? function (p, a) { return handler._findChildBySelector(p, a); }
@@ -150,6 +156,8 @@ var commentUtils = {
    * 将评论原始时间字符串转为北京时间 ISO 格式 (YYYY-MM-DDTHH:mm:ss+08:00)
    * 用于上报服务端，替换相对时间如 "19分钟前"
    */
+  // 入参：timeStr 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 toBeijingTime 对应业务流程的处理结果。
   toBeijingTime: function (timeStr) {
     if (!timeStr) return "";
     var parsed = this.parseTime(timeStr);
@@ -164,6 +172,8 @@ var commentUtils = {
   },
 
   // 设备业务函数：处理 parseTime 对应的抖音自动化动作、状态或安全边界。
+  // 入参：timeStr 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 parseTime 对应业务流程的处理结果。
   parseTime: function (timeStr) {
 	    if (!timeStr) return null;
 	    var now = new Date();
@@ -209,6 +219,8 @@ var commentUtils = {
 	    if (ymdMatch) return new Date(parseInt(ymdMatch[1]), parseInt(ymdMatch[2]) - 1, parseInt(ymdMatch[3]));
 
 	    // MM-DD / MM-DD HH:MM — 按当年算若为未来日期则回退一年
+	    // 入参：d 为该业务流程需要的上下文、标识或载荷。
+	    // 出参：返回 _fixFuture 对应业务流程的处理结果。
 	    function _fixFuture(d) {
 	      if (d > now) d.setFullYear(d.getFullYear() - 1);
 	      return d;
@@ -234,6 +246,8 @@ var commentUtils = {
 	 * 当 comment_time selector 误匹配父元素时，text() 返回拼接全文本
 	 * 如 "昵称,评论文本,3小时前, · 广东,回复 按钮," → "3小时前"
 	 */
+	// 入参：raw 为该业务流程需要的上下文、标识或载荷。
+	// 出参：返回 _cleanTimeStr 对应业务流程的处理结果。
 	_cleanTimeStr: function (raw) {
 	  if (!raw) return "";
 	  if (raw.length <= 15 && raw.indexOf(",") === -1) return raw;
@@ -251,6 +265,8 @@ var commentUtils = {
 	},
 
 // 设备业务函数：处理 localPreFilter 对应的抖音自动化动作、状态或安全边界。
+// 入参：text 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 localPreFilter 对应业务流程的处理结果。
 localPreFilter: function (text) {
     if (!text) return false;
     var stripped = text
@@ -267,6 +283,8 @@ localPreFilter: function (text) {
    * @param {number} maxAgeDays
    * @returns {Array}
    */
+  // 入参：comments、maxAgeMs 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 filterByTime 对应业务流程的处理结果。
   filterByTime: function (comments, maxAgeMs) {
     var now = new Date();
     var cutoff = (maxAgeMs === Infinity) ? new Date(0) : new Date(now.getTime() - maxAgeMs);
@@ -285,6 +303,8 @@ localPreFilter: function (text) {
    * @param {Object} options - { avatarEl: UiObject|null, uploadAvatar: bool }
    * @returns {Object|null}
    */
+  // 入参：options 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 collectProfileData 对应业务流程的处理结果。
   collectProfileData: function (options) {
     options = options || {};
     var data = { nickname: "", douyin_id: "", likes_count: "", follow_count: "",
@@ -339,6 +359,8 @@ localPreFilter: function (text) {
   /**
    * 数字字段清洗 — 处理 "1.2万" / "3.5w" / "1,234" 等格式
    */
+  // 入参：data 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _cleanNumericFields 对应业务流程的处理结果。
   _cleanNumericFields: function (data) {
     var numericFields = { likes_count: 1, follow_count: 1, fans_count: 1, works_count: 1 };
     for (var key in numericFields) {
@@ -365,6 +387,8 @@ localPreFilter: function (text) {
    * @param {UiObject} avatarEl
    * @returns {string|null} base64 PNG
    */
+  // 入参：avatarEl 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _cropCircularAvatar 对应业务流程的处理结果。
   _cropCircularAvatar: function (avatarEl) {
     if (!avatarEl || avatarEl.isImage || avatarEl.isCoordinate) return null;
     try {

@@ -14,7 +14,11 @@ VIDEO_AGENCY_TEAM_VERSION = "2026-06-14.1"
 
 
 def _source_metadata(expert_id: str) -> dict[str, str]:
-    """业务函数：处理 _source_metadata 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _source_metadata 对应的业务流程、校验或数据转换。
+
+    入参：expert_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     manifest = load_manifest()
     expert = get_expert(expert_id)
     return {
@@ -25,7 +29,11 @@ def _source_metadata(expert_id: str) -> dict[str, str]:
 
 
 def _phases(expert_id: str) -> list[str]:
-    """业务函数：处理 _phases 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _phases 对应的业务流程、校验或数据转换。
+
+    入参：expert_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return list(get_expert(expert_id).phases)
 
 
@@ -250,7 +258,11 @@ _QUALITY_GATES = {
 
 
 def build_video_agency_team() -> dict[str, Any]:
-    """业务函数：处理 build_video_agency_team 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 build_video_agency_team 对应的业务流程、校验或数据转换。
+
+    入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return {
         "enabled": True,
         "version": VIDEO_AGENCY_TEAM_VERSION,
@@ -264,7 +276,11 @@ def build_video_agency_team() -> dict[str, Any]:
 
 
 def _team_role_ids(team: dict[str, Any]) -> list[str]:
-    """业务函数：处理 _team_role_ids 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _team_role_ids 对应的业务流程、校验或数据转换。
+
+    入参：team 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     roles = (
         list(team.get("core_roles") or []) +
         list(team.get("support_roles") or []) +
@@ -274,7 +290,11 @@ def _team_role_ids(team: dict[str, Any]) -> list[str]:
 
 
 def _is_current_video_agency_team(team: dict[str, Any]) -> bool:
-    """业务函数：处理 _is_current_video_agency_team 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _is_current_video_agency_team 对应的业务流程、校验或数据转换。
+
+    入参：team 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     quality_gates = team.get("quality_gates") or {}
     return (
         team.get("version") == VIDEO_AGENCY_TEAM_VERSION
@@ -284,7 +304,11 @@ def _is_current_video_agency_team(team: dict[str, Any]) -> bool:
 
 
 def ensure_video_agency_team(style_lock: dict[str, Any] | None) -> dict[str, Any]:
-    """业务函数：处理 ensure_video_agency_team 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 ensure_video_agency_team 对应的业务流程、校验或数据转换。
+
+    入参：style_lock 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     style_lock = style_lock or {}
     team = style_lock.get("agency_team")
     if isinstance(team, dict) and _is_current_video_agency_team(team):
@@ -296,7 +320,11 @@ def ensure_video_agency_team(style_lock: dict[str, Any] | None) -> dict[str, Any
 
 
 def summarize_video_agency_team(team: dict[str, Any] | None) -> dict[str, Any]:
-    """业务函数：处理 summarize_video_agency_team 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 summarize_video_agency_team 对应的业务流程、校验或数据转换。
+
+    入参：team 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     team = team or {}
     core_roles = team.get("core_roles") or []
     support_roles = team.get("support_roles") or []
@@ -314,7 +342,11 @@ def summarize_video_agency_team(team: dict[str, Any] | None) -> dict[str, Any]:
 
 
 def build_agency_context(story_bible_or_style_lock: dict[str, Any] | None) -> dict[str, Any]:
-    """业务函数：处理 build_agency_context 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 build_agency_context 对应的业务流程、校验或数据转换。
+
+    入参：story_bible_or_style_lock 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     source = story_bible_or_style_lock or {}
     style_lock = source.get("style_lock") if isinstance(source.get("style_lock"), dict) else source
     team = ensure_video_agency_team(style_lock)

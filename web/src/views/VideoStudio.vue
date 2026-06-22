@@ -53,6 +53,8 @@ const selectedCharacterIds = ref([])
 const selectedSceneIds = ref([])
 
 // 前端业务函数：协调 loadAssets 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 loadAssets 对应业务流程的处理结果。
 async function loadAssets() {
   try {
     const [cRes, sRes] = await Promise.all([
@@ -65,6 +67,8 @@ async function loadAssets() {
 }
 
 // 前端业务函数：协调 toggleCharacter 对应的页面流程、接口调用或状态转换。
+// 入参：id 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 toggleCharacter 对应业务流程的处理结果。
 function toggleCharacter(id) {
   const idx = selectedCharacterIds.value.indexOf(id)
   if (idx >= 0) selectedCharacterIds.value.splice(idx, 1)
@@ -72,6 +76,8 @@ function toggleCharacter(id) {
 }
 
 // 前端业务函数：协调 toggleScene 对应的页面流程、接口调用或状态转换。
+// 入参：id 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 toggleScene 对应业务流程的处理结果。
 function toggleScene(id) {
   const idx = selectedSceneIds.value.indexOf(id)
   if (idx >= 0) selectedSceneIds.value.splice(idx, 1)
@@ -97,6 +103,8 @@ const systemConfig = ref({
 })
 
 // 前端业务函数：协调 loadSystemConfig 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 loadSystemConfig 对应业务流程的处理结果。
 async function loadSystemConfig() {
   try {
     const resp = await getPixelleConfig()
@@ -120,6 +128,8 @@ async function loadSystemConfig() {
 }
 
 // 前端业务函数：协调 buildPixelleConfigUpdates 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 buildPixelleConfigUpdates 对应业务流程的处理结果。
 function buildPixelleConfigUpdates() {
   const cfg = systemConfig.value
   const updates = {
@@ -186,6 +196,8 @@ const bgmList = ref([])
 const resourcesLoading = ref(false)
 
 // 前端业务函数：协调 fetchResources 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 fetchResources 对应业务流程的处理结果。
 async function fetchResources() {
   resourcesLoading.value = true
   try {
@@ -223,6 +235,8 @@ let pollTimer = null
 // ==================== Actions ====================
 
 // 前端业务函数：协调 handleTestConnection 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleTestConnection 对应业务流程的处理结果。
 async function handleTestConnection() {
   try {
     const resp = await getOpenAPISpec()
@@ -232,16 +246,22 @@ async function handleTestConnection() {
   }
 }
 
+// 入参：event 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleBgmUpload 对应业务流程的处理结果。
 function handleBgmUpload(event) {
   contentForm.value.customBgmFile = event.target.files?.[0] || null
 }
 
 // 前端业务函数：协调 handleRefAudioUpload 对应的页面流程、接口调用或状态转换。
+// 入参：event 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleRefAudioUpload 对应业务流程的处理结果。
 function handleRefAudioUpload(event) {
   voiceVisualForm.value.refAudioFile = event.target.files?.[0] || null
 }
 
 // 前端业务函数：协调 handleGenerate 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleGenerate 对应业务流程的处理结果。
 async function handleGenerate() {
   const cf = contentForm.value
   if (!cf.text.trim()) { toast.error('请输入视频主题或脚本'); return }
@@ -328,6 +348,8 @@ async function handleGenerate() {
 }
 
 // 前端业务函数：协调 pollTask 对应的页面流程、接口调用或状态转换。
+// 入参：taskId、videoModel 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 pollTask 对应业务流程的处理结果。
 function pollTask(taskId, videoModel = 'auto') {
   const maxAttempts = videoModel === 'seedance' ? 180 : videoModel === 'kling' ? 120 : 120
   return new Promise((resolve, reject) => {
@@ -377,11 +399,15 @@ function pollTask(taskId, videoModel = 'auto') {
 }
 
 // 前端业务函数：协调 clearPoll 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 clearPoll 对应业务流程的处理结果。
 function clearPoll() {
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
 }
 
 // 前端业务函数：协调 handleClearResult 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleClearResult 对应业务流程的处理结果。
 function handleClearResult() {
   result.value = null
   videoUrl.value = ''

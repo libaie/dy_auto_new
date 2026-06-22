@@ -12,6 +12,8 @@ const newUser = ref({ username: '', password: '', role: 'operator', nickname: ''
 const creating = ref(false)
 
 // 前端业务函数：协调 fetchUsers 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 fetchUsers 对应业务流程的处理结果。
 async function fetchUsers() {
   loading.value = true
   try { const resp = await listUsers(); users.value = resp.data.users || [] }
@@ -19,6 +21,8 @@ async function fetchUsers() {
   finally { loading.value = false }
 }
 
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleCreate 对应业务流程的处理结果。
 async function handleCreate() {
   if (!newUser.value.username || !newUser.value.password) { toast.error('用户名和密码必填'); return }
   creating.value = true

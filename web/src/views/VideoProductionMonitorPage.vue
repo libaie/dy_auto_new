@@ -486,6 +486,8 @@ const primaryAction = computed(() => {
   return { label: '等待自动调度', disabled: true, run: () => {} }
 })
 
+// 入参：episodes 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 flattenSegments 对应业务流程的处理结果。
 function flattenSegments(episodes) {
   const rows = []
   for (const episode of episodes || []) {
@@ -499,11 +501,15 @@ function flattenSegments(episodes) {
 }
 
 // 前端业务函数：协调 stageStatus 对应的页面流程、接口调用或状态转换。
+// 入参：statuses 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 stageStatus 对应业务流程的处理结果。
 function stageStatus(statuses) {
   return statuses.includes(run.value?.status) ? run.value.status : 'pending'
 }
 
 // 前端业务函数：协调 stepClass 对应的页面流程、接口调用或状态转换。
+// 入参：step 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 stepClass 对应业务流程的处理结果。
 function stepClass(step) {
   if (['passed', 'done', 'completed', 'ready', 'image_approved', 'video_segments_approved'].includes(step.status)) return 'border-emerald-500/40 bg-emerald-950/30 text-emerald-300'
   if (['blocked', 'image_review_pending', 'image_human_review_required', 'video_review_pending', 'video_human_review_required'].includes(step.status)) return 'border-amber-500/40 bg-amber-950/30 text-amber-300'
@@ -512,6 +518,8 @@ function stepClass(step) {
 }
 
 // 前端业务函数：协调 statusClass 对应的页面流程、接口调用或状态转换。
+// 入参：status 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 statusClass 对应业务流程的处理结果。
 function statusClass(status) {
   if (['approved', 'completed', 'done', 'ready'].includes(status)) return 'text-emerald-300'
   if (['failed', 'rejected'].includes(status)) return 'text-rose-300'
@@ -520,12 +528,16 @@ function statusClass(status) {
 }
 
 // 前端业务函数：协调 formatCost 对应的页面流程、接口调用或状态转换。
+// 入参：value 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 formatCost 对应业务流程的处理结果。
 function formatCost(value) {
   if (value === null || value === undefined) return '-'
   return Number(value).toFixed(2)
 }
 
 // 前端业务函数：协调 assetTypeLabel 对应的页面流程、接口调用或状态转换。
+// 入参：assetType 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 assetTypeLabel 对应业务流程的处理结果。
 function assetTypeLabel(assetType) {
   return {
     image: '图像',
@@ -534,6 +546,8 @@ function assetTypeLabel(assetType) {
   }[assetType] || assetType
 }
 
+// 入参：e 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 normalizeError 对应业务流程的处理结果。
 function normalizeError(e) {
   const detail = e.response?.data?.detail
   if (detail && typeof detail === 'object') return detail
@@ -547,6 +561,8 @@ function normalizeError(e) {
 }
 
 // 前端业务函数：协调 loadRunSummary 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 loadRunSummary 对应业务流程的处理结果。
 async function loadRunSummary() {
   const runResponse = await getVideoProductionRun(runId)
   run.value = runResponse.data.run
@@ -554,6 +570,8 @@ async function loadRunSummary() {
 }
 
 // 前端业务函数：协调 loadReadiness 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 loadReadiness 对应业务流程的处理结果。
 async function loadReadiness() {
   try {
     const readinessResponse = await getRunReadiness(runId)
@@ -564,6 +582,8 @@ async function loadReadiness() {
 }
 
 // 前端业务函数：协调 loadCostSummary 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 loadCostSummary 对应业务流程的处理结果。
 async function loadCostSummary() {
   try {
     const costsResponse = await getRunCosts(runId)
@@ -574,6 +594,8 @@ async function loadCostSummary() {
 }
 
 // 前端业务函数：协调 loadProviderStageTasks 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 loadProviderStageTasks 对应业务流程的处理结果。
 async function loadProviderStageTasks(params = {}) {
   try {
     const { data } = await getProviderStageTasks(runId, {
@@ -587,6 +609,8 @@ async function loadProviderStageTasks(params = {}) {
 }
 
 // 前端业务函数：协调 loadRepairTasks 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 loadRepairTasks 对应业务流程的处理结果。
 async function loadRepairTasks() {
   repairLoading.value = true
   repairError.value = ''
@@ -604,6 +628,8 @@ async function loadRepairTasks() {
 }
 
 // 前端业务函数：协调 loadStoryboardImages 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 loadStoryboardImages 对应业务流程的处理结果。
 async function loadStoryboardImages() {
   if (!run.value?.episode_id || !run.value?.series_id) {
     storyboardImageState.value = null
@@ -622,6 +648,8 @@ async function loadStoryboardImages() {
   }
 }
 
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 load 对应业务流程的处理结果。
 async function load(options = {}) {
   const silent = options.silent === true
   if (!silent) loading.value = true
@@ -648,6 +676,8 @@ async function load(options = {}) {
 }
 
 // 前端业务函数：协调 storyboardFrameImageStatusLabel 对应的页面流程、接口调用或状态转换。
+// 入参：status 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 storyboardFrameImageStatusLabel 对应业务流程的处理结果。
 function storyboardFrameImageStatusLabel(status) {
   return {
     approved: '已通过',
@@ -658,6 +688,8 @@ function storyboardFrameImageStatusLabel(status) {
   }[status || 'missing'] || '未生成'
 }
 
+// 入参：status 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 storyboardFrameImageStatusClass 对应业务流程的处理结果。
 function storyboardFrameImageStatusClass(status) {
   if (status === 'approved') return 'text-emerald-300'
   if (status === 'pending' || status === 'running') return 'text-amber-300'
@@ -666,11 +698,15 @@ function storyboardFrameImageStatusClass(status) {
 }
 
 // 前端业务函数：协调 canPromoteStoryboardImage 对应的页面流程、接口调用或状态转换。
+// 入参：frame 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 canPromoteStoryboardImage 对应业务流程的处理结果。
 function canPromoteStoryboardImage(frame) {
   return Array.isArray(frame?.asset?.allowed_actions) && frame.asset.allowed_actions.includes('promote_to_video_asset')
 }
 
 // 前端业务函数：协调 promoteStoryboardFrameImage 对应的页面流程、接口调用或状态转换。
+// 入参：frame 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 promoteStoryboardFrameImage 对应业务流程的处理结果。
 async function promoteStoryboardFrameImage(frame) {
   if (!frame?.asset?.id || !run.value?.id || !run.value?.episode_id) return
   storyboardImagePromotingId.value = frame.asset.id
@@ -686,6 +722,8 @@ async function promoteStoryboardFrameImage(frame) {
 }
 
 // 前端业务函数：协调 loadTree 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 loadTree 对应业务流程的处理结果。
 async function loadTree(params = {}) {
   treeLoading.value = true
   treeError.value = ''
@@ -714,12 +752,16 @@ async function loadTree(params = {}) {
 }
 
 // 前端业务函数：协调 selectSegment 对应的页面流程、接口调用或状态转换。
+// 入参：segment 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 selectSegment 对应业务流程的处理结果。
 async function selectSegment(segment) {
   selectedSegment.value = segment
   await refreshSelectedSegmentDetail()
 }
 
 // 前端业务函数：协调 refreshSelectedSegmentDetail 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 refreshSelectedSegmentDetail 对应业务流程的处理结果。
 async function refreshSelectedSegmentDetail(options = {}) {
   if (!selectedSegment.value?.id) return
   const silent = options.silent === true
@@ -735,6 +777,8 @@ async function refreshSelectedSegmentDetail(options = {}) {
 }
 
 // 前端业务函数：协调 act 对应的页面流程、接口调用或状态转换。
+// 入参：fn 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 act 对应业务流程的处理结果。
 async function act(fn) {
   if (acting.value) return
   clearAutopilotTimer()
@@ -752,6 +796,8 @@ async function act(fn) {
 }
 
 // 前端业务函数：协调 clearAutopilotTimer 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 clearAutopilotTimer 对应业务流程的处理结果。
 function clearAutopilotTimer() {
   if (autopilotTimer.value) {
     clearTimeout(autopilotTimer.value)
@@ -760,6 +806,8 @@ function clearAutopilotTimer() {
 }
 
 // 前端业务函数：协调 clearStatusPollTimer 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 clearStatusPollTimer 对应业务流程的处理结果。
 function clearStatusPollTimer() {
   if (statusPollTimer.value) {
     clearTimeout(statusPollTimer.value)
@@ -768,6 +816,8 @@ function clearStatusPollTimer() {
 }
 
 // 前端业务函数：协调 shouldPollStatus 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 shouldPollStatus 对应业务流程的处理结果。
 function shouldPollStatus() {
   return Boolean(
     !autopilotEnabled.value
@@ -777,6 +827,8 @@ function shouldPollStatus() {
 }
 
 // 前端业务函数：协调 scheduleStatusPoll 对应的页面流程、接口调用或状态转换。
+// 入参：delay 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 scheduleStatusPoll 对应业务流程的处理结果。
 function scheduleStatusPoll(delay = STATUS_POLL_INTERVAL_MS) {
   clearStatusPollTimer()
   if (!shouldPollStatus()) return
@@ -784,6 +836,8 @@ function scheduleStatusPoll(delay = STATUS_POLL_INTERVAL_MS) {
 }
 
 // 前端业务函数：协调 scheduleAutopilot 对应的页面流程、接口调用或状态转换。
+// 入参：delay 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 scheduleAutopilot 对应业务流程的处理结果。
 function scheduleAutopilot(delay = 800) {
   clearAutopilotTimer()
   if (!autopilotEnabled.value || autopilotBusy.value || acting.value) return
@@ -792,6 +846,8 @@ function scheduleAutopilot(delay = 800) {
 }
 
 // 前端业务函数：协调 runAutopilotOnce 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 runAutopilotOnce 对应业务流程的处理结果。
 async function runAutopilotOnce() {
   if (!autopilotEnabled.value || autopilotBusy.value || acting.value) return
   autopilotBusy.value = true
@@ -822,25 +878,45 @@ async function runAutopilotOnce() {
 }
 
 // 前端业务函数：协调 startImages 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 startImages 对应业务流程的处理结果。
 function startImages() { return act(() => startImageStage(runId)) }
 // 前端业务函数：协调 backfillTextArtifacts 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 backfillTextArtifacts 对应业务流程的处理结果。
 function backfillTextArtifacts() { return act(() => backfillRunTextArtifacts(runId)) }
 // 前端业务函数：协调 syncImages 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 syncImages 对应业务流程的处理结果。
 function syncImages() { return act(() => syncImageStage(runId)) }
 // 前端业务函数：协调 startVideos 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 startVideos 对应业务流程的处理结果。
 function startVideos() { return act(() => startVideoStage(runId)) }
 // 前端业务函数：协调 syncVideos 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 syncVideos 对应业务流程的处理结果。
 function syncVideos() { return act(() => syncVideoStage(runId)) }
 // 前端业务函数：协调 compose 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 compose 对应业务流程的处理结果。
 function compose() { return act(() => startComposeStage(runId)) }
 // 前端业务函数：协调 syncCompose 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 syncCompose 对应业务流程的处理结果。
 function syncCompose() { return act(() => syncComposeStage(runId)) }
 // 前端业务函数：协调 realWorkerStep 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 realWorkerStep 对应业务流程的处理结果。
 function realWorkerStep() { return act(() => runRealWorkerStep(runId, { lease_id: 'ui-real-worker', batch_size: 1, async_mode: true })) }
 // 前端业务函数：协调 mockWorkerStep 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 mockWorkerStep 对应业务流程的处理结果。
 function mockWorkerStep() { return act(() => runMockSchedulerStep(runId, { lease_id: 'ui-worker', batch_size: 1 })) }
 
 // 前端业务函数：协调 openRepairAction 对应的页面流程、接口调用或状态转换。
+// 入参：task 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 openRepairAction 对应业务流程的处理结果。
 function openRepairAction(task) {
   if (task?.repair_route) {
     window.location.href = task.repair_route
@@ -848,6 +924,8 @@ function openRepairAction(task) {
 }
 
 // 前端业务函数：协调 retryRepair 对应的页面流程、接口调用或状态转换。
+// 入参：task、authorizationPayload 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 retryRepair 对应业务流程的处理结果。
 async function retryRepair(task, authorizationPayload = null) {
   if (!task?.id || repairBusyId.value) return
   repairBusyId.value = task.id
@@ -871,6 +949,8 @@ async function retryRepair(task, authorizationPayload = null) {
 }
 
 // 前端业务函数：协调 previewRetryImpact 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 previewRetryImpact 对应业务流程的处理结果。
 async function previewRetryImpact() {
   if (acting.value || !selectedSegment.value) return
   try {
@@ -883,6 +963,8 @@ async function previewRetryImpact() {
 }
 
 // 前端业务函数：协调 confirmRetry 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 confirmRetry 对应业务流程的处理结果。
 async function confirmRetry() {
   if (!selectedSegment.value) return
   retryDialogOpen.value = false

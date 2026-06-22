@@ -1145,23 +1145,31 @@ onBeforeUnmount(() => {
 })
 
 // 前端业务函数：协调 setMode 对应的页面流程、接口调用或状态转换。
+// 入参：mode 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 setMode 对应业务流程的处理结果。
 function setMode(mode) {
   form.mode = mode
   error.value = ''
 }
 
 // 前端业务函数：协调 createIdempotencyKey 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 createIdempotencyKey 对应业务流程的处理结果。
 function createIdempotencyKey() {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID()
   return `image-${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
 
 // 前端业务函数：协调 assetUrl 对应的页面流程、接口调用或状态转换。
+// 入参：asset 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 assetUrl 对应业务流程的处理结果。
 function assetUrl(asset) {
   return asset?.image_url || asset?.url || ''
 }
 
 // 前端业务函数：协调 applyTaskResponse 对应的页面流程、接口调用或状态转换。
+// 入参：response 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 applyTaskResponse 对应业务流程的处理结果。
 function applyTaskResponse(response) {
   const data = response?.data?.data || response?.data || response || {}
   task.value = data.task || data || null
@@ -1170,21 +1178,29 @@ function applyTaskResponse(response) {
 }
 
 // 前端业务函数：协调 updateAsset 对应的页面流程、接口调用或状态转换。
+// 入参：updated 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 updateAsset 对应业务流程的处理结果。
 function updateAsset(updated) {
   assets.value = assets.value.map(asset => (asset.id === updated.id ? { ...asset, ...updated } : asset))
 }
 
 // 前端业务函数：协调 taskNeedsPolling 对应的页面流程、接口调用或状态转换。
+// 入参：currentTask 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 taskNeedsPolling 对应业务流程的处理结果。
 function taskNeedsPolling(currentTask = task.value) {
   return Boolean(currentTask?.id && activeTaskStatuses.has(String(currentTask.status || '').toLowerCase()))
 }
 
 // 前端业务函数：协调 taskCanProviderSync 对应的页面流程、接口调用或状态转换。
+// 入参：currentTask 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 taskCanProviderSync 对应业务流程的处理结果。
 function taskCanProviderSync(currentTask = task.value) {
   return Boolean(currentTask?.pixelle_task_id || currentTask?.provider_task_id)
 }
 
 // 前端业务函数：协调 clearTaskPoll 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 clearTaskPoll 对应业务流程的处理结果。
 function clearTaskPoll() {
   if (taskPollTimer) {
     clearTimeout(taskPollTimer)
@@ -1193,6 +1209,8 @@ function clearTaskPoll() {
 }
 
 // 前端业务函数：协调 scheduleTaskPoll 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 scheduleTaskPoll 对应业务流程的处理结果。
 function scheduleTaskPoll() {
   clearTaskPoll()
   if (!taskNeedsPolling()) return
@@ -1200,6 +1218,8 @@ function scheduleTaskPoll() {
 }
 
 // 前端业务函数：协调 pollTaskOnce 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 pollTaskOnce 对应业务流程的处理结果。
 async function pollTaskOnce() {
   taskPollTimer = null
   if (!taskNeedsPolling()) return
@@ -1225,28 +1245,38 @@ async function pollTaskOnce() {
 }
 
 // 前端业务函数：协调 compactProviderOptions 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 compactProviderOptions 对应业务流程的处理结果。
 function compactProviderOptions() {
   return Object.fromEntries(Object.entries(form.providerOptions)
     .filter(([, value]) => value !== '' && value !== null && value !== undefined))
 }
 
 // 前端业务函数：协调 modeAcceptsSource 对应的页面流程、接口调用或状态转换。
+// 入参：mode 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 modeAcceptsSource 对应业务流程的处理结果。
 function modeAcceptsSource(mode) {
   return ['image_to_image', 'image_to_image_set'].includes(mode)
 }
 
 // 前端业务函数：协调 modeAcceptsReferences 对应的页面流程、接口调用或状态转换。
+// 入参：mode 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 modeAcceptsReferences 对应业务流程的处理结果。
 function modeAcceptsReferences(mode) {
   return ['multi_reference_to_image', 'multi_reference_to_image_set'].includes(mode)
 }
 
 // 前端业务函数：协调 schemaOptions 对应的页面流程、接口调用或状态转换。
+// 入参：key、fallback 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 schemaOptions 对应业务流程的处理结果。
 function schemaOptions(key, fallback) {
   const options = providerOptionSchema.value?.[key]?.options
   return Array.isArray(options) && options.length ? options : fallback
 }
 
 // 前端业务函数：协调 buildModelParameterPayload 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 buildModelParameterPayload 对应业务流程的处理结果。
 function buildModelParameterPayload() {
   const payload = {}
   if (form.modelId) payload.model_id = form.modelId
@@ -1262,6 +1292,8 @@ function buildModelParameterPayload() {
 }
 
 // 前端业务函数：协调 addSourceAndReferences 对应的页面流程、接口调用或状态转换。
+// 入参：payload 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 addSourceAndReferences 对应业务流程的处理结果。
 function addSourceAndReferences(payload) {
   if (modeAcceptsSource(form.mode) && form.sourceAssetId) {
     payload.source = { type: 'asset', asset_id: form.sourceAssetId, url: form.sourceUrl.trim() }
@@ -1275,6 +1307,8 @@ function addSourceAndReferences(payload) {
 }
 
 // 前端业务函数：协调 buildSelectionPreviewPayload 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 buildSelectionPreviewPayload 对应业务流程的处理结果。
 function buildSelectionPreviewPayload() {
   const providerOptions = compactProviderOptions()
   if (form.watermark) {
@@ -1297,6 +1331,8 @@ function buildSelectionPreviewPayload() {
 }
 
 // 前端业务函数：协调 buildAbPayload 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 buildAbPayload 对应业务流程的处理结果。
 function buildAbPayload() {
   const payload = { ...buildSelectionPreviewPayload() }
   delete payload.strategy_id
@@ -1306,6 +1342,8 @@ function buildAbPayload() {
 }
 
 // 前端业务函数：协调 buildPayload 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 buildPayload 对应业务流程的处理结果。
 function buildPayload() {
   const hasConfirmedCurrentCost = Boolean(
     costConfirmed.value
@@ -1334,6 +1372,8 @@ function buildPayload() {
 }
 
 // 前端业务函数：协调 resetSelectionPreview 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 resetSelectionPreview 对应业务流程的处理结果。
 function resetSelectionPreview() {
   requiresFreshPreviewAfterHighCost.value = previewCostRequiresConfirmation.value || requiresFreshPreviewAfterHighCost.value
   selectionPreviewRequestToken.value += 1
@@ -1344,6 +1384,8 @@ function resetSelectionPreview() {
 }
 
 // 前端业务函数：协调 clearAbWinnerRecommendation 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 clearAbWinnerRecommendation 对应业务流程的处理结果。
 function clearAbWinnerRecommendation() {
   abRecommendationRequestToken.value += 1
   abWinnerRecommendation.value = null
@@ -1352,6 +1394,8 @@ function clearAbWinnerRecommendation() {
 }
 
 // 前端业务函数：协调 resetAbPreview 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 resetAbPreview 对应业务流程的处理结果。
 function resetAbPreview() {
   abRequestToken.value += 1
   abPreview.value = null
@@ -1365,6 +1409,8 @@ function resetAbPreview() {
 }
 
 // 前端业务函数：协调 abCreateKeyForPreview 对应的页面流程、接口调用或状态转换。
+// 入参：requestHash 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 abCreateKeyForPreview 对应业务流程的处理结果。
 function abCreateKeyForPreview(requestHash) {
   if (!requestHash) return `ab-${createIdempotencyKey()}`
   if (!abCreateIdempotencyKey.value || abCreateRequestHash.value !== requestHash) {
@@ -1375,10 +1421,14 @@ function abCreateKeyForPreview(requestHash) {
 }
 
 // 前端业务函数：协调 errorDetail 对应的页面流程、接口调用或状态转换。
+// 入参：e 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 errorDetail 对应业务流程的处理结果。
 function errorDetail(e) {
   return e?.response?.data?.detail || e?.response?.data?.message || e?.message || '操作失败，请稍后重试'
 }
 
+// 入参：value 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 errorText 对应业务流程的处理结果。
 function errorText(value) {
   if (typeof value === 'string') return value
   if (!value) return '操作失败，请稍后重试'
@@ -1389,11 +1439,15 @@ function errorText(value) {
 }
 
 // 前端业务函数：协调 normalizeError 对应的页面流程、接口调用或状态转换。
+// 入参：e 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 normalizeError 对应业务流程的处理结果。
 function normalizeError(e) {
   return errorText(errorDetail(e))
 }
 
 // 前端业务函数：协调 affectedTaskIdFromError 对应的页面流程、接口调用或状态转换。
+// 入参：e 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 affectedTaskIdFromError 对应业务流程的处理结果。
 function affectedTaskIdFromError(e) {
   const detail = errorDetail(e)
   if (!detail || typeof detail !== 'object' || !Array.isArray(detail.affected_ids)) return ''
@@ -1401,6 +1455,8 @@ function affectedTaskIdFromError(e) {
 }
 
 // 前端业务函数：协调 loadAffectedTaskFromError 对应的页面流程、接口调用或状态转换。
+// 入参：e 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 loadAffectedTaskFromError 对应业务流程的处理结果。
 async function loadAffectedTaskFromError(e) {
   const affectedTaskId = affectedTaskIdFromError(e)
   if (!affectedTaskId) return false
@@ -1410,6 +1466,8 @@ async function loadAffectedTaskFromError(e) {
 }
 
 // 前端业务函数：协调 loadApprovedAssets 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 loadApprovedAssets 对应业务流程的处理结果。
 async function loadApprovedAssets() {
   try {
     const response = await listImageAssets({ status: 'approved', page_size: 30 })
@@ -1421,6 +1479,8 @@ async function loadApprovedAssets() {
 }
 
 // 前端业务函数：协调 loadImageModels 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 loadImageModels 对应业务流程的处理结果。
 async function loadImageModels() {
   try {
     const response = await listModels({ model_type: 'image', enabled: true })
@@ -1433,6 +1493,8 @@ async function loadImageModels() {
 }
 
 // 前端业务函数：协调 loadStrategies 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 loadStrategies 对应业务流程的处理结果。
 async function loadStrategies() {
   try {
     const response = await listImageProductionStrategies({ status: 'active' })
@@ -1444,6 +1506,8 @@ async function loadStrategies() {
 }
 
 // 前端业务函数：协调 pruneProviderOptions 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 pruneProviderOptions 对应业务流程的处理结果。
 function pruneProviderOptions() {
   const allowed = new Set(providerOptionFields.value.map(field => field.key))
   for (const key of Object.keys(form.providerOptions)) {
@@ -1452,6 +1516,8 @@ function pruneProviderOptions() {
 }
 
 // 前端业务函数：协调 providerOptionLabel 对应的页面流程、接口调用或状态转换。
+// 入参：key 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 providerOptionLabel 对应业务流程的处理结果。
 function providerOptionLabel(key) {
   const labels = {
     sequential_image_generation: '连续组图',
@@ -1463,18 +1529,26 @@ function providerOptionLabel(key) {
   return labels[key] || key
 }
 
+// 入参：reason 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 rejectedReasonLabel 对应业务流程的处理结果。
 function rejectedReasonLabel(reason) {
   return rejectedReasonLabels[reason] || '未通过当前选择条件'
 }
 
+// 入参：candidate 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 rejectedDetailLabel 对应业务流程的处理结果。
 function rejectedDetailLabel(candidate) {
   return rejectedDetailLabels[candidate?.reason] || '该候选模型暂不适用于当前请求。'
 }
 
+// 入参：candidate 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 rejectedRescueLabel 对应业务流程的处理结果。
 function rejectedRescueLabel(candidate) {
   return rejectedRescueLabels[candidate?.reason] || '请调整模型、策略或 fallback 配置后重新预览。'
 }
 
+// 入参：candidate 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 fallbackCandidateLabel 对应业务流程的处理结果。
 function fallbackCandidateLabel(candidate) {
   if (candidate?.confirmation_required || candidate?.risk_labels?.includes('requires_manual_confirmation')) {
     return '可作为 fallback 使用，创建前需要人工确认。'
@@ -1482,31 +1556,43 @@ function fallbackCandidateLabel(candidate) {
   return '可作为 fallback 使用。'
 }
 
+// 入参：status 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 timelineStatusLabel 对应业务流程的处理结果。
 function timelineStatusLabel(status) {
   return timelineStatusLabels[status] || '未知'
 }
 
+// 入参：status 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 taskStatusLabel 对应业务流程的处理结果。
 function taskStatusLabel(status) {
   if (!status) return '尚未提交'
   return taskStatusLabels[status] || '未知'
 }
 
+// 入参：step 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 timelineStepLabel 对应业务流程的处理结果。
 function timelineStepLabel(step) {
   return timelineStepLabels[step?.key] || step?.label || step?.key || ''
 }
 
 // 前端业务函数：协调 taskRescueActionLabel 对应的页面流程、接口调用或状态转换。
+// 入参：action 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 taskRescueActionLabel 对应业务流程的处理结果。
 function taskRescueActionLabel(action) {
   if (action?.type === 'retry_with_fallback_model') return '使用 fallback 模型重试'
   return '执行修复动作'
 }
 
+// 入参：step 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 isCurrentTimelineStep 对应业务流程的处理结果。
 function isCurrentTimelineStep(step) {
   const current = taskTimeline.value.find(item => ['queued', 'running', 'blocked', 'failed'].includes(item.status))
   return current === step
 }
 
 // 前端业务函数：协调 timelineStatusClass 对应的页面流程、接口调用或状态转换。
+// 入参：status 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 timelineStatusClass 对应业务流程的处理结果。
 function timelineStatusClass(status) {
   if (status === 'completed') return 'text-emerald-300'
   if (status === 'failed' || status === 'blocked') return 'text-rose-300'
@@ -1515,6 +1601,8 @@ function timelineStatusClass(status) {
 }
 
 // 前端业务函数：协调 timelineDotClass 对应的页面流程、接口调用或状态转换。
+// 入参：status 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 timelineDotClass 对应业务流程的处理结果。
 function timelineDotClass(status) {
   if (status === 'completed') return 'bg-emerald-400'
   if (status === 'failed' || status === 'blocked') return 'bg-rose-400'
@@ -1523,6 +1611,8 @@ function timelineDotClass(status) {
 }
 
 // 前端业务函数：协调 uploadSource 对应的页面流程、接口调用或状态转换。
+// 入参：event 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 uploadSource 对应业务流程的处理结果。
 async function uploadSource(event) {
   const file = event.target.files?.[0]
   if (!file) return
@@ -1544,6 +1634,8 @@ async function uploadSource(event) {
 }
 
 // 前端业务函数：协调 useApprovedAsset 对应的页面流程、接口调用或状态转换。
+// 入参：asset 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 useApprovedAsset 对应业务流程的处理结果。
 function useApprovedAsset(asset) {
   form.sourceUrl = assetUrl(asset)
   form.sourceAssetId = asset.id || ''
@@ -1551,11 +1643,15 @@ function useApprovedAsset(asset) {
 }
 
 // 前端业务函数：协调 isReferenceAssetSelected 对应的页面流程、接口调用或状态转换。
+// 入参：asset 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 isReferenceAssetSelected 对应业务流程的处理结果。
 function isReferenceAssetSelected(asset) {
   return form.referenceAssetIds.includes(asset.id)
 }
 
 // 前端业务函数：协调 toggleReferenceAsset 对应的页面流程、接口调用或状态转换。
+// 入参：asset 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 toggleReferenceAsset 对应业务流程的处理结果。
 function toggleReferenceAsset(asset) {
   if (!asset?.id) return
   if (isReferenceAssetSelected(asset)) {
@@ -1568,6 +1664,8 @@ function toggleReferenceAsset(asset) {
 }
 
 // 前端业务函数：协调 previewAbComparison 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 previewAbComparison 对应业务流程的处理结果。
 async function previewAbComparison() {
   if (!abHasValidStrategyCount.value || abLoading.value) return
   const requestToken = abRequestToken.value + 1
@@ -1597,6 +1695,8 @@ async function previewAbComparison() {
 }
 
 // 前端业务函数：协调 createAbComparison 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 createAbComparison 对应业务流程的处理结果。
 async function createAbComparison() {
   if (abCreateDisabled.value) return
   abLoading.value = true
@@ -1619,6 +1719,8 @@ async function createAbComparison() {
 }
 
 // 前端业务函数：协调 refreshAbComparison 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 refreshAbComparison 对应业务流程的处理结果。
 async function refreshAbComparison() {
   if (!abGroup.value?.id || abLoading.value) return
   const groupId = abGroup.value.id
@@ -1643,6 +1745,8 @@ async function refreshAbComparison() {
 }
 
 // 前端业务函数：协调 loadAbWinnerRecommendation 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 loadAbWinnerRecommendation 对应业务流程的处理结果。
 async function loadAbWinnerRecommendation() {
   if (!abGroup.value?.id || abRecommendationLoading.value) return
   const groupId = abGroup.value.id
@@ -1667,6 +1771,8 @@ async function loadAbWinnerRecommendation() {
 }
 
 // 前端业务函数：协调 chooseAbWinner 对应的页面流程、接口调用或状态转换。
+// 入参：attemptId 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 chooseAbWinner 对应业务流程的处理结果。
 async function chooseAbWinner(attemptId) {
   const attempt = (abGroup.value?.attempts || []).find(item => item.id === attemptId)
   if (!abGroup.value?.id || !attemptId || abOutcomeDisabled.value || !attempt?.approved_asset_ready) return
@@ -1684,6 +1790,8 @@ async function chooseAbWinner(attemptId) {
 }
 
 // 前端业务函数：协调 chooseAbNoWinner 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 chooseAbNoWinner 对应业务流程的处理结果。
 async function chooseAbNoWinner() {
   if (!abGroup.value?.id || abOutcomeDisabled.value) return
   abLoading.value = true
@@ -1700,6 +1808,8 @@ async function chooseAbNoWinner() {
 }
 
 // 前端业务函数：协调 runSelectionPreview 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 runSelectionPreview 对应业务流程的处理结果。
 async function runSelectionPreview() {
   const payload = buildSelectionPreviewPayload()
   const requestToken = selectionPreviewRequestToken.value + 1
@@ -1724,6 +1834,8 @@ async function runSelectionPreview() {
 }
 
 // 前端业务函数：协调 handleRescueAction 对应的页面流程、接口调用或状态转换。
+// 入参：action 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleRescueAction 对应业务流程的处理结果。
 async function handleRescueAction(action) {
   if (action?.type !== 'confirm_fallback_model' || !action.model_id) return
   form.modelId = action.model_id
@@ -1732,6 +1844,8 @@ async function handleRescueAction(action) {
 }
 
 // 前端业务函数：协调 handleTaskRescueAction 对应的页面流程、接口调用或状态转换。
+// 入参：action 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleTaskRescueAction 对应业务流程的处理结果。
 async function handleTaskRescueAction(action) {
   if (action?.type !== 'retry_with_fallback_model' || !action.model_id) return
   form.modelId = action.model_id
@@ -1741,6 +1855,8 @@ async function handleTaskRescueAction(action) {
 }
 
 // 前端业务函数：协调 submit 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 submit 对应业务流程的处理结果。
 async function submit() {
   if (!canSubmit.value || submitting.value) return
   submitting.value = true
@@ -1761,6 +1877,8 @@ async function submit() {
 }
 
 // 前端业务函数：协调 refreshTask 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 refreshTask 对应业务流程的处理结果。
 async function refreshTask() {
   if (!task.value?.id || syncing.value) return
   syncing.value = true
@@ -1776,6 +1894,8 @@ async function refreshTask() {
 }
 
 // 前端业务函数：协调 syncTask 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 syncTask 对应业务流程的处理结果。
 async function syncTask() {
   if (!task.value?.id || syncing.value) return
   syncing.value = true
@@ -1791,6 +1911,8 @@ async function syncTask() {
 }
 
 // 前端业务函数：协调 dispatchQueuedTask 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 dispatchQueuedTask 对应业务流程的处理结果。
 async function dispatchQueuedTask() {
   if (!task.value?.id || syncing.value) return
   syncing.value = true
@@ -1806,11 +1928,15 @@ async function dispatchQueuedTask() {
 }
 
 // 前端业务函数：协调 assetAllowed 对应的页面流程、接口调用或状态转换。
+// 入参：asset、action 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 assetAllowed 对应业务流程的处理结果。
 function assetAllowed(asset, action) {
   return Array.isArray(asset?.allowed_actions) && asset.allowed_actions.includes(action)
 }
 
 // 前端业务函数：协调 canPromoteAsset 对应的页面流程、接口调用或状态转换。
+// 入参：asset 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 canPromoteAsset 对应业务流程的处理结果。
 function canPromoteAsset(asset) {
   const context = asset?.destination_context || {}
   return assetAllowed(asset, 'promote_to_video_asset')
@@ -1819,6 +1945,8 @@ function canPromoteAsset(asset) {
 }
 
 // 前端业务函数：协调 assetReviewGateLabel 对应的页面流程、接口调用或状态转换。
+// 入参：gate 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 assetReviewGateLabel 对应业务流程的处理结果。
 function assetReviewGateLabel(gate) {
   if (gate?.status === 'approved') return '已通过'
   if (gate?.status === 'manual_review_pending') return '待人工审查'
@@ -1828,6 +1956,8 @@ function assetReviewGateLabel(gate) {
   return '未开始'
 }
 
+// 入参：asset、action 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 reviewAsset 对应业务流程的处理结果。
 async function reviewAsset(asset, action) {
   if (!asset.id) return
   error.value = ''
@@ -1842,6 +1972,8 @@ async function reviewAsset(asset, action) {
 }
 
 // 前端业务函数：协调 promoteAsset 对应的页面流程、接口调用或状态转换。
+// 入参：asset 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 promoteAsset 对应业务流程的处理结果。
 async function promoteAsset(asset) {
   if (!asset.id) return
   const context = asset.destination_context || {}
@@ -1868,6 +2000,8 @@ async function promoteAsset(asset) {
 }
 
 // 前端业务函数：协调 createTaskFromAsset 对应的页面流程、接口调用或状态转换。
+// 入参：asset、action 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 createTaskFromAsset 对应业务流程的处理结果。
 async function createTaskFromAsset(asset, action) {
   if (!asset.id) return
   error.value = ''
@@ -1891,12 +2025,16 @@ async function createTaskFromAsset(asset, action) {
 }
 
 // 前端业务函数：协调 editAgain 对应的页面流程、接口调用或状态转换。
+// 入参：asset 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 editAgain 对应业务流程的处理结果。
 async function editAgain(asset) {
   if (!assetAllowed(asset, 'repaint')) return
   await createTaskFromAsset(asset, 'repaint')
 }
 
 // 前端业务函数：协调 copyAsNewTask 对应的页面流程、接口调用或状态转换。
+// 入参：asset 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 copyAsNewTask 对应业务流程的处理结果。
 async function copyAsNewTask(asset) {
   if (!assetAllowed(asset, 'copy_as_new_task')) return
   await createTaskFromAsset(asset, 'copy_as_new_task')

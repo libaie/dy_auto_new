@@ -43,7 +43,11 @@ def create_or_resume_invocation(
     production_segment_id: str | None = None,
     pipeline_run_id: str | None = None,
 ) -> AgencyExpertInvocation:
-    """业务函数：处理 create_or_resume_invocation 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 create_or_resume_invocation 对应的业务流程、校验或数据转换。
+
+    入参：db、idempotency_key、series_id、stage、expert_id、role、source、input_summary、episode_id、run_id、production_plan_id、production_episode_id、production_segment_id、pipeline_run_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     existing = (
         db.query(AgencyExpertInvocation)
         .filter(AgencyExpertInvocation.idempotency_key == idempotency_key)
@@ -128,7 +132,11 @@ def finalize_invocation_and_audit(
     repair: dict[str, Any] | None = None,
     duration_ms: int = 0,
 ) -> AgencyExpertInvocation:
-    """业务函数：处理 finalize_invocation_and_audit 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 finalize_invocation_and_audit 对应的业务流程、校验或数据转换。
+
+    入参：db、invocation_id、result_status、output_summary、evidence、token_usage、model_config_snapshot、error_code、error_message、repair、duration_ms 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     invocation = (
         db.query(AgencyExpertInvocation)
         .filter(AgencyExpertInvocation.id == invocation_id)

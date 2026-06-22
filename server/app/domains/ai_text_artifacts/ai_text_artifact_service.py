@@ -32,9 +32,16 @@ ARTIFACT_CONSUMPTION_ORDER = {
 
 
 class AITextArtifactService:
-    """业务类：承载 AITextArtifactService 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 AITextArtifactService 相关的数据结构、状态或业务协作。
+
+    类参数：db 承载该类的业务配置、状态或数据字段。
+    """
     def __init__(self, db: Session):
-        """初始化业务对象依赖，保存后续流程需要的运行上下文。"""
+        """初始化业务对象依赖，保存后续流程需要的运行上下文。
+
+        入参：db 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         self.db = db
 
     def create_artifact(
@@ -58,7 +65,11 @@ class AITextArtifactService:
         status: str = "review_pending",
         commit: bool = True,
     ) -> AITextArtifact:
-        """业务函数：处理 create_artifact 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 create_artifact 对应的业务流程、校验或数据转换。
+
+        入参：series_id、target_type、target_id、artifact_type、source_type、episode_id、run_id、production_plan_id、parent_artifact_id、input_json、content_json、content_text、model_trace_json、review_trace_json、created_by、status、commit 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         version = self._next_version(target_type, target_id, artifact_type)
         artifact = AITextArtifact(
             series_id=series_id,
@@ -95,7 +106,11 @@ class AITextArtifactService:
         content_text: str | None = None,
         actor_user_id: str | None = None,
     ) -> AITextArtifact:
-        """业务函数：处理 edit_artifact 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 edit_artifact 对应的业务流程、校验或数据转换。
+
+        入参：artifact_id、content_json、content_text、actor_user_id 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         parent = self._get_artifact(artifact_id)
         return self.create_artifact(
             series_id=parent.series_id,
@@ -125,7 +140,11 @@ class AITextArtifactService:
         model_trace_json: dict[str, Any] | None = None,
         actor_user_id: str | None = None,
     ) -> AITextArtifact:
-        """业务函数：处理 regenerate_artifact 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 regenerate_artifact 对应的业务流程、校验或数据转换。
+
+        入参：artifact_id、input_json、content_json、content_text、model_trace_json、actor_user_id 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         parent = self._get_artifact(artifact_id)
         return self.create_artifact(
             series_id=parent.series_id,
@@ -152,7 +171,11 @@ class AITextArtifactService:
         input_json: dict[str, Any] | None = None,
         actor_user_id: str | None = None,
     ) -> AITextArtifact:
-        """业务函数：处理 regenerate_artifact_with_ai 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 regenerate_artifact_with_ai 对应的业务流程、校验或数据转换。
+
+        入参：artifact_id、input_json、actor_user_id 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         from app.domains.model_configuration.ai_generator import ai_generator
 
         parent = self._get_artifact(artifact_id)
@@ -202,7 +225,11 @@ class AITextArtifactService:
         actor_user_id: str | None = None,
         commit: bool = True,
     ) -> AITextArtifact:
-        """业务函数：处理 approve_artifact 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 approve_artifact 对应的业务流程、校验或数据转换。
+
+        入参：artifact_id、actor_user_id、commit 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         artifact = self._get_artifact(artifact_id)
         latest = self.latest_version(
             target_type=artifact.target_type,
@@ -243,7 +270,11 @@ class AITextArtifactService:
         target_id: str,
         artifact_type: str,
     ) -> AITextArtifact | None:
-        """业务函数：处理 latest_approved 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 latest_approved 对应的业务流程、校验或数据转换。
+
+        入参：target_type、target_id、artifact_type 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         return (
             self.db.query(AITextArtifact)
             .filter(
@@ -263,7 +294,11 @@ class AITextArtifactService:
         target_id: str,
         artifact_type: str,
     ) -> AITextArtifact | None:
-        """业务函数：处理 latest_version 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 latest_version 对应的业务流程、校验或数据转换。
+
+        入参：target_type、target_id、artifact_type 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         return (
             self.db.query(AITextArtifact)
             .filter(
@@ -282,7 +317,11 @@ class AITextArtifactService:
         target_id: str,
         artifact_type: str,
     ) -> list[AITextArtifact]:
-        """业务函数：处理 list_versions 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 list_versions 对应的业务流程、校验或数据转换。
+
+        入参：target_type、target_id、artifact_type 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         return (
             self.db.query(AITextArtifact)
             .filter(
@@ -295,7 +334,11 @@ class AITextArtifactService:
         )
 
     def lineage(self, artifact_id: str) -> list[AITextArtifact]:
-        """业务函数：处理 lineage 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 lineage 对应的业务流程、校验或数据转换。
+
+        入参：artifact_id 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         artifact = self._get_artifact(artifact_id)
         return self.list_versions(
             target_type=artifact.target_type,
@@ -312,7 +355,11 @@ class AITextArtifactService:
         run_id: str | None = None,
         metadata_json: dict[str, Any] | None = None,
     ) -> AITextArtifactConsumer:
-        """业务函数：处理 bind_consumer 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 bind_consumer 对应的业务流程、校验或数据转换。
+
+        入参：artifact_id、consumer_type、consumer_id、run_id、metadata_json 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         artifact = self._get_artifact(artifact_id)
         existing = (
             self.db.query(AITextArtifactConsumer)
@@ -347,7 +394,11 @@ class AITextArtifactService:
         run_id: str,
         production_plan_id: str | None = None,
     ) -> list[AITextArtifactConsumer]:
-        """业务函数：处理 bind_latest_approved_for_episode_run 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 bind_latest_approved_for_episode_run 对应的业务流程、校验或数据转换。
+
+        入参：series_id、episode_id、run_id、production_plan_id 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         bindings: list[AITextArtifactConsumer] = []
         for artifact_type in SERIES_RUN_ARTIFACT_TYPES:
             artifact = self.latest_approved(
@@ -368,7 +419,11 @@ class AITextArtifactService:
         return bindings
 
     def consumed_artifacts_for_run(self, run_id: str) -> list[dict[str, Any]]:
-        """业务函数：处理 consumed_artifacts_for_run 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 consumed_artifacts_for_run 对应的业务流程、校验或数据转换。
+
+        入参：run_id 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         rows = (
             self.db.query(AITextArtifactConsumer, AITextArtifact)
             .join(AITextArtifact, AITextArtifactConsumer.artifact_id == AITextArtifact.id)
@@ -415,7 +470,11 @@ class AITextArtifactService:
         run_id: str,
         production_plan_id: str | None,
     ) -> AITextArtifactConsumer:
-        """业务函数：处理 _bind_run_artifact 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 _bind_run_artifact 对应的业务流程、校验或数据转换。
+
+        入参：artifact、run_id、production_plan_id 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         return self.bind_consumer(
             artifact.id,
             consumer_type="video_production_run",
@@ -430,7 +489,11 @@ class AITextArtifactService:
         )
 
     def backfill_run_text_artifacts(self, run_id: str) -> list[dict[str, Any]]:
-        """业务函数：处理 backfill_run_text_artifacts 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 backfill_run_text_artifacts 对应的业务流程、校验或数据转换。
+
+        入参：run_id 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         run = self.db.query(VideoProductionRun).filter(VideoProductionRun.id == run_id).first()
         if not run:
             raise ValueError("run_not_found")
@@ -552,7 +615,11 @@ class AITextArtifactService:
         content_json: dict[str, Any],
         content_text: str,
     ) -> AITextArtifact | None:
-        """业务函数：处理 _ensure_approved_legacy_artifact 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 _ensure_approved_legacy_artifact 对应的业务流程、校验或数据转换。
+
+        入参：series_id、episode_id、target_type、target_id、artifact_type、content_json、content_text 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         approved = self.latest_approved(
             target_type=target_type,
             target_id=target_id,
@@ -578,14 +645,22 @@ class AITextArtifactService:
         return self.approve_artifact(artifact.id, actor_user_id="system")
 
     def _storyboard_prompt_lines(self, storyboard: dict[str, Any], key: str) -> list[str]:
-        """业务函数：处理 _storyboard_prompt_lines 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 _storyboard_prompt_lines 对应的业务流程、校验或数据转换。
+
+        入参：storyboard、key 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         frames = storyboard.get("frames") or []
         if not isinstance(frames, list):
             return []
         return [str(frame.get(key) or "") for frame in frames if isinstance(frame, dict) and frame.get(key)]
 
     def _storyboard_dialogue_lines(self, storyboard: dict[str, Any]) -> list[str]:
-        """业务函数：处理 _storyboard_dialogue_lines 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 _storyboard_dialogue_lines 对应的业务流程、校验或数据转换。
+
+        入参：storyboard 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         frames = storyboard.get("frames") or []
         lines: list[str] = []
         if not isinstance(frames, list):
@@ -602,7 +677,11 @@ class AITextArtifactService:
         return lines
 
     def _legacy_episode_outline(self, series: Series, episode: Episode) -> dict[str, Any]:
-        """业务函数：处理 _legacy_episode_outline 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 _legacy_episode_outline 对应的业务流程、校验或数据转换。
+
+        入参：series、episode 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         return {
             "schema_version": "series.episode_outline.v1",
             "episode_number": int(episode.episode_number),
@@ -613,7 +692,11 @@ class AITextArtifactService:
         }
 
     def _legacy_continuity_ledger(self, series: Series, episode: Episode) -> dict[str, Any]:
-        """业务函数：处理 _legacy_continuity_ledger 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 _legacy_continuity_ledger 对应的业务流程、校验或数据转换。
+
+        入参：series、episode 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         return {
             "schema_version": "series.continuity_ledger.v1",
             "series_id": series.id,
@@ -627,7 +710,11 @@ class AITextArtifactService:
         }
 
     def _regenerate_system_prompt(self, artifact: AITextArtifact) -> str:
-        """业务函数：处理 _regenerate_system_prompt 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 _regenerate_system_prompt 对应的业务流程、校验或数据转换。
+
+        入参：artifact 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         if artifact.content_json:
             return (
                 "你是短剧生产系统的文字产物再生成助手。"
@@ -640,7 +727,11 @@ class AITextArtifactService:
         )
 
     def _regenerate_user_prompt(self, artifact: AITextArtifact, input_json: dict[str, Any]) -> str:
-        """业务函数：处理 _regenerate_user_prompt 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 _regenerate_user_prompt 对应的业务流程、校验或数据转换。
+
+        入参：artifact、input_json 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         return "\n".join([
             f"artifact_type: {artifact.artifact_type}",
             f"target_type: {artifact.target_type}",
@@ -654,7 +745,11 @@ class AITextArtifactService:
         ])
 
     def _parse_model_json(self, raw_text: str) -> dict[str, Any] | list[Any] | None:
-        """业务函数：处理 _parse_model_json 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 _parse_model_json 对应的业务流程、校验或数据转换。
+
+        入参：raw_text 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         if not raw_text:
             return None
         candidates = [raw_text]
@@ -679,7 +774,11 @@ class AITextArtifactService:
         return None
 
     def _next_version(self, target_type: str, target_id: str, artifact_type: str) -> int:
-        """业务函数：处理 _next_version 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 _next_version 对应的业务流程、校验或数据转换。
+
+        入参：target_type、target_id、artifact_type 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         current = (
             self.db.query(func.max(AITextArtifact.version))
             .filter(
@@ -692,7 +791,11 @@ class AITextArtifactService:
         return int(current or 0) + 1
 
     def _get_artifact(self, artifact_id: str) -> AITextArtifact:
-        """业务函数：处理 _get_artifact 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 _get_artifact 对应的业务流程、校验或数据转换。
+
+        入参：artifact_id 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         artifact = self.db.query(AITextArtifact).filter(AITextArtifact.id == artifact_id).first()
         if not artifact:
             raise ValueError("artifact_not_found")

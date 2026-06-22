@@ -17,17 +17,29 @@ VIDEO_RUN_TERMINAL_STATUSES = {"completed", "done", "failed", "cancelled", "canc
 
 
 def series_char_dict(c: Character) -> dict:
-    """业务函数：处理 series_char_dict 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 series_char_dict 对应的业务流程、校验或数据转换。
+
+    入参：c 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return {col.name: getattr(c, col.name) for col in Character.__table__.columns}
 
 
 def series_scene_dict(s: Scene) -> dict:
-    """业务函数：处理 series_scene_dict 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 series_scene_dict 对应的业务流程、校验或数据转换。
+
+    入参：s 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return {col.name: getattr(s, col.name) for col in Scene.__table__.columns}
 
 
 def series_dict(s: Series, include_linked_assets: bool = False) -> dict:
-    """业务函数：处理 series_dict 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 series_dict 对应的业务流程、校验或数据转换。
+
+    入参：s、include_linked_assets 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     base = {col.name: getattr(s, col.name) for col in Series.__table__.columns}
     base["character_count"] = len(s.characters) if hasattr(s, "characters") else 0
     base["scene_count"] = len(s.scenes) if hasattr(s, "scenes") else 0
@@ -38,7 +50,11 @@ def series_dict(s: Series, include_linked_assets: bool = False) -> dict:
 
 
 def episode_dict(e: Episode) -> dict:
-    """业务函数：处理 episode_dict 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 episode_dict 对应的业务流程、校验或数据转换。
+
+    入参：e 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return {col.name: getattr(e, col.name) for col in Episode.__table__.columns}
 
 
@@ -49,7 +65,11 @@ def episode_asset_usage_items(
     ids: list[str],
     usage_items: list,
 ) -> list[dict]:
-    """业务函数：处理 episode_asset_usage_items 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 episode_asset_usage_items 对应的业务流程、校验或数据转换。
+
+    入参：db、model、ids、usage_items 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     usage_by_id = {
         str(item.get("id")): item
         for item in usage_items
@@ -70,7 +90,11 @@ def episode_asset_usage_items(
 
 
 def episode_asset_scope_payload(db: Session, episode: Episode) -> dict:
-    """业务函数：处理 episode_asset_scope_payload 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 episode_asset_scope_payload 对应的业务流程、校验或数据转换。
+
+    入参：db、episode 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     service = AITextArtifactService(db)
     artifact = service.latest_approved(
         target_type="episode",
@@ -105,7 +129,11 @@ def episode_asset_scope_payload(db: Session, episode: Episode) -> dict:
 
 
 def active_video_runs_by_episode(db: Session, series_id: str) -> dict[str, VideoProductionRun]:
-    """业务函数：处理 active_video_runs_by_episode 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 active_video_runs_by_episode 对应的业务流程、校验或数据转换。
+
+    入参：db、series_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     runs = db.query(VideoProductionRun).filter(
         VideoProductionRun.series_id == series_id
     ).order_by(VideoProductionRun.created_at.desc()).all()
@@ -119,7 +147,11 @@ def active_video_runs_by_episode(db: Session, series_id: str) -> dict[str, Video
 
 
 def episode_dict_with_video_run(e: Episode, active_run: VideoProductionRun | None = None) -> dict:
-    """业务函数：处理 episode_dict_with_video_run 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 episode_dict_with_video_run 对应的业务流程、校验或数据转换。
+
+    入参：e、active_run 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     payload = episode_dict(e)
     if active_run:
         payload["active_video_run_id"] = active_run.id
@@ -130,7 +162,11 @@ def episode_dict_with_video_run(e: Episode, active_run: VideoProductionRun | Non
 
 
 def character_reference_urls(c: Character) -> list[str]:
-    """业务函数：处理 character_reference_urls 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 character_reference_urls 对应的业务流程、校验或数据转换。
+
+    入参：c 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return [u for u in [
         c.avatar_front_url,
         c.avatar_side_url,
@@ -140,7 +176,11 @@ def character_reference_urls(c: Character) -> list[str]:
 
 
 def scene_reference_urls(s: Scene) -> list[str]:
-    """业务函数：处理 scene_reference_urls 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 scene_reference_urls 对应的业务流程、校验或数据转换。
+
+    入参：s 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return [u for u in [
         s.reference_wideshot_url,
         s.reference_midshot_url,
@@ -149,7 +189,11 @@ def scene_reference_urls(s: Scene) -> list[str]:
 
 
 def reference_status(series: Series) -> dict:
-    """业务函数：处理 reference_status 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 reference_status 对应的业务流程、校验或数据转换。
+
+    入参：series 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     characters = list(series.characters or [])
     scenes = list(series.scenes or [])
     return {
@@ -165,7 +209,11 @@ def reference_status(series: Series) -> dict:
 
 
 def agency_console_payload(db: Session, series: Series, series_id: str) -> dict:
-    """业务函数：处理 agency_console_payload 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 agency_console_payload 对应的业务流程、校验或数据转换。
+
+    入参：db、series、series_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     episodes = db.query(Episode).filter(
         Episode.series_id == series_id
     ).order_by(Episode.episode_number).all()

@@ -22,6 +22,8 @@ const ratios = [
   { value: '4:3', label: '4:3' },
 ]
 
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 imageUrls 对应业务流程的处理结果。
 function imageUrls() {
   return imageUrlText.value
     .split(/[\n,]/)
@@ -30,6 +32,8 @@ function imageUrls() {
 }
 
 // 前端业务函数：协调 handleGenerate 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleGenerate 对应业务流程的处理结果。
 async function handleGenerate() {
   if (!prompt.value.trim()) return
 

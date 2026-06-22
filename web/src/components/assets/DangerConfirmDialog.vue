@@ -14,6 +14,8 @@ defineProps({
 
 const emit = defineEmits(['confirm', 'cancel'])
 
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 cancel 对应业务流程的处理结果。
 function cancel() {
   emit('cancel')
 }

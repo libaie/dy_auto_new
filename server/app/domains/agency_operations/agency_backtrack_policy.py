@@ -26,7 +26,11 @@ def trigger_backtrack_if_needed(
     *,
     reason: str,
 ) -> dict[str, Any]:
-    """业务函数：处理 trigger_backtrack_if_needed 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 trigger_backtrack_if_needed 对应的业务流程、校验或数据转换。
+
+    入参：db、run、asset、reason 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if not run.production_plan_id:
         return {"triggered": False, "reason": "missing_production_plan"}
     if asset.asset_type not in {"image", "video_segment"}:
@@ -105,7 +109,11 @@ def trigger_backtrack_if_needed(
 
 
 def _failure_count(db: Session, run: VideoProductionRun, asset: VideoProductionAsset) -> int:
-    """业务函数：处理 _failure_count 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _failure_count 对应的业务流程、校验或数据转换。
+
+    入参：db、run、asset 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     query = (
         db.query(VideoReviewRecord)
         .join(VideoProductionAsset, VideoReviewRecord.asset_id == VideoProductionAsset.id)
@@ -127,21 +135,33 @@ def _failure_count(db: Session, run: VideoProductionRun, asset: VideoProductionA
 
 
 def _target_scope(asset: VideoProductionAsset) -> tuple[str, str]:
-    """业务函数：处理 _target_scope 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _target_scope 对应的业务流程、校验或数据转换。
+
+    入参：asset 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     target_type = asset.target_type or ("production_segment" if asset.production_segment_id else "asset")
     target_id = asset.target_id or asset.production_segment_id or asset.id
     return target_type, target_id
 
 
 def _repair_for_asset(asset: VideoProductionAsset) -> tuple[str, str]:
-    """业务函数：处理 _repair_for_asset 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _repair_for_asset 对应的业务流程、校验或数据转换。
+
+    入参：asset 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if asset.asset_type == "video_segment":
         return "video_segment_failed", "image_generation"
     return "image_generation_failed", "storyboard"
 
 
 def _apply_backtrack_run_state(run: VideoProductionRun, backtrack_to: str) -> None:
-    """业务函数：处理 _apply_backtrack_run_state 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _apply_backtrack_run_state 对应的业务流程、校验或数据转换。
+
+    入参：run、backtrack_to 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     run.current_stage = backtrack_to
     if backtrack_to == "image_generation":
         run.status = "image_batch_running"

@@ -48,11 +48,15 @@ const canHaveMatchMode = computed(() =>
 )
 
 // 前端业务函数：协调 updateField 对应的页面流程、接口调用或状态转换。
+// 入参：key、value 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 updateField 对应业务流程的处理结果。
 function updateField(key, value) {
   emit('update', { ...props.strategy, [key]: value })
 }
 
 // 前端业务函数：协调 onTypeChange 对应的页面流程、接口调用或状态转换。
+// 入参：newType 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 onTypeChange 对应业务流程的处理结果。
 function onTypeChange(newType) {
   const base = { type: newType }
   if (newType === 'coordinate') {
@@ -72,6 +76,8 @@ function onTypeChange(newType) {
 // --- Multi-condition helpers ---
 
 // 前端业务函数：协调 toggleConditionMode 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 toggleConditionMode 对应业务流程的处理结果。
 function toggleConditionMode() {
   if (isMultiCondition.value) {
     const first = props.strategy.conditions[0]
@@ -94,17 +100,23 @@ function toggleConditionMode() {
 }
 
 // 前端业务函数：协调 setLogic 对应的页面流程、接口调用或状态转换。
+// 入参：val 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 setLogic 对应业务流程的处理结果。
 function setLogic(val) {
   emit('update', { ...props.strategy, logic: val })
 }
 
 // 前端业务函数：协调 addCondition 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 addCondition 对应业务流程的处理结果。
 function addCondition() {
   const conds = [...(props.strategy.conditions || []), { type: 'text', value: '', match_mode: 'exact' }]
   emit('update', { ...props.strategy, conditions: conds })
 }
 
 // 前端业务函数：协调 removeCondition 对应的页面流程、接口调用或状态转换。
+// 入参：index 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 removeCondition 对应业务流程的处理结果。
 function removeCondition(index) {
   const conds = props.strategy.conditions.filter((_, i) => i !== index)
   if (conds.length === 0) {
@@ -115,6 +127,8 @@ function removeCondition(index) {
 }
 
 // 前端业务函数：协调 updateCondition 对应的页面流程、接口调用或状态转换。
+// 入参：index、key、value 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 updateCondition 对应业务流程的处理结果。
 function updateCondition(index, key, value) {
   const conds = props.strategy.conditions.map((c, i) =>
     i === index ? { ...c, [key]: value } : c
@@ -123,6 +137,8 @@ function updateCondition(index, key, value) {
 }
 
 // 前端业务函数：协调 onCondTypeChange 对应的页面流程、接口调用或状态转换。
+// 入参：index、newType 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 onCondTypeChange 对应业务流程的处理结果。
 function onCondTypeChange(index, newType) {
   const conds = props.strategy.conditions.map((c, i) =>
     i === index ? { type: newType, value: '', match_mode: 'exact' } : c
@@ -131,22 +147,30 @@ function onCondTypeChange(index, newType) {
 }
 
 // 前端业务函数：协调 addStep 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 addStep 对应业务流程的处理结果。
 function addStep() {
   const steps = [...(props.strategy.steps || []), { type: 'text', value: '' }]
   emit('update', { ...props.strategy, steps })
 }
 // 前端业务函数：协调 addNavStep 对应的页面流程、接口调用或状态转换。
+// 入参：nav 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 addNavStep 对应业务流程的处理结果。
 function addNavStep(nav) {
   const step = nav === 'parent' ? { nav: 'parent' } : { nav, type: 'text', value: '' }
   const steps = [...(props.strategy.steps || []), step]
   emit('update', { ...props.strategy, steps })
 }
 // 前端业务函数：协调 removeStep 对应的页面流程、接口调用或状态转换。
+// 入参：index 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 removeStep 对应业务流程的处理结果。
 function removeStep(index) {
   const steps = props.strategy.steps.filter((_, i) => i !== index)
   emit('update', { ...props.strategy, steps })
 }
 // 前端业务函数：协调 updateStep 对应的页面流程、接口调用或状态转换。
+// 入参：index、key、value 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 updateStep 对应业务流程的处理结果。
 function updateStep(index, key, value) {
   const steps = props.strategy.steps.map((s, i) =>
     i === index ? { ...s, [key]: value } : s
@@ -155,6 +179,8 @@ function updateStep(index, key, value) {
 }
 
 // 前端业务函数：协调 onImageFileSelect 对应的页面流程、接口调用或状态转换。
+// 入参：e 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 onImageFileSelect 对应业务流程的处理结果。
 async function onImageFileSelect(e) {
   const file = e.target.files?.[0]
   if (!file) return

@@ -38,7 +38,11 @@ def _policy_snapshot(
     policy_type: str,
     default_snapshot: dict[str, Any],
 ) -> tuple[dict[str, Any], str | None]:
-    """业务函数：处理 _policy_snapshot 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _policy_snapshot 对应的业务流程、校验或数据转换。
+
+    入参：db、policy_id、policy_type、default_snapshot 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if not policy_id:
         return dict(default_snapshot), None
     row = (
@@ -55,7 +59,11 @@ def _policy_snapshot(
 
 
 def _count_images(payload: dict[str, Any]) -> int:
-    """业务函数：处理 _count_images 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _count_images 对应的业务流程、校验或数据转换。
+
+    入参：payload 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     try:
         return max(1, int(payload.get("count") or 1))
     except (TypeError, ValueError):
@@ -68,7 +76,11 @@ def estimate_image_cost(
     strategy: ImageProductionStrategy | None,
     model_config: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """业务函数：处理 estimate_image_cost 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 estimate_image_cost 对应的业务流程、校验或数据转换。
+
+    入参：db、payload、strategy、model_config 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     policy, policy_id = _policy_snapshot(
         db,
         strategy.cost_policy_version_id if strategy else None,
@@ -105,7 +117,11 @@ def preview_image_capacity(
     strategy: ImageProductionStrategy | None,
     model_id: str | None,
 ) -> dict[str, Any]:
-    """业务函数：处理 preview_image_capacity 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 preview_image_capacity 对应的业务流程、校验或数据转换。
+
+    入参：db、strategy、model_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     policy, policy_id = _policy_snapshot(
         db,
         strategy.capacity_policy_version_id if strategy else None,
@@ -175,7 +191,11 @@ def preview_review_gate(
     strategy: ImageProductionStrategy | None,
     destination_role: str | None,
 ) -> dict[str, Any]:
-    """业务函数：处理 preview_review_gate 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 preview_review_gate 对应的业务流程、校验或数据转换。
+
+    入参：db、strategy、destination_role 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     policy, policy_id = _policy_snapshot(
         db,
         strategy.review_policy_version_id if strategy else None,

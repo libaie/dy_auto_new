@@ -9,7 +9,11 @@ from app.domains.video_production.production_errors import ProductionErrorCode
 
 
 def _serialize_code(code: ProductionErrorCode | str | None) -> str | None:
-    """业务函数：处理 _serialize_code 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _serialize_code 对应的业务流程、校验或数据转换。
+
+    入参：code 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if code is None:
         return None
     if isinstance(code, ProductionErrorCode):
@@ -19,7 +23,10 @@ def _serialize_code(code: ProductionErrorCode | str | None) -> str | None:
 
 @dataclass
 class ProductionActionResult:
-    """业务类：承载 ProductionActionResult 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 ProductionActionResult 相关的数据结构、状态或业务协作。
+
+    类参数：affected_ids、code、data、message、repair_action、repair_route、retryable、status 承载该类的业务配置、状态或数据字段。
+    """
     status: str
     message: str = ""
     code: ProductionErrorCode | str | None = None
@@ -31,7 +38,11 @@ class ProductionActionResult:
 
     @classmethod
     def success(cls, message: str = "", data: dict | None = None) -> "ProductionActionResult":
-        """业务函数：处理 success 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 success 对应的业务流程、校验或数据转换。
+
+        入参：message、data 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         return cls(status="success", code="OK", message=message, data=data or {})
 
     @classmethod
@@ -45,7 +56,11 @@ class ProductionActionResult:
         retryable: bool = False,
         data: dict | None = None,
     ) -> "ProductionActionResult":
-        """业务函数：处理 blocked 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 blocked 对应的业务流程、校验或数据转换。
+
+        入参：code、message、repair_action、repair_route、affected_ids、retryable、data 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         return cls(
             status="blocked",
             code=code,
@@ -58,7 +73,11 @@ class ProductionActionResult:
         )
 
     def to_http_detail(self) -> dict:
-        """业务函数：处理 to_http_detail 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 to_http_detail 对应的业务流程、校验或数据转换。
+
+        入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         code = _serialize_code(self.code)
         return {
             "ok": self.status == "success",

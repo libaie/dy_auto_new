@@ -51,7 +51,11 @@ DEFAULT_DATA = {
 
 @router.get("/reference-categories")
 def list_categories(db: Session = Depends(get_db)):
-    """获取所有字典分类 (公开只读), 含每类已启用选项数."""
+    """业务函数：处理 list_categories 对应的业务流程、校验或数据转换。
+
+    入参：db 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     cats = db.query(ReferenceCategory).order_by(ReferenceCategory.sort_order).all()
     # Per-category enabled item count
     counts = {}
@@ -71,7 +75,10 @@ def list_categories(db: Session = Depends(get_db)):
 
 
 class CategoryCreate(BaseModel):
-    """业务类：承载 CategoryCreate 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 CategoryCreate 相关的数据结构、状态或业务协作。
+
+    类参数：key、label、sort_order 承载该类的业务配置、状态或数据字段。
+    """
     key: str
     label: str
     sort_order: int = 0
@@ -80,7 +87,11 @@ class CategoryCreate(BaseModel):
 @router.post("/reference-categories")
 def create_category(body: CategoryCreate, db: Session = Depends(get_db),
                     user = Depends(verify_admin_token)):
-    """业务函数：处理 create_category 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 create_category 对应的业务流程、校验或数据转换。
+
+    入参：body、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     cat = ReferenceCategory(key=body.key, label=body.label, sort_order=body.sort_order)
     db.add(cat)
     try:
@@ -94,7 +105,11 @@ def create_category(body: CategoryCreate, db: Session = Depends(get_db),
 @router.put("/reference-categories/{cat_id}")
 def update_category(cat_id: str, body: dict, db: Session = Depends(get_db),
                     user = Depends(verify_admin_token)):
-    """业务函数：处理 update_category 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 update_category 对应的业务流程、校验或数据转换。
+
+    入参：cat_id、body、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     cat = db.query(ReferenceCategory).filter(ReferenceCategory.id == cat_id).first()
     if not cat:
         raise HTTPException(404, "分类不存在")
@@ -118,7 +133,11 @@ def update_category(cat_id: str, body: dict, db: Session = Depends(get_db),
 @router.delete("/reference-categories/{cat_id}")
 def delete_category(cat_id: str, db: Session = Depends(get_db),
                     user = Depends(verify_admin_token)):
-    """业务函数：处理 delete_category 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 delete_category 对应的业务流程、校验或数据转换。
+
+    入参：cat_id、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     cat = db.query(ReferenceCategory).filter(ReferenceCategory.id == cat_id).first()
     if not cat:
         raise HTTPException(404, "分类不存在")
@@ -132,7 +151,11 @@ def delete_category(cat_id: str, db: Session = Depends(get_db),
 
 @router.get("/reference-data/{category}")
 def list_items(category: str, db: Session = Depends(get_db)):
-    """获取某分类下的所有启用选项 (公开只读)."""
+    """业务函数：处理 list_items 对应的业务流程、校验或数据转换。
+
+    入参：category、db 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     items = db.query(ReferenceData).filter(
         ReferenceData.category == category, ReferenceData.enabled == True
     ).order_by(ReferenceData.sort_order).all()
@@ -143,7 +166,10 @@ def list_items(category: str, db: Session = Depends(get_db)):
 
 
 class RefDataCreate(BaseModel):
-    """业务类：承载 RefDataCreate 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 RefDataCreate 相关的数据结构、状态或业务协作。
+
+    类参数：category、description、label、sort_order、value 承载该类的业务配置、状态或数据字段。
+    """
     category: str
     value: str
     label: str
@@ -154,7 +180,11 @@ class RefDataCreate(BaseModel):
 @router.post("/reference-data")
 def create_item(body: RefDataCreate, db: Session = Depends(get_db),
                 user = Depends(verify_admin_token)):
-    """业务函数：处理 create_item 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 create_item 对应的业务流程、校验或数据转换。
+
+    入参：body、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     item = ReferenceData(**body.model_dump())
     db.add(item)
     try:
@@ -168,7 +198,11 @@ def create_item(body: RefDataCreate, db: Session = Depends(get_db),
 @router.put("/reference-data/{item_id}")
 def update_item(item_id: str, body: dict, db: Session = Depends(get_db),
                 user = Depends(verify_admin_token)):
-    """业务函数：处理 update_item 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 update_item 对应的业务流程、校验或数据转换。
+
+    入参：item_id、body、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     item = db.query(ReferenceData).filter(ReferenceData.id == item_id).first()
     if not item: raise HTTPException(404)
     for k, v in body.items():
@@ -180,7 +214,11 @@ def update_item(item_id: str, body: dict, db: Session = Depends(get_db),
 @router.delete("/reference-data/{item_id}")
 def delete_item(item_id: str, db: Session = Depends(get_db),
                 user = Depends(verify_admin_token)):
-    """业务函数：处理 delete_item 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 delete_item 对应的业务流程、校验或数据转换。
+
+    入参：item_id、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     db.query(ReferenceData).filter(ReferenceData.id == item_id).delete()
     db.commit()
     return {"ok": True}
@@ -189,7 +227,11 @@ def delete_item(item_id: str, db: Session = Depends(get_db),
 @router.get("/reference-data/admin/{category}")
 def list_all_items(category: str, db: Session = Depends(get_db),
                    user = Depends(verify_admin_token)):
-    """管理端：列出某分类所有项 (含 id, enabled)."""
+    """业务函数：处理 list_all_items 对应的业务流程、校验或数据转换。
+
+    入参：category、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     items = db.query(ReferenceData).filter(
         ReferenceData.category == category
     ).order_by(ReferenceData.sort_order).all()
@@ -204,7 +246,11 @@ def list_all_items(category: str, db: Session = Depends(get_db),
 # ==== Seed ====
 
 def seed_reference_data(db: Session):
-    """启动时 seed 默认分类 + 字典数据。幂等：已存在则跳过。"""
+    """业务函数：处理 seed_reference_data 对应的业务流程、校验或数据转换。
+
+    入参：db 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     for i, (key, label) in enumerate(DEFAULT_CATEGORIES):
         exists = db.query(ReferenceCategory).filter(ReferenceCategory.key == key).first()
         if not exists:

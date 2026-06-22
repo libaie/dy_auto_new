@@ -13,6 +13,8 @@ var SearchCollectHandler = Object.create(CommentBaseHandler);
 SearchCollectHandler._config = { videoTimeoutMs: 0, interVideoDelay: 1500, maxVideoCount: 200 };
 
 // 设备业务函数：处理 SearchCollectHandler.execute 对应的抖音自动化动作、状态或安全边界。
+// 入参：params 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 SearchCollectHandler.execute 对应业务流程的处理结果。
 SearchCollectHandler.execute = function (params) {
   if (params.share_links && params.share_links.length > 0) {
     return this._executeShareLinks(params);
@@ -21,22 +23,30 @@ SearchCollectHandler.execute = function (params) {
 };
 
 // 设备业务函数：处理 SearchCollectHandler._beforeSearch 对应的抖音自动化动作、状态或安全边界。
+// 入参：params 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 SearchCollectHandler._beforeSearch 对应业务流程的处理结果。
 SearchCollectHandler._beforeSearch = function (params) {
   this._currentDest = aiAnalyzer.resolveDestination(params.keyword);
 };
 
 // 设备业务函数：处理 SearchCollectHandler._prepareAnalyzer 对应的抖音自动化动作、状态或安全边界。
+// 入参：params 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 SearchCollectHandler._prepareAnalyzer 对应业务流程的处理结果。
 SearchCollectHandler._prepareAnalyzer = function (params) {
   aiAnalyzer.useTemplate(params.prompt_template_id, "general");
 };
 
 // 设备业务函数：处理 SearchCollectHandler._initStats 对应的抖音自动化动作、状态或安全边界。
+// 入参：params 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 SearchCollectHandler._initStats 对应业务流程的处理结果。
 SearchCollectHandler._initStats = function (params) {
   return { success_count: 0, fail_count: 0, details: [],
     _taskId: params.task_id || "", _keyword: params.keyword || "" };
 };
 
 // 设备业务函数：处理 SearchCollectHandler._shouldProcessVideo 对应的抖音自动化动作、状态或安全边界。
+// 入参：params、videoIndex 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 SearchCollectHandler._shouldProcessVideo 对应业务流程的处理结果。
 SearchCollectHandler._shouldProcessVideo = function (params, videoIndex) {
   // 残留在评论区则先退出
   if (uiOperator.isOnPage("is_comment_view")) {
@@ -48,6 +58,8 @@ SearchCollectHandler._shouldProcessVideo = function (params, videoIndex) {
 };
 
 // 设备业务函数：处理 SearchCollectHandler._closeComments 对应的抖音自动化动作、状态或安全边界。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 SearchCollectHandler._closeComments 对应业务流程的处理结果。
 SearchCollectHandler._closeComments = function () {
   this.safeClick("comment_off_btn", 2);
   sleep(400);
@@ -59,6 +71,8 @@ SearchCollectHandler._closeComments = function () {
 };
 
 // 设备业务函数：处理 SearchCollectHandler._processComments 对应的抖音自动化动作、状态或安全边界。
+// 入参：params、stats、videoIndex 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 SearchCollectHandler._processComments 对应业务流程的处理结果。
 SearchCollectHandler._processComments = function (params, stats, videoIndex) {
   var keyword = params.keyword;
   var taskId = params.task_id || "";
@@ -220,11 +234,15 @@ SearchCollectHandler._processComments = function (params, stats, videoIndex) {
   stats.success_count += collected;
 };
 
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 SearchCollectHandler._openComments 对应业务流程的处理结果。
 SearchCollectHandler._openComments = function () {
   return commentUtils.openComments();
 };
 
 // 设备业务函数：处理 SearchCollectHandler._aiQualify 对应的抖音自动化动作、状态或安全边界。
+// 入参：comment 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 SearchCollectHandler._aiQualify 对应业务流程的处理结果。
 SearchCollectHandler._aiQualify = function (comment) {
   if (!comment || !comment.text) return false;
   try {
@@ -238,6 +256,8 @@ SearchCollectHandler._aiQualify = function (comment) {
   } catch (e) { logger.warn(TAG, "AI分析失败: " + e.message); return false; }
 };
 
+// 入参：item、comment 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 SearchCollectHandler._collectCommentData 对应业务流程的处理结果。
 SearchCollectHandler._collectCommentData = function (item, comment) {
   var timeStr = comment.time || "";
   var parsed = commentUtils.parseTime(timeStr);
@@ -266,6 +286,8 @@ SearchCollectHandler._collectCommentData = function (item, comment) {
 };
 
 // 设备业务函数：处理 SearchCollectHandler._collectUserData 对应的抖音自动化动作、状态或安全边界。
+// 入参：item、comment 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 SearchCollectHandler._collectUserData 对应业务流程的处理结果。
 SearchCollectHandler._collectUserData = function (item, comment) {
   var avatarEl = this._findChildBySelector(item, "comment_author_avatar");
   if (!avatarEl) { logger.warn(TAG, "头像未找到"); return null; }
@@ -301,6 +323,8 @@ SearchCollectHandler._collectUserData = function (item, comment) {
 };
 
 // 设备业务函数：处理 SearchCollectHandler._reportCollection 对应的抖音自动化动作、状态或安全边界。
+// 入参：taskId、keyword、commentData、userData、dataSourceType 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 SearchCollectHandler._reportCollection 对应业务流程的处理结果。
 SearchCollectHandler._reportCollection = function (taskId, keyword, commentData, userData, dataSourceType) {
   var payload = { task_id: taskId, keyword: keyword, comment: commentData, data_source_type: dataSourceType || 0 };
   if (userData) payload.user = userData;
@@ -309,6 +333,8 @@ SearchCollectHandler._reportCollection = function (taskId, keyword, commentData,
   try { apiClient.incrementStats((this._params || {}).account_id, "collect", "", 1); } catch (e) {}
 };
 
+// 入参：params 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 SearchCollectHandler.execute 对应业务流程的处理结果。
 SearchCollectHandler.execute = function (params) {
   if (params.share_links && params.share_links.length > 0) {
     return this._executeShareLinks(params);
@@ -317,6 +343,8 @@ SearchCollectHandler.execute = function (params) {
 };
 
 // 设备业务函数：处理 SearchCollectHandler._executeShareLinks 对应的抖音自动化动作、状态或安全边界。
+// 入参：params 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 SearchCollectHandler._executeShareLinks 对应业务流程的处理结果。
 SearchCollectHandler._executeShareLinks = function (params) {
   var links = params.share_links;
   var taskId = params.task_id || "";

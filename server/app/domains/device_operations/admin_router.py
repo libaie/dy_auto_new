@@ -19,7 +19,11 @@ router = APIRouter(prefix="/api/devices", tags=["devices"])
 
 @router.websocket("/ws/pair-events")
 async def ws_pair_events(websocket: WebSocket, token: str = Query(...)):
-    """业务函数：处理 ws_pair_events 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 ws_pair_events 对应的业务流程、校验或数据转换。
+
+    入参：websocket、token 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Admin subscribes to real-time pairing events (new requests, approvals, rejections)."""
     result = verify_ws_admin_token(token)
     if not result or not result[0]:
@@ -37,7 +41,10 @@ async def ws_pair_events(websocket: WebSocket, token: str = Query(...)):
 
 
 class DeviceCreateRequest(BaseModel):
-    """业务类：承载 DeviceCreateRequest 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 DeviceCreateRequest 相关的数据结构、状态或业务协作。
+
+    类参数：bound_account_id、ip、name、proxy_config 承载该类的业务配置、状态或数据字段。
+    """
     name: str
     ip: Optional[str] = None
     bound_account_id: Optional[str] = None
@@ -45,7 +52,10 @@ class DeviceCreateRequest(BaseModel):
 
 
 class DeviceUpdateRequest(BaseModel):
-    """业务类：承载 DeviceUpdateRequest 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 DeviceUpdateRequest 相关的数据结构、状态或业务协作。
+
+    类参数：bound_account_id、ip、name、proxy_config、status 承载该类的业务配置、状态或数据字段。
+    """
     name: Optional[str] = None
     ip: Optional[str] = None
     status: Optional[str] = None
@@ -54,7 +64,11 @@ class DeviceUpdateRequest(BaseModel):
 
 
 def _device_to_dict(dev: Device) -> dict:
-    """业务函数：处理 _device_to_dict 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _device_to_dict 对应的业务流程、校验或数据转换。
+
+    入参：dev 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return {
         "id": dev.id,
         "name": dev.name,
@@ -84,7 +98,11 @@ async def create_device(
     db: Session = Depends(get_db),
     user = Depends(require_role("admin")),
 ):
-    """业务函数：处理 create_device 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 create_device 对应的业务流程、校验或数据转换。
+
+    入参：request、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     user_id, _ = user
     # Validate bound_account_id references an existing account
     if request.bound_account_id:
@@ -114,7 +132,11 @@ def list_devices(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 list_devices 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 list_devices 对应的业务流程、校验或数据转换。
+
+    入参：skip、limit、bound_account_id、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     limit = min(limit, 100)
     query = db.query(Device)
     if bound_account_id is not None:
@@ -137,7 +159,11 @@ def list_pair_requests(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 list_pair_requests 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 list_pair_requests 对应的业务流程、校验或数据转换。
+
+    入参：status、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """List device pairing requests, filtered by status."""
     query = db.query(DevicePairRequest)
     if status != "all":
@@ -174,7 +200,11 @@ async def approve_pair_request(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 approve_pair_request 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 approve_pair_request 对应的业务流程、校验或数据转换。
+
+    入参：request_id、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Approve a pairing request — generates per-device secret and creates Device record."""
     import uuid
     from app.config import DEVICE_CONFIG, ANTI_DETECT_CONFIG, ANTI_DETECT_CONFIG_VERSION, get_ai_config
@@ -263,7 +293,11 @@ async def reject_pair_request(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 reject_pair_request 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 reject_pair_request 对应的业务流程、校验或数据转换。
+
+    入参：request_id、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Reject a pairing request."""
     pair_req = db.query(DevicePairRequest).filter(DevicePairRequest.id == request_id).first()
     if not pair_req:
@@ -295,7 +329,11 @@ def get_device(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 get_device 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 get_device 对应的业务流程、校验或数据转换。
+
+    入参：device_id、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     user_id, role = user
     query = db.query(Device).filter(Device.id == device_id)
     if role != "admin":
@@ -313,7 +351,11 @@ async def update_device(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 update_device 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 update_device 对应的业务流程、校验或数据转换。
+
+    入参：device_id、request、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     user_id, role = user
     query = db.query(Device).filter(Device.id == device_id)
     if role != "admin":
@@ -361,7 +403,11 @@ async def disconnect_device(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 disconnect_device 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 disconnect_device 对应的业务流程、校验或数据转换。
+
+    入参：device_id、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Force-disconnect a device by closing its WebSocket connection.
 
     The device will detect the disconnect, attempt to reconnect, and
@@ -398,7 +444,11 @@ async def delete_device(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 delete_device 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 delete_device 对应的业务流程、校验或数据转换。
+
+    入参：device_id、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     from app.db.models.device_operations import DevicePairRequest
     from app.db.models import Task
 

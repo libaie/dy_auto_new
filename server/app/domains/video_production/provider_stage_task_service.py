@@ -19,7 +19,11 @@ from app.domains.video_production.production_state_contract import (
 
 
 def request_hash(payload: dict) -> str:
-    """业务函数：处理 request_hash 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 request_hash 对应的业务流程、校验或数据转换。
+
+    入参：payload 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     encoded = json.dumps(
         payload,
         sort_keys=True,
@@ -38,7 +42,11 @@ def provider_stage_idempotency_key(
     provider: str,
     model_name: str,
 ) -> str:
-    """业务函数：处理 provider_stage_idempotency_key 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 provider_stage_idempotency_key 对应的业务流程、校验或数据转换。
+
+    入参：run_id、stage、target_type、target_id、provider、model_name 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return f"{run_id}:{stage}:{target_type}:{target_id}:{provider}:{model_name}"
 
 
@@ -55,7 +63,11 @@ def get_or_create_stage_task(
     model_name: str,
     payload: dict,
 ) -> tuple[ProviderStageTask, bool]:
-    """业务函数：处理 get_or_create_stage_task 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 get_or_create_stage_task 对应的业务流程、校验或数据转换。
+
+    入参：db、run_id、plan_id、job_id、target_type、target_id、stage、provider、model_name、payload 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     digest = request_hash(payload)
     idempotency_key = provider_stage_idempotency_key(
         run_id=run_id,
@@ -100,7 +112,11 @@ def get_or_create_stage_task(
 
 
 def set_task_status(db: Session, task: ProviderStageTask, next_status: str, **values) -> ProviderStageTask:
-    """业务函数：处理 set_task_status 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 set_task_status 对应的业务流程、校验或数据转换。
+
+    入参：db、task、next_status、values 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if task.status != next_status and not validate_transition("provider_stage_task", task.status, next_status):
         raise ValueError(f"Invalid provider stage task transition: {task.status} -> {next_status}")
     for key, value in values.items():
@@ -113,7 +129,11 @@ def set_task_status(db: Session, task: ProviderStageTask, next_status: str, **va
 
 
 def claim_stage_task_for_submit(db: Session, task_id: str) -> bool:
-    """业务函数：处理 claim_stage_task_for_submit 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 claim_stage_task_for_submit 对应的业务流程、校验或数据转换。
+
+    入参：db、task_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     now = bj_now()
     updated = (
         db.query(ProviderStageTask)

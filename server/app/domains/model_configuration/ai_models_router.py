@@ -39,7 +39,10 @@ LEGACY_EXPERT_REVIEW_DEFAULT_NAME = "OpenAI Compatible Expert Review"
 
 
 class ModelCreate(BaseModel):
-    """业务类：承载 ModelCreate 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 ModelCreate 相关的数据结构、状态或业务协作。
+
+    类参数：api_key、api_secret、base_url、config_json、model_name、model_type、name、provider 承载该类的业务配置、状态或数据字段。
+    """
     name: str = Field(..., min_length=1, max_length=100)
     model_type: Literal["llm", "image", "video", "tts", "audit"]
     provider: str = Field(..., min_length=1, max_length=30)
@@ -51,7 +54,10 @@ class ModelCreate(BaseModel):
 
 
 class ModelUpdate(BaseModel):
-    """业务类：承载 ModelUpdate 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 ModelUpdate 相关的数据结构、状态或业务协作。
+
+    类参数：api_key、api_secret、base_url、clear_secret、config_json、enabled、model_name、model_type、name、provider、sort_order 承载该类的业务配置、状态或数据字段。
+    """
     name: str | None = None
     model_type: Literal["llm", "image", "video", "tts", "audit"] | None = None
     provider: str | None = None
@@ -66,7 +72,11 @@ class ModelUpdate(BaseModel):
 
 
 def _model_dict(m: AIModel, reveal: bool = False) -> dict:
-    """业务函数：处理 _model_dict 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _model_dict 对应的业务流程、校验或数据转换。
+
+    入参：m、reveal 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     ak = ""; asc = ""
     if reveal:
         if m.api_key:
@@ -99,7 +109,11 @@ def list_models(
     db: Session = Depends(get_db),
     _ = Depends(verify_admin_token),
 ):
-    """业务函数：处理 list_models 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 list_models 对应的业务流程、校验或数据转换。
+
+    入参：model_type、scene_key、enabled、db、_ 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     q = db.query(AIModel)
     if scene_key:
         try:
@@ -121,7 +135,11 @@ def get_options(
     db: Session = Depends(get_db),
     _ = Depends(verify_admin_token),
 ):
-    """业务函数：处理 get_options 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 get_options 对应的业务流程、校验或数据转换。
+
+    入参：model_type、scene_key、db、_ 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     q = db.query(AIModel).filter(AIModel.enabled == True)
     if scene_key:
         try:
@@ -139,7 +157,11 @@ def get_options(
 
 @router.get("/schema")
 def get_schema(_ = Depends(verify_admin_token)):
-    """业务函数：处理 get_schema 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 get_schema 对应的业务流程、校验或数据转换。
+
+    入参：_ 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Return scene definitions, provider presets, protocols, and custom field policy."""
     return {"ok": True, **get_schema_payload()}
 
@@ -147,7 +169,11 @@ def get_schema(_ = Depends(verify_admin_token)):
 @router.get("/{model_id}")
 def get_model(model_id: str, db: Session = Depends(get_db),
               _ = Depends(require_role("admin"))):
-    """业务函数：处理 get_model 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 get_model 对应的业务流程、校验或数据转换。
+
+    入参：model_id、db、_ 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     m = db.query(AIModel).filter(AIModel.id == model_id).first()
     if not m:
         raise HTTPException(404, "模型不存在")
@@ -157,7 +183,11 @@ def get_model(model_id: str, db: Session = Depends(get_db),
 @router.post("")
 def create_model(body: ModelCreate, db: Session = Depends(get_db),
                  _ = Depends(require_role("admin"))):
-    """业务函数：处理 create_model 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 create_model 对应的业务流程、校验或数据转换。
+
+    入参：body、db、_ 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     m = AIModel(
         name=body.name, model_type=body.model_type, provider=body.provider,
         base_url=body.base_url or None,
@@ -178,7 +208,11 @@ def create_model(body: ModelCreate, db: Session = Depends(get_db),
 @router.put("/{model_id}")
 def update_model(model_id: str, body: ModelUpdate, db: Session = Depends(get_db),
                  _ = Depends(require_role("admin"))):
-    """业务函数：处理 update_model 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 update_model 对应的业务流程、校验或数据转换。
+
+    入参：model_id、body、db、_ 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     m = db.query(AIModel).filter(AIModel.id == model_id).first()
     if not m:
         raise HTTPException(404, "模型不存在")
@@ -213,7 +247,11 @@ def update_model(model_id: str, body: ModelUpdate, db: Session = Depends(get_db)
 @router.delete("/{model_id}")
 def delete_model(model_id: str, db: Session = Depends(get_db),
                  _ = Depends(require_role("admin"))):
-    """业务函数：处理 delete_model 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 delete_model 对应的业务流程、校验或数据转换。
+
+    入参：model_id、db、_ 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     m = db.query(AIModel).filter(AIModel.id == model_id).first()
     if not m:
         raise HTTPException(404, "模型不存在")
@@ -238,7 +276,11 @@ _SSRF_BLOCKED_NETWORKS = [
 
 
 def _is_private_url(url: str) -> bool:
-    """业务函数：处理 _is_private_url 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _is_private_url 对应的业务流程、校验或数据转换。
+
+    入参：url 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Check if a URL targets a private/internal IP address (SSRF prevention)."""
     try:
         parsed = urlparse(url)
@@ -260,7 +302,11 @@ def _is_private_url(url: str) -> bool:
 
 
 def _build_auth_headers(provider: str, api_key: str) -> dict:
-    """业务函数：处理 _build_auth_headers 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _build_auth_headers 对应的业务流程、校验或数据转换。
+
+    入参：provider、api_key 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Build auth headers based on provider protocol."""
     if provider == "anthropic":
         return {"x-api-key": api_key, "anthropic-version": "2023-06-01"}
@@ -271,7 +317,11 @@ def _build_auth_headers(provider: str, api_key: str) -> dict:
 
 @tool
 def model_connection_check(test_url: str, headers: dict, strategy: str) -> dict:
-    """业务函数：处理 model_connection_check 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 model_connection_check 对应的业务流程、校验或数据转换。
+
+    入参：test_url、headers、strategy 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Run one model-provider connection check."""
     # 模型连接检测只验证 provider 配置可用性，不写入生产业务状态。
     resp = httpx.get(test_url, headers=headers, timeout=httpx.Timeout(10, connect=5))
@@ -283,7 +333,11 @@ def model_connection_check(test_url: str, headers: dict, strategy: str) -> dict:
 @router.post("/{model_id}/test")
 def test_connection(model_id: str, db: Session = Depends(get_db),
                      _ = Depends(require_role("admin"))):
-    """业务函数：处理 test_connection 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 test_connection 对应的业务流程、校验或数据转换。
+
+    入参：model_id、db、_ 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     m = db.query(AIModel).filter(AIModel.id == model_id).first()
     if not m:
         raise HTTPException(404, "模型不存在")
@@ -357,7 +411,11 @@ DEFAULT_MODELS = [
 
 
 def _merge_missing_config(existing: dict, defaults: dict, path: tuple[str, ...] = ()) -> dict:
-    """业务函数：处理 _merge_missing_config 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _merge_missing_config 对应的业务流程、校验或数据转换。
+
+    入参：existing、defaults、path 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     merged = dict(existing or {})
     for key, value in (defaults or {}).items():
         child_path = path + (key,)
@@ -371,7 +429,11 @@ def _merge_missing_config(existing: dict, defaults: dict, path: tuple[str, ...] 
 
 
 def _bailian_expert_review_entry() -> dict:
-    """业务函数：处理 _bailian_expert_review_entry 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _bailian_expert_review_entry 对应的业务流程、校验或数据转换。
+
+    入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return next(
         entry
         for entry in DEFAULT_MODELS
@@ -382,7 +444,11 @@ def _bailian_expert_review_entry() -> dict:
 
 
 def _upgrade_legacy_expert_review_default(db: Session) -> None:
-    """业务函数：处理 _upgrade_legacy_expert_review_default 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _upgrade_legacy_expert_review_default 对应的业务流程、校验或数据转换。
+
+    入参：db 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     entry = _bailian_expert_review_entry()
     legacy = db.query(AIModel).filter(
         AIModel.model_type == "llm",
@@ -416,7 +482,11 @@ def _upgrade_legacy_expert_review_default(db: Session) -> None:
 
 
 def seed_ai_models(db: Session):
-    """业务函数：处理 seed_ai_models 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 seed_ai_models 对应的业务流程、校验或数据转换。
+
+    入参：db 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Seed default model configs. Idempotent."""
     _upgrade_legacy_expert_review_default(db)
     for entry in DEFAULT_MODELS:

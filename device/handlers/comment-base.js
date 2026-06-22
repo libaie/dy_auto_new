@@ -30,6 +30,8 @@ CommentBaseHandler._config = {
  * 执行入口 — 搜索 → 视频循环 → 逐视频处理评论
  * 子类必须实现 _processComments(params, stats, videoIndex)
  */
+// 入参：params 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 CommentBaseHandler.execute 对应业务流程的处理结果。
 CommentBaseHandler.execute = function (params) {
   var keyword = params.keyword;
   var videoCount = (params.video_count === -1) ? this._config.maxVideoCount : (params.video_count || this._config.defaultVideoCount);
@@ -44,6 +46,8 @@ CommentBaseHandler.execute = function (params) {
   logger.info(TAG, "关键词='" + keyword + "', 视频=" + videoCount + ", 排序=" + sortBy);
 
   var taskId = params.task_id || "";
+  // 入参：step、detail、prog 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _reportProgress 对应业务流程的处理结果。
   function _reportProgress(step, detail, prog) {
     if (taskId) { try { apiClient.reportProgress(taskId, step, detail, prog); } catch (e) {} }
   }
@@ -138,11 +142,15 @@ CommentBaseHandler.execute = function (params) {
 /**
  * 搜索前准备（子类可覆盖）
  */
+// 入参：params 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 CommentBaseHandler._beforeSearch 对应业务流程的处理结果。
 CommentBaseHandler._beforeSearch = function (params) {
   // default: no-op
 };
 
 // 设备业务函数：处理 CommentBaseHandler._prepareAnalyzer 对应的抖音自动化动作、状态或安全边界。
+// 入参：params 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 CommentBaseHandler._prepareAnalyzer 对应业务流程的处理结果。
 CommentBaseHandler._prepareAnalyzer = function (params) {
   aiAnalyzer.useTemplate(params.prompt_template_id);
 };
@@ -150,6 +158,8 @@ CommentBaseHandler._prepareAnalyzer = function (params) {
 /**
  * 初始化统计对象（子类可覆盖）
  */
+// 入参：params 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 CommentBaseHandler._initStats 对应业务流程的处理结果。
 CommentBaseHandler._initStats = function (params) {
   return { videos_processed: 0, success_count: 0, fail_count: 0, skipped: 0, details: [] };
 };
@@ -157,6 +167,8 @@ CommentBaseHandler._initStats = function (params) {
 /**
  * 等待进入视频页
  */
+// 入参：params、videoIndex 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 CommentBaseHandler._waitForVideoPage 对应业务流程的处理结果。
 CommentBaseHandler._waitForVideoPage = function (params, videoIndex) {
   var timeout = this._config.videoTimeoutMs;
   var startTime = Date.now();
@@ -177,6 +189,8 @@ CommentBaseHandler._waitForVideoPage = function (params, videoIndex) {
 /**
  * 预检评论数，返回 true 继续处理
  */
+// 入参：params、videoIndex 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 CommentBaseHandler._shouldProcessVideo 对应业务流程的处理结果。
 CommentBaseHandler._shouldProcessVideo = function (params, videoIndex) {
   var commentBtn = uiOperator.findElement("video_comment_btn", 2000);
   if (!commentBtn) return false;
@@ -195,6 +209,8 @@ CommentBaseHandler._shouldProcessVideo = function (params, videoIndex) {
 /**
  * 视频被跳过时的处理（子类可覆盖）
  */
+// 入参：params、stats、videoIndex 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 CommentBaseHandler._onVideoSkipped 对应业务流程的处理结果。
 CommentBaseHandler._onVideoSkipped = function (params, stats, videoIndex) {
   // default: no-op
 };
@@ -202,6 +218,8 @@ CommentBaseHandler._onVideoSkipped = function (params, stats, videoIndex) {
 /**
  * 打开评论区
  */
+// 入参：params、videoIndex 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 CommentBaseHandler._ensureCommentsOpen 对应业务流程的处理结果。
 CommentBaseHandler._ensureCommentsOpen = function (params, videoIndex) {
   return commentUtils.openComments();
 };
@@ -209,6 +227,8 @@ CommentBaseHandler._ensureCommentsOpen = function (params, videoIndex) {
 /**
  * 关闭评论区
  */
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 CommentBaseHandler._closeComments 对应业务流程的处理结果。
 CommentBaseHandler._closeComments = function () {
   this.safeClick("comment_off_btn", 2);
   sleep(400);
@@ -226,6 +246,8 @@ CommentBaseHandler._closeComments = function () {
  * @param {number} videoIndex — 当前视频索引
  * @returns {string|undefined} "break" 终止视频循环，否则继续
  */
+// 入参：params、stats、videoIndex 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 CommentBaseHandler._processComments 对应业务流程的处理结果。
 CommentBaseHandler._processComments = function (params, stats, videoIndex) {
   throw new Error("_processComments() not implemented");
 };

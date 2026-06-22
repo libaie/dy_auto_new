@@ -6,6 +6,8 @@ var logger = require("../utils/logger");
 var TAG = "悬浮窗";
 
 var _classesImported = false;
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 ensureClasses 对应业务流程的处理结果。
 function ensureClasses() {
   if (_classesImported) return;
   importClass(android.animation.ValueAnimator);
@@ -20,6 +22,8 @@ function ensureClasses() {
 
 // dp → px
 // 设备业务函数：处理 dpToPx 对应的抖音自动化动作、状态或安全边界。
+// 入参：dp 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 dpToPx 对应业务流程的处理结果。
 function dpToPx(dp) {
   return Math.round(dp * device.density / 160);
 }
@@ -42,6 +46,8 @@ var floatingWindow = {
   _ballPx: 0,
 
   // 设备业务函数：处理 init 对应的抖音自动化动作、状态或安全边界。
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 init 对应业务流程的处理结果。
   init: function () {
     var self = this;
     ensureClasses();
@@ -146,12 +152,16 @@ var floatingWindow = {
     });
 
     ui.run(function () {
+      // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+      // 出参：返回 setTimeout 对应业务流程的处理结果。
       setTimeout(function () { self._playEnterAnimation(); }, 100);
     });
 
     logger.info(TAG, "悬浮窗(美化版)已创建");
   },
 
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _handleAdsorption 对应业务流程的处理结果。
   _handleAdsorption: function () {
     var currentX = this._window.getX();
     var currentY = this._window.getY();
@@ -176,6 +186,8 @@ var floatingWindow = {
   },
 
   // 设备业务函数：处理 _playEdgeBounce 对应的抖音自动化动作、状态或安全边界。
+  // 入参：startX、startY、endX、endY 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _playEdgeBounce 对应业务流程的处理结果。
   _playEdgeBounce: function (startX, startY, endX, endY) {
     var win = this._window;
     var animator = ValueAnimator.ofFloat(0, 1);
@@ -193,6 +205,8 @@ var floatingWindow = {
   },
 
   // 设备业务函数：处理 _playPressAnimation 对应的抖音自动化动作、状态或安全边界。
+  // 入参：isPressed 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _playPressAnimation 对应业务流程的处理结果。
   _playPressAnimation: function (isPressed) {
     if (!this._window) return;
     var scale = isPressed ? 0.88 : 1.0;
@@ -207,6 +221,8 @@ var floatingWindow = {
   },
 
   // 设备业务函数：处理 _playEnterAnimation 对应的抖音自动化动作、状态或安全边界。
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _playEnterAnimation 对应业务流程的处理结果。
   _playEnterAnimation: function () {
     if (!this._window) return;
     var card = this._window.ballCard;
@@ -220,6 +236,8 @@ var floatingWindow = {
   },
 
   // 设备业务函数：处理 _playClickAnimation 对应的抖音自动化动作、状态或安全边界。
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _playClickAnimation 对应业务流程的处理结果。
   _playClickAnimation: function () {
     if (!this._window) return;
     var card = this._window.ballCard;
@@ -232,6 +250,8 @@ var floatingWindow = {
   },
 
   // 设备业务函数：处理 _onButtonClick 对应的抖音自动化动作、状态或安全边界。
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _onButtonClick 对应业务流程的处理结果。
   _onButtonClick: function () {
     if (this._isLogVisible) {
       this._hideLogWindow();
@@ -242,6 +262,8 @@ var floatingWindow = {
 
   /* ------------ 往下为日志及配对窗口逻辑，保持你的原样 ------------ */
 
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _showLogWindow 对应业务流程的处理结果。
   _showLogWindow: function () {
     var self = this;
     if (this._logWindow) {
@@ -284,6 +306,8 @@ var floatingWindow = {
     }
 
     // 设备业务函数：处理 this._logListener 对应的抖音自动化动作、状态或安全边界。
+    // 入参：level、tag、msg 为该业务流程需要的上下文、标识或载荷。
+    // 出参：返回 this._logListener 对应业务流程的处理结果。
     this._logListener = function (level, tag, msg) {
       if (self._logWindow) {
         var now = new Date().toLocaleTimeString();
@@ -331,6 +355,8 @@ var floatingWindow = {
   },
 
   // 设备业务函数：处理 _hideLogWindow 对应的抖音自动化动作、状态或安全边界。
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _hideLogWindow 对应业务流程的处理结果。
   _hideLogWindow: function () {
     if (this._logWindow) {
       if (this._logListener) {
@@ -344,6 +370,8 @@ var floatingWindow = {
   },
 
   // 设备业务函数：处理 _getLogColor 对应的抖音自动化动作、状态或安全边界。
+  // 入参：level 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _getLogColor 对应业务流程的处理结果。
   _getLogColor: function (level) {
     switch (level) {
       case "error": return "#ff4444";
@@ -355,6 +383,8 @@ var floatingWindow = {
   },
 
   // 设备业务函数：处理 setStatus 对应的抖音自动化动作、状态或安全边界。
+  // 入参：status 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 setStatus 对应业务流程的处理结果。
   setStatus: function (status) {
     if (!this._window) return;
     // 美化版的图标指示器
@@ -374,12 +404,16 @@ var floatingWindow = {
   },
 
   // 设备业务函数：处理 showToast 对应的抖音自动化动作、状态或安全边界。
+  // 入参：msg、duration 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 showToast 对应业务流程的处理结果。
   showToast: function (msg, duration) {
     duration = duration || 3000;
     toast(msg);
   },
 
   // 设备业务函数：处理 showPairingUI 对应的抖音自动化动作、状态或安全边界。
+  // 入参：callback 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 showPairingUI 对应业务流程的处理结果。
   showPairingUI: function (callback) {
     var self = this;
     this._mode = "pair";
@@ -436,6 +470,8 @@ var floatingWindow = {
   },
 
   // 设备业务函数：处理 updatePairStatus 对应的抖音自动化动作、状态或安全边界。
+  // 入参：text 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 updatePairStatus 对应业务流程的处理结果。
   updatePairStatus: function (text) {
     if (this._pairWindow && this._pairWindow.statusText) {
       var self = this;
@@ -450,6 +486,8 @@ var floatingWindow = {
   },
 
   // 设备业务函数：处理 showWaitingUI 对应的抖音自动化动作、状态或安全边界。
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 showWaitingUI 对应业务流程的处理结果。
   showWaitingUI: function () {
     var self = this;
     this._mode = "waiting";
@@ -494,6 +532,8 @@ var floatingWindow = {
   },
 
   // 设备业务函数：处理 showMainUI 对应的抖音自动化动作、状态或安全边界。
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 showMainUI 对应业务流程的处理结果。
   showMainUI: function () {
     this._mode = "main";
     if (this._pairWindow) {
@@ -510,6 +550,8 @@ var floatingWindow = {
   },
 
   // 设备业务函数：处理 destroy 对应的抖音自动化动作、状态或安全边界。
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 destroy 对应业务流程的处理结果。
   destroy: function () {
     if (this._logListener) {
       logger.removeListener(this._logListener);

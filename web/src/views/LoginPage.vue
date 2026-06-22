@@ -13,6 +13,8 @@ const error = ref('')
 const loading = ref(false)
 
 // 前端业务函数：协调 handleLogin 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleLogin 对应业务流程的处理结果。
 async function handleLogin() {
   error.value = ''
   loading.value = true

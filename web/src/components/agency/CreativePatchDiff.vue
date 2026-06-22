@@ -55,27 +55,37 @@ const fields = computed(() => {
 })
 
 // 前端业务函数：协调 beforeValue 对应的页面流程、接口调用或状态转换。
+// 入参：field 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 beforeValue 对应业务流程的处理结果。
 function beforeValue(field) {
   return props.patch?.before?.[field]
 }
 
 // 前端业务函数：协调 afterValue 对应的页面流程、接口调用或状态转换。
+// 入参：field 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 afterValue 对应业务流程的处理结果。
 function afterValue(field) {
   return props.after?.[field]
 }
 
 // 前端业务函数：协调 updateField 对应的页面流程、接口调用或状态转换。
+// 入参：field、value 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 updateField 对应业务流程的处理结果。
 function updateField(field, value) {
   emit('update:after', { ...(props.after || {}), [field]: value })
 }
 
 // 前端业务函数：协调 displayValue 对应的页面流程、接口调用或状态转换。
+// 入参：value 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 displayValue 对应业务流程的处理结果。
 function displayValue(value) {
   if (value === undefined || value === null || value === '') return '空'
   if (typeof value === 'string') return value
   return JSON.stringify(value, null, 2)
 }
 
+// 入参：status 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 statusLabel 对应业务流程的处理结果。
 function statusLabel(status) {
   const labels = {
     proposed: '待处理',

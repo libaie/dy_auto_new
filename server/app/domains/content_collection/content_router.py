@@ -29,7 +29,11 @@ async def create_template(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 create_template 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 create_template 对应的业务流程、校验或数据转换。
+
+    入参：request、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     result = mutations.create_template(db, request)
     await realtime_events.broadcast_content_changed()
     return result
@@ -43,7 +47,11 @@ def list_templates(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 list_templates 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 list_templates 对应的业务流程、校验或数据转换。
+
+    入参：category、skip、limit、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return mutations.list_templates(db, category=category, skip=skip, limit=limit)
 
 
@@ -53,7 +61,11 @@ def get_template(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 get_template 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 get_template 对应的业务流程、校验或数据转换。
+
+    入参：template_id、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     tpl = mutations.get_template(db, template_id)
     if not tpl:
         raise HTTPException(status_code=404, detail="Template not found")
@@ -67,7 +79,11 @@ async def update_template(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 update_template 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 update_template 对应的业务流程、校验或数据转换。
+
+    入参：template_id、request、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     tpl = mutations.update_template(db, template_id, request)
     if not tpl:
         raise HTTPException(status_code=404, detail="Template not found")
@@ -81,7 +97,11 @@ async def delete_template(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 delete_template 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 delete_template 对应的业务流程、校验或数据转换。
+
+    入参：template_id、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if not mutations.delete_template(db, template_id):
         raise HTTPException(status_code=404, detail="Template not found")
     await realtime_events.broadcast_content_changed()
@@ -96,7 +116,11 @@ async def add_sensitive_word(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 add_sensitive_word 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 add_sensitive_word 对应的业务流程、校验或数据转换。
+
+    入参：request、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     try:
         result = mutations.add_sensitive_word(db, request)
         await realtime_events.broadcast_content_changed()
@@ -112,7 +136,11 @@ def list_sensitive_words(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 list_sensitive_words 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 list_sensitive_words 对应的业务流程、校验或数据转换。
+
+    入参：skip、limit、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return mutations.list_sensitive_words(db, skip=skip, limit=limit)
 
 
@@ -122,7 +150,11 @@ async def delete_sensitive_word(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 delete_sensitive_word 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 delete_sensitive_word 对应的业务流程、校验或数据转换。
+
+    入参：word_id、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if not mutations.delete_sensitive_word(db, word_id):
         raise HTTPException(status_code=404, detail="Word not found")
     await realtime_events.broadcast_content_changed()
@@ -137,7 +169,11 @@ async def generate_content(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 generate_content 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 generate_content 对应的业务流程、校验或数据转换。
+
+    入参：request、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     try:
         content = await content_generation.generate_from_template(db, request)
     except ValueError as e:
@@ -158,7 +194,11 @@ async def generate_keywords(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 generate_keywords 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 generate_keywords 对应的业务流程、校验或数据转换。
+
+    入参：request、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     try:
         keywords = await content_generation.generate_keywords(db, request)
     except RuntimeError as e:
@@ -175,7 +215,11 @@ async def generate_regex(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 generate_regex 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 generate_regex 对应的业务流程、校验或数据转换。
+
+    入参：request、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     try:
         regex = await content_generation.generate_regex(db, request)
     except RuntimeError as e:
@@ -191,7 +235,11 @@ async def generate_clean_prompt(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 generate_clean_prompt 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 generate_clean_prompt 对应的业务流程、校验或数据转换。
+
+    入参：request、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     try:
         prompt = await content_generation.generate_clean_prompt(db, request)
     except RuntimeError as e:

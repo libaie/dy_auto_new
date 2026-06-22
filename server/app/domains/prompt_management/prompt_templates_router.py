@@ -25,20 +25,29 @@ router = APIRouter(prefix="/api/prompt-templates", tags=["prompt-templates"])
 
 
 class TemplateGenerateRequest(BaseModel):
-    """业务类：承载 TemplateGenerateRequest 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 TemplateGenerateRequest 相关的数据结构、状态或业务协作。
+
+    类参数：description、industry 承载该类的业务配置、状态或数据字段。
+    """
     description: str
     industry: str = "health"
 
 
 class TemplateRewriteRequest(BaseModel):
-    """业务类：承载 TemplateRewriteRequest 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 TemplateRewriteRequest 相关的数据结构、状态或业务协作。
+
+    类参数：content、industry、instruction 承载该类的业务配置、状态或数据字段。
+    """
     content: Any = None
     instruction: Any = None
     industry: str = "health"
 
 
 class TemplateCreateRequest(BaseModel):
-    """业务类：承载 TemplateCreateRequest 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 TemplateCreateRequest 相关的数据结构、状态或业务协作。
+
+    类参数：content、description、industry、name 承载该类的业务配置、状态或数据字段。
+    """
     name: str
     industry: str = "health"
     description: str = ""
@@ -46,14 +55,20 @@ class TemplateCreateRequest(BaseModel):
 
 
 class TemplateUpdateRequest(BaseModel):
-    """业务类：承载 TemplateUpdateRequest 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 TemplateUpdateRequest 相关的数据结构、状态或业务协作。
+
+    类参数：content、description、industry 承载该类的业务配置、状态或数据字段。
+    """
     content: Optional[dict] = None
     industry: Optional[str] = None
     description: Optional[str] = None
 
 
 class TemplateToggleRequest(BaseModel):
-    """业务类：承载 TemplateToggleRequest 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 TemplateToggleRequest 相关的数据结构、状态或业务协作。
+
+    类参数：enabled 承载该类的业务配置、状态或数据字段。
+    """
     enabled: bool
 
 
@@ -129,12 +144,20 @@ or explanatory text."""
 
 
 def _sse(payload: dict) -> str:
-    """业务函数：处理 _sse 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _sse 对应的业务流程、校验或数据转换。
+
+    入参：payload 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
 
 
 def _strip_json_fence(raw: str) -> str:
-    """业务函数：处理 _strip_json_fence 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _strip_json_fence 对应的业务流程、校验或数据转换。
+
+    入参：raw 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     content = raw.strip()
     if not content.startswith("```"):
         return content
@@ -148,7 +171,11 @@ def _strip_json_fence(raw: str) -> str:
 
 
 def _canonical_template_json(content: dict) -> str:
-    """业务函数：处理 _canonical_template_json 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _canonical_template_json 对应的业务流程、校验或数据转换。
+
+    入参：content 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return json.dumps(content, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
@@ -158,7 +185,11 @@ async def generate_template(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """AI 根据描述生成提示词模板 JSON"""
+    """业务函数：处理 generate_template 对应的业务流程、校验或数据转换。
+
+    入参：request、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     from app.domains.model_configuration.ai_generator import ai_generator as gen
 
     user_prompt = (
@@ -200,7 +231,11 @@ async def generate_template_stream(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """AI 根据描述生成提示词模板 JSON（SSE 流式输出，避免超时）"""
+    """业务函数：处理 generate_template_stream 对应的业务流程、校验或数据转换。
+
+    入参：request、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     from app.domains.model_configuration.ai_generator import ai_generator as gen
 
     user_prompt = (
@@ -212,7 +247,11 @@ async def generate_template_stream(
     )
 
     async def event_stream():
-        """业务函数：处理 event_stream 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 event_stream 对应的业务流程、校验或数据转换。
+
+        入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         yield f"data: {json.dumps({'type': 'status', 'text': '正在调用 AI 生成...'})}\n\n"
 
         raw_chunks = []
@@ -262,10 +301,18 @@ async def rewrite_template_stream(
     request: TemplateRewriteRequest,
     user = Depends(require_role("admin")),
 ):
-    """业务函数：处理 rewrite_template_stream 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 rewrite_template_stream 对应的业务流程、校验或数据转换。
+
+    入参：request、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """AI rewrite preview for prompt template JSON. Stateless SSE endpoint."""
     def stream_headers():
-        """业务函数：处理 stream_headers 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 stream_headers 对应的业务流程、校验或数据转换。
+
+        入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         return {
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
@@ -273,9 +320,17 @@ async def rewrite_template_stream(
         }
 
     def error_stream(message: str):
-        """业务函数：处理 error_stream 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 error_stream 对应的业务流程、校验或数据转换。
+
+        入参：message 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         async def stream():
-            """业务函数：处理 stream 对应的业务流程、校验或数据转换。"""
+            """业务函数：处理 stream 对应的业务流程、校验或数据转换。
+
+            入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+            出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+            """
             yield _sse({"type": "error", "message": message})
 
         return stream()
@@ -308,7 +363,11 @@ async def rewrite_template_stream(
         )
 
     async def event_stream():
-        """业务函数：处理 event_stream 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 event_stream 对应的业务流程、校验或数据转换。
+
+        入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         raw_chunks = []
         try:
             yield _sse({"type": "status", "text": "Rewriting prompt template..."})
@@ -364,7 +423,11 @@ def list_templates(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 list_templates 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 list_templates 对应的业务流程、校验或数据转换。
+
+    入参：include_disabled、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     templates = prompt_template_service.list_all_templates(db, include_disabled=include_disabled)
     version = prompt_template_service.get_version(db)
     return {"templates": templates, "total": len(templates), "version": version}
@@ -376,7 +439,11 @@ def get_template(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 get_template 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 get_template 对应的业务流程、校验或数据转换。
+
+    入参：name、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     tmpl = prompt_template_service.get_template(db, name)
     if not tmpl:
         raise HTTPException(status_code=404, detail="Template not found")
@@ -389,7 +456,11 @@ async def create_template(
     db: Session = Depends(get_db),
     user = Depends(require_role("admin")),
 ):
-    """业务函数：处理 create_template 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 create_template 对应的业务流程、校验或数据转换。
+
+    入参：request、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     try:
         tmpl = prompt_template_service.create_template(
             db, name=request.name, industry=request.industry,
@@ -418,7 +489,11 @@ async def update_template(
     db: Session = Depends(get_db),
     user = Depends(require_role("admin")),
 ):
-    """业务函数：处理 update_template 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 update_template 对应的业务流程、校验或数据转换。
+
+    入参：name、request、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     try:
         tmpl = prompt_template_service.update_template(
             db, name=name,
@@ -448,7 +523,11 @@ async def delete_template(
     db: Session = Depends(get_db),
     user = Depends(require_role("admin")),
 ):
-    """业务函数：处理 delete_template 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 delete_template 对应的业务流程、校验或数据转换。
+
+    入参：name、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     deleted = prompt_template_service.delete_template(db, name)
     if not deleted:
         raise HTTPException(status_code=404, detail="Template not found")
@@ -473,7 +552,11 @@ async def toggle_template(
     db: Session = Depends(get_db),
     user = Depends(require_role("admin")),
 ):
-    """业务函数：处理 toggle_template 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 toggle_template 对应的业务流程、校验或数据转换。
+
+    入参：name、request、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     try:
         tmpl = prompt_template_service.toggle_template(db, name, request.enabled)
     except ValueError as e:

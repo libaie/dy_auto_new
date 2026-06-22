@@ -23,6 +23,8 @@ const progressLabel = computed(() => {
   return props.progress.message || props.progress.status || '处理中...'
 })
 
+// 入参：seconds 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 formatDuration 对应业务流程的处理结果。
 function formatDuration(seconds) {
   if (!seconds) return '-'
   const m = Math.floor(seconds / 60)
@@ -31,6 +33,8 @@ function formatDuration(seconds) {
 }
 
 // 前端业务函数：协调 formatFileSize 对应的页面流程、接口调用或状态转换。
+// 入参：bytes 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 formatFileSize 对应业务流程的处理结果。
 function formatFileSize(bytes) {
   if (!bytes) return '-'
   if (bytes < 1024) return `${bytes} B`

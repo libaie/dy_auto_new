@@ -25,14 +25,21 @@ from app.db.models import (
 
 @dataclass
 class AssetLifecycleError(Exception):
-    """业务类：承载 AssetLifecycleError 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 AssetLifecycleError 相关的数据结构、状态或业务协作。
+
+    类参数：code、details、message 承载该类的业务配置、状态或数据字段。
+    """
     code: str
     message: str
     details: dict | None = None
 
 
 def _json_contains(value, needle: str) -> bool:
-    """业务函数：处理 _json_contains 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _json_contains 对应的业务流程、校验或数据转换。
+
+    入参：value、needle 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if value is None:
         return False
     if isinstance(value, str):
@@ -45,7 +52,11 @@ def _json_contains(value, needle: str) -> bool:
 
 
 def _series_episode_ids(db: Session, series_id: str) -> list[str]:
-    """业务函数：处理 _series_episode_ids 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _series_episode_ids 对应的业务流程、校验或数据转换。
+
+    入参：db、series_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return [
         row[0]
         for row in db.query(Episode.id).filter(Episode.series_id == series_id).all()
@@ -53,7 +64,11 @@ def _series_episode_ids(db: Session, series_id: str) -> list[str]:
 
 
 def _series_has_production_dependencies(db: Session, series_id: str) -> bool:
-    """业务函数：处理 _series_has_production_dependencies 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _series_has_production_dependencies 对应的业务流程、校验或数据转换。
+
+    入参：db、series_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if db.query(VideoProductionRun.id).filter(VideoProductionRun.series_id == series_id).first():
         return True
     if db.query(PipelineRun.id).filter(PipelineRun.series_id == series_id).first():
@@ -77,7 +92,11 @@ def _series_has_production_dependencies(db: Session, series_id: str) -> bool:
 
 
 def delete_or_archive_series(db: Session, series_id: str) -> dict:
-    """业务函数：处理 delete_or_archive_series 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 delete_or_archive_series 对应的业务流程、校验或数据转换。
+
+    入参：db、series_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     series = db.query(Series).filter(Series.id == series_id).first()
     if not series:
         raise AssetLifecycleError("SERIES_NOT_FOUND", "Series not found", {"series_id": series_id})
@@ -96,7 +115,11 @@ def delete_or_archive_series(db: Session, series_id: str) -> dict:
 
 
 def unlink_character_from_series(db: Session, series_id: str, character_id: str) -> dict:
-    """业务函数：处理 unlink_character_from_series 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 unlink_character_from_series 对应的业务流程、校验或数据转换。
+
+    入参：db、series_id、character_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if not db.query(Series.id).filter(Series.id == series_id).first():
         raise AssetLifecycleError("SERIES_NOT_FOUND", "Series not found", {"series_id": series_id})
     if not db.query(Character.id).filter(Character.id == character_id).first():
@@ -118,7 +141,11 @@ def unlink_character_from_series(db: Session, series_id: str, character_id: str)
 
 
 def unlink_scene_from_series(db: Session, series_id: str, scene_id: str) -> dict:
-    """业务函数：处理 unlink_scene_from_series 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 unlink_scene_from_series 对应的业务流程、校验或数据转换。
+
+    入参：db、series_id、scene_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if not db.query(Series.id).filter(Series.id == series_id).first():
         raise AssetLifecycleError("SERIES_NOT_FOUND", "Series not found", {"series_id": series_id})
     if not db.query(Scene.id).filter(Scene.id == scene_id).first():
@@ -140,7 +167,11 @@ def unlink_scene_from_series(db: Session, series_id: str, scene_id: str) -> dict
 
 
 def _character_is_referenced(db: Session, character_id: str) -> bool:
-    """业务函数：处理 _character_is_referenced 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _character_is_referenced 对应的业务流程、校验或数据转换。
+
+    入参：db、character_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if db.execute(
         series_characters.select().where(series_characters.c.character_id == character_id)
     ).first():
@@ -149,14 +180,22 @@ def _character_is_referenced(db: Session, character_id: str) -> bool:
 
 
 def _scene_is_referenced(db: Session, scene_id: str) -> bool:
-    """业务函数：处理 _scene_is_referenced 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _scene_is_referenced 对应的业务流程、校验或数据转换。
+
+    入参：db、scene_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if db.execute(series_scenes.select().where(series_scenes.c.scene_id == scene_id)).first():
         return True
     return _json_references_asset(db, scene_id)
 
 
 def _json_references_asset(db: Session, asset_id: str) -> bool:
-    """业务函数：处理 _json_references_asset 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _json_references_asset 对应的业务流程、校验或数据转换。
+
+    入参：db、asset_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     for (story_bible_json,) in db.query(Series.story_bible_json).all():
         if _json_contains(story_bible_json, asset_id):
             return True
@@ -170,7 +209,11 @@ def _json_references_asset(db: Session, asset_id: str) -> bool:
 
 
 def archive_character_or_scene(db: Session, asset_type: str, asset_id: str) -> dict:
-    """业务函数：处理 archive_character_or_scene 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 archive_character_or_scene 对应的业务流程、校验或数据转换。
+
+    入参：db、asset_type、asset_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if asset_type == "character":
         row = db.query(Character).filter(Character.id == asset_id).first()
         is_referenced = _character_is_referenced

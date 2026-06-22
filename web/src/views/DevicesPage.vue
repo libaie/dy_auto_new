@@ -39,6 +39,8 @@ const loading = ref(false)
 // --- Accounts list for binding dropdown ---
 const accounts = ref([])
 // 前端业务函数：协调 fetchAccounts 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 fetchAccounts 对应业务流程的处理结果。
 async function fetchAccounts() {
   try {
     const res = await listAccounts({ limit: 200 })
@@ -90,6 +92,8 @@ const columns = [
 ]
 
 // --- Fetch devices ---
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 fetchDevices 对应业务流程的处理结果。
 async function fetchDevices() {
   loading.value = true
   try {
@@ -107,6 +111,8 @@ async function fetchDevices() {
 }
 
 // 前端业务函数：协调 handlePageChange 对应的页面流程、接口调用或状态转换。
+// 入参：p 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handlePageChange 对应业务流程的处理结果。
 function handlePageChange(p) {
   page.value = p
   fetchDevices()
@@ -114,6 +120,8 @@ function handlePageChange(p) {
 
 // --- Fetch pair requests ---
 // 前端业务函数：协调 fetchPairRequests 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 fetchPairRequests 对应业务流程的处理结果。
 async function fetchPairRequests() {
   pairLoading.value = true
   try {
@@ -128,6 +136,8 @@ async function fetchPairRequests() {
 }
 
 // 前端业务函数：协调 handleApprove 对应的页面流程、接口调用或状态转换。
+// 入参：req 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleApprove 对应业务流程的处理结果。
 async function handleApprove(req) {
   pairActionLoading.value = req.id
   try {
@@ -145,6 +155,8 @@ async function handleApprove(req) {
 }
 
 // 前端业务函数：协调 handleReject 对应的页面流程、接口调用或状态转换。
+// 入参：req 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleReject 对应业务流程的处理结果。
 async function handleReject(req) {
   pairActionLoading.value = req.id
   try {
@@ -160,6 +172,8 @@ async function handleReject(req) {
 }
 
 // 前端业务函数：协调 switchTab 对应的页面流程、接口调用或状态转换。
+// 入参：tab 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 switchTab 对应业务流程的处理结果。
 function switchTab(tab) {
   activeTab.value = tab
   if (tab === 'pairing') fetchPairRequests()
@@ -168,6 +182,8 @@ function switchTab(tab) {
 
 // --- Open create dialog ---
 // 前端业务函数：协调 openCreateDialog 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 openCreateDialog 对应业务流程的处理结果。
 function openCreateDialog() {
   isEditing.value = false
   editingId.value = null
@@ -179,6 +195,8 @@ function openCreateDialog() {
 
 // --- Open edit dialog ---
 // 前端业务函数：协调 openEditDialog 对应的页面流程、接口调用或状态转换。
+// 入参：device 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 openEditDialog 对应业务流程的处理结果。
 function openEditDialog(device) {
   isEditing.value = true
   editingId.value = device.id
@@ -193,6 +211,8 @@ function openEditDialog(device) {
 
 // --- Save (create or update) ---
 // 前端业务函数：协调 handleSave 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleSave 对应业务流程的处理结果。
 async function handleSave() {
   if (!form.name.trim()) {
     formError.value = '设备名称不能为空'
@@ -247,12 +267,16 @@ async function handleSave() {
 
 // --- Delete ---
 // 前端业务函数：协调 openDeleteDialog 对应的页面流程、接口调用或状态转换。
+// 入参：device 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 openDeleteDialog 对应业务流程的处理结果。
 function openDeleteDialog(device) {
   deletingDevice.value = device
   showDeleteDialog.value = true
 }
 
 // 前端业务函数：协调 handleDelete 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleDelete 对应业务流程的处理结果。
 async function handleDelete() {
   if (!deletingDevice.value) return
   deleting.value = true
@@ -275,6 +299,8 @@ async function handleDelete() {
 const disconnectingId = ref(null)
 
 // 前端业务函数：协调 handleDisconnect 对应的页面流程、接口调用或状态转换。
+// 入参：device 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleDisconnect 对应业务流程的处理结果。
 async function handleDisconnect(device) {
   disconnectingId.value = device.id
   try {
@@ -296,6 +322,8 @@ let wsReconnectTimer = null
 let wsDisposed = false
 
 // 前端业务函数：协调 connectPairWS 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 connectPairWS 对应业务流程的处理结果。
 function connectPairWS() {
   if (wsDisposed || ws) return
   const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
@@ -355,6 +383,8 @@ function connectPairWS() {
 }
 
 // 前端业务函数：协调 disconnectPairWS 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 disconnectPairWS 对应业务流程的处理结果。
 function disconnectPairWS() {
   wsDisposed = true
   if (wsReconnectTimer) {

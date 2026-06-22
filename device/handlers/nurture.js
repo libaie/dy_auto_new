@@ -24,6 +24,8 @@ var TAG = "养号";
  */
 var NurtureHandler = Object.create(BaseHandler);
 
+// 入参：params 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 NurtureHandler.execute 对应业务流程的处理结果。
 NurtureHandler.execute = function (params) {
   // V2 format: sub_tasks + completion_mode
   if (params.sub_tasks) {
@@ -34,6 +36,8 @@ NurtureHandler.execute = function (params) {
 };
 
 // 设备业务函数：处理 NurtureHandler._executeV2 对应的抖音自动化动作、状态或安全边界。
+// 入参：params 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 NurtureHandler._executeV2 对应业务流程的处理结果。
 NurtureHandler._executeV2 = function (params) {
   var subTasks = params.sub_tasks;
   var completionMode = params.completion_mode || "all";
@@ -129,6 +133,8 @@ NurtureHandler._executeV2 = function (params) {
   return { success: true, result: stats };
 };
 
+// 入参：params 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 NurtureHandler._initNurtureRuntime 对应业务流程的处理结果。
 NurtureHandler._initNurtureRuntime = function (params) {
   params = params || {};
   this._nurtureQuota = {
@@ -139,6 +145,8 @@ NurtureHandler._initNurtureRuntime = function (params) {
 };
 
 // 设备业务函数：处理 NurtureHandler._quotaValue 对应的抖音自动化动作、状态或安全边界。
+// 入参：value 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 NurtureHandler._quotaValue 对应业务流程的处理结果。
 NurtureHandler._quotaValue = function (value) {
   if (value === null || value === undefined || value === "") return null;
   var n = Number(value);
@@ -147,6 +155,8 @@ NurtureHandler._quotaValue = function (value) {
 };
 
 // 设备业务函数：处理 NurtureHandler._hasNurtureQuota 对应的抖音自动化动作、状态或安全边界。
+// 入参：type 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 NurtureHandler._hasNurtureQuota 对应业务流程的处理结果。
 NurtureHandler._hasNurtureQuota = function (type) {
   if (!this._nurtureQuota) return true;
   var remaining = this._nurtureQuota[type];
@@ -154,6 +164,8 @@ NurtureHandler._hasNurtureQuota = function (type) {
 };
 
 // 设备业务函数：处理 NurtureHandler._consumeNurtureQuota 对应的抖音自动化动作、状态或安全边界。
+// 入参：type 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 NurtureHandler._consumeNurtureQuota 对应业务流程的处理结果。
 NurtureHandler._consumeNurtureQuota = function (type) {
   if (!this._nurtureQuota) return;
   var remaining = this._nurtureQuota[type];
@@ -161,6 +173,8 @@ NurtureHandler._consumeNurtureQuota = function (type) {
 };
 
 // 设备业务函数：处理 NurtureHandler._recordNurtureAction 对应的抖音自动化动作、状态或安全边界。
+// 入参：type、accountId 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 NurtureHandler._recordNurtureAction 对应业务流程的处理结果。
 NurtureHandler._recordNurtureAction = function (type, accountId) {
   var taskType = null;
   if (type === "like") taskType = "nurture";
@@ -175,6 +189,8 @@ NurtureHandler._recordNurtureAction = function (type, accountId) {
   }
 };
 
+// 入参：task 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 NurtureHandler._executeSubTask 对应业务流程的处理结果。
 NurtureHandler._executeSubTask = function (task) {
   switch (task.type) {
     case "browse":
@@ -193,6 +209,8 @@ NurtureHandler._executeSubTask = function (task) {
 };
 
 // 设备业务函数：处理 NurtureHandler._browseFeed 对应的抖音自动化动作、状态或安全边界。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 NurtureHandler._browseFeed 对应业务流程的处理结果。
 NurtureHandler._browseFeed = function () {
   this._ensureOnFeed();
   // 浏览推荐页：快速扫一眼，大部分 2-5 秒，偶尔多停一会
@@ -202,6 +220,8 @@ NurtureHandler._browseFeed = function () {
   return true;
 };
 
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 NurtureHandler._watchVideo 对应业务流程的处理结果。
 NurtureHandler._watchVideo = function () {
   // 先检测是否是广告 — 广告直接跳过
   if (this._isAdContent()) {
@@ -246,6 +266,8 @@ NurtureHandler._watchVideo = function () {
  * @param {number} median - 中位数(ms)，控制主体集中位置
  * @returns {number} 拟人化的时长(ms)
  */
+// 入参：min、max、median 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 NurtureHandler._humanDuration 对应业务流程的处理结果。
 NurtureHandler._humanDuration = function (min, max, median) {
   // 对数正态分布：ln(N(mu, sigma)) 产生右偏分布
   var mu = Math.log(median);
@@ -263,6 +285,8 @@ NurtureHandler._humanDuration = function (min, max, median) {
  * 检测当前屏幕是否为广告内容
  * @returns {boolean}
  */
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 NurtureHandler._isAdContent 对应业务流程的处理结果。
 NurtureHandler._isAdContent = function () {
   try {
     // 常见广告标识文本
@@ -302,6 +326,8 @@ NurtureHandler._isAdContent = function () {
  * @param {string} videoText - 视频文本内容
  * @returns {boolean} true=相关或无关键词过滤, false=不相关
  */
+// 入参：videoText 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 NurtureHandler._isKeywordRelevant 对应业务流程的处理结果。
 NurtureHandler._isKeywordRelevant = function (videoText) {
   if (!this._keywordMatrix || this._keywordMatrix.length === 0) return true;
   if (!videoText || videoText.length < 2) return false;
@@ -346,6 +372,8 @@ NurtureHandler._isKeywordRelevant = function (videoText) {
  * 评估当前视频内容质量 — 基于可见的互动数据
  * @returns {"high" | "medium" | "low"}
  */
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 NurtureHandler._assessContentQuality 对应业务流程的处理结果。
 NurtureHandler._assessContentQuality = function () {
   try {
     // 尝试读取点赞数（控件 id 可能随版本变化）
@@ -382,6 +410,8 @@ NurtureHandler._assessContentQuality = function () {
  * @param {string} text - 数字文本
  * @returns {number}
  */
+// 入参：text 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 NurtureHandler._parseCount 对应业务流程的处理结果。
 NurtureHandler._parseCount = function (text) {
   if (!text) return 0;
   text = text.replace(/,/g, "").trim();
@@ -400,6 +430,8 @@ NurtureHandler._parseCount = function (text) {
  * 使用选择器系统检测点赞按钮（推荐页特征），避免硬编码 ID 失效
  * 支持最多重试 5 次，每次优先 safeClick("back_btn")，失败则回退系统 back()
  */
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 NurtureHandler._ensureOnFeed 对应业务流程的处理结果。
 NurtureHandler._ensureOnFeed = function () {
   var maxRetries = 5;
   for (var attempt = 0; attempt < maxRetries; attempt++) {
@@ -436,6 +468,8 @@ NurtureHandler._ensureOnFeed = function () {
   logger.warn(TAG, maxRetries + " 次尝试后仍未回到推荐页");
 };
 
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 NurtureHandler._likeCurrentVideo 对应业务流程的处理结果。
 NurtureHandler._likeCurrentVideo = function () {
   if (this._isAdContent()) {
     logger.info(TAG, "广告内容，跳过点赞");
@@ -457,6 +491,8 @@ NurtureHandler._likeCurrentVideo = function () {
   return !!clicked;
 };
 
+// 入参：templateId、templateContent 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 NurtureHandler._commentOnVideo 对应业务流程的处理结果。
 NurtureHandler._commentOnVideo = function (templateId, templateContent) {
   if (this._isAdContent()) {
     logger.info(TAG, "广告内容，跳过评论");
@@ -531,6 +567,8 @@ NurtureHandler._commentOnVideo = function (templateId, templateContent) {
 };
 
 // 设备业务函数：处理 NurtureHandler._followCurrentUser 对应的抖音自动化动作、状态或安全边界。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 NurtureHandler._followCurrentUser 对应业务流程的处理结果。
 NurtureHandler._followCurrentUser = function () {
   if (this._isAdContent()) {
     logger.info(TAG, "广告内容，跳过关注");
@@ -554,6 +592,8 @@ NurtureHandler._followCurrentUser = function () {
 
 // --- Legacy support ---
 // 设备业务函数：处理 NurtureHandler._legacyExecute 对应的抖音自动化动作、状态或安全边界。
+// 入参：params 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 NurtureHandler._legacyExecute 对应业务流程的处理结果。
 NurtureHandler._legacyExecute = function (params) {
   var duration = params.duration || 30;
   var actions = params.actions || [
@@ -612,6 +652,8 @@ NurtureHandler._legacyExecute = function (params) {
   return { success: true, result: stats };
 };
 
+// 入参：actions 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 NurtureHandler._weightedRandom 对应业务流程的处理结果。
 NurtureHandler._weightedRandom = function (actions) {
   var totalWeight = actions.reduce(function (sum, a) { return sum + a.weight; }, 0);
   var random = Math.random() * totalWeight;

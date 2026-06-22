@@ -21,7 +21,11 @@ LEGACY_SEEDANCE_VIDEO_MODELS = (
 
 
 def _normalize_model_name(name: str | None) -> str:
-    """业务函数：处理 _normalize_model_name 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _normalize_model_name 对应的业务流程、校验或数据转换。
+
+    入参：name 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Normalize NULL/empty model_name to empty string for dedup matching."""
     if name is None:
         return ""
@@ -29,7 +33,11 @@ def _normalize_model_name(name: str | None) -> str:
 
 
 def _find_existing(db: Session, model_type: str, provider: str, model_name: str | None) -> AIModel | None:
-    """业务函数：处理 _find_existing 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _find_existing 对应的业务流程、校验或数据转换。
+
+    入参：db、model_type、provider、model_name 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Find an existing AIModel with matching type+provider+name, handling NULL/empty."""
     normalized = _normalize_model_name(model_name)
     q = db.query(AIModel).filter(
@@ -44,7 +52,11 @@ def _find_existing(db: Session, model_type: str, provider: str, model_name: str 
 
 
 def migrate_legacy_settings(db: Session) -> dict:
-    """业务函数：处理 migrate_legacy_settings 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 migrate_legacy_settings 对应的业务流程、校验或数据转换。
+
+    入参：db 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """
     Migrate legacy Settings/Pixelle/Seedance config into AIModel.
 

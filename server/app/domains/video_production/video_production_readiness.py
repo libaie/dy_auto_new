@@ -22,12 +22,20 @@ PRODUCTION_ROUTE = "/video-production/{run_id}"
 
 
 def _empty_counts() -> dict:
-    """业务函数：处理 _empty_counts 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _empty_counts 对应的业务流程、校验或数据转换。
+
+    入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return {"total": 0, "approved": 0, "pending": 0, "failed": 0}
 
 
 def _latest_assets(db: Session, run_id: str) -> dict:
-    """业务函数：处理 _latest_assets 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _latest_assets 对应的业务流程、校验或数据转换。
+
+    入参：db、run_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return {
         asset_type: latest_assets_by_frame(db, run_id, asset_type)
         for asset_type in ("image", "video_segment", "final_video")
@@ -35,7 +43,11 @@ def _latest_assets(db: Session, run_id: str) -> dict:
 
 
 def _asset_counts(latest_assets: dict) -> dict:
-    """业务函数：处理 _asset_counts 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _asset_counts 对应的业务流程、校验或数据转换。
+
+    入参：latest_assets 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     counts = {
         "image": _empty_counts(),
         "video_segment": _empty_counts(),
@@ -55,12 +67,20 @@ def _asset_counts(latest_assets: dict) -> dict:
 
 
 def _has_blocking_assets(counts: dict, asset_type: str) -> bool:
-    """业务函数：处理 _has_blocking_assets 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _has_blocking_assets 对应的业务流程、校验或数据转换。
+
+    入参：counts、asset_type 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return counts[asset_type]["pending"] > 0 or counts[asset_type]["failed"] > 0
 
 
 def _missing_or_unapproved_expected_frames(expected_frame_ids: list[str], assets_by_frame: dict) -> list[str]:
-    """业务函数：处理 _missing_or_unapproved_expected_frames 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _missing_or_unapproved_expected_frames 对应的业务流程、校验或数据转换。
+
+    入参：expected_frame_ids、assets_by_frame 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return [
         frame_id
         for frame_id in expected_frame_ids
@@ -69,7 +89,11 @@ def _missing_or_unapproved_expected_frames(expected_frame_ids: list[str], assets
 
 
 def _review_block(code: str, message: str, repair_action: str, run_id: str) -> dict:
-    """业务函数：处理 _review_block 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _review_block 对应的业务流程、校验或数据转换。
+
+    入参：code、message、repair_action、run_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return {
         "code": code,
         "message": message,
@@ -81,7 +105,11 @@ def _review_block(code: str, message: str, repair_action: str, run_id: str) -> d
 
 
 def _production_block(code: str, message: str, repair_action: str, run_id: str) -> dict:
-    """业务函数：处理 _production_block 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _production_block 对应的业务流程、校验或数据转换。
+
+    入参：code、message、repair_action、run_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return {
         "code": code,
         "message": message,
@@ -93,12 +121,20 @@ def _production_block(code: str, message: str, repair_action: str, run_id: str) 
 
 
 def _next_action(key: str, label: str) -> dict:
-    """业务函数：处理 _next_action 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _next_action 对应的业务流程、校验或数据转换。
+
+    入参：key、label 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return {"key": key, "label": label}
 
 
 def _video_gate_relevant(status: str) -> bool:
-    """业务函数：处理 _video_gate_relevant 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _video_gate_relevant 对应的业务流程、校验或数据转换。
+
+    入参：status 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return status not in {
         "draft",
         "storyboard_ready",
@@ -110,7 +146,11 @@ def _video_gate_relevant(status: str) -> bool:
 
 
 def _image_gate_relevant(status: str) -> bool:
-    """业务函数：处理 _image_gate_relevant 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _image_gate_relevant 对应的业务流程、校验或数据转换。
+
+    入参：status 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return status not in {
         "draft",
         "storyboard_ready",
@@ -121,7 +161,11 @@ def _image_gate_relevant(status: str) -> bool:
 
 
 def _blocked_compose_jobs(db: Session, run) -> list[ProductionJob]:
-    """业务函数：处理 _blocked_compose_jobs 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _blocked_compose_jobs 对应的业务流程、校验或数据转换。
+
+    入参：db、run 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if not run.production_plan_id:
         return []
     return (
@@ -135,7 +179,11 @@ def _blocked_compose_jobs(db: Session, run) -> list[ProductionJob]:
 
 
 def build_run_readiness(db: Session, run) -> dict:
-    """业务函数：处理 build_run_readiness 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 build_run_readiness 对应的业务流程、校验或数据转换。
+
+    入参：db、run 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     run_type = get_run_type(run)
     if run.status in {"reference_generation_running", "reference_generation_blocked"}:
         return {

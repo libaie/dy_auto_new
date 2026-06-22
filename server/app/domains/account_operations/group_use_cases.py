@@ -11,17 +11,27 @@ from .read_models import group_to_dict, member_to_dict
 
 
 class DuplicateNameError(ValueError):
-    """业务类：承载 DuplicateNameError 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 DuplicateNameError 相关的数据结构、状态或业务协作。
+
+    类参数：无显式类参数 承载该类的业务配置、状态或数据字段。
+    """
     pass
 
 
 class InvalidAccountIdsError(ValueError):
-    """业务类：承载 InvalidAccountIdsError 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 InvalidAccountIdsError 相关的数据结构、状态或业务协作。
+
+    类参数：无显式类参数 承载该类的业务配置、状态或数据字段。
+    """
     pass
 
 
 def create_group(db, request, user_id: str) -> dict:
-    """业务函数：处理 create_group 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 create_group 对应的业务流程、校验或数据转换。
+
+    入参：db、request、user_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     existing = db.query(AccountGroup).filter(AccountGroup.name == request.name, AccountGroup.user_id == user_id).first()
     if existing:
         raise DuplicateNameError("分组名称已存在")
@@ -33,7 +43,11 @@ def create_group(db, request, user_id: str) -> dict:
 
 
 def list_groups(db, skip: int, limit: int, user: tuple) -> dict:
-    """业务函数：处理 list_groups 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 list_groups 对应的业务流程、校验或数据转换。
+
+    入参：db、skip、limit、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     limit = min(limit, 100)
     user_id, role = user
     member_counts = (
@@ -63,7 +77,11 @@ def list_groups(db, skip: int, limit: int, user: tuple) -> dict:
 
 
 def get_group(db, group_id: str, user: tuple) -> dict:
-    """业务函数：处理 get_group 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 get_group 对应的业务流程、校验或数据转换。
+
+    入参：db、group_id、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     group = _group_query(db, group_id, user).first()
     if not group:
         raise LookupError("分组不存在")
@@ -72,7 +90,11 @@ def get_group(db, group_id: str, user: tuple) -> dict:
 
 
 def update_group(db, group_id: str, request, user: tuple) -> dict:
-    """业务函数：处理 update_group 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 update_group 对应的业务流程、校验或数据转换。
+
+    入参：db、group_id、request、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     group = _group_query(db, group_id, user).first()
     if not group:
         raise LookupError("分组不存在")
@@ -94,7 +116,11 @@ def update_group(db, group_id: str, request, user: tuple) -> dict:
 
 
 def delete_group(db, group_id: str, user: tuple) -> dict:
-    """业务函数：处理 delete_group 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 delete_group 对应的业务流程、校验或数据转换。
+
+    入参：db、group_id、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     group = _group_query(db, group_id, user).first()
     if not group:
         raise LookupError("分组不存在")
@@ -104,7 +130,11 @@ def delete_group(db, group_id: str, user: tuple) -> dict:
 
 
 def list_members(db, group_id: str, status: str, user: tuple) -> dict:
-    """业务函数：处理 list_members 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 list_members 对应的业务流程、校验或数据转换。
+
+    入参：db、group_id、status、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     _require_group(db, group_id, user)
     user_id, role = user
     query = (
@@ -124,7 +154,11 @@ def list_members(db, group_id: str, status: str, user: tuple) -> dict:
 
 
 def add_members(db, group_id: str, request, user: tuple) -> dict:
-    """业务函数：处理 add_members 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 add_members 对应的业务流程、校验或数据转换。
+
+    入参：db、group_id、request、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     _require_group(db, group_id, user)
     user_id, role = user
     account_query = db.query(Account.id).filter(Account.id.in_(request.account_ids))
@@ -149,7 +183,11 @@ def add_members(db, group_id: str, request, user: tuple) -> dict:
 
 
 def remove_members(db, group_id: str, request, user: tuple) -> dict:
-    """业务函数：处理 remove_members 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 remove_members 对应的业务流程、校验或数据转换。
+
+    入参：db、group_id、request、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     _require_group(db, group_id, user)
     count = (
         db.query(AccountGroupMember)
@@ -164,7 +202,11 @@ def remove_members(db, group_id: str, request, user: tuple) -> dict:
 
 
 def _group_query(db, group_id: str, user: tuple):
-    """业务函数：处理 _group_query 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _group_query 对应的业务流程、校验或数据转换。
+
+    入参：db、group_id、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     user_id, role = user
     query = db.query(AccountGroup).filter(AccountGroup.id == group_id)
     if role != "admin":
@@ -173,7 +215,11 @@ def _group_query(db, group_id: str, user: tuple):
 
 
 def _require_group(db, group_id: str, user: tuple):
-    """业务函数：处理 _require_group 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _require_group 对应的业务流程、校验或数据转换。
+
+    入参：db、group_id、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     group = _group_query(db, group_id, user).first()
     if not group:
         raise LookupError("分组不存在")

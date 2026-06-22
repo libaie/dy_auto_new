@@ -30,7 +30,11 @@ HIGH_REPAINT_RATE = 0.2
 
 
 def _quality_score(metrics: dict[str, Any]) -> int:
-    """业务函数：处理 _quality_score 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _quality_score 对应的业务流程、校验或数据转换。
+
+    入参：metrics 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     failure_rate = metrics["failure_count"] / max(metrics["attempt_count"], 1)
     repaint_rate = metrics["repaint_count"] / max(metrics["attempt_count"], 1)
     score = 100 - (failure_rate * 60) - (repaint_rate * 30)
@@ -38,7 +42,11 @@ def _quality_score(metrics: dict[str, Any]) -> int:
 
 
 def _recommendations(metrics: dict[str, Any], score: int) -> list[dict[str, str]]:
-    """业务函数：处理 _recommendations 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _recommendations 对应的业务流程、校验或数据转换。
+
+    入参：metrics、score 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     attempt_count = metrics["attempt_count"]
     failure_rate = metrics["failure_count"] / max(attempt_count, 1)
     repaint_rate = metrics["repaint_count"] / max(attempt_count, 1)
@@ -73,7 +81,11 @@ def _recommendations(metrics: dict[str, Any], score: int) -> list[dict[str, str]
 
 
 def _confidence(metrics: dict[str, Any]) -> str:
-    """业务函数：处理 _confidence 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _confidence 对应的业务流程、校验或数据转换。
+
+    入参：metrics 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     attempt_count = metrics["attempt_count"]
     if attempt_count < LOW_SAMPLE_ATTEMPTS:
         return "low"
@@ -83,7 +95,11 @@ def _confidence(metrics: dict[str, Any]) -> str:
 
 
 def _status(metrics: dict[str, Any], score: int, recommendations: list[dict[str, str]]) -> str:
-    """业务函数：处理 _status 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _status 对应的业务流程、校验或数据转换。
+
+    入参：metrics、score、recommendations 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     codes = {item["code"] for item in recommendations}
     if metrics["low_sample"] or "HIGH_FAILURE_RATE" in codes or "HIGH_REPAINT_RATE" in codes or score < 70:
         return "cautious"
@@ -93,7 +109,11 @@ def _status(metrics: dict[str, Any], score: int, recommendations: list[dict[str,
 
 
 def strategy_recommendation_payload(db: Session, strategy_id: str) -> dict[str, Any]:
-    """业务函数：处理 strategy_recommendation_payload 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 strategy_recommendation_payload 对应的业务流程、校验或数据转换。
+
+    入参：db、strategy_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     strategy = db.query(ImageProductionStrategy).filter(ImageProductionStrategy.id == strategy_id).first()
     if strategy is None:
         raise image_error(
@@ -127,7 +147,11 @@ def strategy_recommendation_payload(db: Session, strategy_id: str) -> dict[str, 
 
 
 def _ab_attempt_rows(db: Session, group_id: str) -> list[ImageProductionAbAttempt]:
-    """业务函数：处理 _ab_attempt_rows 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _ab_attempt_rows 对应的业务流程、校验或数据转换。
+
+    入参：db、group_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return (
         db.query(ImageProductionAbAttempt)
         .filter_by(group_id=group_id)
@@ -137,7 +161,11 @@ def _ab_attempt_rows(db: Session, group_id: str) -> list[ImageProductionAbAttemp
 
 
 def _approved_asset_ids(db: Session, attempt: ImageProductionAbAttempt) -> list[str]:
-    """业务函数：处理 _approved_asset_ids 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _approved_asset_ids 对应的业务流程、校验或数据转换。
+
+    入参：db、attempt 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if not attempt.task_id:
         return []
     rows = (
@@ -151,7 +179,11 @@ def _approved_asset_ids(db: Session, attempt: ImageProductionAbAttempt) -> list[
 
 
 def _metric_number(metrics: dict[str, Any], *keys: str) -> float | None:
-    """业务函数：处理 _metric_number 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _metric_number 对应的业务流程、校验或数据转换。
+
+    入参：metrics、keys 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     for key in keys:
         value = metrics.get(key)
         if value is None and isinstance(metrics.get("metrics"), dict):
@@ -166,7 +198,11 @@ def _metric_number(metrics: dict[str, Any], *keys: str) -> float | None:
 
 
 def _estimated_cost_amount(metrics: dict[str, Any]) -> float | None:
-    """业务函数：处理 _estimated_cost_amount 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _estimated_cost_amount 对应的业务流程、校验或数据转换。
+
+    入参：metrics 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     estimated_cost = metrics.get("estimated_cost")
     if isinstance(estimated_cost, dict):
         try:
@@ -177,7 +213,11 @@ def _estimated_cost_amount(metrics: dict[str, Any]) -> float | None:
 
 
 def _ab_attempt_score(db: Session, attempt: ImageProductionAbAttempt) -> dict[str, Any]:
-    """业务函数：处理 _ab_attempt_score 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _ab_attempt_score 对应的业务流程、校验或数据转换。
+
+    入参：db、attempt 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     metrics = attempt.metrics_snapshot_json or {}
     if not isinstance(metrics, dict):
         metrics = {}
@@ -233,7 +273,11 @@ def _ab_recommendation_payload(
     recommended_attempt_id: str | None = None,
     recommended_asset_ids: list[str] | None = None,
 ) -> dict[str, Any]:
-    """业务函数：处理 _ab_recommendation_payload 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _ab_recommendation_payload 对应的业务流程、校验或数据转换。
+
+    入参：group、eligible、code、attempt_scores、recommended_attempt_id、recommended_asset_ids 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return {
         "group_id": group.id,
         "eligible": eligible,
@@ -246,7 +290,11 @@ def _ab_recommendation_payload(
 
 
 def ab_winner_recommendation_payload(db: Session, group_id: str, user_id: str | None = None) -> dict[str, Any]:
-    """业务函数：处理 ab_winner_recommendation_payload 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 ab_winner_recommendation_payload 对应的业务流程、校验或数据转换。
+
+    入参：db、group_id、user_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     group = db.query(ImageProductionAbGroup).filter_by(id=group_id).first()
     if not group or group.user_id != user_id:
         raise image_error(

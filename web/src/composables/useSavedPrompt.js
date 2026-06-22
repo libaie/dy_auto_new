@@ -9,6 +9,8 @@ const STORE_PREFIX = 'ai_prompt_'
  * @param {string} defaultValue - 默认值
  * @returns {import('vue').Ref<string>}
  */
+// 入参：key、defaultValue 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 useSavedPrompt 对应业务流程的处理结果。
 export function useSavedPrompt(key, defaultValue) {
   const storageKey = STORE_PREFIX + key
   let saved = defaultValue

@@ -7,7 +7,11 @@ from app.data.model_schema_data import get_schema, SCENES, PROVIDERS, PROTOCOLS,
 
 
 def get_scene_by_key(scene_key: str) -> dict | None:
-    """业务函数：处理 get_scene_by_key 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 get_scene_by_key 对应的业务流程、校验或数据转换。
+
+    入参：scene_key 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Return the scene definition for a scene_key, or None if unknown."""
     for scene in SCENES:
         if scene["key"] == scene_key:
@@ -16,14 +20,22 @@ def get_scene_by_key(scene_key: str) -> dict | None:
 
 
 def get_providers_for_scene(scene_key: str) -> list[str]:
-    """业务函数：处理 get_providers_for_scene 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 get_providers_for_scene 对应的业务流程、校验或数据转换。
+
+    入参：scene_key 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Providers available for a given scene."""
     scene = get_scene_by_key(scene_key)
     return scene["providers"] if scene else []
 
 
 def get_provider_preset(provider: str) -> dict:
-    """业务函数：处理 get_provider_preset 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 get_provider_preset 对应的业务流程、校验或数据转换。
+
+    入参：provider 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Return provider metadata (label, default_base_url, protocol, test_strategy)."""
     return PROVIDERS.get(provider, {
         "label": provider,
@@ -35,6 +47,10 @@ def get_provider_preset(provider: str) -> dict:
 
 
 def get_schema_payload() -> dict:
-    """业务函数：处理 get_schema_payload 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 get_schema_payload 对应的业务流程、校验或数据转换。
+
+    入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Full schema for the frontend GET /api/ai-models/schema endpoint."""
     return get_schema()

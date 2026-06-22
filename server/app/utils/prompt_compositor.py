@@ -18,9 +18,16 @@ DEFAULT_SEED_SCHEMA = {"seed": {"type": "number"}}
 
 
 class AssetPromptCompositor:
-    """业务类：承载 AssetPromptCompositor 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 AssetPromptCompositor 相关的数据结构、状态或业务协作。
+
+    类参数：db 承载该类的业务配置、状态或数据字段。
+    """
     def __init__(self, db: Session):
-        """初始化业务对象依赖，保存后续流程需要的运行上下文。"""
+        """初始化业务对象依赖，保存后续流程需要的运行上下文。
+
+        入参：db 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         self.db = db
         self.anchor_manager = AssetAnchorManager(db)
 
@@ -33,7 +40,11 @@ class AssetPromptCompositor:
         video_model_name: str | None = None,
         input_image_url: str | None = None,
     ) -> ComposedShotPrompt:
-        """业务函数：处理 compose_shot_prompt 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 compose_shot_prompt 对应的业务流程、校验或数据转换。
+
+        入参：shot_id、provider、provider_options_schema、video_model_name、input_image_url 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         if _requires_input_image_url(video_model_name) and not str(input_image_url or "").strip():
             raise ValueError("input_image_url is required for Wan 2.7 image-to-video generation")
 
@@ -74,7 +85,11 @@ class AssetPromptCompositor:
         )
 
     def _shot(self, shot_id: str) -> ProductionShot:
-        """业务函数：处理 _shot 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 _shot 对应的业务流程、校验或数据转换。
+
+        入参：shot_id 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         shot = self.db.query(ProductionShot).filter(ProductionShot.id == shot_id).first()
         if not shot:
             shot = self.db.query(ProductionShot).filter(ProductionShot.shot_id == shot_id).first()
@@ -84,7 +99,11 @@ class AssetPromptCompositor:
 
 
 def _shot_character_ids(shot: ProductionShot) -> list[str]:
-    """业务函数：处理 _shot_character_ids 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _shot_character_ids 对应的业务流程、校验或数据转换。
+
+    入参：shot 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     value = shot.character_ids or []
     if not isinstance(value, list):
         return []
@@ -92,7 +111,11 @@ def _shot_character_ids(shot: ProductionShot) -> list[str]:
 
 
 def _action_and_emotion_description(shot: ProductionShot) -> str:
-    """业务函数：处理 _action_and_emotion_description 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _action_and_emotion_description 对应的业务流程、校验或数据转换。
+
+    入参：shot 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     action = str(shot.action or "").strip()
     emotion = str(shot.emotion or "").strip()
     if action and emotion:
@@ -101,6 +124,10 @@ def _action_and_emotion_description(shot: ProductionShot) -> str:
 
 
 def _requires_input_image_url(video_model_name: str | None) -> bool:
-    """业务函数：处理 _requires_input_image_url 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _requires_input_image_url 对应的业务流程、校验或数据转换。
+
+    入参：video_model_name 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     name = str(video_model_name or "").lower().replace(" ", "")
     return "wan" in name and ("2.7" in name or "wan2.7" in name)

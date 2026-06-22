@@ -103,6 +103,8 @@ onBeforeUnmount(() => {
 })
 
 // 前端业务函数：协调 addEscapeListener 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 addEscapeListener 对应业务流程的处理结果。
 function addEscapeListener() {
   if (escapeListenerActive || typeof document === 'undefined') return
   document.addEventListener('keydown', handleEscapeKeydown)
@@ -110,6 +112,8 @@ function addEscapeListener() {
 }
 
 // 前端业务函数：协调 removeEscapeListener 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 removeEscapeListener 对应业务流程的处理结果。
 function removeEscapeListener() {
   if (!escapeListenerActive || typeof document === 'undefined') return
   document.removeEventListener('keydown', handleEscapeKeydown)
@@ -117,6 +121,8 @@ function removeEscapeListener() {
 }
 
 // 前端业务函数：协调 handleEscapeKeydown 对应的页面流程、接口调用或状态转换。
+// 入参：event 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleEscapeKeydown 对应业务流程的处理结果。
 function handleEscapeKeydown(event) {
   if (event.key === 'Escape' && props.expertId) {
     emit('close')
@@ -124,16 +130,22 @@ function handleEscapeKeydown(event) {
 }
 
 // 前端业务函数：协调 isCurrentRequest 对应的页面流程、接口调用或状态转换。
+// 入参：requestId、requestedId 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 isCurrentRequest 对应业务流程的处理结果。
 function isCurrentRequest(requestId, requestedId) {
   return requestId === requestSequence && props.expertId === requestedId
 }
 
 // 前端业务函数：协调 expertName 对应的页面流程、接口调用或状态转换。
+// 入参：id、fallback 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 expertName 对应业务流程的处理结果。
 function expertName(id, fallback = '') {
   return knownExpertName(id, fallback)
 }
 
 // 前端业务函数：协调 metadataText 对应的页面流程、接口调用或状态转换。
+// 入参：value、fallback 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 metadataText 对应业务流程的处理结果。
 function metadataText(value, fallback) {
   return value ? fallback : '-'
 }

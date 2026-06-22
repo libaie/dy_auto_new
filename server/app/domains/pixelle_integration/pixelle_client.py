@@ -23,7 +23,11 @@ _base_url: str = ""
 
 
 def _normalize_base_url(value: str | None) -> str:
-    """业务函数：处理 _normalize_base_url 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _normalize_base_url 对应的业务流程、校验或数据转换。
+
+    入参：value 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     clean = (value or DEFAULT_BASE_URL).strip().rstrip("/")
     if clean.endswith("/api"):
         clean = clean[:-4]
@@ -31,7 +35,11 @@ def _normalize_base_url(value: str | None) -> str:
 
 
 def _get_base_url(db: Session | None = None) -> str:
-    """业务函数：处理 _get_base_url 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _get_base_url 对应的业务流程、校验或数据转换。
+
+    入参：db 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     global _base_url
     if _base_url:
         return _normalize_base_url(_base_url)
@@ -49,7 +57,11 @@ def _get_base_url(db: Session | None = None) -> str:
 
 
 def _get_api_key(db: Session | None = None) -> str:
-    """业务函数：处理 _get_api_key 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _get_api_key 对应的业务流程、校验或数据转换。
+
+    入参：db 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if db is not None:
         try:
             from app.db.models import SystemSetting
@@ -63,7 +75,11 @@ def _get_api_key(db: Session | None = None) -> str:
 
 
 def _get_client() -> httpx.AsyncClient:
-    """业务函数：处理 _get_client 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _get_client 对应的业务流程、校验或数据转换。
+
+    入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     global _client, _client_loop
     try:
         loop = asyncio.get_running_loop()
@@ -77,7 +93,11 @@ def _get_client() -> httpx.AsyncClient:
 
 
 async def close_client():
-    """业务函数：处理 close_client 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 close_client 对应的业务流程、校验或数据转换。
+
+    入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Close the module-level httpx client. Call during app shutdown."""
     global _client, _client_loop
     if _client and not _client.is_closed:
@@ -93,7 +113,11 @@ async def _pixelle_request_direct(
     api_key: str = "",
     request_kwargs: dict | None = None,
 ) -> dict:
-    """统一的 Pixelle-Video HTTP 请求入口，带指数退避重试."""
+    """业务函数：处理 _pixelle_request_direct 对应的业务流程、校验或数据转换。
+
+    入参：method、base_url、path、api_key、request_kwargs 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     url = f"{_normalize_base_url(base_url)}{path}"
     client = _get_client()
     last_err = None
@@ -137,13 +161,21 @@ async def pixelle_provider_request(
     api_key: str = "",
     request_kwargs: dict | None = None,
 ) -> dict:
-    """业务函数：处理 pixelle_provider_request 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 pixelle_provider_request 对应的业务流程、校验或数据转换。
+
+    入参：method、base_url、path、api_key、request_kwargs 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Execute one Pixelle provider HTTP request with retry and API-key handling."""
     return await _pixelle_request_direct(method, base_url, path, api_key, request_kwargs)
 
 
 async def _pixelle_request(method: str, path: str, db: Session | None = None, **kwargs) -> dict:
-    """业务函数：处理 _pixelle_request 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _pixelle_request 对应的业务流程、校验或数据转换。
+
+    入参：method、path、db、kwargs 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return await pixelle_provider_request.ainvoke({
         "method": method,
         "base_url": _get_base_url(db),

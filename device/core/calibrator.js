@@ -19,6 +19,8 @@ var logger = require("../utils/logger");
 
 var TAG = "标定";
 
+// 入参：dir 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 ensureDirPath 对应业务流程的处理结果。
 function ensureDirPath(dir) {
   if (!dir) return false;
   try {
@@ -40,6 +42,8 @@ var calibrator = {
    *   - unattended: boolean (内部) — 自动触发时跳过 toast 导航提示
    * @returns {{ captured: number, uploaded: number, errors: string[] }}
    */
+  // 入参：options 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 run 对应业务流程的处理结果。
   run: function (options) {
     options = options || {};
     var resolution = device.width + "x" + device.height;
@@ -123,6 +127,8 @@ var calibrator = {
    * 验证当前页面指纹匹配目标页面
    * 通过 uiOperator.detectPage() 返回的 page_detect 名称模糊匹配
    */
+  // 入参：detectKey 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _verifyPage 对应业务流程的处理结果。
   _verifyPage: function (detectKey) {
     try {
       var detected = uiOperator.detectPage();
@@ -137,6 +143,8 @@ var calibrator = {
   /**
    * 收集所有包含 coordinate 策略的 action
    */
+  // 入参：pageKey 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _collectCoordinateActions 对应业务流程的处理结果。
   _collectCoordinateActions: function (pageKey) {
     var targets = [];
     var cache = selectorLoader._cache;
@@ -187,6 +195,8 @@ var calibrator = {
    * 截图并裁剪模板区域
    * @returns {{ action_name, filename, data: bytes } | null}
    */
+  // 入参：actionName、xPercent、yPercent、resolution 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _captureTemplate 对应业务流程的处理结果。
   _captureTemplate: function (actionName, xPercent, yPercent, resolution) {
     var screen = images.captureScreen();
     if (!screen) {

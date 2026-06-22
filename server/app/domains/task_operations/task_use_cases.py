@@ -28,30 +28,46 @@ logger = logging.getLogger(__name__)
 
 
 class TaskValidationError(ValueError):
-    """业务类：承载 TaskValidationError 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 TaskValidationError 相关的数据结构、状态或业务协作。
+
+    类参数：无显式类参数 承载该类的业务配置、状态或数据字段。
+    """
     """A request is syntactically valid but cannot be processed."""
 
 
 class TaskParamsError(ValueError):
-    """业务类：承载 TaskParamsError 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 TaskParamsError 相关的数据结构、状态或业务协作。
+
+    类参数：无显式类参数 承载该类的业务配置、状态或数据字段。
+    """
     """Task params failed model validation."""
 
 
 class TaskNotFoundError(LookupError):
-    """业务类：承载 TaskNotFoundError 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 TaskNotFoundError 相关的数据结构、状态或业务协作。
+
+    类参数：无显式类参数 承载该类的业务配置、状态或数据字段。
+    """
     """Requested task does not exist."""
 
 
 @dataclass(frozen=True)
 class BatchCreateOutcome:
-    """业务类：承载 BatchCreateOutcome 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 BatchCreateOutcome 相关的数据结构、状态或业务协作。
+
+    类参数：notify_admins、notify_devices、payload 承载该类的业务配置、状态或数据字段。
+    """
     payload: dict
     notify_devices: bool
     notify_admins: bool
 
 
 async def create_task(db, request, user):
-    """业务函数：处理 create_task 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 create_task 对应的业务流程、校验或数据转换。
+
+    入参：db、request、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if not request.account_id:
         raise TaskValidationError("account_id is required for single create")
 
@@ -72,7 +88,11 @@ async def create_task(db, request, user):
 
 
 async def batch_create_tasks(db, request, user) -> BatchCreateOutcome:
-    """业务函数：处理 batch_create_tasks 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 batch_create_tasks 对应的业务流程、校验或数据转换。
+
+    入参：db、request、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if not request.group_ids and not request.account_ids:
         raise TaskValidationError("需要提供 group_ids 或 account_ids")
 
@@ -113,7 +133,11 @@ async def batch_create_tasks(db, request, user) -> BatchCreateOutcome:
 
 
 def list_tasks(db, status, task_type, search, sort_by, sort_order, skip, limit, user) -> dict:
-    """业务函数：处理 list_tasks 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 list_tasks 对应的业务流程、校验或数据转换。
+
+    入参：db、status、task_type、search、sort_by、sort_order、skip、limit、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     limit = min(limit, 100)
     user_id, role = user
     current_user_id = None if role == "admin" else user_id
@@ -139,12 +163,20 @@ def list_tasks(db, status, task_type, search, sort_by, sort_order, skip, limit, 
 
 
 def batch_delete_tasks(db, task_ids: list[str]) -> dict:
-    """业务函数：处理 batch_delete_tasks 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 batch_delete_tasks 对应的业务流程、校验或数据转换。
+
+    入参：db、task_ids 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return batch_delete_response(task_service.delete_tasks_batch(db, task_ids))
 
 
 def get_task(db, task_id: str):
-    """业务函数：处理 get_task 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 get_task 对应的业务流程、校验或数据转换。
+
+    入参：db、task_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     task = task_service.get_task(db=db, task_id=task_id)
     if not task:
         raise TaskNotFoundError("Task not found")
@@ -152,7 +184,11 @@ def get_task(db, task_id: str):
 
 
 def cancel_task(db, task_id: str):
-    """业务函数：处理 cancel_task 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 cancel_task 对应的业务流程、校验或数据转换。
+
+    入参：db、task_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     try:
         return task_service.cancel_task(db=db, task_id=task_id)
     except ValueError as e:
@@ -162,7 +198,11 @@ def cancel_task(db, task_id: str):
 
 
 def delete_task(db, task_id: str) -> dict:
-    """业务函数：处理 delete_task 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 delete_task 对应的业务流程、校验或数据转换。
+
+    入参：db、task_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     try:
         task_service.delete_task(db=db, task_id=task_id)
     except ValueError as e:
@@ -173,7 +213,11 @@ def delete_task(db, task_id: str) -> dict:
 
 
 async def _resolve_params_for_request(db, task_type: str, params: dict) -> dict:
-    """业务函数：处理 _resolve_params_for_request 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _resolve_params_for_request 对应的业务流程、校验或数据转换。
+
+    入参：db、task_type、params 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     try:
         resolved = validate_and_normalize_params(task_type, params)
     except Exception as e:
@@ -186,13 +230,21 @@ async def _resolve_params_for_request(db, task_type: str, params: dict) -> dict:
 
 
 def _keywords_from_params(params: dict) -> list[str]:
-    """业务函数：处理 _keywords_from_params 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _keywords_from_params 对应的业务流程、校验或数据转换。
+
+    入参：params 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     raw_keywords = params.get("keywords", []) or ([params.get("keyword")] if params.get("keyword") else [])
     return [k.strip() for k in raw_keywords if k and k.strip()]
 
 
 def _assert_groups_exist(db, group_ids: list[str]):
-    """业务函数：处理 _assert_groups_exist 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _assert_groups_exist 对应的业务流程、校验或数据转换。
+
+    入参：db、group_ids 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if not group_ids:
         return
 
@@ -208,7 +260,11 @@ def _assert_groups_exist(db, group_ids: list[str]):
 
 
 def _resolve_active_accounts(db, group_ids: list[str], account_ids: list[str]) -> list:
-    """业务函数：处理 _resolve_active_accounts 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _resolve_active_accounts 对应的业务流程、校验或数据转换。
+
+    入参：db、group_ids、account_ids 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     all_accounts = []
     seen_account_ids = set()
 
@@ -239,7 +295,11 @@ def _resolve_active_accounts(db, group_ids: list[str], account_ids: list[str]) -
 
 
 def _create_channel_tasks(db, request, user_id: str, ttype: str, params: dict, keywords: list[str], all_accounts: list) -> list[dict]:
-    """业务函数：处理 _create_channel_tasks 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _create_channel_tasks 对应的业务流程、校验或数据转换。
+
+    入参：db、request、user_id、ttype、params、keywords、all_accounts 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     channel_group_id = _resolve_channel_group_id(db, request, all_accounts)
     template_params = {k: v for k, v in params.items() if k not in ("keyword", "keywords")}
     channel = Channel(
@@ -278,7 +338,11 @@ def _create_channel_tasks(db, request, user_id: str, ttype: str, params: dict, k
 
 
 def _resolve_channel_group_id(db, request, all_accounts: list) -> str:
-    """业务函数：处理 _resolve_channel_group_id 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _resolve_channel_group_id 对应的业务流程、校验或数据转换。
+
+    入参：db、request、all_accounts 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     channel_group_id = request.group_ids[0] if request.group_ids else None
     if channel_group_id:
         return channel_group_id
@@ -310,7 +374,11 @@ def _resolve_channel_group_id(db, request, all_accounts: list) -> str:
 
 
 def _create_direct_tasks(db, request, user_id: str, ttype: str, params: dict, all_accounts: list) -> list[dict]:
-    """业务函数：处理 _create_direct_tasks 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _create_direct_tasks 对应的业务流程、校验或数据转换。
+
+    入参：db、request、user_id、ttype、params、all_accounts 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     created_tasks = []
     for acc in all_accounts:
         task = task_service.create_task(
@@ -326,7 +394,11 @@ def _create_direct_tasks(db, request, user_id: str, ttype: str, params: dict, al
 
 
 def _should_notify_devices_for_created_tasks(db, created_tasks: list[dict]) -> bool:
-    """业务函数：处理 _should_notify_devices_for_created_tasks 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _should_notify_devices_for_created_tasks 对应的业务流程、校验或数据转换。
+
+    入参：db、created_tasks 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if not created_tasks:
         return False
     if not any(task.get("id") for task in created_tasks):

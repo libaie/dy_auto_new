@@ -19,7 +19,11 @@ def enqueue_repair_tasks_for_invocation(
     invocation: AgencyExpertInvocation,
     policy_snapshot: dict | None,
 ) -> dict:
-    """业务函数：处理 enqueue_repair_tasks_for_invocation 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 enqueue_repair_tasks_for_invocation 对应的业务流程、校验或数据转换。
+
+    入参：db、invocation、policy_snapshot 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     output = invocation.output_summary_json or {}
     tasks = [RepairTask.model_validate(item) for item in output.get("repair_tasks") or [] if isinstance(item, dict)]
     policy = AutoRepairPolicy.model_validate(policy_snapshot or {})
@@ -62,7 +66,11 @@ def _can_auto_execute(
     repair_budget_used: float,
     repair_round: int,
 ) -> tuple[bool, str]:
-    """业务函数：处理 _can_auto_execute 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _can_auto_execute 对应的业务流程、校验或数据转换。
+
+    入参：db、invocation、task、policy、repair_budget_used、repair_round 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if not policy.enabled:
         return False, "自动返修策略未启用，需要人工确认"
     if not task.auto_execute:
@@ -83,7 +91,11 @@ def _can_auto_execute(
 
 
 def _provider_budget_available(db: Session, plan_id: str | None, estimated_cost: float) -> bool:
-    """业务函数：处理 _provider_budget_available 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _provider_budget_available 对应的业务流程、校验或数据转换。
+
+    入参：db、plan_id、estimated_cost 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if not plan_id:
         return False
     plan = db.query(ProductionPlan).filter(ProductionPlan.id == plan_id).first()
@@ -93,7 +105,11 @@ def _provider_budget_available(db: Session, plan_id: str | None, estimated_cost:
 
 
 def _repair_budget_used(db: Session, plan_id: str | None, run_id: str | None) -> float:
-    """业务函数：处理 _repair_budget_used 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _repair_budget_used 对应的业务流程、校验或数据转换。
+
+    入参：db、plan_id、run_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if not plan_id:
         return 0.0
     query = (
@@ -112,13 +128,21 @@ def _repair_budget_used(db: Session, plan_id: str | None, run_id: str | None) ->
 
 
 def _stable_repair_scope(invocation: AgencyExpertInvocation, task: RepairTask) -> tuple[str | None, str, str, str, str]:
-    """业务函数：处理 _stable_repair_scope 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _stable_repair_scope 对应的业务流程、校验或数据转换。
+
+    入参：invocation、task 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     target = task.target_id or invocation.series_id or "missing-target"
     return (invocation.production_plan_id, task.stage, task.type, task.target_type, target)
 
 
 def _next_repair_round(db: Session, invocation: AgencyExpertInvocation, task: RepairTask) -> int:
-    """业务函数：处理 _next_repair_round 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _next_repair_round 对应的业务流程、校验或数据转换。
+
+    入参：db、invocation、task 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     scope = _stable_repair_scope(invocation, task)
     rows = (
         db.query(ProductionAuditEvent)
@@ -142,7 +166,11 @@ def _next_repair_round(db: Session, invocation: AgencyExpertInvocation, task: Re
 
 
 def _existing_open_repair_job(db: Session, invocation: AgencyExpertInvocation, task: RepairTask) -> ProductionJob | None:
-    """业务函数：处理 _existing_open_repair_job 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _existing_open_repair_job 对应的业务流程、校验或数据转换。
+
+    入参：db、invocation、task 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return (
         db.query(ProductionJob)
         .filter(ProductionJob.plan_id == invocation.production_plan_id)
@@ -160,7 +188,11 @@ def _enqueue_repair_job(
     task: RepairTask,
     repair_round: int,
 ) -> tuple[ProductionJob, bool]:
-    """业务函数：处理 _enqueue_repair_job 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _enqueue_repair_job 对应的业务流程、校验或数据转换。
+
+    入参：db、invocation、task、repair_round 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     existing = _existing_open_repair_job(db, invocation, task)
     if existing:
         return existing, False
@@ -204,7 +236,11 @@ def _record_manual_required(
     *,
     repair_round: int,
 ) -> None:
-    """业务函数：处理 _record_manual_required 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _record_manual_required 对应的业务流程、校验或数据转换。
+
+    入参：db、invocation、task、reason、repair_round 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     db.add(ProductionAuditEvent(
         event_type="agency_repair_manual_required",
         run_id=invocation.run_id,
@@ -224,6 +260,10 @@ def _record_manual_required(
 
 
 def _idempotency_key(invocation: AgencyExpertInvocation, task: RepairTask, repair_round: int) -> str:
-    """业务函数：处理 _idempotency_key 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _idempotency_key 对应的业务流程、校验或数据转换。
+
+    入参：invocation、task、repair_round 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     plan_id, stage, repair_type, target_type, target = _stable_repair_scope(invocation, task)
     return f"repair:{plan_id}:{stage}:{repair_type}:{target_type}:{target}:round:{repair_round}"

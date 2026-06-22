@@ -18,7 +18,10 @@ router = APIRouter(prefix="/api/selectors", tags=["selectors"])
 
 
 class SelectorCreateRequest(BaseModel):
-    """业务类：承载 SelectorCreateRequest 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 SelectorCreateRequest 相关的数据结构、状态或业务协作。
+
+    类参数：action_name、category、clean_mode、clean_pattern、clean_prompt、description、extract_field、platform_version、purpose、resolution_profile、strategies、strategy_logic 承载该类的业务配置、状态或数据字段。
+    """
     action_name: str
     strategies: list[dict]
     platform_version: str = "default"
@@ -34,7 +37,10 @@ class SelectorCreateRequest(BaseModel):
 
 
 class SelectorUpdateRequest(BaseModel):
-    """业务类：承载 SelectorUpdateRequest 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 SelectorUpdateRequest 相关的数据结构、状态或业务协作。
+
+    类参数：category、clean_mode、clean_pattern、clean_prompt、description、extract_field、platform_version、purpose、resolution_profile、strategies、strategy_logic 承载该类的业务配置、状态或数据字段。
+    """
     strategies: Optional[list[dict]] = None
     platform_version: Optional[str] = None
     resolution_profile: Optional[str] = None
@@ -50,7 +56,10 @@ class SelectorUpdateRequest(BaseModel):
 
 
 class SelectorToggleRequest(BaseModel):
-    """业务类：承载 SelectorToggleRequest 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 SelectorToggleRequest 相关的数据结构、状态或业务协作。
+
+    类参数：enabled 承载该类的业务配置、状态或数据字段。
+    """
     enabled: bool
 
 
@@ -61,7 +70,11 @@ def list_selectors(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 list_selectors 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 list_selectors 对应的业务流程、校验或数据转换。
+
+    入参：include_disabled、category、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     selectors = selector_service.list_all_selectors(db, include_disabled=include_disabled, category=category)
     version = selector_service.get_version(db)
     return {"selectors": selectors, "total": len(selectors), "version": version}
@@ -74,7 +87,11 @@ def list_templates(
     resolution: str = Query(None),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 list_templates 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 list_templates 对应的业务流程、校验或数据转换。
+
+    入参：resolution、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     templates = template_service.list_templates(resolution=resolution)
     return {"templates": templates, "total": len(templates)}
 
@@ -86,7 +103,11 @@ async def upload_template(
     resolution: str = Query("default"),
     user = Depends(require_role("admin")),
 ):
-    """业务函数：处理 upload_template 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 upload_template 对应的业务流程、校验或数据转换。
+
+    入参：file、action_name、resolution、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     import os
     ext = os.path.splitext(file.filename or "")[1].lower()
     if ext not in (".png", ".jpg", ".jpeg"):
@@ -108,7 +129,11 @@ def delete_template(
     resolution: str = Query("default"),
     user = Depends(require_role("admin")),
 ):
-    """业务函数：处理 delete_template 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 delete_template 对应的业务流程、校验或数据转换。
+
+    入参：filename、resolution、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     deleted = template_service.delete_template(filename, resolution=resolution)
     if not deleted:
         raise HTTPException(status_code=404, detail="模板文件不存在")
@@ -121,7 +146,11 @@ def get_selector(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 get_selector 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 get_selector 对应的业务流程、校验或数据转换。
+
+    入参：action_name、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     sel = selector_service.get_selector(db, action_name)
     if not sel:
         raise HTTPException(status_code=404, detail="Selector not found")
@@ -134,7 +163,11 @@ async def create_selector(
     db: Session = Depends(get_db),
     user = Depends(require_role("admin")),
 ):
-    """业务函数：处理 create_selector 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 create_selector 对应的业务流程、校验或数据转换。
+
+    入参：request、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     try:
         sel = selector_service.create_selector(
             db, action_name=request.action_name,
@@ -170,7 +203,11 @@ async def update_selector(
     db: Session = Depends(get_db),
     user = Depends(require_role("admin")),
 ):
-    """业务函数：处理 update_selector 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 update_selector 对应的业务流程、校验或数据转换。
+
+    入参：action_name、request、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     try:
         sel = selector_service.update_selector(
             db, action_name=action_name,
@@ -207,7 +244,11 @@ async def delete_selector(
     db: Session = Depends(get_db),
     user = Depends(require_role("admin")),
 ):
-    """业务函数：处理 delete_selector 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 delete_selector 对应的业务流程、校验或数据转换。
+
+    入参：action_name、platform_version、resolution_profile、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     deleted = selector_service.delete_selector(db, action_name,
         platform_version=platform_version, resolution_profile=resolution_profile)
     if not deleted:
@@ -232,7 +273,11 @@ async def toggle_selector(
     db: Session = Depends(get_db),
     user = Depends(require_role("admin")),
 ):
-    """业务函数：处理 toggle_selector 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 toggle_selector 对应的业务流程、校验或数据转换。
+
+    入参：action_name、request、platform_version、resolution_profile、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     try:
         sel = selector_service.toggle_selector(db, action_name, request.enabled,
             platform_version=platform_version, resolution_profile=resolution_profile)

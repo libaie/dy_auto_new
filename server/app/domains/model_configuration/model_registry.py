@@ -13,10 +13,17 @@ logger = logging.getLogger(__name__)
 
 
 class ModelResolutionError(Exception):
-    """业务类：承载 ModelResolutionError 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 ModelResolutionError 相关的数据结构、状态或业务协作。
+
+    类参数：repair_action、scene_key、status_code 承载该类的业务配置、状态或数据字段。
+    """
     """Raised when a model cannot be resolved for a scene."""
     def __init__(self, scene_key: str, repair_action: str, status_code: int = 400):
-        """初始化业务对象依赖，保存后续流程需要的运行上下文。"""
+        """初始化业务对象依赖，保存后续流程需要的运行上下文。
+
+        入参：scene_key、repair_action、status_code 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         self.scene_key = scene_key
         self.repair_action = repair_action
         self.status_code = status_code
@@ -24,7 +31,11 @@ class ModelResolutionError(Exception):
 
 
 def _get_scene_label(scene_key: str) -> str:
-    """业务函数：处理 _get_scene_label 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _get_scene_label 对应的业务流程、校验或数据转换。
+
+    入参：scene_key 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     for scene in SCENES:
         if scene["key"] == scene_key:
             return scene["label"]
@@ -36,7 +47,11 @@ def get_model_for_scene(
     scene_key: str,
     explicit_model_id: str | None = None,
 ) -> dict:
-    """业务函数：处理 get_model_for_scene 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 get_model_for_scene 对应的业务流程、校验或数据转换。
+
+    入参：db、scene_key、explicit_model_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """
     Resolve a runtime model configuration for a scene.
 

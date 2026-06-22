@@ -384,11 +384,15 @@ const selectedCharacterReferenceUrls = computed(() => uniqueSafeUrls(selected.va
 const selectedStyleReferenceUrls = computed(() => uniqueSafeUrls(selected.value?.reference_evidence?.style_reference_urls || []))
 
 // 前端业务函数：协调 uniqueSafeUrls 对应的页面流程、接口调用或状态转换。
+// 入参：values 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 uniqueSafeUrls 对应业务流程的处理结果。
 function uniqueSafeUrls(values) {
   return [...new Set(values.map(safeReferenceUrl).filter(Boolean))]
 }
 
 // 前端业务函数：协调 safeReferenceUrl 对应的页面流程、接口调用或状态转换。
+// 入参：value 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 safeReferenceUrl 对应业务流程的处理结果。
 function safeReferenceUrl(value) {
   if (typeof value !== 'string') return ''
   const trimmed = value.trim()
@@ -403,12 +407,16 @@ function safeReferenceUrl(value) {
 }
 
 // 前端业务函数：协调 readableError 对应的页面流程、接口调用或状态转换。
+// 入参：e、fallback 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 readableError 对应业务流程的处理结果。
 function readableError(e, fallback) {
   const detail = e.response?.data?.detail
   return detail?.message || detail || e.message || fallback
 }
 
 // 前端业务函数：协调 staleAssetId 对应的页面流程、接口调用或状态转换。
+// 入参：e 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 staleAssetId 对应业务流程的处理结果。
 function staleAssetId(e) {
   const detail = e.response?.data?.detail
   const code = detail?.code || e.response?.data?.code || ''
@@ -422,6 +430,8 @@ function staleAssetId(e) {
 }
 
 // 前端业务函数：协调 refreshAfterStaleVersion 对应的页面流程、接口调用或状态转换。
+// 入参：e 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 refreshAfterStaleVersion 对应业务流程的处理结果。
 async function refreshAfterStaleVersion(e) {
   const preferredId = staleAssetId(e)
   if (!preferredId && !isStaleVersionError(e)) return false
@@ -430,6 +440,8 @@ async function refreshAfterStaleVersion(e) {
   return true
 }
 
+// 入参：e 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 isStaleVersionError 对应业务流程的处理结果。
 function isStaleVersionError(e) {
   const detail = e.response?.data?.detail
   const code = detail?.code || e.response?.data?.code || ''
@@ -441,6 +453,8 @@ function isStaleVersionError(e) {
 }
 
 // 前端业务函数：协调 cannotApprove 对应的页面流程、接口调用或状态转换。
+// 入参：asset 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 cannotApprove 对应业务流程的处理结果。
 function cannotApprove(asset) {
   if (!asset) return true
   return (
@@ -453,6 +467,8 @@ function cannotApprove(asset) {
 }
 
 // 前端业务函数：协调 approvalDisabledReason 对应的页面流程、接口调用或状态转换。
+// 入参：asset 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 approvalDisabledReason 对应业务流程的处理结果。
 function approvalDisabledReason(asset) {
   if (!asset) return ''
   if (asset.copy_status !== 'persisted' || !asset.checksum || !asset.storage_path) return '资产尚未持久化'
@@ -463,15 +479,21 @@ function approvalDisabledReason(asset) {
   return ''
 }
 
+// 入参：asset 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 isStorageFailed 对应业务流程的处理结果。
 function isStorageFailed(asset) {
   return asset?.copy_status === 'storage_failed' || asset?.status === 'storage_failed'
 }
 
 // 前端业务函数：协调 storageFailureMessage 对应的页面流程、接口调用或状态转换。
+// 入参：asset 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 storageFailureMessage 对应业务流程的处理结果。
 function storageFailureMessage(asset) {
   return asset?.storage_error_json?.message || asset?.storage_error_json?.cause || '资产持久化失败'
 }
 
+// 入参：preferredAssetId 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 load 对应业务流程的处理结果。
 async function load(preferredAssetId = '') {
   loading.value = true
   error.value = ''
@@ -500,6 +522,8 @@ async function load(preferredAssetId = '') {
 }
 
 // 前端业务函数：协调 loadRepairTasks 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 loadRepairTasks 对应业务流程的处理结果。
 async function loadRepairTasks() {
   if (!runId.value) return
   repairLoading.value = true
@@ -518,11 +542,15 @@ async function loadRepairTasks() {
 }
 
 // 前端业务函数：协调 openRepairAction 对应的页面流程、接口调用或状态转换。
+// 入参：task 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 openRepairAction 对应业务流程的处理结果。
 function openRepairAction(task) {
   if (task?.repair_route) window.location.href = task.repair_route
 }
 
 // 前端业务函数：协调 retryRepairTask 对应的页面流程、接口调用或状态转换。
+// 入参：task、authorizationPayload 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 retryRepairTask 对应业务流程的处理结果。
 async function retryRepairTask(task, authorizationPayload = null) {
   if (!task?.id || repairBusyId.value) return
   repairBusyId.value = task.id
@@ -546,18 +574,24 @@ async function retryRepairTask(task, authorizationPayload = null) {
 }
 
 // 前端业务函数：协调 openImageEdit 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 openImageEdit 对应业务流程的处理结果。
 function openImageEdit() {
   imageEditOpen.value = true
   imageEditError.value = ''
 }
 
 // 前端业务函数：协调 closeImageEdit 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 closeImageEdit 对应业务流程的处理结果。
 function closeImageEdit() {
   imageEditOpen.value = false
   imageEditError.value = ''
 }
 
 // 前端业务函数：协调 submitImageEdit 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 submitImageEdit 对应业务流程的处理结果。
 async function submitImageEdit() {
   if (!selected.value) return
   const instruction = imageEditInstruction.value.trim()
@@ -589,6 +623,8 @@ async function submitImageEdit() {
 }
 
 // 前端业务函数：协调 voidCurrentAsset 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 voidCurrentAsset 对应业务流程的处理结果。
 async function voidCurrentAsset() {
   if (!selected.value) return
   const comment = prompt('作废原因（可选）：')
@@ -612,6 +648,8 @@ async function voidCurrentAsset() {
 }
 
 // 前端业务函数：协调 selectGate 对应的页面流程、接口调用或状态转换。
+// 入参：assetType 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 selectGate 对应业务流程的处理结果。
 async function selectGate(assetType) {
   activeGate.value = assetType
   selectedIds.value = []
@@ -625,6 +663,8 @@ async function selectGate(assetType) {
 }
 
 // 前端业务函数：协调 approve 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 approve 对应业务流程的处理结果。
 async function approve() {
   if (!selected.value) return
   if (cannotApprove(selected.value)) return
@@ -640,6 +680,8 @@ async function approve() {
 }
 
 // 前端业务函数：协调 retryPersist 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 retryPersist 对应业务流程的处理结果。
 async function retryPersist() {
   if (!selected.value || !isStorageFailed(selected.value)) return
   acting.value = true
@@ -654,6 +696,8 @@ async function retryPersist() {
 }
 
 // 前端业务函数：协调 bulkApprove 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 bulkApprove 对应业务流程的处理结果。
 async function bulkApprove() {
   if (!bulkApprovableSelectedIds.value.length) return
   acting.value = true
@@ -676,6 +720,8 @@ async function bulkApprove() {
 }
 
 // 前端业务函数：协调 reject 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 reject 对应业务流程的处理结果。
 async function reject() {
   if (!selected.value) return
   const reason = prompt('驳回原因（可选）：')
@@ -692,6 +738,8 @@ async function reject() {
 }
 
 // 前端业务函数：协调 loadRunStatus 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 loadRunStatus 对应业务流程的处理结果。
 async function loadRunStatus() {
   if (!runId.value) return
   try {
@@ -704,6 +752,8 @@ async function loadRunStatus() {
 }
 
 // 前端业务函数：协调 doSync 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 doSync 对应业务流程的处理结果。
 async function doSync() {
   if (!runId.value) return
   syncing.value = true
@@ -724,6 +774,8 @@ async function doSync() {
 }
 
 // 前端业务函数：协调 regenerate 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 regenerate 对应业务流程的处理结果。
 async function regenerate() {
   if (!selected.value) return
   acting.value = true
@@ -745,6 +797,8 @@ async function regenerate() {
 }
 
 // 前端业务函数：协调 syncRegen 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 syncRegen 对应业务流程的处理结果。
 async function syncRegen() {
   if (!selected.value) return
   acting.value = true

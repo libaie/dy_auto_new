@@ -25,12 +25,16 @@ const toast = useToastStore()
 
 // --- WebSocket ---
 // 前端业务函数：协调 wsUrl 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 wsUrl 对应业务流程的处理结果。
 function wsUrl() {
   const token = localStorage.getItem('token') || ''
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
   return `${protocol}//${location.host}/api/devices/ws/pair-events?token=${encodeURIComponent(token)}`
 }
 useWebSocket(wsUrl, {
+  // 入参：msg 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 onMessage 对应业务流程的处理结果。
   onMessage(msg) {
     if (msg.event === 'content_changed') { fetchTemplates(); fetchWords() }
   },
@@ -74,6 +78,8 @@ const categoryColors = {
 
 // --- Fetch templates ---
 // 前端业务函数：协调 fetchTemplates 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 fetchTemplates 对应业务流程的处理结果。
 async function fetchTemplates() {
   loading.value = true
   try {
@@ -90,6 +96,8 @@ async function fetchTemplates() {
 
 // --- Template CRUD ---
 // 前端业务函数：协调 openCreateDialog 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 openCreateDialog 对应业务流程的处理结果。
 function openCreateDialog() {
   isEditing.value = false
   editingId.value = null
@@ -99,6 +107,8 @@ function openCreateDialog() {
 }
 
 // 前端业务函数：协调 openEditDialog 对应的页面流程、接口调用或状态转换。
+// 入参：tpl 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 openEditDialog 对应业务流程的处理结果。
 function openEditDialog(tpl) {
   isEditing.value = true
   editingId.value = tpl.id
@@ -111,6 +121,8 @@ function openEditDialog(tpl) {
 }
 
 // 前端业务函数：协调 handleSave 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleSave 对应业务流程的处理结果。
 async function handleSave() {
   if (!form.name.trim()) { formError.value = '名称不能为空'; return }
   if (!form.body.trim()) { formError.value = '模板内容不能为空'; return }
@@ -142,12 +154,16 @@ async function handleSave() {
 }
 
 // 前端业务函数：协调 openDeleteDialog 对应的页面流程、接口调用或状态转换。
+// 入参：tpl 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 openDeleteDialog 对应业务流程的处理结果。
 function openDeleteDialog(tpl) {
   deletingTemplate.value = tpl
   showDeleteDialog.value = true
 }
 
 // 前端业务函数：协调 handleDelete 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleDelete 对应业务流程的处理结果。
 async function handleDelete() {
   if (!deletingTemplate.value) return
   deleting.value = true
@@ -165,6 +181,8 @@ async function handleDelete() {
 
 // --- Sensitive words ---
 // 前端业务函数：协调 fetchWords 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 fetchWords 对应业务流程的处理结果。
 async function fetchWords() {
   wordsLoading.value = true
   try {
@@ -178,6 +196,8 @@ async function fetchWords() {
 }
 
 // 前端业务函数：协调 handleAddWord 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleAddWord 对应业务流程的处理结果。
 async function handleAddWord() {
   const w = newWord.value.trim()
   if (!w) return
@@ -194,6 +214,8 @@ async function handleAddWord() {
 }
 
 // 前端业务函数：协调 handleDeleteWord 对应的页面流程、接口调用或状态转换。
+// 入参：word 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleDeleteWord 对应业务流程的处理结果。
 async function handleDeleteWord(word) {
   try {
     await deleteSensitiveWord(word.id)
@@ -204,6 +226,8 @@ async function handleDeleteWord(word) {
 }
 
 // --- AI Generate ---
+// 入参：tpl 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 openGenerateDialog 对应业务流程的处理结果。
 function openGenerateDialog(tpl) {
   generatingTemplate.value = tpl
   generateForm.keyword = ''
@@ -215,6 +239,8 @@ function openGenerateDialog(tpl) {
 }
 
 // 前端业务函数：协调 handleGenerate 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleGenerate 对应业务流程的处理结果。
 async function handleGenerate() {
   generating.value = true
   generateError.value = null
@@ -234,6 +260,8 @@ async function handleGenerate() {
 }
 
 // 前端业务函数：协调 copyResult 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 copyResult 对应业务流程的处理结果。
 function copyResult() {
   if (generateResult.value) {
     navigator.clipboard.writeText(generateResult.value)

@@ -10,11 +10,15 @@ var crashRecovery = {
   /**
    * 设置当前执行的账号 ID（由 task-executor 调用）
    */
+  // 入参：accountId 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 setAccountId 对应业务流程的处理结果。
   setAccountId: function (accountId) {
     this._currentAccountId = accountId;
   },
 
   // 设备业务函数：处理 ensureAppRunning 对应的抖音自动化动作、状态或安全边界。
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 ensureAppRunning 对应业务流程的处理结果。
   ensureAppRunning: function () {
     if (currentPackage() === "com.ss.android.ugc.aweme") {
       this._consecutiveFailures = 0;
@@ -56,6 +60,8 @@ var crashRecovery = {
   },
 
   // 设备业务函数：处理 handleDialogs 对应的抖音自动化动作、状态或安全边界。
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 handleDialogs 对应业务流程的处理结果。
   handleDialogs: function () {
     var dialogButtons = [
       "知道了", "确定", "关闭", "重试",
@@ -113,6 +119,8 @@ var crashRecovery = {
   },
 
   // 设备业务函数：处理 checkANR 对应的抖音自动化动作、状态或安全边界。
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 checkANR 对应业务流程的处理结果。
   checkANR: function () {
     try {
       var anrBtn = text("等待").findOne(2000);
@@ -127,6 +135,8 @@ var crashRecovery = {
   },
 
   // 设备业务函数：处理 healthCheck 对应的抖音自动化动作、状态或安全边界。
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 healthCheck 对应业务流程的处理结果。
   healthCheck: function () {
     if (this.checkANR()) {
       logger.warn(TAG, "ANR handled, waiting for recovery...");

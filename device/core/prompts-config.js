@@ -469,12 +469,16 @@ var promptsConfig = {
 
   _override: null,  // 服务端下发的模板内容，非 null 时优先级高于本地 industry 配置
 
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 get 对应业务流程的处理结果。
   get: function () {
     if (this._override) return this._override;
     return this.industries[this.industry] || this.industries["health"];
   },
 
   // 设备业务函数：处理 setOverride 对应的抖音自动化动作、状态或安全边界。
+  // 入参：templateContent 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 setOverride 对应业务流程的处理结果。
   setOverride: function (templateContent) {
     if (!templateContent) { this._override = null; return true; }
     // Validate required top-level fields
@@ -492,6 +496,8 @@ var promptsConfig = {
   },
 
   // 设备业务函数：处理 setIndustry 对应的抖音自动化动作、状态或安全边界。
+  // 入参：name 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 setIndustry 对应业务流程的处理结果。
   setIndustry: function (name) {
     if (this.industries[name]) {
       this.industry = name;

@@ -7,7 +7,11 @@ from app.domains.content_collection.content_service import content_service
 
 
 async def generate_from_template(db, request):
-    """业务函数：处理 generate_from_template 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 generate_from_template 对应的业务流程、校验或数据转换。
+
+    入参：db、request 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return await content_service.generate_from_template(
         db,
         request.template_id,
@@ -16,7 +20,11 @@ async def generate_from_template(db, request):
 
 
 async def generate_keywords(db, request):
-    """业务函数：处理 generate_keywords 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 generate_keywords 对应的业务流程、校验或数据转换。
+
+    入参：db、request 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return await content_service.generate_keyword_matrix(
         request.keyword,
         request.count,
@@ -25,10 +33,18 @@ async def generate_keywords(db, request):
 
 
 async def generate_regex(db, request):
-    """业务函数：处理 generate_regex 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 generate_regex 对应的业务流程、校验或数据转换。
+
+    入参：db、request 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return await content_service.generate_regex(db, request.description)
 
 
 async def generate_clean_prompt(db, request):
-    """业务函数：处理 generate_clean_prompt 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 generate_clean_prompt 对应的业务流程、校验或数据转换。
+
+    入参：db、request 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return await content_service.generate_clean_prompt(db, request.description)

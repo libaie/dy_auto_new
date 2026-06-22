@@ -10,6 +10,8 @@ var selectorResolver = {
   /**
    * 在父元素内按选择器策略查找子元素
    */
+  // 入参：parent、actionName 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 findChildBySelector 对应业务流程的处理结果。
   findChildBySelector: function (parent, actionName) {
     var selector = selectorLoader.get(actionName);
     if (!selector) return null;
@@ -22,6 +24,8 @@ var selectorResolver = {
   },
 
   // 设备业务函数：处理 findByStrategyInParent 对应的抖音自动化动作、状态或安全边界。
+  // 入参：parent、strategy 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 findByStrategyInParent 对应业务流程的处理结果。
   findByStrategyInParent: function (parent, strategy) {
     if (strategy.conditions && strategy.conditions.length > 0) {
       return selectorResolver.findByConditionsInParent(parent, strategy);
@@ -33,6 +37,8 @@ var selectorResolver = {
   },
 
   // 设备业务函数：处理 findByCondInParent 对应的抖音自动化动作、状态或安全边界。
+  // 入参：parent、cond 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 findByCondInParent 对应业务流程的处理结果。
   findByCondInParent: function (parent, cond) {
     var matchMode = cond.match_mode || "exact";
     try {
@@ -58,6 +64,8 @@ var selectorResolver = {
   },
 
   // 设备业务函数：处理 findAllByCondInParent 对应的抖音自动化动作、状态或安全边界。
+  // 入参：parent、cond 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 findAllByCondInParent 对应业务流程的处理结果。
   findAllByCondInParent: function (parent, cond) {
     var matchMode = cond.match_mode || "exact";
     try {
@@ -83,6 +91,8 @@ var selectorResolver = {
   },
 
   // 设备业务函数：处理 findByConditionsInParent 对应的抖音自动化动作、状态或安全边界。
+  // 入参：parent、strategy 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 findByConditionsInParent 对应业务流程的处理结果。
   findByConditionsInParent: function (parent, strategy) {
     var conditions = strategy.conditions;
     var logic = strategy.logic || "and";
@@ -114,6 +124,8 @@ var selectorResolver = {
   },
 
   // 设备业务函数：处理 findByChainInParent 对应的抖音自动化动作、状态或安全边界。
+  // 入参：parent、steps 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 findByChainInParent 对应业务流程的处理结果。
   findByChainInParent: function (parent, steps) {
     if (!steps || steps.length === 0) return null;
 
@@ -193,6 +205,8 @@ var selectorResolver = {
   /**
    * 从子元素提取值
    */
+  // 入参：el、actionName、fallback 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 extractChildValue 对应业务流程的处理结果。
   extractChildValue: function (el, actionName, fallback) {
     try {
       var selector = selectorLoader.get(actionName);

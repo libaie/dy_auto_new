@@ -21,7 +21,10 @@ router = APIRouter(prefix="/api/scenes", tags=["scenes"])
 
 
 class SceneCreate(BaseModel):
-    """业务类：承载 SceneCreate 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 SceneCreate 相关的数据结构、状态或业务协作。
+
+    类参数：lighting、location_desc、mood、name、scene_type 承载该类的业务配置、状态或数据字段。
+    """
     name: str
     scene_type: str = "indoor"
     location_desc: Optional[str] = None
@@ -30,19 +33,28 @@ class SceneCreate(BaseModel):
 
 
 class AutoGenerateInput(BaseModel):
-    """业务类：承载 AutoGenerateInput 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 AutoGenerateInput 相关的数据结构、状态或业务协作。
+
+    类参数：count、genre、text 承载该类的业务配置、状态或数据字段。
+    """
     text: str = Field(..., min_length=10, max_length=5000)
     genre: str = "drama"
     count: int = Field(default=5, ge=1, le=10)
 
 
 class ReferenceGenerateInput(BaseModel):
-    """业务类：承载 ReferenceGenerateInput 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 ReferenceGenerateInput 相关的数据结构、状态或业务协作。
+
+    类参数：slot 承载该类的业务配置、状态或数据字段。
+    """
     slot: str = "all"
 
 
 class AiRewriteInput(BaseModel):
-    """业务类：承载 AiRewriteInput 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 AiRewriteInput 相关的数据结构、状态或业务协作。
+
+    类参数：instruction 承载该类的业务配置、状态或数据字段。
+    """
     instruction: str = ""
 
 SCENE_GEN_SYSTEM = """你是一位资深的电影导演和场景设计师。根据用户提供的故事概要，生成详细的拍摄场景描述。
@@ -59,7 +71,11 @@ SCENE_GEN_SYSTEM = """你是一位资深的电影导演和场景设计师。根�
 def list_scenes(db: Session = Depends(get_db),
                 include_archived: bool = Query(False),
                 _: str = Depends(verify_admin_token)):
-    """业务函数：处理 list_scenes 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 list_scenes 对应的业务流程、校验或数据转换。
+
+    入参：db、include_archived、_ 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     scenes = db.query(Scene).all()
     if not include_archived:
         scenes = [s for s in scenes if not (s.meta_json or {}).get("archived")]
@@ -69,7 +85,11 @@ def list_scenes(db: Session = Depends(get_db),
 @router.post("")
 def create_scene(body: SceneCreate, db: Session = Depends(get_db),
                  user = Depends(verify_admin_token)):
-    """业务函数：处理 create_scene 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 create_scene 对应的业务流程、校验或数据转换。
+
+    入参：body、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     s = Scene(**body.model_dump())
     db.add(s); db.commit(); db.refresh(s)
     return {"ok": True, "scene": _to_dict(s)}
@@ -78,7 +98,11 @@ def create_scene(body: SceneCreate, db: Session = Depends(get_db),
 @router.put("/{scene_id}")
 def update_scene(scene_id: str, body: dict, db: Session = Depends(get_db),
                  user = Depends(verify_admin_token)):
-    """业务函数：处理 update_scene 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 update_scene 对应的业务流程、校验或数据转换。
+
+    入参：scene_id、body、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     s = db.query(Scene).filter(Scene.id == scene_id).first()
     if not s:
         raise HTTPException(404, "Scene not found")
@@ -92,7 +116,11 @@ def update_scene(scene_id: str, body: dict, db: Session = Depends(get_db),
 @router.delete("/{scene_id}")
 def delete_scene(scene_id: str, db: Session = Depends(get_db),
                  user = Depends(verify_admin_token)):
-    """业务函数：处理 delete_scene 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 delete_scene 对应的业务流程、校验或数据转换。
+
+    入参：scene_id、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     try:
         result = archive_character_or_scene(db, "scene", scene_id)
     except AssetLifecycleError as exc:
@@ -102,7 +130,11 @@ def delete_scene(scene_id: str, db: Session = Depends(get_db),
 
 
 def _reference_asset_http_error(exc: ReferenceAssetError) -> HTTPException:
-    """业务函数：处理 _reference_asset_http_error 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _reference_asset_http_error 对应的业务流程、校验或数据转换。
+
+    入参：exc 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     status_code = 400
     if exc.code == "SCENE_NOT_FOUND":
         status_code = 404
@@ -114,7 +146,11 @@ def _reference_asset_http_error(exc: ReferenceAssetError) -> HTTPException:
 
 
 def _ai_rewrite_http_error(exc: AssetAiRewriteError) -> HTTPException:
-    """业务函数：处理 _ai_rewrite_http_error 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _ai_rewrite_http_error 对应的业务流程、校验或数据转换。
+
+    入参：exc 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     status_code = 409
     if exc.code == "SCENE_NOT_FOUND":
         status_code = 404
@@ -130,7 +166,11 @@ async def generate_scene_reference_images_endpoint(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 generate_scene_reference_images_endpoint 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 generate_scene_reference_images_endpoint 对应的业务流程、校验或数据转换。
+
+    入参：scene_id、body、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     try:
         return await generate_scene_reference_images(db, scene_id, slot=(body.slot if body else "all"))
     except ReferenceAssetError as exc:
@@ -145,7 +185,11 @@ async def generate_scene_ai_rewrite_endpoint(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    """业务函数：处理 generate_scene_ai_rewrite_endpoint 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 generate_scene_ai_rewrite_endpoint 对应的业务流程、校验或数据转换。
+
+    入参：scene_id、body、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     try:
         return await generate_scene_rewrite_candidate(
             db, scene_id, instruction=(body.instruction if body else "")
@@ -167,7 +211,11 @@ async def generate_scene_ai_rewrite_endpoint(
 @router.post("/auto-generate")
 async def auto_generate_scenes(body: AutoGenerateInput, db: Session = Depends(get_db),
                                user = Depends(verify_admin_token)):
-    """AI 根据故事文本自动生成场景描述。返回场景列表（不持久化），前端确认后逐个创建。"""
+    """业务函数：处理 auto_generate_scenes 对应的业务流程、校验或数据转换。
+
+    入参：body、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     user_prompt = f"""故事概要：{body.text}
 类型：{body.genre}
 需要生成的场景数量：{body.count}
@@ -192,7 +240,11 @@ async def auto_generate_scenes(body: AutoGenerateInput, db: Session = Depends(ge
 
 
 def _parse_scenes_json(raw: str) -> dict:
-    """业务函数：处理 _parse_scenes_json 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _parse_scenes_json 对应的业务流程、校验或数据转换。
+
+    入参：raw 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     import re
     try:
         return json.loads(raw)
@@ -214,5 +266,9 @@ def _parse_scenes_json(raw: str) -> dict:
 
 
 def _to_dict(s: Scene) -> dict:
-    """业务函数：处理 _to_dict 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _to_dict 对应的业务流程、校验或数据转换。
+
+    入参：s 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return {col.name: getattr(s, col.name) for col in Scene.__table__.columns}

@@ -23,6 +23,8 @@ const pixelleConnTest = ref(null)
 const pixelleTesting = ref(false)
 
 // 前端业务函数：协调 fetchSettings 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 fetchSettings 对应业务流程的处理结果。
 async function fetchSettings() {
   loading.value = true
   try {
@@ -43,6 +45,8 @@ async function fetchSettings() {
 }
 
 // 前端业务函数：协调 handleSave 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleSave 对应业务流程的处理结果。
 async function handleSave() {
   saving.value = true
   try {
@@ -64,6 +68,8 @@ async function handleSave() {
 }
 
 // 前端业务函数：协调 handleTestConnection 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleTestConnection 对应业务流程的处理结果。
 async function handleTestConnection() {
   pixelleTesting.value = true
   pixelleConnTest.value = null

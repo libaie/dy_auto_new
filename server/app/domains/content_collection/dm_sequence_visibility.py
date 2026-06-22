@@ -14,7 +14,11 @@ from app.models import TaskStatus
 
 
 def _extract_sequence_id(params: Optional[dict]) -> Optional[str]:
-    """业务函数：处理 _extract_sequence_id 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _extract_sequence_id 对应的业务流程、校验或数据转换。
+
+    入参：params 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if not isinstance(params, dict):
         return None
     seq_id = params.get("dm_sequence_id")
@@ -22,7 +26,11 @@ def _extract_sequence_id(params: Optional[dict]) -> Optional[str]:
 
 
 def _task_sequence_ids_for_device(db: Session, device_id: Optional[str]) -> set[str]:
-    """业务函数：处理 _task_sequence_ids_for_device 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _task_sequence_ids_for_device 对应的业务流程、校验或数据转换。
+
+    入参：db、device_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if not device_id:
         return set()
 
@@ -43,7 +51,11 @@ def get_device_visible_dm_sequences(
     device_id: Optional[str],
     extra_sequence_ids: Iterable[str] | None = None,
 ) -> list[DMSequence]:
-    """业务函数：处理 get_device_visible_dm_sequences 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 get_device_visible_dm_sequences 对应的业务流程、校验或数据转换。
+
+    入参：db、device_id、extra_sequence_ids 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Return shared/user-scoped DM sequences plus sequences referenced by this device's tasks."""
     requested_ids = _task_sequence_ids_for_device(db, device_id)
     if extra_sequence_ids:

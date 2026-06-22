@@ -32,8 +32,12 @@ const props = defineProps({
 
 const emit = defineEmits(['page-change'])
 
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 totalPages 对应业务流程的处理结果。
 const totalPages = () => Math.ceil(props.total / props.pageSize)
 
+// 入参：p 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 goToPage 对应业务流程的处理结果。
 const goToPage = (p) => {
   if (p >= 1 && p <= totalPages()) {
     emit('page-change', p)

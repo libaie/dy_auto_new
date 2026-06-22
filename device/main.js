@@ -19,6 +19,8 @@ var TAG = "主程序";
 /**
  * 收集设备硬件信息（通过 AutoJS6 device API）
  */
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 collectDeviceInfo 对应业务流程的处理结果。
 function collectDeviceInfo() {
   var info = {};
   try {
@@ -61,6 +63,8 @@ events.on("exit", function () {
 /**
  * 配对流程 — 未配对时显示配对界面，配对完成后启动主循环
  */
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 startPairingFlow 对应业务流程的处理结果。
 function startPairingFlow() {
   logger.info(TAG, "设备未配对，进入配对流程");
 
@@ -94,6 +98,8 @@ function startPairingFlow() {
 /**
  * WS 实时等待审批 — 优先使用 WebSocket，失败时 fallback 到轮询
  */
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 startPairingWait 对应业务流程的处理结果。
 function startPairingWait() {
   threads.start(function () {
     var result = pairing.waitForApproval(function (status, data) {
@@ -111,6 +117,8 @@ function startPairingWait() {
     } else if (result && result.status === "rejected") {
       logger.warn(TAG, "配对被拒绝，2 秒后重新显示配对界面");
       floatingWindow.updatePairStatus("配对已被拒绝");
+      // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+      // 出参：返回 setTimeout 对应业务流程的处理结果。
       setTimeout(function () {
         startPairingFlow();
       }, 2000);
@@ -125,6 +133,8 @@ function startPairingWait() {
 /**
  * 配对轮询 — 定期检查审批结果
  */
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 startPairingPoll 对应业务流程的处理结果。
 function startPairingPoll() {
   var pollInterval = 5000; // 5秒轮询一次
   var maxWait = 300000;    // 最长等待5分钟
@@ -136,6 +146,8 @@ function startPairingPoll() {
       clearInterval(pollTimer);
       floatingWindow.updatePairStatus("配对超时，请重新连接");
       logger.warn(TAG, "配对超时");
+      // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+      // 出参：返回 setTimeout 对应业务流程的处理结果。
       setTimeout(function () {
         floatingWindow.showPairingUI(function (ip) {
           // 重新发起配对
@@ -167,6 +179,8 @@ function startPairingPoll() {
       clearInterval(pollTimer);
       logger.warn(TAG, "配对被拒绝，2 秒后重新显示配对界面");
       floatingWindow.updatePairStatus("配对已被拒绝");
+      // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+      // 出参：返回 setTimeout 对应业务流程的处理结果。
       setTimeout(function () {
         startPairingFlow();
       }, 2000);
@@ -180,6 +194,8 @@ function startPairingPoll() {
  * @param {string} [serverUrl] - 服务端地址（配对成功时显式传入）
  * @param {string} [secret] - 设备密钥（配对成功时显式传入）
  */
+// 入参：serverUrl、secret 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 startMainLoop 对应业务流程的处理结果。
 function startMainLoop(serverUrl, secret) {
   // 使用显式参数或从 storage 读取
   config.serverUrl = serverUrl || pairing.getSavedServerUrl();
@@ -203,9 +219,15 @@ function startMainLoop(serverUrl, secret) {
   var _knownTaskIds = {};       // taskId→true: 当前运行中+已入队的 task id，防重复派发
   var _recentlyFinished = [];   // 最近完成的 task id (最多 20 个)，防网络重放
   var MAX_RECENT = 20;
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _mainLoopRuntime.isIdle 对应业务流程的处理结果。
   _mainLoopRuntime.isIdle = function () { return !_taskBusy && _taskQueue.length === 0 && !_needsRestart; };
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _mainLoopRuntime.catchUpPoll 对应业务流程的处理结果。
   _mainLoopRuntime.catchUpPoll = function () { catchUpPoll(); };
 
+  // 入参：taskId 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _isDuplicateTask 对应业务流程的处理结果。
   function _isDuplicateTask(taskId) {
     if (_knownTaskIds[taskId]) return true;
     for (var i = 0; i < _recentlyFinished.length; i++) {
@@ -215,6 +237,8 @@ function startMainLoop(serverUrl, secret) {
   }
 
   // 设备业务函数：处理 handleTask 对应的抖音自动化动作、状态或安全边界。
+  // 入参：task 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 handleTask 对应业务流程的处理结果。
   function handleTask(task) {
     if (!task || !task.id) return;
     if (_isDuplicateTask(task.id)) {
@@ -227,6 +251,8 @@ function startMainLoop(serverUrl, secret) {
   }
 
   // 设备业务函数：处理 processTaskQueue 对应的抖音自动化动作、状态或安全边界。
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 processTaskQueue 对应业务流程的处理结果。
   function processTaskQueue() {
     if (_needsRestart || _taskBusy || _taskQueue.length === 0) return;
     _taskBusy = true;
@@ -298,11 +324,15 @@ function startMainLoop(serverUrl, secret) {
   }
 
   // 设备业务函数：处理 applyDMSequences 对应的抖音自动化动作、状态或安全边界。
+  // 入参：dmSequences 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 applyDMSequences 对应业务流程的处理结果。
   function applyDMSequences(dmSequences) {
     SearchBaseHandler.applyDMSequences(dmSequences || []);
   }
 
   // 设备业务函数：处理 applyPollSideData 对应的抖音自动化动作、状态或安全边界。
+  // 入参：response 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 applyPollSideData 对应业务流程的处理结果。
   function applyPollSideData(response) {
     if (!response) return;
     if (response.proxy) apiClient.setProxy(response.proxy);
@@ -315,12 +345,16 @@ function startMainLoop(serverUrl, secret) {
   }
 
   // 设备业务函数：处理 syncDMSequences 对应的抖音自动化动作、状态或安全边界。
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 syncDMSequences 对应业务流程的处理结果。
   function syncDMSequences() {
     return SearchBaseHandler.syncDMSequences();
   }
 
   // 认证失败处理
   var authFailed = false;
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 handleAuthFailure 对应业务流程的处理结果。
   function handleAuthFailure() {
     if (authFailed) return;
     authFailed = true;
@@ -363,32 +397,46 @@ function startMainLoop(serverUrl, secret) {
 
   // 注册 WS 推送回调
   deviceWs.setCallbacks({
+    // 入参：task 为该业务流程需要的上下文、标识或载荷。
+    // 出参：返回 onTask 对应业务流程的处理结果。
     onTask: function (task) {
       syncDMSequences();
       handleTask(task);
     },
     // 设备业务函数：处理 onCancelTask 对应的抖音自动化动作、状态或安全边界。
+    // 入参：taskId 为该业务流程需要的上下文、标识或载荷。
+    // 出参：返回 onCancelTask 对应业务流程的处理结果。
     onCancelTask: function (taskId) {
       _handleCancelledTask(taskId);
     },
     // 设备业务函数：处理 onSelectorsUpdated 对应的抖音自动化动作、状态或安全边界。
+    // 入参：version 为该业务流程需要的上下文、标识或载荷。
+    // 出参：返回 onSelectorsUpdated 对应业务流程的处理结果。
     onSelectorsUpdated: function (version) {
       logger.info(TAG, "选择器更新: v" + version);
       selectorLoader.checkAndUpdate(version);
     },
+    // 入参：version 为该业务流程需要的上下文、标识或载荷。
+    // 出参：返回 onPromptTemplatesUpdated 对应业务流程的处理结果。
     onPromptTemplatesUpdated: function (version) {
       logger.info(TAG, "提示词模板更新: v" + version);
       promptTemplateLoader.checkAndUpdate(version);
     },
+    // 入参：serverConfig、proxy 为该业务流程需要的上下文、标识或载荷。
+    // 出参：返回 onConfigUpdated 对应业务流程的处理结果。
     onConfigUpdated: function (serverConfig, proxy) {
       if (serverConfig) applyServerConfig(serverConfig);
       if (proxy) apiClient.setProxy(proxy);
     },
     // 设备业务函数：处理 onNewTaskAvailable 对应的抖音自动化动作、状态或安全边界。
+    // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+    // 出参：返回 onNewTaskAvailable 对应业务流程的处理结果。
     onNewTaskAvailable: function () {
       catchUpPoll();
     },
     // 设备业务函数：处理 onDeviceRemoved 对应的抖音自动化动作、状态或安全边界。
+    // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+    // 出参：返回 onDeviceRemoved 对应业务流程的处理结果。
     onDeviceRemoved: function () {
       logger.error(TAG, "设备已被服务端移除，返回配对界面");
       deviceWs.stop();
@@ -480,6 +528,8 @@ function startMainLoop(serverUrl, secret) {
    * 已不在运行时（设备重启/任务已结束）需立即 ack，否则
    * check_cancelled_running 会持续投递，设备卡在取消循环拿不到新任务。
    */
+  // 入参：taskId 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _handleCancelledTask 对应业务流程的处理结果。
   function _handleCancelledTask(taskId) {
     logger.info(TAG, "收到服务端取消任务: " + taskId);
     var currentTaskId = taskExecutor.getCurrentTaskId();
@@ -500,6 +550,8 @@ function startMainLoop(serverUrl, secret) {
   /**
    * catch-up poll — 捕获离线期间积累的任务
    */
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 catchUpPoll 对应业务流程的处理结果。
   function catchUpPoll() {
     try {
       var response = apiClient.poll();
@@ -536,6 +588,8 @@ var _idleTicks = 0;
 var _idlePollTimer = null;
 
 // 设备业务函数：处理 _startIdlePoll 对应的抖音自动化动作、状态或安全边界。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 _startIdlePoll 对应业务流程的处理结果。
 function _startIdlePoll() {
   if (_idlePollTimer) clearInterval(_idlePollTimer);
   _idlePollTimer = setInterval(function () {
@@ -561,6 +615,8 @@ function _startIdlePoll() {
  * 应用服务端下发的配置
  * @param {Object} serverConfig - 服务端返回的 config 对象
  */
+// 入参：serverConfig 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 applyServerConfig 对应业务流程的处理结果。
 function applyServerConfig(serverConfig) {
   if (!serverConfig) return;
 

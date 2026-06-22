@@ -61,8 +61,14 @@ const route = useRoute(); const run = ref(null); const loading = ref(true); cons
 const layerNames = ['资产生成', '资产工坊', '故事工坊', '导演工坊', '渲染引擎', '后期包装']
 const layers = computed(() => { if (!run.value) return []; const json = run.value.layers_json || {}; return Array.from({ length: 6 }, (_, i) => ({ status: json[String(i)]?.status || (i === run.value.current_layer ? 'running' : 'pending') })) })
 const stats = computed(() => { if (!run.value) return []; const diff = run.value.started_at ? Math.floor((Date.now() - new Date(run.value.started_at).getTime()) / 1000) : 0; return [{ label: '当前层', value: `${run.value.current_layer}/6` }, { label: '累计成本', value: `¥${(run.value.actual_cost_so_far || 0).toFixed(2)}` }, { label: '运行时间', value: `${Math.floor(diff/60)}m ${diff%60}s` }] })
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 load 对应业务流程的处理结果。
 async function load() { try { const { data } = await getRunById(route.params.runId); if (data.ok) { run.value = data.run; if (run.value?.status === 'completed' || run.value?.status === 'failed') { if (timer) { clearInterval(timer); timer = null } } } else throw new Error('Not found') } catch (e) { error.value = e.message || '加载失败'; if (timer) clearInterval(timer) } finally { loading.value = false } }
+// 入参：s 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 runStatusClass 对应业务流程的处理结果。
 function runStatusClass(s) { return { running: 'bg-sky-900/40 text-sky-400', completed: 'bg-emerald-900/40 text-emerald-400', failed: 'bg-red-900/40 text-red-400', pending: 'bg-gray-800 text-slate-400' }[s] || 'bg-gray-800 text-slate-400' }
+// 入参：s 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 layerBarClass 对应业务流程的处理结果。
 function layerBarClass(s) { return s === 'completed' ? 'bg-emerald-500' : s === 'running' ? 'bg-sky-500 animate-pulse' : '' }
 onMounted(() => { load(); timer = setInterval(load, 5000) })
 onUnmounted(() => clearInterval(timer))

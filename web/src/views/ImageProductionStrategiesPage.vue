@@ -264,6 +264,8 @@ const statusLabels = {
   disabled: '停用',
 }
 
+// 入参：e 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 normalizeError 对应业务流程的处理结果。
 function normalizeError(e) {
   return errorText(
     e.response?.data?.detail?.user_message
@@ -274,6 +276,8 @@ function normalizeError(e) {
   )
 }
 
+// 入参：value 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 errorText 对应业务流程的处理结果。
 function errorText(value) {
   if (typeof value === 'string') return value
   if (!value) return '操作失败，请稍后重试'
@@ -284,14 +288,20 @@ function errorText(value) {
 }
 
 // 前端业务函数：协调 roleLabel 对应的页面流程、接口调用或状态转换。
+// 入参：role 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 roleLabel 对应业务流程的处理结果。
 function roleLabel(role) {
   return roleLabels[role] || role || '未指定'
 }
 
+// 入参：status 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 statusLabel 对应业务流程的处理结果。
 function statusLabel(status) {
   return statusLabels[status] || status || '未知'
 }
 
+// 入参：status 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 statusClass 对应业务流程的处理结果。
 function statusClass(status) {
   if (status === 'active') return 'border-emerald-500/40 text-emerald-300'
   if (status === 'archived') return 'border-slate-700 text-slate-400'
@@ -299,6 +309,8 @@ function statusClass(status) {
 }
 
 // 前端业务函数：协调 recommendationStatusLabel 对应的页面流程、接口调用或状态转换。
+// 入参：status 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 recommendationStatusLabel 对应业务流程的处理结果。
 function recommendationStatusLabel(status) {
   if (status === 'recommended') return '推荐使用'
   if (status === 'cautious') return '谨慎观察'
@@ -307,32 +319,44 @@ function recommendationStatusLabel(status) {
   return '待评估'
 }
 
+// 入参：modelId 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 modelName 对应业务流程的处理结果。
 function modelName(modelId) {
   if (!modelId) return '自动'
   const model = imageModels.value.find((item) => item.id === modelId)
   return model?.name || modelId
 }
 
+// 入参：model 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 modelOptionLabel 对应业务流程的处理结果。
 function modelOptionLabel(model) {
   return `${model.name || model.id} · ${model.provider || model.model_name || model.id}`
 }
 
 // 前端业务函数：协调 successRateLabel 对应的页面流程、接口调用或状态转换。
+// 入参：metrics 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 successRateLabel 对应业务流程的处理结果。
 function successRateLabel(metrics) {
   return `${Math.round(((metrics?.success_rate ?? 0) * 100))}%`
 }
 
 // 前端业务函数：协调 costLabel 对应的页面流程、接口调用或状态转换。
+// 入参：metrics 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 costLabel 对应业务流程的处理结果。
 function costLabel(metrics) {
   return `${metrics?.average_cost_amount ?? 0} ${metrics?.currency || 'CNY'}`
 }
 
 // 前端业务函数：协调 latencyLabel 对应的页面流程、接口调用或状态转换。
+// 入参：metrics 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 latencyLabel 对应业务流程的处理结果。
 function latencyLabel(metrics) {
   return `${metrics?.average_latency_seconds ?? 0}s`
 }
 
 // 前端业务函数：协调 normalizeModels 对应的页面流程、接口调用或状态转换。
+// 入参：response 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 normalizeModels 对应业务流程的处理结果。
 function normalizeModels(response) {
   const data = response?.data?.data || response?.data || response || {}
   if (Array.isArray(data.models)) return data.models
@@ -341,6 +365,8 @@ function normalizeModels(response) {
 }
 
 // 前端业务函数：协调 loadStrategies 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 loadStrategies 对应业务流程的处理结果。
 async function loadStrategies() {
   loading.value = true
   error.value = ''
@@ -356,6 +382,8 @@ async function loadStrategies() {
 }
 
 // 前端业务函数：协调 loadImageModels 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 loadImageModels 对应业务流程的处理结果。
 async function loadImageModels() {
   try {
     const response = await listModels({ model_type: 'image', enabled: true })
@@ -366,6 +394,8 @@ async function loadImageModels() {
 }
 
 // 前端业务函数：协调 refreshMetrics 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 refreshMetrics 对应业务流程的处理结果。
 async function refreshMetrics() {
   metricsMessage.value = ''
   error.value = ''
@@ -380,6 +410,8 @@ async function refreshMetrics() {
 }
 
 // 前端业务函数：协调 showRecommendation 对应的页面流程、接口调用或状态转换。
+// 入参：strategyId 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 showRecommendation 对应业务流程的处理结果。
 async function showRecommendation(strategyId) {
   const requestId = latestRecommendationRequestId.value + 1
   latestRecommendationRequestId.value = requestId
@@ -401,6 +433,8 @@ async function showRecommendation(strategyId) {
 }
 
 // 前端业务函数：协调 openEditor 对应的页面流程、接口调用或状态转换。
+// 入参：strategy 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 openEditor 对应业务流程的处理结果。
 function openEditor(strategy) {
   editorError.value = ''
   editing.value = strategy
@@ -409,6 +443,8 @@ function openEditor(strategy) {
 }
 
 // 前端业务函数：协调 closeEditor 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 closeEditor 对应业务流程的处理结果。
 function closeEditor() {
   editorError.value = ''
   editing.value = null
@@ -417,6 +453,8 @@ function closeEditor() {
 }
 
 // 前端业务函数：协调 saveEditor 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 saveEditor 对应业务流程的处理结果。
 async function saveEditor() {
   if (!editing.value) return
   error.value = ''
@@ -449,6 +487,8 @@ async function saveEditor() {
 }
 
 // 前端业务函数：协调 archive 对应的页面流程、接口调用或状态转换。
+// 入参：id 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 archive 对应业务流程的处理结果。
 async function archive(id) {
   error.value = ''
   try {

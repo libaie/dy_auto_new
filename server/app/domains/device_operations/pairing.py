@@ -24,7 +24,11 @@ async def create_pair_request(
     raw_request: Request,
     db: Session = Depends(get_db),
 ):
-    """业务函数：处理 create_pair_request 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 create_pair_request 对应的业务流程、校验或数据转换。
+
+    入参：request、raw_request、db 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Unauthenticated — device sends pairing request to server.
 
     Flow:
@@ -162,7 +166,11 @@ async def create_pair_request(
 
 
 def _build_approved_payload(pair_req, db=None) -> dict:
-    """业务函数：处理 _build_approved_payload 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _build_approved_payload 对应的业务流程、校验或数据转换。
+
+    入参：pair_req、db 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Build the approved response payload (shared by HTTP and WS)."""
     from app.config import DEVICE_CONFIG, ANTI_DETECT_CONFIG, ANTI_DETECT_CONFIG_VERSION, get_ai_config
 
@@ -187,7 +195,11 @@ def check_pair_status(
     token: str = Query(...),
     db: Session = Depends(get_db),
 ):
-    """业务函数：处理 check_pair_status 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 check_pair_status 对应的业务流程、校验或数据转换。
+
+    入参：token、db 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Unauthenticated — device polls for approval result."""
     from app.db.models.device_operations import Device, DevicePairRequest
 
@@ -216,7 +228,11 @@ def check_pair_status(
 
 @router.websocket("/ws/pair/{token}")
 async def ws_pair_status(websocket: WebSocket, token: str):
-    """业务函数：处理 ws_pair_status 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 ws_pair_status 对应的业务流程、校验或数据转换。
+
+    入参：websocket、token 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Device connects via WS to receive real-time pairing approval result."""
     from app.db.models.device_operations import Device, DevicePairRequest
 

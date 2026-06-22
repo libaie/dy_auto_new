@@ -280,3 +280,4 @@ def test_all_business_code_has_standard_chinese_comments():
     assert result.module_missing == []
     assert result.risk_missing == []
     assert result.declaration_missing == []
+    assert result.contract_missing == []

@@ -15,7 +15,11 @@ _SELECTORS_REVISION_KEY = "selectors_revision"
 
 
 def _get_revision(db: Session) -> int:
-    """业务函数：处理 _get_revision 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _get_revision 对应的业务流程、校验或数据转换。
+
+    入参：db 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Get current selectors revision counter. Falls back to max(updated_at)
     ts for migration from pre-revision installations."""
     row = db.query(SystemSetting).filter(SystemSetting.key == _SELECTORS_REVISION_KEY).first()
@@ -34,7 +38,11 @@ def _get_revision(db: Session) -> int:
 
 
 def _set_revision(db: Session, rev: int) -> None:
-    """业务函数：处理 _set_revision 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _set_revision 对应的业务流程、校验或数据转换。
+
+    入参：db、rev 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     row = db.query(SystemSetting).filter(SystemSetting.key == _SELECTORS_REVISION_KEY).first()
     if row:
         row.value = str(rev)
@@ -44,7 +52,11 @@ def _set_revision(db: Session, rev: int) -> None:
 
 
 def _bump_revision(db: Session) -> int:
-    """业务函数：处理 _bump_revision 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _bump_revision 对应的业务流程、校验或数据转换。
+
+    入参：db 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Increment selectors revision counter and return new value."""
     rev = _get_revision(db) + 1
     _set_revision(db, rev)
@@ -52,7 +64,11 @@ def _bump_revision(db: Session) -> int:
 
 
 def _aspect_tag(resolution: str) -> str:
-    """业务函数：处理 _aspect_tag 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _aspect_tag 对应的业务流程、校验或数据转换。
+
+    入参：resolution 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Compute aspect-ratio tag from 'WxH' string, e.g. '1080x2400' → '9:20'."""
     try:
         w, h = resolution.split("x")
@@ -70,7 +86,11 @@ def _aspect_tag(resolution: str) -> str:
 
 
 def _profile_priority(sel_profile: str, dev_resolution: str, dev_ar: str) -> int:
-    """业务函数：处理 _profile_priority 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _profile_priority 对应的业务流程、校验或数据转换。
+
+    入参：sel_profile、dev_resolution、dev_ar 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Score a selector's resolution_profile against device resolution.
     3=exact match, 2=same aspect ratio, 1=default, 0=other."""
     if not sel_profile or sel_profile == "default":
@@ -83,7 +103,11 @@ def _profile_priority(sel_profile: str, dev_resolution: str, dev_ar: str) -> int
 
 
 def _to_dict(sel: UISelector) -> dict:
-    """业务函数：处理 _to_dict 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _to_dict 对应的业务流程、校验或数据转换。
+
+    入参：sel 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return {
         "action_name": sel.action_name,
         "description": sel.description or "",
@@ -103,7 +127,11 @@ def _to_dict(sel: UISelector) -> dict:
 
 
 def _to_device_dict(sel: UISelector) -> dict:
-    """业务函数：处理 _to_device_dict 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _to_device_dict 对应的业务流程、校验或数据转换。
+
+    入参：sel 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Device-facing dict (no description/version/enabled)."""
     return {
         "action_name": sel.action_name,
@@ -120,11 +148,18 @@ def _to_device_dict(sel: UISelector) -> dict:
 
 
 class SelectorService:
-    """业务类：承载 SelectorService 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 SelectorService 相关的数据结构、状态或业务协作。
+
+    类参数：无显式类参数 承载该类的业务配置、状态或数据字段。
+    """
     """UI selector management — DB-backed."""
 
     def get_all_selectors(self, db: Session, device_id: str = None) -> tuple[int, list[dict]]:
-        """业务函数：处理 get_all_selectors 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 get_all_selectors 对应的业务流程、校验或数据转换。
+
+        入参：db、device_id 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         """Returns (version, selectors_list). Version is max version across all selectors.
         When device_id is given, filters by resolution_profile: exact match > same AR > default.
         """
@@ -150,7 +185,11 @@ class SelectorService:
         return version, [_to_device_dict(s) for s in selectors]
 
     def get_selector(self, db: Session, action_name: str) -> Optional[dict]:
-        """业务函数：处理 get_selector 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 get_selector 对应的业务流程、校验或数据转换。
+
+        入参：db、action_name 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         """Get a single selector by action_name."""
         s = db.query(UISelector).filter(
             UISelector.action_name == action_name,
@@ -161,7 +200,11 @@ class SelectorService:
         return _to_dict(s)
 
     def get_version(self, db: Session) -> int:
-        """业务函数：处理 get_version 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 get_version 对应的业务流程、校验或数据转换。
+
+        入参：db 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         """Get current selectors revision — guaranteed monotonic across all CRUD."""
         return _get_revision(db)
 
@@ -172,7 +215,11 @@ class SelectorService:
                         extract_field: str = None,
                         clean_mode: str = None, clean_pattern: str = None,
                         clean_prompt: str = None, resolution_profile: str = "default") -> dict:
-        """业务函数：处理 create_selector 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 create_selector 对应的业务流程、校验或数据转换。
+
+        入参：db、action_name、strategies、platform_version、version、description、category、purpose、strategy_logic、extract_field、clean_mode、clean_pattern、clean_prompt、resolution_profile 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         """Create a new UI selector."""
         existing = db.query(UISelector).filter(
             UISelector.action_name == action_name,
@@ -210,7 +257,11 @@ class SelectorService:
                         extract_field: str = None,
                         clean_mode: str = None, clean_pattern: str = None,
                         clean_prompt: str = None, resolution_profile: str = None) -> dict:
-        """业务函数：处理 update_selector 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 update_selector 对应的业务流程、校验或数据转换。
+
+        入参：db、action_name、strategies、platform_version、description、category、purpose、strategy_logic、extract_field、clean_mode、clean_pattern、clean_prompt、resolution_profile 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         """Update an existing selector. platform_version and resolution_profile
         are lookup-only (composite key) — never updated. To change them, delete+recreate."""
         q = db.query(UISelector).filter(UISelector.action_name == action_name)
@@ -250,7 +301,11 @@ class SelectorService:
 
     def delete_selector(self, db: Session, action_name: str, platform_version: str = None,
                         resolution_profile: str = None) -> bool:
-        """业务函数：处理 delete_selector 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 delete_selector 对应的业务流程、校验或数据转换。
+
+        入参：db、action_name、platform_version、resolution_profile 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         """Delete a selector by (action_name, platform_version, resolution_profile)."""
         q = db.query(UISelector).filter(UISelector.action_name == action_name)
         if platform_version:
@@ -267,7 +322,11 @@ class SelectorService:
 
     def toggle_selector(self, db: Session, action_name: str, enabled: bool,
                         platform_version: str = None, resolution_profile: str = None) -> dict:
-        """业务函数：处理 toggle_selector 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 toggle_selector 对应的业务流程、校验或数据转换。
+
+        入参：db、action_name、enabled、platform_version、resolution_profile 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         """Enable or disable a selector by (action_name, platform_version, resolution_profile)."""
         q = db.query(UISelector).filter(UISelector.action_name == action_name)
         if platform_version:
@@ -286,7 +345,11 @@ class SelectorService:
 
     def list_all_selectors(self, db: Session, include_disabled: bool = False,
                            category: str = None) -> list[dict]:
-        """业务函数：处理 list_all_selectors 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 list_all_selectors 对应的业务流程、校验或数据转换。
+
+        入参：db、include_disabled、category 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         """List all selectors (optionally including disabled ones and filtering by category)."""
         query = db.query(UISelector)
         if not include_disabled:

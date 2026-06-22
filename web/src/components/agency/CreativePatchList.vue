@@ -38,6 +38,8 @@ defineProps({
 defineEmits(['select'])
 
 // 前端业务函数：协调 statusLabel 对应的页面流程、接口调用或状态转换。
+// 入参：status 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 statusLabel 对应业务流程的处理结果。
 function statusLabel(status) {
   const labels = {
     proposed: '待处理',
@@ -49,6 +51,8 @@ function statusLabel(status) {
   return labels[status] || status || '未知'
 }
 
+// 入参：stage 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 stageLabel 对应业务流程的处理结果。
 function stageLabel(stage) {
   const labels = {
     style_lock: '风格锁定',

@@ -10,6 +10,8 @@ var uiOperator = {
    * 启动抖音
    * @returns {boolean}
    */
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 openApp 对应业务流程的处理结果。
   openApp: function () {
     var TARGET_PKG = "com.ss.android.ugc.aweme";
     logger.info(TAG, "正在打开抖音...");
@@ -73,6 +75,8 @@ var uiOperator = {
   /**
    * 关闭抖音
    */
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 closeApp 对应业务流程的处理结果。
   closeApp: function () {
     logger.info(TAG, "正在返回桌面...");
     try {
@@ -87,6 +91,8 @@ var uiOperator = {
    * 检查抖音是否在前台
    * @returns {boolean}
    */
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 isAppActive 对应业务流程的处理结果。
   isAppActive: function () {
     var pkg = currentPackage();
     if (pkg === "com.ss.android.ugc.aweme") return true;
@@ -98,6 +104,8 @@ var uiOperator = {
   /**
    * 判断元素是否在当前屏幕内
    */
+  // 入参：el 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _isOnScreen 对应业务流程的处理结果。
   _isOnScreen: function (el) {
     if (!el) return false;
     // 坐标类型（图片匹配、坐标策略）视为在屏幕内
@@ -112,6 +120,8 @@ var uiOperator = {
   },
 
   // 设备业务函数：处理 _applyStrategyOffset 对应的抖音自动化动作、状态或安全边界。
+  // 入参：element、strategy 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _applyStrategyOffset 对应业务流程的处理结果。
   _applyStrategyOffset: function (element, strategy) {
     if (!element || !strategy || (strategy.x_percent == null && strategy.y_percent == null)) return element;
 
@@ -150,6 +160,8 @@ var uiOperator = {
    * @param {number} timeout - 超时时间（毫秒），默认 5000
    * @returns {UiObject|null} 找到的控件，或 null
    */
+  // 入参：actionName、timeout、quiet 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 findElement 对应业务流程的处理结果。
   findElement: function (actionName, timeout, quiet) {
     timeout = timeout || 2000;
     var selector = selectorLoader.get(actionName);
@@ -228,6 +240,8 @@ var uiOperator = {
    * @param {number} timeout - 超时时间（毫秒），默认 5000
    * @returns {Object|null} 找到的元素或 null
    */
+  // 入参：actionName、timeout 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 waitForElement 对应业务流程的处理结果。
   waitForElement: function (actionName, timeout) {
     timeout = timeout || 5000;
     var findTimeout = 1000;  // 单次 findElement 超时，短轮询保证总超时精度
@@ -247,6 +261,8 @@ var uiOperator = {
    * @param {number} timeout - 超时时间（毫秒），默认 5000
    * @returns {boolean} 页面是否匹配
    */
+  // 入参：pageKey、timeout 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 waitForPage 对应业务流程的处理结果。
   waitForPage: function (pageKey, timeout) {
     timeout = timeout || 5000;
     var startTime = Date.now();
@@ -261,6 +277,8 @@ var uiOperator = {
   /**
    * 按条件查找元素（支持 text/id/desc/className 类型 + match_mode）
    */
+  // 入参：cond 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _findByCondition 对应业务流程的处理结果。
   _findByCondition: function (cond) {
     if (cond.type === "textContains") return textContains(cond.value).find();
 
@@ -286,6 +304,8 @@ var uiOperator = {
   /**
    * 检查单个元素是否匹配条件
    */
+  // 入参：el、cond 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _elementMatchesCondition 对应业务流程的处理结果。
   _elementMatchesCondition: function (el, cond) {
     var matchMode = cond.match_mode || "exact";
     var actual;
@@ -307,6 +327,8 @@ var uiOperator = {
   /**
    * 多条件组合查找（AND/OR 逻辑）
    */
+  // 入参：strategy 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _findByConditions 对应业务流程的处理结果。
   _findByConditions: function (strategy) {
     var conditions = strategy.conditions;
     var logic = strategy.logic || "and";
@@ -361,6 +383,8 @@ var uiOperator = {
    * @param {Object} strategy - { type, value, match_mode, conditions, logic, ... }
    * @returns {UiObject|null}
    */
+  // 入参：strategy 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _findByStrategy 对应业务流程的处理结果。
   _findByStrategy: function (strategy) {
     // Multi-condition mode
     if (strategy.conditions && strategy.conditions.length > 0) {
@@ -418,6 +442,8 @@ var uiOperator = {
    * @param {Object} strategy - { type, value }
    * @returns {Array} UiObject 数组
    */
+  // 入参：strategy 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _findManyByStrategy 对应业务流程的处理结果。
   _findManyByStrategy: function (strategy) {
     // Multi-condition mode
     if (strategy.conditions && strategy.conditions.length > 0) {
@@ -454,6 +480,8 @@ var uiOperator = {
   /**
    * 多条件组合查找多个控件（AND/OR）
    */
+  // 入参：strategy 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _findManyByConditions 对应业务流程的处理结果。
   _findManyByConditions: function (strategy) {
     var conditions = strategy.conditions;
     var logic = strategy.logic || "and";
@@ -496,6 +524,8 @@ var uiOperator = {
   },
 
   /** 生成元素去重 key（bounds 中心 + className） */
+  // 入参：el 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _elKey 对应业务流程的处理结果。
   _elKey: function (el) {
     try {
       var b = el.bounds();
@@ -504,6 +534,8 @@ var uiOperator = {
   },
 
   // 设备业务函数：处理 _findByChainAll 对应的抖音自动化动作、状态或安全边界。
+  // 入参：steps 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _findByChainAll 对应业务流程的处理结果。
   _findByChainAll: function (steps) {
     if (!steps || steps.length === 0) return [];
     // Build selector chain from filter steps (same as _findByChain)
@@ -524,6 +556,8 @@ var uiOperator = {
    * @param {number} timeout - 超时时间（毫秒），默认 5000
    * @returns {Array} UiObject 数组，找不到返回空数组
    */
+  // 入参：actionName、timeout、quiet 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 findElements 对应业务流程的处理结果。
   findElements: function (actionName, timeout, quiet) {
     timeout = timeout || 5000;
     var selector = selectorLoader.get(actionName);
@@ -571,6 +605,8 @@ var uiOperator = {
    * @param {number} timeout - 每个 strategy 的超时 ms，默认 300
    * @returns {boolean}
    */
+  // 入参：actionName、timeout 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 isOnPage 对应业务流程的处理结果。
   isOnPage: function (actionName, timeout) {
     timeout = timeout || 300;
     var config = selectorLoader.get(actionName);
@@ -602,6 +638,8 @@ var uiOperator = {
    * 检测当前页面 — 遍历所有 page_detect 选择器，按 priority 返回第一个匹配的 action_name
    * @returns {string|null} 页面名，无匹配返回 null
    */
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 detectPage 对应业务流程的处理结果。
   detectPage: function () {
     var all = selectorLoader._cache;
     var pages = [];
@@ -625,11 +663,15 @@ var uiOperator = {
    * @param {number} threshold - 匹配阈值
    * @returns {Object|null} { isImage: true, x, y } 或 null
    */
+  // 入参：templateFile、threshold 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _findByImage 对应业务流程的处理结果。
   _findByImage: function (templateFile, threshold) {
     var res = device.width + "x" + device.height;
     threshold = threshold || 0.75;
 
     // 设备业务函数：处理 addCandidate 对应的抖音自动化动作、状态或安全边界。
+    // 入参：list、seen、dir、name 为该业务流程需要的上下文、标识或载荷。
+    // 出参：返回 addCandidate 对应业务流程的处理结果。
     function addCandidate(list, seen, dir, name) {
       if (!dir || !name) return;
       var path = dir + name;
@@ -640,6 +682,8 @@ var uiOperator = {
     }
 
     // 设备业务函数：处理 _arTag 对应的抖音自动化动作、状态或安全边界。
+    // 入参：r 为该业务流程需要的上下文、标识或载荷。
+    // 出参：返回 _arTag 对应业务流程的处理结果。
     function _arTag(r) {
       try {
         var parts = r.split("x");
@@ -651,6 +695,8 @@ var uiOperator = {
       } catch (e) { return "unknown"; }
     }
     // 设备业务函数：处理 _sameARDirs 对应的抖音自动化动作、状态或安全边界。
+    // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+    // 出参：返回 _sameARDirs 对应业务流程的处理结果。
     function _sameARDirs() {
       var target = _arTag(res);
       if (target === "unknown") return [];
@@ -671,6 +717,8 @@ var uiOperator = {
     }
 
     // 设备业务函数：处理 collectCandidates 对应的抖音自动化动作、状态或安全边界。
+    // 入参：templateName 为该业务流程需要的上下文、标识或载荷。
+    // 出参：返回 collectCandidates 对应业务流程的处理结果。
     function collectCandidates(templateName) {
       var dirs = [
         "/sdcard/dy_auto/templates/" + res + "/",
@@ -778,6 +826,8 @@ var uiOperator = {
    * @param {Array} steps
    * @returns {UiObject|null}
    */
+  // 入参：steps 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _findByChain 对应业务流程的处理结果。
   _findByChain: function (steps) {
     if (!steps || steps.length === 0) return null;
 
@@ -881,6 +931,8 @@ var uiOperator = {
     return result;
   },
 
+  // 入参：step 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _makeSelector 对应业务流程的处理结果。
   _makeSelector: function (step) {
     var contains = step.match_mode === "contains";
     switch (step.type) {
@@ -897,6 +949,8 @@ var uiOperator = {
   },
 
   // 设备业务函数：处理 _chainSelector 对应的抖音自动化动作、状态或安全边界。
+  // 入参：sel、step 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _chainSelector 对应业务流程的处理结果。
   _chainSelector: function (sel, step) {
     var contains = step.match_mode === "contains";
     switch (step.type) {
@@ -913,6 +967,8 @@ var uiOperator = {
   },
 
   // 设备业务函数：处理 _elementMatchesStep 对应的抖音自动化动作、状态或安全边界。
+  // 入参：el、step 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _elementMatchesStep 对应业务流程的处理结果。
   _elementMatchesStep: function (el, step) {
     var actual;
     try {
@@ -935,6 +991,8 @@ var uiOperator = {
    * @param {UiObject} element
    * @returns {boolean}
    */
+  // 入参：element 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 clickElement 对应业务流程的处理结果。
   clickElement: function (element) {
     if (!element) return false;
 
@@ -987,6 +1045,8 @@ var uiOperator = {
    * @param {string} text - 要输入的文本
    * @returns {boolean}
    */
+  // 入参：element、text 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 inputText 对应业务流程的处理结果。
   inputText: function (element, text) {
     if (!element || !text) return false;
 
@@ -1039,6 +1099,8 @@ var uiOperator = {
    * @param {string} submitActionName - 提交按钮的动作名（回退方案）
    * @returns {boolean}
    */
+  // 入参：submitActionName 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 submitViaKeyboard 对应业务流程的处理结果。
   submitViaKeyboard: function (submitActionName) {
     // 尝试键盘回车
     try { shell("input keyevent 66", false); sleep(300); return true; } catch (e1) { /* ignore */ }
@@ -1063,6 +1125,8 @@ var uiOperator = {
    * 执行上滑操作（浏览下一条视频）
    * @returns {boolean}
    */
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 swipeUp 对应业务流程的处理结果。
   swipeUp: function () {
     var startX = device.width * (0.35 + Math.random() * 0.2);         // 35%-55% 屏宽
     var startY = device.height * (0.6 + Math.random() * 0.1);         // 60%-70% 屏高
@@ -1079,6 +1143,8 @@ var uiOperator = {
    * @param {Object} options - { threshold, region }
    * @returns {boolean} 是否找到并点击
    */
+  // 入参：templatePath、options 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 findImageClick 对应业务流程的处理结果。
   findImageClick: function (templatePath, options) {
     options = options || {};
     var threshold = options.threshold || 0.8;
@@ -1126,6 +1192,8 @@ var uiOperator = {
    * @param {Object} selector - 选择器配置 (含 purpose, extract_field, clean_mode, clean_pattern, clean_prompt)
    * @returns {string|null} 提取并清洗后的值
    */
+  // 入参：element、selector 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 extractValue 对应业务流程的处理结果。
   extractValue: function (element, selector) {
     if (!element || !selector || selector.purpose !== "extract") return null;
 
@@ -1188,6 +1256,8 @@ var uiOperator = {
 
    * @returns {Object} 控件树摘要
    */
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 captureUISnapshot 对应业务流程的处理结果。
   captureUISnapshot: function () {
     var snapshot = { elements: [] };
     try {

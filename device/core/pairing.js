@@ -9,6 +9,8 @@ var STORAGE_KEY = "dy_auto";
 /**
  * 读取响应体为字符串（兼容 AutoJS6 的 Java ResponseBody 对象）
  */
+// 入参：response 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 readResponseBody 对应业务流程的处理结果。
 function readResponseBody(response) {
   var body = response.body;
   if (typeof body === "string") return body;
@@ -27,6 +29,8 @@ var pairing = {
    * 检查设备是否已完成配对（本地存储中有密钥）
    * @returns {boolean}
    */
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 isConfigured 对应业务流程的处理结果。
   isConfigured: function () {
     var storage = storages.create(STORAGE_KEY);
     return !!storage.get("device_secret", "");
@@ -36,6 +40,8 @@ var pairing = {
    * 获取已保存的密钥
    * @returns {string}
    */
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 getSavedSecret 对应业务流程的处理结果。
   getSavedSecret: function () {
     return storages.create(STORAGE_KEY).get("device_secret", "");
   },
@@ -44,6 +50,8 @@ var pairing = {
    * 获取已保存的服务端地址
    * @returns {string}
    */
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 getSavedServerUrl 对应业务流程的处理结果。
   getSavedServerUrl: function () {
     return storages.create(STORAGE_KEY).get("server_url", "");
   },
@@ -53,6 +61,8 @@ var pairing = {
    * @param {string} serverUrl
    * @param {string} secret
    */
+  // 入参：serverUrl、secret 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 save 对应业务流程的处理结果。
   save: function (serverUrl, secret) {
     var storage = storages.create(STORAGE_KEY);
     storage.put("server_url", serverUrl);
@@ -70,6 +80,8 @@ var pairing = {
    * @param {Object} [extra] - 额外设备信息 { screen_resolution, sdk_version, available_memory, manufacturer, ... }
    * @returns {Object|null} { pairing_token, status } 或 null
    */
+  // 入参：serverIp、deviceId、deviceName、osVersion、appVersion、extra 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 request 对应业务流程的处理结果。
   request: function (serverIp, deviceId, deviceName, osVersion, appVersion, extra) {
     var port = "8001";
     var ip = serverIp;
@@ -134,6 +146,8 @@ var pairing = {
    * 轮询审批结果
    * @returns {Object|null} { status, secret?, config? } 或 null
    */
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 checkStatus 对应业务流程的处理结果。
   checkStatus: function () {
     if (!this._pairingToken || !this._serverUrl) {
       logger.error(TAG, "无配对令牌，无法查询状态");
@@ -180,6 +194,8 @@ var pairing = {
    * @param {Function} onStatusChange - 状态变化回调 onStatusChange(status, data)
    * @returns {Object|null} 审批结果或 null（超时/失败）
    */
+  // 入参：onStatusChange 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 waitForApproval 对应业务流程的处理结果。
   waitForApproval: function (onStatusChange) {
     if (!this._pairingToken || !this._serverUrl) {
       logger.error(TAG, "无配对令牌，无法等待审批");
@@ -207,9 +223,13 @@ var pairing = {
 
       var listener = new JavaAdapter(WebSocketListener, {
         // 设备业务函数：处理 onOpen 对应的抖音自动化动作、状态或安全边界。
+        // 入参：ws、response 为该业务流程需要的上下文、标识或载荷。
+        // 出参：返回 onOpen 对应业务流程的处理结果。
         onOpen: function (ws, response) {
           logger.info(TAG, "WS 已连接，等待审批...");
         },
+        // 入参：ws、text 为该业务流程需要的上下文、标识或载荷。
+        // 出参：返回 onMessage 对应业务流程的处理结果。
         onMessage: function (ws, text) {
           try {
             var data = JSON.parse(String(text));
@@ -225,10 +245,14 @@ var pairing = {
             logger.error(TAG, "WS 消息解析失败: " + e.message);
           }
         },
+        // 入参：ws、t、response 为该业务流程需要的上下文、标识或载荷。
+        // 出参：返回 onFailure 对应业务流程的处理结果。
         onFailure: function (ws, t, response) {
           logger.error(TAG, "WS 连接失败: " + t.getMessage());
           done = true;
         },
+        // 入参：ws、code、reason 为该业务流程需要的上下文、标识或载荷。
+        // 出参：返回 onClosing 对应业务流程的处理结果。
         onClosing: function (ws, code, reason) {
           try { ws.close(1000, null); } catch (e) { /* already closed */ }
           done = true;
@@ -262,6 +286,8 @@ var pairing = {
    * 获取当前配对令牌（用于外部轮询）
    * @returns {string|null}
    */
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 getPairingToken 对应业务流程的处理结果。
   getPairingToken: function () {
     return this._pairingToken;
   },
@@ -269,6 +295,8 @@ var pairing = {
   /**
    * 清除配对信息（用于重新配对）
    */
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 clear 对应业务流程的处理结果。
   clear: function () {
     var storage = storages.create(STORAGE_KEY);
     storage.remove("device_secret");

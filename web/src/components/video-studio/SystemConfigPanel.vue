@@ -18,6 +18,8 @@ const llmPresets = [
 ]
 
 // 前端业务函数：协调 applyLLMPreset 对应的页面流程、接口调用或状态转换。
+// 入参：preset 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 applyLLMPreset 对应业务流程的处理结果。
 function applyLLMPreset(preset) {
   emit('update:modelValue', {
     ...props.modelValue,
@@ -27,6 +29,8 @@ function applyLLMPreset(preset) {
 }
 
 // 前端业务函数：协调 updateField 对应的页面流程、接口调用或状态转换。
+// 入参：key、value 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 updateField 对应业务流程的处理结果。
 function updateField(key, value) {
   emit('update:modelValue', { ...props.modelValue, [key]: value })
 }

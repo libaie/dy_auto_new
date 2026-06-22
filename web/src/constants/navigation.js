@@ -102,6 +102,8 @@ export const ROUTE_CATEGORY_MAP = {
 }
 
 // 前端业务函数：协调 getCategoryByRoute 对应的页面流程、接口调用或状态转换。
+// 入参：route 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 getCategoryByRoute 对应业务流程的处理结果。
 export function getCategoryByRoute(route) {
   // 1. exact path match
   if (ROUTE_CATEGORY_MAP[route.path] != null) {

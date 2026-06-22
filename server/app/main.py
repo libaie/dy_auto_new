@@ -50,7 +50,11 @@ from app.domains.model_configuration.ai_generator import ai_generator
 
 
 def _one_sentence_reference_check_due(run, now=None) -> bool:
-    """业务函数：处理 _one_sentence_reference_check_due 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _one_sentence_reference_check_due 对应的业务流程、校验或数据转换。
+
+    入参：run、now 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     from datetime import datetime
 
     trace = dict((run.model_trace_json or {}).get("one_sentence") or {})
@@ -66,7 +70,11 @@ def _one_sentence_reference_check_due(run, now=None) -> bool:
 
 
 async def _style_lock_worker(interval_seconds: float | None = None, batch_size: int | None = None):
-    """业务函数：处理 _style_lock_worker 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _style_lock_worker 对应的业务流程、校验或数据转换。
+
+    入参：interval_seconds、batch_size 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Consume durable style-lock jobs so /style-lock does not depend on the page staying open."""
     import logging
     from app.domains.ai_video_series import style_lock
@@ -104,7 +112,11 @@ async def _style_lock_worker(interval_seconds: float | None = None, batch_size: 
 
 
 async def _story_plan_worker(interval_seconds: float | None = None, batch_size: int | None = None):
-    """业务函数：处理 _story_plan_worker 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _story_plan_worker 对应的业务流程、校验或数据转换。
+
+    入参：interval_seconds、batch_size 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Consume durable story-planning jobs so the series page can safely refresh."""
     import logging
     from app.domains.ai_video_series import story_planning
@@ -142,7 +154,11 @@ async def _story_plan_worker(interval_seconds: float | None = None, batch_size: 
 
 
 async def _one_sentence_reference_worker(interval_seconds: float | None = None, batch_size: int | None = None):
-    """业务函数：处理 _one_sentence_reference_worker 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _one_sentence_reference_worker 对应的业务流程、校验或数据转换。
+
+    入参：interval_seconds、batch_size 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Resume one-sentence reference-generation jobs after page refresh or server restart."""
     import logging
     from app.db.models import VideoProductionRun
@@ -193,7 +209,11 @@ async def _one_sentence_reference_worker(interval_seconds: float | None = None, 
 
 
 async def _offline_checker():
-    """业务函数：处理 _offline_checker 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _offline_checker 对应的业务流程、校验或数据转换。
+
+    入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     from app.domains.device_operations.status_lifecycle import offline_checker
 
     await offline_checker()
@@ -201,7 +221,11 @@ async def _offline_checker():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """业务函数：处理 lifespan 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 lifespan 对应的业务流程、校验或数据转换。
+
+    入参：app 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Startup: init DB and seed. Shutdown: stop checker."""
     if get_db not in app.dependency_overrides:
         seed_all()
@@ -256,7 +280,11 @@ _logger = logging.getLogger("app")
 
 @app.middleware("http")
 async def _catch_unhandled_errors(request: Request, call_next):
-    """业务函数：处理 _catch_unhandled_errors 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _catch_unhandled_errors 对应的业务流程、校验或数据转换。
+
+    入参：request、call_next 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     try:
         return await call_next(request)
     except Exception:
@@ -304,7 +332,11 @@ app.include_router(dm_sequences_router.router)
 
 @app.get("/health")
 def health_check():
-    """业务函数：处理 health_check 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 health_check 对应的业务流程、校验或数据转换。
+
+    入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return {"status": "ok", "version": "0.3.0"}
 
 

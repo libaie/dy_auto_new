@@ -8,7 +8,10 @@ from enum import Enum
 
 
 class ProductionErrorCode(str, Enum):
-    """业务类：承载 ProductionErrorCode 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 ProductionErrorCode 相关的数据结构、状态或业务协作。
+
+    类参数：ASSET_COPY_FAILED、ASSET_STORAGE_FAILED、ASSET_URL_MISSING、BUDGET_BLOCKED、BUDGET_EXCEEDED、BUDGET_EXHAUSTED_AFTER_ACTUAL_COST、EPISODE_ASSET_SCOPE_MISSING、INVALID_RUN_TYPE、MIGRATION_HEALTH_BLOCKED、PAUSED_BY_OPERATOR、PROVIDER_STAGE_TASK_EXISTS、PROVIDER_STAGE_TASK_SYNC_REQUIRED、PROVIDER_SUBMIT_FAILED、PROVIDER_TASK_FAILED、PROVIDER_TASK_PENDING、PROVIDER_THROTTLED、RETRY_IMPACT_BLOCKED、REVIEW_GATE_BLOCKED、REVIEW_PERMISSION_DENIED、RUN_LINK_AMBIGUOUS、RUN_LINK_MISSING、RUN_NOT_FOUND、SEGMENT_PLAN_MISSING、STALE_ASSET_VERSION、STORYBOARD_MISSING、STYLE_LOCK_MISSING、TEXT_ARTIFACT_REVIEW_REQUIRED 承载该类的业务配置、状态或数据字段。
+    """
     INVALID_RUN_TYPE = "INVALID_RUN_TYPE"
     RUN_NOT_FOUND = "RUN_NOT_FOUND"
     STYLE_LOCK_MISSING = "STYLE_LOCK_MISSING"
@@ -40,7 +43,10 @@ class ProductionErrorCode(str, Enum):
 
 @dataclass
 class ProductionRepairableError(ValueError):
-    """业务类：承载 ProductionRepairableError 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 ProductionRepairableError 相关的数据结构、状态或业务协作。
+
+    类参数：affected_ids、cause、code、message、repair_action、repair_route、retryable 承载该类的业务配置、状态或数据字段。
+    """
     code: ProductionErrorCode
     message: str
     repair_action: str
@@ -51,7 +57,11 @@ class ProductionRepairableError(ValueError):
 
 
 def to_http_detail(error: ProductionRepairableError) -> dict:
-    """业务函数：处理 to_http_detail 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 to_http_detail 对应的业务流程、校验或数据转换。
+
+    入参：error 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return {
         "code": error.code.value,
         "error_code": error.code.value,

@@ -26,12 +26,19 @@ router = APIRouter(prefix="/api/pixelle", tags=["pixelle"])
 # ---- Config bridge (Pixelle-Video config.yaml read/write) ----
 
 class PixelleConfigUpdate(BaseModel):
-    """业务类：承载 PixelleConfigUpdate 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 PixelleConfigUpdate 相关的数据结构、状态或业务协作。
+
+    类参数：updates 承载该类的业务配置、状态或数据字段。
+    """
     updates: dict = {}
 
 
 def _read_pixelle_config() -> dict:
-    """业务函数：处理 _read_pixelle_config 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _read_pixelle_config 对应的业务流程、校验或数据转换。
+
+    入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     path = Path(PIXELLE_CONFIG_PATH)
     if not path.exists():
         raise HTTPException(status_code=404, detail=f"Pixelle-Video config 文件不存在: {PIXELLE_CONFIG_PATH}")
@@ -40,7 +47,11 @@ def _read_pixelle_config() -> dict:
 
 
 def _write_pixelle_config(data: dict):
-    """业务函数：处理 _write_pixelle_config 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _write_pixelle_config 对应的业务流程、校验或数据转换。
+
+    入参：data 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     path = Path(PIXELLE_CONFIG_PATH)
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
@@ -48,7 +59,11 @@ def _write_pixelle_config(data: dict):
 
 
 def _pixelle_api_key(db: Session | None = None) -> str:
-    """业务函数：处理 _pixelle_api_key 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _pixelle_api_key 对应的业务流程、校验或数据转换。
+
+    入参：db 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if db is not None:
         try:
             from app.db.models import SystemSetting
@@ -61,7 +76,11 @@ def _pixelle_api_key(db: Session | None = None) -> str:
 
 
 def _pixelle_headers(db: Session | None = None) -> dict:
-    """业务函数：处理 _pixelle_headers 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _pixelle_headers 对应的业务流程、校验或数据转换。
+
+    入参：db 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Headers for direct Pixelle-Video HTTP calls (includes API key if configured)."""
     h = {}
     api_key = _pixelle_api_key(db)
@@ -72,7 +91,11 @@ def _pixelle_headers(db: Session | None = None) -> dict:
 
 @tool
 async def reload_pixelle_config(base_url: str, headers: dict) -> bool:
-    """业务函数：处理 reload_pixelle_config 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 reload_pixelle_config 对应的业务流程、校验或数据转换。
+
+    入参：base_url、headers 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Ask Pixelle-Video to reload its config."""
     # Pixelle 管理连接集中设置超时和鉴权头，避免各接口重复拼接 provider 配置。
     async with httpx.AsyncClient(
@@ -88,7 +111,11 @@ async def reload_pixelle_config(base_url: str, headers: dict) -> bool:
 
 @tool
 async def pixelle_openapi_probe(base_url: str, headers: dict) -> dict:
-    """业务函数：处理 pixelle_openapi_probe 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 pixelle_openapi_probe 对应的业务流程、校验或数据转换。
+
+    入参：base_url、headers 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Read Pixelle-Video OpenAPI metadata for a connectivity check."""
     # Pixelle 管理连接集中设置超时和鉴权头，避免各接口重复拼接 provider 配置。
     async with httpx.AsyncClient(
@@ -103,7 +130,11 @@ async def pixelle_openapi_probe(base_url: str, headers: dict) -> dict:
 
 
 def _redact_api_key(key: str) -> str:
-    """业务函数：处理 _redact_api_key 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _redact_api_key 对应的业务流程、校验或数据转换。
+
+    入参：key 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if not key or len(key) < 8:
         return key
     return key[:4] + "*" * (len(key) - 8) + key[-4:]
@@ -113,7 +144,11 @@ _SECRET_KEY_PARTS = ("api_key", "api_secret", "secret", "token", "authorization"
 
 
 def _redact_secrets(config):
-    """业务函数：处理 _redact_secrets 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _redact_secrets 对应的业务流程、校验或数据转换。
+
+    入参：config 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Return a deep copy with secret-looking values redacted for safe display."""
     if isinstance(config, list):
         return [_redact_secrets(item) for item in config]
@@ -132,13 +167,21 @@ def _redact_secrets(config):
 async def get_pixelle_config(
     user = Depends(require_role("admin")),
 ):
-    """业务函数：处理 get_pixelle_config 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 get_pixelle_config 对应的业务流程、校验或数据转换。
+
+    入参：user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Read Pixelle-Video config.yaml (API keys redacted)."""
     return _redact_secrets(_read_pixelle_config())
 
 
 def _serialize_ai_models(db: Session) -> dict:
-    """业务函数：处理 _serialize_ai_models 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _serialize_ai_models 对应的业务流程、校验或数据转换。
+
+    入参：db 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Read AIModel table and serialize to Pixelle-Video ai_models.scenes format."""
     from app.db.models import AIModel
     from app.domains.system_configuration.crypto import decrypt
@@ -181,12 +224,20 @@ async def update_pixelle_config(
     db: Session = Depends(get_db),
     user = Depends(require_role("admin")),
 ):
-    """业务函数：处理 update_pixelle_config 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 update_pixelle_config 对应的业务流程、校验或数据转换。
+
+    入参：body、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Update Pixelle-Video config.yaml with deep merge, then trigger reload."""
     current = _read_pixelle_config()
 
     def deep_merge(base, updates):
-        """业务函数：处理 deep_merge 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 deep_merge 对应的业务流程、校验或数据转换。
+
+        入参：base、updates 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         for key, value in updates.items():
             if isinstance(value, dict) and isinstance(base.get(key), dict):
                 deep_merge(base[key], value)
@@ -220,7 +271,11 @@ async def template_preview_image(
     token: str = Query(None),
     authorization: str = Header(None),
 ):
-    """业务函数：处理 template_preview_image 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 template_preview_image 对应的业务流程、校验或数据转换。
+
+    入参：size、filename、token、authorization 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Serve template preview image. Accepts token via query param for <img> tags."""
     username = None
     if authorization and authorization.startswith("Bearer "):
@@ -260,7 +315,11 @@ async def test_connection(
     db: Session = Depends(get_db),
     user = Depends(require_role("admin")),
 ):
-    """业务函数：处理 test_connection 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 test_connection 对应的业务流程、校验或数据转换。
+
+    入参：db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Test connectivity to Pixelle-Video."""
     cfg = _resolve_pixelle_config(db)
     try:
@@ -296,7 +355,11 @@ _proxy_client_api_key = None
 
 
 def _get_proxy_client(db=None) -> httpx.AsyncClient:
-    """业务函数：处理 _get_proxy_client 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _get_proxy_client 对应的业务流程、校验或数据转换。
+
+    入参：db 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     global _proxy_client, _proxy_client_url, _proxy_client_api_key
     cfg = _resolve_pixelle_config(db)
     url = cfg["url"]
@@ -320,7 +383,11 @@ def _get_proxy_client(db=None) -> httpx.AsyncClient:
 
 
 async def _do_proxy(request: Request, db: Session, path: str = "") -> Response:
-    """业务函数：处理 _do_proxy 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _do_proxy 对应的业务流程、校验或数据转换。
+
+    入参：request、db、path 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Core proxy logic — forward request to Pixelle-Video and return response."""
     client = _get_proxy_client(db)
 
@@ -379,7 +446,11 @@ async def proxy_to_pixelle(
     db: Session = Depends(get_db),
     user = Depends(require_role("admin")),
 ):
-    """业务函数：处理 proxy_to_pixelle 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 proxy_to_pixelle 对应的业务流程、校验或数据转换。
+
+    入参：path、request、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return await _do_proxy(request, db, path)
 
 
@@ -389,5 +460,9 @@ async def proxy_root_to_pixelle(
     db: Session = Depends(get_db),
     user = Depends(require_role("admin")),
 ):
-    """业务函数：处理 proxy_root_to_pixelle 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 proxy_root_to_pixelle 对应的业务流程、校验或数据转换。
+
+    入参：request、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return await _do_proxy(request, db, "")

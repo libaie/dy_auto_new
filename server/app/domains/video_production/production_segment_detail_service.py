@@ -16,7 +16,11 @@ from app.db.models.video_production import (
 
 
 def _asset_payload(asset: VideoProductionAsset | None) -> dict | None:
-    """业务函数：处理 _asset_payload 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _asset_payload 对应的业务流程、校验或数据转换。
+
+    入参：asset 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if not asset:
         return None
     return {
@@ -33,7 +37,11 @@ def _asset_payload(asset: VideoProductionAsset | None) -> dict | None:
 
 
 def get_segment_detail(db: Session, segment_id: str, history_limit: int = 10) -> dict:
-    """业务函数：处理 get_segment_detail 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 get_segment_detail 对应的业务流程、校验或数据转换。
+
+    入参：db、segment_id、history_limit 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     segment = db.query(ProductionSegment).filter(ProductionSegment.id == segment_id).first()
     if not segment:
         raise ValueError("Production segment not found")

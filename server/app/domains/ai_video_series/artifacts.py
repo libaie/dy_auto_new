@@ -17,7 +17,11 @@ PLACEHOLDER_STORY_PLAN_SOURCES = {"system_backfill", "legacy_run_backfill"}
 
 
 def actor_id(user) -> str | None:
-    """业务函数：处理 actor_id 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 actor_id 对应的业务流程、校验或数据转换。
+
+    入参：user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if isinstance(user, tuple) and user:
         return str(user[0])
     if isinstance(user, str):
@@ -26,7 +30,11 @@ def actor_id(user) -> str | None:
 
 
 def storyboard_text_values(storyboard: dict, key: str) -> list[str]:
-    """业务函数：处理 storyboard_text_values 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 storyboard_text_values 对应的业务流程、校验或数据转换。
+
+    入参：storyboard、key 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     frames = storyboard.get("frames") or []
     if not isinstance(frames, list):
         return []
@@ -49,7 +57,11 @@ def storyboard_text_values(storyboard: dict, key: str) -> list[str]:
 
 
 def record_episode_update_text_artifacts(db: Session, episode: Episode, payload: dict, user) -> None:
-    """业务函数：处理 record_episode_update_text_artifacts 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 record_episode_update_text_artifacts 对应的业务流程、校验或数据转换。
+
+    入参：db、episode、payload、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     service = AITextArtifactService(db)
     actor = actor_id(user) or "episode_update"
     base_input = {
@@ -104,7 +116,11 @@ def record_episode_update_text_artifacts(db: Session, episode: Episode, payload:
 
 
 def story_plan_artifact_summary(artifact) -> dict:
-    """业务函数：处理 story_plan_artifact_summary 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 story_plan_artifact_summary 对应的业务流程、校验或数据转换。
+
+    入参：artifact 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return {
         "id": artifact.id,
         "artifact_type": artifact.artifact_type,
@@ -118,7 +134,11 @@ def story_plan_artifact_summary(artifact) -> dict:
 
 
 def completed_story_plan_payload(db: Session, series: Series) -> dict | None:
-    """业务函数：处理 completed_story_plan_payload 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 completed_story_plan_payload 对应的业务流程、校验或数据转换。
+
+    入参：db、series 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     target_episode_count = max(1, int(series.total_episodes or 1))
     episodes = (
         db.query(Episode)
@@ -183,7 +203,11 @@ def _mark_story_planning_completed(
     artifacts: list[dict],
     target_episode_count: int,
 ) -> dict:
-    """业务函数：处理 _mark_story_planning_completed 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _mark_story_planning_completed 对应的业务流程、校验或数据转换。
+
+    入参：db、series、current、artifacts、target_episode_count 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     story_bible = dict(series.story_bible_json or {})
     current = dict(current)
     current["version"] = int(current.get("version") or 1)

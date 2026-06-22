@@ -29,7 +29,11 @@ _PLAN_LOCKS_GUARD = threading.Lock()
 
 
 def _plan_lock(plan_id: str) -> threading.RLock:
-    """业务函数：处理 _plan_lock 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _plan_lock 对应的业务流程、校验或数据转换。
+
+    入参：plan_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     with _PLAN_LOCKS_GUARD:
         lock = _PLAN_LOCKS.get(plan_id)
         if lock is None:
@@ -39,7 +43,11 @@ def _plan_lock(plan_id: str) -> threading.RLock:
 
 
 def _plan(db: Session, plan_id: str) -> ProductionPlan:
-    """业务函数：处理 _plan 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _plan 对应的业务流程、校验或数据转换。
+
+    入参：db、plan_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     plan = db.query(ProductionPlan).filter(ProductionPlan.id == plan_id).first()
     if not plan:
         raise ValueError("Production plan not found")
@@ -47,7 +55,11 @@ def _plan(db: Session, plan_id: str) -> ProductionPlan:
 
 
 def _locked_plan(db: Session, plan_id: str) -> ProductionPlan:
-    """业务函数：处理 _locked_plan 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _locked_plan 对应的业务流程、校验或数据转换。
+
+    入参：db、plan_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     query = db.query(ProductionPlan).filter(ProductionPlan.id == plan_id)
     if db.get_bind().dialect.name == "sqlite":
         plan = query.first()
@@ -59,7 +71,11 @@ def _locked_plan(db: Session, plan_id: str) -> ProductionPlan:
 
 
 def _reservation(db: Session, reservation_id: str) -> ProviderCostReservation:
-    """业务函数：处理 _reservation 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _reservation 对应的业务流程、校验或数据转换。
+
+    入参：db、reservation_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     reservation = (
         db.query(ProviderCostReservation)
         .filter(ProviderCostReservation.id == reservation_id)
@@ -71,7 +87,11 @@ def _reservation(db: Session, reservation_id: str) -> ProviderCostReservation:
 
 
 def _repairable_state_error(message: str, reservation: ProviderCostReservation) -> ProductionRepairableError:
-    """业务函数：处理 _repairable_state_error 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _repairable_state_error 对应的业务流程、校验或数据转换。
+
+    入参：message、reservation 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return ProductionRepairableError(
         code=ProductionErrorCode.BUDGET_BLOCKED,
         message=message,
@@ -84,7 +104,11 @@ def _repairable_state_error(message: str, reservation: ProviderCostReservation) 
 
 
 def active_reserved_cost(db: Session, plan_id: str) -> float:
-    """业务函数：处理 active_reserved_cost 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 active_reserved_cost 对应的业务流程、校验或数据转换。
+
+    入参：db、plan_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     total = (
         db.query(func.coalesce(func.sum(ProviderCostReservation.reserved_cost), 0.0))
         .filter(
@@ -105,7 +129,11 @@ def create_cost_reservation(
     currency: str = "CNY",
     expires_at=None,
 ) -> ProviderCostReservation:
-    """业务函数：处理 create_cost_reservation 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 create_cost_reservation 对应的业务流程、校验或数据转换。
+
+    入参：db、plan_id、provider_stage_task_id、estimated_cost、currency、expires_at 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     with _plan_lock(plan_id):
         plan = _locked_plan(db, plan_id)
         estimated = float(estimated_cost)
@@ -139,7 +167,11 @@ def create_cost_reservation(
 
 
 def mark_reservation_submitted(db: Session, reservation_id: str) -> ProviderCostReservation:
-    """业务函数：处理 mark_reservation_submitted 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 mark_reservation_submitted 对应的业务流程、校验或数据转换。
+
+    入参：db、reservation_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     reservation = _reservation(db, reservation_id)
     if reservation.status == COST_SUBMITTED:
         return reservation
@@ -157,7 +189,11 @@ def mark_reservation_submitted(db: Session, reservation_id: str) -> ProviderCost
 
 
 def mark_reservation_stale_needs_repair(db: Session, reservation_id: str) -> ProviderCostReservation:
-    """业务函数：处理 mark_reservation_stale_needs_repair 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 mark_reservation_stale_needs_repair 对应的业务流程、校验或数据转换。
+
+    入参：db、reservation_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     reservation = _reservation(db, reservation_id)
     if reservation.status == COST_STALE_NEEDS_REPAIR:
         return reservation
@@ -180,7 +216,11 @@ def settle_reservation(
     actual_cost: float,
     units_json=None,
 ) -> ProviderCostReservation:
-    """业务函数：处理 settle_reservation 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 settle_reservation 对应的业务流程、校验或数据转换。
+
+    入参：db、reservation_id、actual_cost、units_json 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     with db.no_autoflush:
         plan_id = (
             db.query(ProviderCostReservation.plan_id)
@@ -241,7 +281,11 @@ def settle_reservation(
 
 
 def release_unsubmitted_reservation(db: Session, reservation_id: str) -> ProviderCostReservation:
-    """业务函数：处理 release_unsubmitted_reservation 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 release_unsubmitted_reservation 对应的业务流程、校验或数据转换。
+
+    入参：db、reservation_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     reservation = _reservation(db, reservation_id)
     if reservation.status == COST_RELEASED:
         return reservation
@@ -258,7 +302,11 @@ def release_unsubmitted_reservation(db: Session, reservation_id: str) -> Provide
 
 
 def expire_unsubmitted_reservations(db: Session) -> int:
-    """业务函数：处理 expire_unsubmitted_reservations 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 expire_unsubmitted_reservations 对应的业务流程、校验或数据转换。
+
+    入参：db 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     now = bj_now()
     expired = (
         db.query(ProviderCostReservation)

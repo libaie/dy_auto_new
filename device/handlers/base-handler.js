@@ -17,6 +17,8 @@ var BaseHandler = {
    * @param {Object} params - 任务参数
    * @returns {Object} { success: boolean, result: Object, error?: string }
    */
+  // 入参：params 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 execute 对应业务流程的处理结果。
   execute: function (params) {
     throw new Error("execute() not implemented");
   },
@@ -25,6 +27,8 @@ var BaseHandler = {
    * 确保抖音在前台，不在则启动
    * @returns {boolean}
    */
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 ensureAppActive 对应业务流程的处理结果。
   ensureAppActive: function () {
     if (!uiOperator.isAppActive()) {
       return uiOperator.openApp();
@@ -38,6 +42,8 @@ var BaseHandler = {
    * @param {number} retries
    * @returns {boolean}
    */
+  // 入参：actionName、retries 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 safeClick 对应业务流程的处理结果。
   safeClick: function (actionName, retries) {
     retries = retries || 3;
     for (var i = 0; i < retries; i++) {
@@ -60,6 +66,8 @@ var BaseHandler = {
    * @param {string} text
    * @returns {boolean}
    */
+  // 入参：actionName、text 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 safeInput 对应业务流程的处理结果。
   safeInput: function (actionName, text) {
     var element = uiOperator.findElement(actionName, 5000);
     if (element) {
@@ -79,6 +87,8 @@ var BaseHandler = {
    * 通过键盘回车提交（优先键盘，回退点击提交按钮）
    * @param {string} submitActionName - 提交按钮的动作名（回退方案）
    */
+  // 入参：submitActionName 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 submitViaKeyboard 对应业务流程的处理结果。
   submitViaKeyboard: function (submitActionName) {
     return uiOperator.submitViaKeyboard(submitActionName);
   },
@@ -87,6 +97,8 @@ var BaseHandler = {
    * 从当前屏幕提取视频相关文本（标题、描述、作者等）
    * @returns {string} 拼接的文本内容
    */
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _extractVideoText 对应业务流程的处理结果。
   _extractVideoText: function () {
     var parts = [];
     try {
@@ -126,31 +138,43 @@ var BaseHandler = {
    * 在父元素内按选择器策略查找子元素
    * 支持 conditions/AND/OR、match_mode:contains、chain
    */
+  // 入参：parent、actionName 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _findChildBySelector 对应业务流程的处理结果。
   _findChildBySelector: function (parent, actionName) {
     return selectorResolver.findChildBySelector(parent, actionName);
   },
 
   // 设备业务函数：处理 _findByStrategyInParent 对应的抖音自动化动作、状态或安全边界。
+  // 入参：parent、strategy 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _findByStrategyInParent 对应业务流程的处理结果。
   _findByStrategyInParent: function (parent, strategy) {
     return selectorResolver.findByStrategyInParent(parent, strategy);
   },
 
   // 设备业务函数：处理 _findByCondInParent 对应的抖音自动化动作、状态或安全边界。
+  // 入参：parent、cond 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _findByCondInParent 对应业务流程的处理结果。
   _findByCondInParent: function (parent, cond) {
     return selectorResolver.findByCondInParent(parent, cond);
   },
 
   // 设备业务函数：处理 _findAllByCondInParent 对应的抖音自动化动作、状态或安全边界。
+  // 入参：parent、cond 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _findAllByCondInParent 对应业务流程的处理结果。
   _findAllByCondInParent: function (parent, cond) {
     return selectorResolver.findAllByCondInParent(parent, cond);
   },
 
   // 设备业务函数：处理 _findByConditionsInParent 对应的抖音自动化动作、状态或安全边界。
+  // 入参：parent、strategy 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _findByConditionsInParent 对应业务流程的处理结果。
   _findByConditionsInParent: function (parent, strategy) {
     return selectorResolver.findByConditionsInParent(parent, strategy);
   },
 
   // 设备业务函数：处理 _findByChainInParent 对应的抖音自动化动作、状态或安全边界。
+  // 入参：parent、steps 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _findByChainInParent 对应业务流程的处理结果。
   _findByChainInParent: function (parent, steps) {
     return selectorResolver.findByChainInParent(parent, steps);
   },
@@ -158,6 +182,8 @@ var BaseHandler = {
   /**
    * 从子元素提取值（支持选择器的 purpose=extract 配置）
    */
+  // 入参：el、actionName、fallback 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 _extractChildValue 对应业务流程的处理结果。
   _extractChildValue: function (el, actionName, fallback) {
     var selector = selectorLoader.get(actionName);
     if (selector && selector.purpose === "extract") {

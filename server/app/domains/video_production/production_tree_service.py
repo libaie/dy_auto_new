@@ -33,12 +33,20 @@ from app.domains.video_production.production_status import (
 
 
 def _normalize_page(page: int, page_size: int) -> tuple[int, int]:
-    """业务函数：处理 _normalize_page 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _normalize_page 对应的业务流程、校验或数据转换。
+
+    入参：page、page_size 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return max(1, int(page or 1)), min(max(1, int(page_size or 50)), 100)
 
 
 def _plan_payload(plan: ProductionPlan) -> dict:
-    """业务函数：处理 _plan_payload 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _plan_payload 对应的业务流程、校验或数据转换。
+
+    入参：plan 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return {
         "id": plan.id,
         "series_id": plan.series_id,
@@ -49,7 +57,11 @@ def _plan_payload(plan: ProductionPlan) -> dict:
 
 
 def _episode_payload(episode: ProductionEpisode, scenes: list[dict]) -> dict:
-    """业务函数：处理 _episode_payload 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _episode_payload 对应的业务流程、校验或数据转换。
+
+    入参：episode、scenes 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return {
         "id": episode.id,
         "episode_id": episode.episode_id,
@@ -61,7 +73,11 @@ def _episode_payload(episode: ProductionEpisode, scenes: list[dict]) -> dict:
 
 
 def _scene_payload(scene: ProductionScene, shots: list[dict]) -> dict:
-    """业务函数：处理 _scene_payload 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _scene_payload 对应的业务流程、校验或数据转换。
+
+    入参：scene、shots 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return {
         "id": scene.id,
         "scene_id": scene.scene_id,
@@ -73,7 +89,11 @@ def _scene_payload(scene: ProductionScene, shots: list[dict]) -> dict:
 
 
 def _shot_payload(shot: ProductionShot, segments: list[dict]) -> dict:
-    """业务函数：处理 _shot_payload 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _shot_payload 对应的业务流程、校验或数据转换。
+
+    入参：shot、segments 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return {
         "id": shot.id,
         "shot_id": shot.shot_id,
@@ -85,7 +105,11 @@ def _shot_payload(shot: ProductionShot, segments: list[dict]) -> dict:
 
 
 def _asset_payload(asset: VideoProductionAsset) -> dict:
-    """业务函数：处理 _asset_payload 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _asset_payload 对应的业务流程、校验或数据转换。
+
+    入参：asset 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return {
         "id": asset.id,
         "asset_type": asset.asset_type,
@@ -101,7 +125,11 @@ def _asset_payload(asset: VideoProductionAsset) -> dict:
 
 
 def _job_payload(job: ProductionJob) -> dict:
-    """业务函数：处理 _job_payload 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _job_payload 对应的业务流程、校验或数据转换。
+
+    入参：job 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     return {
         "id": job.id,
         "stage": job.stage,
@@ -119,7 +147,11 @@ def _segment_payload(
     jobs_by_segment: dict[str, list[ProductionJob]] | None = None,
     latest_assets_by_segment: dict[str, dict[str, VideoProductionAsset]] | None = None,
 ) -> dict:
-    """业务函数：处理 _segment_payload 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _segment_payload 对应的业务流程、校验或数据转换。
+
+    入参：segment、jobs_by_segment、latest_assets_by_segment 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     jobs = {
         job.stage: _job_payload(job)
         for job in (jobs_by_segment or {}).get(segment.id, [])
@@ -147,7 +179,11 @@ def _effective_segment_status(
     jobs: list[dict],
     latest_assets: dict[str, dict],
 ) -> str:
-    """业务函数：处理 _effective_segment_status 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _effective_segment_status 对应的业务流程、校验或数据转换。
+
+    入参：segment、jobs、latest_assets 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     by_stage = {job["stage"]: job["status"] for job in jobs}
     if JOB_BLOCKED in set(by_stage.values()):
         return SEGMENT_BLOCKED_BY_REVIEW
@@ -176,7 +212,11 @@ def get_run_tree(
     status: str | None = None,
     run_id: str | None = None,
 ) -> dict:
-    """业务函数：处理 get_run_tree 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 get_run_tree 对应的业务流程、校验或数据转换。
+
+    入参：db、plan_id、page、page_size、status、run_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     plan = db.query(ProductionPlan).filter(ProductionPlan.id == plan_id).first()
     if not plan:
         raise ValueError("Production plan not found")
@@ -265,7 +305,11 @@ def get_run_tree(
 
 
 def _jobs_by_segment(db: Session, plan_id: str, segment_ids: list[str]) -> dict[str, list[ProductionJob]]:
-    """业务函数：处理 _jobs_by_segment 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _jobs_by_segment 对应的业务流程、校验或数据转换。
+
+    入参：db、plan_id、segment_ids 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if not segment_ids:
         return {}
     rows = (
@@ -288,7 +332,11 @@ def _latest_assets_by_segment(
     *,
     run_id: str | None = None,
 ) -> dict[str, dict[str, VideoProductionAsset]]:
-    """业务函数：处理 _latest_assets_by_segment 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _latest_assets_by_segment 对应的业务流程、校验或数据转换。
+
+    入参：db、segment_ids、run_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if not segment_ids:
         return {}
     query = (
@@ -306,7 +354,11 @@ def _latest_assets_by_segment(
 
 
 def _repair_nodes(db: Session, plan_id: str) -> list[dict]:
-    """业务函数：处理 _repair_nodes 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _repair_nodes 对应的业务流程、校验或数据转换。
+
+    入参：db、plan_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     jobs = (
         db.query(ProductionJob)
         .filter(ProductionJob.plan_id == plan_id)

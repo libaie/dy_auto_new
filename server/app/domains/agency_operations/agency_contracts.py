@@ -13,14 +13,20 @@ except ImportError:  # pragma: no cover - Python < 3.11 compatibility
     from enum import Enum
 
     class StrEnum(str, Enum):
-        """业务类：承载 StrEnum 相关的数据结构、状态或业务协作。"""
+        """业务类：承载 StrEnum 相关的数据结构、状态或业务协作。
+
+        类参数：无显式类参数 承载该类的业务配置、状态或数据字段。
+        """
         pass
 
 from pydantic import BaseModel, Field
 
 
 class AgencyExecutionStatus(StrEnum):
-    """业务类：承载 AgencyExecutionStatus 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 AgencyExecutionStatus 相关的数据结构、状态或业务协作。
+
+    类参数：cancelled、completed、failed、queued、running 承载该类的业务配置、状态或数据字段。
+    """
     queued = "queued"
     running = "running"
     completed = "completed"
@@ -29,7 +35,10 @@ class AgencyExecutionStatus(StrEnum):
 
 
 class AgencyInvocationResultStatus(StrEnum):
-    """业务类：承载 AgencyInvocationResultStatus 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 AgencyInvocationResultStatus 相关的数据结构、状态或业务协作。
+
+    类参数：blocked、failed、passed、pending、warn 承载该类的业务配置、状态或数据字段。
+    """
     pending = "pending"
     passed = "passed"
     warn = "warn"
@@ -38,7 +47,10 @@ class AgencyInvocationResultStatus(StrEnum):
 
 
 class AgencyStepStatus(StrEnum):
-    """业务类：承载 AgencyStepStatus 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 AgencyStepStatus 相关的数据结构、状态或业务协作。
+
+    类参数：blocked、completed、failed、pending、running、warning 承载该类的业务配置、状态或数据字段。
+    """
     pending = "pending"
     running = "running"
     completed = "completed"
@@ -48,7 +60,10 @@ class AgencyStepStatus(StrEnum):
 
 
 class AgencyExpertSummary(BaseModel):
-    """业务类：承载 AgencyExpertSummary 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 AgencyExpertSummary 相关的数据结构、状态或业务协作。
+
+    类参数：expert_id、legacy、name、phases、role_type、sha256、source_commit、source_path 承载该类的业务配置、状态或数据字段。
+    """
     expert_id: str
     name: str
     role_type: str
@@ -60,7 +75,10 @@ class AgencyExpertSummary(BaseModel):
 
 
 class AgencyInvocationSummary(BaseModel):
-    """业务类：承载 AgencyInvocationSummary 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 AgencyInvocationSummary 相关的数据结构、状态或业务协作。
+
+    类参数：decision、display_scope、duration_ms、error_code、evidence、execution_status、expert_id、findings、id、legacy、next_action、required_changes、result_status、role、stage、summary 承载该类的业务配置、状态或数据字段。
+    """
     id: str
     stage: str
     expert_id: str
@@ -80,7 +98,10 @@ class AgencyInvocationSummary(BaseModel):
 
 
 class AgencyInvocationDetail(AgencyInvocationSummary):
-    """业务类：承载 AgencyInvocationDetail 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 AgencyInvocationDetail 相关的数据结构、状态或业务协作。
+
+    类参数：evidence、input_summary、model_config_snapshot、output_summary、repair_action、repair_route、repair_target_ids、repair_target_type、retry_scope、source_commit、source_path、source_repo、source_sha256、token_usage 承载该类的业务配置、状态或数据字段。
+    """
     input_summary: dict[str, Any] = Field(default_factory=dict)
     output_summary: dict[str, Any] = Field(default_factory=dict)
     evidence: list[Any] = Field(default_factory=list)
@@ -98,7 +119,10 @@ class AgencyInvocationDetail(AgencyInvocationSummary):
 
 
 class AgencyDecisionLogItem(BaseModel):
-    """业务类：承载 AgencyDecisionLogItem 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 AgencyDecisionLogItem 相关的数据结构、状态或业务协作。
+
+    类参数：decision、display_scope、error_code、evidence、expert_id、findings、id、invocation_id、legacy、next_action、required_changes、result_status、role、stage 承载该类的业务配置、状态或数据字段。
+    """
     id: str
     invocation_id: str
     stage: str
@@ -116,7 +140,10 @@ class AgencyDecisionLogItem(BaseModel):
 
 
 class AgencyStageGraphNode(BaseModel):
-    """业务类：承载 AgencyStageGraphNode 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 AgencyStageGraphNode 相关的数据结构、状态或业务协作。
+
+    类参数：invocation_ids、label、lead、qa、reviewers、stage、status 承载该类的业务配置、状态或数据字段。
+    """
     stage: str
     label: str
     status: AgencyStepStatus
@@ -127,7 +154,10 @@ class AgencyStageGraphNode(BaseModel):
 
 
 class AgencyConsoleResponse(BaseModel):
-    """业务类：承载 AgencyConsoleResponse 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 AgencyConsoleResponse 相关的数据结构、状态或业务协作。
+
+    类参数：agency_trace_status、decision_log、expert_invocations、expert_team、latest_run、ok、production_steps、series、stage_graph 承载该类的业务配置、状态或数据字段。
+    """
     ok: bool = True
     series: dict[str, Any]
     latest_run: dict[str, Any] | None = None

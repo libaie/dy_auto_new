@@ -13,7 +13,11 @@ logger = logging.getLogger(__name__)
 
 
 async def maybe_resolve_content_template(params: dict, task_type: str, db=None) -> dict:
-    """业务函数：处理 maybe_resolve_content_template 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 maybe_resolve_content_template 对应的业务流程、校验或数据转换。
+
+    入参：params、task_type、db 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """If params has content_template_id, resolve it into params.content."""
     template_id = params.get("content_template_id")
     if not template_id:
@@ -30,7 +34,11 @@ async def maybe_resolve_content_template(params: dict, task_type: str, db=None) 
 
 
 async def maybe_resolve_dm_sequence(params: dict, db=None) -> dict:
-    """业务函数：处理 maybe_resolve_dm_sequence 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 maybe_resolve_dm_sequence 对应的业务流程、校验或数据转换。
+
+    入参：params、db 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Resolve dm_sequence_id into inline messages while preserving the id."""
     seq_id = params.get("dm_sequence_id")
     if not seq_id or not db:
@@ -55,7 +63,11 @@ async def maybe_resolve_dm_sequence(params: dict, db=None) -> dict:
 
 
 async def maybe_expand_keywords(params: dict, task_type: str, db=None) -> dict:
-    """业务函数：处理 maybe_expand_keywords 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 maybe_expand_keywords 对应的业务流程、校验或数据转换。
+
+    入参：params、task_type、db 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """If nurture task has keywords, expand them into keyword_matrix via AI."""
     if task_type != "nurture" or "keywords" not in params:
         return params
@@ -82,7 +94,11 @@ async def maybe_expand_keywords(params: dict, task_type: str, db=None) -> dict:
 
 
 def maybe_resolve_nurture_subtask_templates(params: dict, task_type: str, db=None) -> dict:
-    """业务函数：处理 maybe_resolve_nurture_subtask_templates 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 maybe_resolve_nurture_subtask_templates 对应的业务流程、校验或数据转换。
+
+    入参：params、task_type、db 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if task_type != "nurture" or not db:
         return params
     sub_tasks = params.get("sub_tasks")
@@ -111,14 +127,22 @@ def maybe_resolve_nurture_subtask_templates(params: dict, task_type: str, db=Non
 
 
 def resolve_task_type(type_val) -> TaskType:
-    """业务函数：处理 resolve_task_type 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 resolve_task_type 对应的业务流程、校验或数据转换。
+
+    入参：type_val 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     if isinstance(type_val, TaskType):
         return type_val
     return TaskType(type_val)
 
 
 def validate_and_normalize_params(task_type: str, params: dict) -> dict:
-    """业务函数：处理 validate_and_normalize_params 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 validate_and_normalize_params 对应的业务流程、校验或数据转换。
+
+    入参：task_type、params 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Validate and normalize task params using models.TASK_PARAMS_VALIDATORS."""
     from app.models import TASK_PARAMS_VALIDATORS
     from pydantic import BaseModel as PydanticBase

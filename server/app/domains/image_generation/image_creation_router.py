@@ -37,7 +37,10 @@ router = APIRouter(prefix="/api/image-creation", tags=["image-creation"])
 
 
 class CreateImageTaskRequest(BaseModel):
-    """业务类：承载 CreateImageTaskRequest 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 CreateImageTaskRequest 相关的数据结构、状态或业务协作。
+
+    类参数：cost_confirmation、count、destination_context、destination_role、episode_id、idempotency_key、mode、model_id、negative_prompt、output_format、prompt、provider_options、reference_images、response_format、selection_preview_id、selection_preview_request_hash、series_id、size、source、source_asset_id、source_url、strategy_id、strategy_version、watermark 承载该类的业务配置、状态或数据字段。
+    """
     mode: str
     prompt: str
     negative_prompt: str = ""
@@ -65,7 +68,10 @@ class CreateImageTaskRequest(BaseModel):
 
 
 class ReviewImageAssetRequest(BaseModel):
-    """业务类：承载 ReviewImageAssetRequest 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 ReviewImageAssetRequest 相关的数据结构、状态或业务协作。
+
+    类参数：action、asset_version、comment、report_json 承载该类的业务配置、状态或数据字段。
+    """
     action: str
     comment: str = ""
     asset_version: int = Field(..., ge=1)
@@ -73,7 +79,10 @@ class ReviewImageAssetRequest(BaseModel):
 
 
 class EditImageAssetRequest(BaseModel):
-    """业务类：承载 EditImageAssetRequest 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 EditImageAssetRequest 相关的数据结构、状态或业务协作。
+
+    类参数：action、asset_version、cost_confirmation、count、destination_context、destination_role、episode_id、idempotency_key、model_id、negative_prompt、output_format、prompt、provider_options、reference_images、response_format、selection_preview_id、selection_preview_request_hash、series_id、size、strategy_id、strategy_version、watermark 承载该类的业务配置、状态或数据字段。
+    """
     prompt: str
     action: str = "repaint"
     asset_version: int | None = Field(None, ge=1)
@@ -100,7 +109,11 @@ class EditImageAssetRequest(BaseModel):
 
 @router.post("/uploads")
 async def upload_image(file: UploadFile = File(...), user=Depends(require_role("admin"))):
-    """业务函数：处理 upload_image 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 upload_image 对应的业务流程、校验或数据转换。
+
+    入参：file、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     try:
         saved = await save_upload(file, configured_public_base_url())
     except ValueError as exc:
@@ -119,7 +132,11 @@ async def upload_image(file: UploadFile = File(...), user=Depends(require_role("
 
 @router.get("/pixelle-files/{file_path:path}")
 async def pixelle_file(file_path: str, db: Session = Depends(get_db)):
-    """业务函数：处理 pixelle_file 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 pixelle_file 对应的业务流程、校验或数据转换。
+
+    入参：file_path、db 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     clean = unquote(file_path).lstrip("/")
     if not clean or ".." in PurePosixPath(clean).parts:
         raise image_error(
@@ -159,7 +176,11 @@ async def pixelle_file(file_path: str, db: Session = Depends(get_db)):
 
 @router.post("/tasks")
 async def create_task(body: CreateImageTaskRequest, db: Session = Depends(get_db), user=Depends(require_role("admin"))):
-    """业务函数：处理 create_task 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 create_task 对应的业务流程、校验或数据转换。
+
+    入参：body、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     payload = body.model_dump()
     if isinstance(user, tuple):
         payload["user_id"] = user[0]
@@ -169,7 +190,11 @@ async def create_task(body: CreateImageTaskRequest, db: Session = Depends(get_db
 
 @router.get("/tasks/{task_id}")
 async def read_task(task_id: str, db: Session = Depends(get_db), user=Depends(require_role("admin"))):
-    """业务函数：处理 read_task 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 read_task 对应的业务流程、校验或数据转换。
+
+    入参：task_id、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     from app.db.models.image_production import ImageCreationAsset, ImageCreationTask
 
     task = db.query(ImageCreationTask).filter(ImageCreationTask.id == task_id).first()
@@ -181,7 +206,11 @@ async def read_task(task_id: str, db: Session = Depends(get_db), user=Depends(re
 
 @router.post("/tasks/{task_id}/sync")
 async def sync_task(task_id: str, db: Session = Depends(get_db), user=Depends(require_role("admin"))):
-    """业务函数：处理 sync_task 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 sync_task 对应的业务流程、校验或数据转换。
+
+    入参：task_id、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     from app.db.models.image_production import ImageCreationAsset
 
     task = await sync_image_task(db, task_id)
@@ -191,7 +220,11 @@ async def sync_task(task_id: str, db: Session = Depends(get_db), user=Depends(re
 
 @router.post("/tasks/{task_id}/dispatch")
 async def dispatch_task(task_id: str, db: Session = Depends(get_db), user=Depends(require_role("admin"))):
-    """业务函数：处理 dispatch_task 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 dispatch_task 对应的业务流程、校验或数据转换。
+
+    入参：task_id、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     task = await dispatch_queued_image_task(db, task_id)
     return {"ok": True, "task": task_payload(task), "assets": []}
 
@@ -207,7 +240,11 @@ async def assets(
     db: Session = Depends(get_db),
     user=Depends(require_role("admin")),
 ):
-    """业务函数：处理 assets 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 assets 对应的业务流程、校验或数据转换。
+
+    入参：status、destination_role、series_id、episode_id、page、page_size、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     rows, total = list_image_assets(
         db,
         status=status,
@@ -222,7 +259,11 @@ async def assets(
 
 @router.post("/assets/{asset_id}/review")
 async def review_asset(asset_id: str, body: ReviewImageAssetRequest, db: Session = Depends(get_db), user=Depends(require_role("admin"))):
-    """业务函数：处理 review_asset 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 review_asset 对应的业务流程、校验或数据转换。
+
+    入参：asset_id、body、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     asset, reviews = review_image_asset(
         db,
         asset_id,
@@ -236,7 +277,11 @@ async def review_asset(asset_id: str, body: ReviewImageAssetRequest, db: Session
 
 @router.post("/assets/{asset_id}/edit")
 async def edit_asset(asset_id: str, body: EditImageAssetRequest, db: Session = Depends(get_db), user=Depends(require_role("admin"))):
-    """业务函数：处理 edit_asset 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 edit_asset 对应的业务流程、校验或数据转换。
+
+    入参：asset_id、body、db、user 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     from app.db.models.image_production import ImageCreationAsset
 
     asset = db.query(ImageCreationAsset).filter(ImageCreationAsset.id == asset_id).first()

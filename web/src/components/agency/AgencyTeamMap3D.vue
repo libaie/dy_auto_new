@@ -278,21 +278,29 @@ const activeZoneKeys = computed(() => {
 })
 
 // 前端业务函数：协调 expertName 对应的页面流程、接口调用或状态转换。
+// 入参：id、fallback 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 expertName 对应业务流程的处理结果。
 function expertName(id, fallback = '') {
   return knownExpertName(id, fallback)
 }
 
 // 前端业务函数：协调 phaseText 对应的页面流程、接口调用或状态转换。
+// 入参：phases 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 phaseText 对应业务流程的处理结果。
 function phaseText(phases) {
   return knownPhaseText(phases)
 }
 
 // 前端业务函数：协调 skillText 对应的页面流程、接口调用或状态转换。
+// 入参：expert 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 skillText 对应业务流程的处理结果。
 function skillText(expert) {
   return knownSkillText(expert)
 }
 
 // 前端业务函数：协调 normalizeRoleLabels 对应的页面流程、接口调用或状态转换。
+// 入参：value 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 normalizeRoleLabels 对应业务流程的处理结果。
 function normalizeRoleLabels(value) {
   if (!value) return []
   if (Array.isArray(value)) return value.flatMap(normalizeRoleLabels)
@@ -305,11 +313,15 @@ function normalizeRoleLabels(value) {
 }
 
 // 前端业务函数：协调 addRoleLabels 对应的页面流程、接口调用或状态转换。
+// 入参：labels、value 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 addRoleLabels 对应业务流程的处理结果。
 function addRoleLabels(labels, value) {
   normalizeRoleLabels(value).forEach(label => labels.add(label))
 }
 
 // 前端业务函数：协调 roleText 对应的页面流程、接口调用或状态转换。
+// 入参：expert 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 roleText 对应业务流程的处理结果。
 function roleText(expert) {
   const expertId = expert.expert_id
   const labels = new Set()
@@ -328,11 +340,15 @@ function roleText(expert) {
   return `职责：${labels.size ? Array.from(labels).join(' / ') : '协作专家'}`
 }
 
+// 入参：item 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 isActiveInvocation 对应业务流程的处理结果。
 function isActiveInvocation(item) {
   return ['running', 'pending'].includes(item.execution_status) || ['running', 'pending'].includes(item.result_status)
 }
 
 // 前端业务函数：协调 isAttentionStage 对应的页面流程、接口调用或状态转换。
+// 入参：status 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 isAttentionStage 对应业务流程的处理结果。
 function isAttentionStage(status) {
   return [
     'blocked',
@@ -348,11 +364,15 @@ function isAttentionStage(status) {
 }
 
 // 前端业务函数：协调 normalizeStageStatus 对应的页面流程、接口调用或状态转换。
+// 入参：status 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 normalizeStageStatus 对应业务流程的处理结果。
 function normalizeStageStatus(status) {
   return String(status || '').toLowerCase()
 }
 
 // 前端业务函数：协调 normalizeExpertIds 对应的页面流程、接口调用或状态转换。
+// 入参：value 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 normalizeExpertIds 对应业务流程的处理结果。
 function normalizeExpertIds(value) {
   if (!value) return []
   if (Array.isArray(value)) return value.flatMap(normalizeExpertIds)
@@ -363,6 +383,8 @@ function normalizeExpertIds(value) {
 }
 
 // 前端业务函数：协调 addExpertIds 对应的页面流程、接口调用或状态转换。
+// 入参：ids、value 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 addExpertIds 对应业务流程的处理结果。
 function addExpertIds(ids, value) {
   normalizeExpertIds(value)
     .filter(id => !isLegacyExpert(id))
@@ -370,6 +392,8 @@ function addExpertIds(ids, value) {
 }
 
 // 前端业务函数：协调 normalizeStageInvocationIds 对应的页面流程、接口调用或状态转换。
+// 入参：stage 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 normalizeStageInvocationIds 对应业务流程的处理结果。
 function normalizeStageInvocationIds(stage) {
   return [
     ...(stage.invocation_ids || []),
@@ -378,6 +402,8 @@ function normalizeStageInvocationIds(stage) {
 }
 
 // 前端业务函数：协调 normalizeStageInvocationSummaries 对应的页面流程、接口调用或状态转换。
+// 入参：stage 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 normalizeStageInvocationSummaries 对应业务流程的处理结果。
 function normalizeStageInvocationSummaries(stage) {
   return [
     ...(stage.invocation_summaries || []),
@@ -388,11 +414,15 @@ function normalizeStageInvocationSummaries(stage) {
 }
 
 // 前端业务函数：协调 isExpertActive 对应的页面流程、接口调用或状态转换。
+// 入参：expertId 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 isExpertActive 对应业务流程的处理结果。
 function isExpertActive(expertId) {
   return activeExpertIds.value.has(expertId)
 }
 
 // 前端业务函数：协调 normalizeZoneKey 对应的页面流程、接口调用或状态转换。
+// 入参：stage 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 normalizeZoneKey 对应业务流程的处理结果。
 function normalizeZoneKey(stage) {
   if (['storyboard', 'style_lock'].includes(stage)) return 'storyboard'
   if (['image_stage', 'render'].includes(stage)) return 'image_stage'
@@ -403,16 +433,22 @@ function normalizeZoneKey(stage) {
 }
 
 // 前端业务函数：协调 selectExpert 对应的页面流程、接口调用或状态转换。
+// 入参：expertId 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 selectExpert 对应业务流程的处理结果。
 function selectExpert(expertId) {
   emit('select', expertId)
 }
 
 // 前端业务函数：协调 updateViewport 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 updateViewport 对应业务流程的处理结果。
 function updateViewport() {
   viewportWidth.value = window.innerWidth
 }
 
 // 前端业务函数：协调 hasWebglContext 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 hasWebglContext 对应业务流程的处理结果。
 function hasWebglContext() {
   if (typeof window.WebGLRenderingContext === 'undefined') return false
   try {
@@ -425,6 +461,8 @@ function hasWebglContext() {
 }
 
 // 前端业务函数：协调 disposeMaterialTextures 对应的页面流程、接口调用或状态转换。
+// 入参：material、disposedTextures 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 disposeMaterialTextures 对应业务流程的处理结果。
 function disposeMaterialTextures(material, disposedTextures) {
   Object.values(material).forEach(value => {
     if (Array.isArray(value)) {
@@ -444,6 +482,8 @@ function disposeMaterialTextures(material, disposedTextures) {
 }
 
 // 前端业务函数：协调 disposeSceneGraph 对应的页面流程、接口调用或状态转换。
+// 入参：currentScene 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 disposeSceneGraph 对应业务流程的处理结果。
 function disposeSceneGraph(currentScene) {
   if (!currentScene?.traverse) return
   const disposedTextures = new Set()
@@ -459,6 +499,8 @@ function disposeSceneGraph(currentScene) {
 }
 
 // 前端业务函数：协调 stopScene 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 stopScene 对应业务流程的处理结果。
 function stopScene() {
   if (frameId) cancelAnimationFrame(frameId)
   frameId = 0
@@ -477,6 +519,8 @@ function stopScene() {
 }
 
 // 前端业务函数：协调 resizeRenderer 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 resizeRenderer 对应业务流程的处理结果。
 function resizeRenderer() {
   if (!renderer || !camera || !canvasEl.value) return
   const canvas = canvasEl.value
@@ -488,6 +532,8 @@ function resizeRenderer() {
 }
 
 // 前端业务函数：协调 createMaterial 对应的页面流程、接口调用或状态转换。
+// 入参：THREE、color 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 createMaterial 对应业务流程的处理结果。
 function createMaterial(THREE, color, options = {}) {
   const materialOptions = {
     color,
@@ -503,6 +549,8 @@ function createMaterial(THREE, color, options = {}) {
 }
 
 // 前端业务函数：协调 addBox 对应的页面流程、接口调用或状态转换。
+// 入参：THREE、target、size、position、color 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 addBox 对应业务流程的处理结果。
 function addBox(THREE, target, size, position, color, options = {}) {
   const material = createMaterial(THREE, color, options)
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(size[0], size[1], size[2]), material)
@@ -519,6 +567,8 @@ function addBox(THREE, target, size, position, color, options = {}) {
 }
 
 // 前端业务函数：协调 addSphere 对应的页面流程、接口调用或状态转换。
+// 入参：THREE、target、radius、position、color 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 addSphere 对应业务流程的处理结果。
 function addSphere(THREE, target, radius, position, color, options = {}) {
   const mesh = new THREE.Mesh(
     new THREE.SphereGeometry(radius, options.widthSegments || 18, options.heightSegments || 12),
@@ -531,6 +581,8 @@ function addSphere(THREE, target, radius, position, color, options = {}) {
 }
 
 // 前端业务函数：协调 addCapsule 对应的页面流程、接口调用或状态转换。
+// 入参：THREE、target、radius、length、position、color 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 addCapsule 对应业务流程的处理结果。
 function addCapsule(THREE, target, radius, length, position, color, options = {}) {
   const mesh = new THREE.Mesh(
     new THREE.CapsuleGeometry(radius, length, options.capSegments || 5, options.radialSegments || 12),
@@ -547,6 +599,8 @@ function addCapsule(THREE, target, radius, length, position, color, options = {}
 }
 
 // 前端业务函数：协调 addCone 对应的页面流程、接口调用或状态转换。
+// 入参：THREE、target、radius、height、position、color 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 addCone 对应业务流程的处理结果。
 function addCone(THREE, target, radius, height, position, color, options = {}) {
   const mesh = new THREE.Mesh(
     new THREE.ConeGeometry(radius, height, options.radialSegments || 16),
@@ -563,6 +617,8 @@ function addCone(THREE, target, radius, height, position, color, options = {}) {
 }
 
 // 前端业务函数：协调 addTorus 对应的页面流程、接口调用或状态转换。
+// 入参：THREE、target、radius、tube、position、color 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 addTorus 对应业务流程的处理结果。
 function addTorus(THREE, target, radius, tube, position, color, options = {}) {
   const mesh = new THREE.Mesh(
     new THREE.TorusGeometry(radius, tube, options.radialSegments || 8, options.tubularSegments || 32),
@@ -579,6 +635,8 @@ function addTorus(THREE, target, radius, tube, position, color, options = {}) {
 }
 
 // 前端业务函数：协调 drawRoundedRect 对应的页面流程、接口调用或状态转换。
+// 入参：ctx、x、y、width、height、radius 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 drawRoundedRect 对应业务流程的处理结果。
 function drawRoundedRect(ctx, x, y, width, height, radius) {
   ctx.beginPath()
   ctx.moveTo(x + radius, y)
@@ -594,6 +652,8 @@ function drawRoundedRect(ctx, x, y, width, height, radius) {
 }
 
 // 前端业务函数：协调 createAvatarTitleTexture 对应的页面流程、接口调用或状态转换。
+// 入参：THREE、title、active 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 createAvatarTitleTexture 对应业务流程的处理结果。
 function createAvatarTitleTexture(THREE, title, active) {
   const canvas = document.createElement('canvas')
   canvas.width = 384
@@ -620,6 +680,8 @@ function createAvatarTitleTexture(THREE, title, active) {
 }
 
 // 前端业务函数：协调 addAvatarTitle 对应的页面流程、接口调用或状态转换。
+// 入参：THREE、base、expert 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 addAvatarTitle 对应业务流程的处理结果。
 function addAvatarTitle(THREE, base, expert) {
   const active = isExpertActive(expert.expert_id)
   const texture = createAvatarTitleTexture(THREE, expert.name || expertName(expert.expert_id), active)
@@ -638,6 +700,8 @@ function addAvatarTitle(THREE, base, expert) {
 }
 
 // 前端业务函数：协调 addExpertStudio 对应的页面流程、接口调用或状态转换。
+// 入参：THREE、target 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 addExpertStudio 对应业务流程的处理结果。
 function addExpertStudio(THREE, target) {
   const studio = new THREE.Group()
 
@@ -694,6 +758,8 @@ function addExpertStudio(THREE, target) {
 }
 
 // 前端业务函数：协调 addFloorGrid 对应的页面流程、接口调用或状态转换。
+// 入参：THREE、target 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 addFloorGrid 对应业务流程的处理结果。
 function addFloorGrid(THREE, target) {
   for (let x = -4; x <= 4; x += 1) {
     addBox(THREE, target, [0.018, 0.012, 7.0], [x, 0.035, 0], '#334155', { emissive: '#020617', opacity: 0.64, transparent: true })
@@ -704,6 +770,8 @@ function addFloorGrid(THREE, target) {
 }
 
 // 前端业务函数：协调 addZonePanel 对应的页面流程、接口调用或状态转换。
+// 入参：THREE、target、zoneKey、position、size、color 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 addZonePanel 对应业务流程的处理结果。
 function addZonePanel(THREE, target, zoneKey, position, size, color) {
   const active = activeZoneKeys.value.has(zoneKey)
   const panel = addBox(THREE, target, size, position, color, {
@@ -729,6 +797,8 @@ function addZonePanel(THREE, target, zoneKey, position, size, color) {
 }
 
 // 前端业务函数：协调 addWorkStation 对应的页面流程、接口调用或状态转换。
+// 入参：THREE、target、position、color 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 addWorkStation 对应业务流程的处理结果。
 function addWorkStation(THREE, target, position, color) {
   addBox(THREE, target, [1.28, 0.1, 0.68], [position[0], position[1] - 0.08, position[2]], '#374151')
   addBox(THREE, target, [1.1, 0.04, 0.5], [position[0], position[1] - 0.005, position[2]], '#52525b', { roughness: 0.36 })
@@ -741,6 +811,8 @@ function addWorkStation(THREE, target, position, color) {
 }
 
 // 前端业务函数：协调 addOverheadLights 对应的页面流程、接口调用或状态转换。
+// 入参：THREE、target 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 addOverheadLights 对应业务流程的处理结果。
 function addOverheadLights(THREE, target) {
   ;[-3.2, 0, 3.2].forEach(x => {
     addBox(THREE, target, [1.35, 0.045, 0.22], [x, 2.86, -0.9], '#e0f2fe', {
@@ -754,23 +826,31 @@ function addOverheadLights(THREE, target) {
 }
 
 // 前端业务函数：协调 seededUnit 对应的页面流程、接口调用或状态转换。
+// 入参：seed 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 seededUnit 对应业务流程的处理结果。
 function seededUnit(seed) {
   const value = Math.sin(seed * 12.9898 + 78.233) * 43758.5453
   return value - Math.floor(value)
 }
 
 // 前端业务函数：协调 clamp 对应的页面流程、接口调用或状态转换。
+// 入参：value、min、max 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 clamp 对应业务流程的处理结果。
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max)
 }
 
 // 前端业务函数：协调 easeInOut 对应的页面流程、接口调用或状态转换。
+// 入参：value 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 easeInOut 对应业务流程的处理结果。
 function easeInOut(value) {
   const t = clamp(value, 0, 1)
   return t * t * (3 - 2 * t)
 }
 
 // 前端业务函数：协调 pointInsideObstacle 对应的页面流程、接口调用或状态转换。
+// 入参：point、obstacle、padding 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 pointInsideObstacle 对应业务流程的处理结果。
 function pointInsideObstacle(point, obstacle, padding = 0) {
   return (
     point.x >= obstacle.xMin - padding &&
@@ -781,12 +861,18 @@ function pointInsideObstacle(point, obstacle, padding = 0) {
 }
 
 // 前端业务函数：协调 isPointWalkable 对应的页面流程、接口调用或状态转换。
+// 入参：point、padding 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 isPointWalkable 对应业务流程的处理结果。
 function isPointWalkable(point, padding = 0.18) {
   return !STUDIO_OBSTACLES.some(obstacle => pointInsideObstacle(point, obstacle, padding))
 }
 
 // 前端业务函数：协调 segmentsIntersect 对应的页面流程、接口调用或状态转换。
+// 入参：a、b、c、d 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 segmentsIntersect 对应业务流程的处理结果。
 function segmentsIntersect(a, b, c, d) {
+  // 入参：p、q、r 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 cross 对应业务流程的处理结果。
   const cross = (p, q, r) => ((q.x - p.x) * (r.z - p.z)) - ((q.z - p.z) * (r.x - p.x))
   const abC = cross(a, b, c)
   const abD = cross(a, b, d)
@@ -796,6 +882,8 @@ function segmentsIntersect(a, b, c, d) {
 }
 
 // 前端业务函数：协调 segmentIntersectsObstacle 对应的页面流程、接口调用或状态转换。
+// 入参：start、end、obstacle、padding 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 segmentIntersectsObstacle 对应业务流程的处理结果。
 function segmentIntersectsObstacle(start, end, obstacle, padding = 0.24) {
   const inflated = {
     xMin: obstacle.xMin - padding,
@@ -817,11 +905,15 @@ function segmentIntersectsObstacle(start, end, obstacle, padding = 0.24) {
 }
 
 // 前端业务函数：协调 isWalkSegmentClear 对应的页面流程、接口调用或状态转换。
+// 入参：start、end 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 isWalkSegmentClear 对应业务流程的处理结果。
 function isWalkSegmentClear(start, end) {
   return STUDIO_OBSTACLES.every(obstacle => !segmentIntersectsObstacle(start, end, obstacle))
 }
 
 // 前端业务函数：协调 jitterWaypoint 对应的页面流程、接口调用或状态转换。
+// 入参：point、seed 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 jitterWaypoint 对应业务流程的处理结果。
 function jitterWaypoint(point, seed) {
   const candidate = {
     x: clamp(point.x + (seededUnit(seed) - 0.5) * 0.42, -4.15, 4.15),
@@ -831,11 +923,15 @@ function jitterWaypoint(point, seed) {
 }
 
 // 前端业务函数：协调 distanceBetween 对应的页面流程、接口调用或状态转换。
+// 入参：start、end 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 distanceBetween 对应业务流程的处理结果。
 function distanceBetween(start, end) {
   return Math.hypot(end.x - start.x, end.z - start.z)
 }
 
 // 前端业务函数：协调 pickNextWaypointIndex 对应的页面流程、接口调用或状态转换。
+// 入参：currentIndex、seed 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 pickNextWaypointIndex 对应业务流程的处理结果。
 function pickNextWaypointIndex(currentIndex, seed) {
   const nearby = STUDIO_WALK_LINKS
     .filter(([a, b]) => a === currentIndex || b === currentIndex)
@@ -848,6 +944,8 @@ function pickNextWaypointIndex(currentIndex, seed) {
 }
 
 // 前端业务函数：协调 createWalkState 对应的页面流程、接口调用或状态转换。
+// 入参：index、total 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 createWalkState 对应业务流程的处理结果。
 function createWalkState(index, total) {
   const currentIndex = index % STUDIO_WAYPOINTS.length
   const nextIndex = pickNextWaypointIndex(currentIndex, index * 17 + total + 5)
@@ -870,6 +968,8 @@ function createWalkState(index, total) {
 }
 
 // 前端业务函数：协调 advanceWalkState 对应的页面流程、接口调用或状态转换。
+// 入参：state 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 advanceWalkState 对应业务流程的处理结果。
 function advanceWalkState(state) {
   state.previous = state.target
   const nextIndex = pickNextWaypointIndex(state.currentIndex, state.seed)
@@ -883,6 +983,8 @@ function advanceWalkState(state) {
 }
 
 // 前端业务函数：协调 randomWalkingPosition 对应的页面流程、接口调用或状态转换。
+// 入参：state、elapsedSeconds 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 randomWalkingPosition 对应业务流程的处理结果。
 function randomWalkingPosition(state, elapsedSeconds) {
   while (elapsedSeconds >= state.segmentStartedAt + state.duration + state.pause) {
     state.segmentStartedAt += state.duration + state.pause
@@ -901,17 +1003,23 @@ function randomWalkingPosition(state, elapsedSeconds) {
 }
 
 // 前端业务函数：协调 avatarStageFacing 对应的页面流程、接口调用或状态转换。
+// 入参：facing、index 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 avatarStageFacing 对应业务流程的处理结果。
 function avatarStageFacing(facing, index) {
   return facing * 0.22 + Math.sin(index * 1.37) * 0.12
 }
 
 // 前端业务函数：协调 lerpAngle 对应的页面流程、接口调用或状态转换。
+// 入参：current、target、amount 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 lerpAngle 对应业务流程的处理结果。
 function lerpAngle(current, target, amount) {
   const delta = Math.atan2(Math.sin(target - current), Math.cos(target - current))
   return current + delta * amount
 }
 
 // 前端业务函数：协调 addAvatar 对应的页面流程、接口调用或状态转换。
+// 入参：THREE、group、expert、index、total 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 addAvatar 对应业务流程的处理结果。
 function addAvatar(THREE, group, expert, index, total) {
   const walkState = createWalkState(index, total)
   const walk = randomWalkingPosition(walkState, 0)
@@ -989,6 +1097,8 @@ function addAvatar(THREE, group, expert, index, total) {
 }
 
 // 前端业务函数：协调 addAvatarProp 对应的页面流程、接口调用或状态转换。
+// 入参：THREE、base、expertId、accentColor 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 addAvatarProp 对应业务流程的处理结果。
 function addAvatarProp(THREE, base, expertId, accentColor) {
   if (expertId === 'short_video_editing_coach') {
     addBox(THREE, base, [0.28, 0.2, 0.04], [-0.48, 1.08, 0.28], '#f8fafc', { roughness: 0.38 })
@@ -1014,6 +1124,8 @@ function addAvatarProp(THREE, base, expertId, accentColor) {
 }
 
 // 前端业务函数：协调 updateAvatarWalkPose 对应的页面流程、接口调用或状态转换。
+// 入参：walker、index、elapsedSeconds、moving 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 updateAvatarWalkPose 对应业务流程的处理结果。
 function updateAvatarWalkPose(walker, index, elapsedSeconds, moving) {
   const parts = walker.userData.parts || {}
   const stride = moving ? Math.sin(elapsedSeconds * 7.2 + index * 0.71) : 0
@@ -1057,11 +1169,15 @@ function updateAvatarWalkPose(walker, index, elapsedSeconds, moving) {
 }
 
 // 前端业务函数：协调 isRenderCurrent 对应的页面流程、接口调用或状态转换。
+// 入参：token 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 isRenderCurrent 对应业务流程的处理结果。
 function isRenderCurrent(token) {
   return !unmounted && token === renderToken && canRender3d.value && canvasEl.value
 }
 
 // 前端业务函数：协调 expertIdFromObject 对应的页面流程、接口调用或状态转换。
+// 入参：object 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 expertIdFromObject 对应业务流程的处理结果。
 function expertIdFromObject(object) {
   let cursor = object
   while (cursor) {
@@ -1072,6 +1188,8 @@ function expertIdFromObject(object) {
 }
 
 // 前端业务函数：协调 renderScene 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 renderScene 对应业务流程的处理结果。
 async function renderScene() {
   const token = ++renderToken
   stopScene()
@@ -1138,6 +1256,8 @@ async function renderScene() {
   canvasClickTarget = canvas
   resizeRenderer()
 
+  // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 animate 对应业务流程的处理结果。
   const animate = () => {
     if (!isRenderCurrent(token) || !renderer || !scene || !camera) return
     if (!staticMode.value) {

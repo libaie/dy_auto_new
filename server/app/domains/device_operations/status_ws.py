@@ -14,7 +14,11 @@ from app.ws_manager import pair_ws_manager
 
 router = APIRouter()
 async def _notify_pending_tasks(db: Session, device_id: str):
-    """业务函数：处理 _notify_pending_tasks 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 _notify_pending_tasks 对应的业务流程、校验或数据转换。
+
+    入参：db、device_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Check if there are pending tasks for this device and notify it via WS."""
     import logging
     logger = logging.getLogger(__name__)
@@ -86,7 +90,11 @@ async def _notify_pending_tasks(db: Session, device_id: str):
 
 @router.websocket("/ws/status")
 async def ws_device_status(websocket: WebSocket):
-    """业务函数：处理 ws_device_status 对应的业务流程、校验或数据转换。"""
+    """业务函数：处理 ws_device_status 对应的业务流程、校验或数据转换。
+
+    入参：websocket 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
     """Device maintains a persistent WS connection for status tracking.
     Server detects disconnect immediately → marks device offline → broadcasts to admins.
 

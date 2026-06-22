@@ -11,7 +11,10 @@ from app.db.models.device_operations import Device
 
 
 class DeviceService:
-    """业务类：承载 DeviceService 相关的数据结构、状态或业务协作。"""
+    """业务类：承载 DeviceService 相关的数据结构、状态或业务协作。
+
+    类参数：无显式类参数 承载该类的业务配置、状态或数据字段。
+    """
     def register(
         self, db: Session, device_id: str, name: str,
         os_version: str = "", app_version: str = "",
@@ -21,7 +24,11 @@ class DeviceService:
         manufacturer: str = "", product: str = "",
         device_model: str = "", hardware: str = "", display: str = "",
     ) -> dict:
-        """业务函数：处理 register 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 register 对应的业务流程、校验或数据转换。
+
+        入参：db、device_id、name、os_version、app_version、ip、screen_resolution、sdk_version、total_memory、manufacturer、product、device_model、hardware、display 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         """Register or update a device. Returns device info dict."""
         device = db.query(Device).filter(Device.id == device_id).first()
         now = bj_now()
@@ -65,7 +72,11 @@ class DeviceService:
         }
 
     def update_heartbeat(self, db: Session, device_id: str, ip: str = "") -> bool:
-        """业务函数：处理 update_heartbeat 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 update_heartbeat 对应的业务流程、校验或数据转换。
+
+        入参：db、device_id、ip 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         """Update device last_seen_at. Returns True if status changed to online."""
         device = db.query(Device).filter(Device.id == device_id).first()
         if not device:
@@ -79,7 +90,11 @@ class DeviceService:
         return was_offline
 
     def get_device_status(self, db: Session, device_id: str) -> dict | None:
-        """业务函数：处理 get_device_status 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 get_device_status 对应的业务流程、校验或数据转换。
+
+        入参：db、device_id 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         """Get device status info including proxy_config. Returns None for unknown devices."""
         device = db.query(Device).filter(Device.id == device_id).first()
         if not device:
@@ -95,7 +110,11 @@ class DeviceService:
         }
 
     def set_offline_devices(self, db: Session, timeout_seconds: int = 300) -> int:
-        """业务函数：处理 set_offline_devices 对应的业务流程、校验或数据转换。"""
+        """业务函数：处理 set_offline_devices 对应的业务流程、校验或数据转换。
+
+        入参：db、timeout_seconds 为该业务流程需要的上下文、标识或载荷。
+        出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+        """
         """Mark devices as offline if no heartbeat for timeout_seconds. Returns count."""
         now = bj_now()
         cutoff_dt = now - timedelta(seconds=timeout_seconds)

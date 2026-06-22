@@ -71,12 +71,16 @@ const toast = useToastStore()
 
 // --- WebSocket ---
 // 前端业务函数：协调 wsUrl 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 wsUrl 对应业务流程的处理结果。
 function wsUrl() {
   const token = localStorage.getItem('token') || ''
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
   return `${protocol}//${location.host}/api/devices/ws/pair-events?token=${encodeURIComponent(token)}`
 }
 useWebSocket(wsUrl, {
+  // 入参：msg 为该业务流程需要的上下文、标识或载荷。
+  // 出参：返回 onMessage 对应业务流程的处理结果。
   onMessage(msg) {
     if (msg.event === 'chains_changed') fetchInstances()
   },
@@ -94,6 +98,8 @@ const columns = [
 ]
 
 // --- Fetch instances ---
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 fetchInstances 对应业务流程的处理结果。
 async function fetchInstances() {
   loading.value = true
   try {
@@ -113,6 +119,8 @@ async function fetchInstances() {
 }
 
 // 前端业务函数：协调 handlePageChange 对应的页面流程、接口调用或状态转换。
+// 入参：p 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handlePageChange 对应业务流程的处理结果。
 function handlePageChange(p) {
   page.value = p
   fetchInstances()
@@ -125,6 +133,8 @@ watch(statusFilter, () => {
 
 // --- Create dialog ---
 // 前端业务函数：协调 openCreateDialog 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 openCreateDialog 对应业务流程的处理结果。
 async function openCreateDialog() {
   createForm.template_id = ''
   createForm.selectionMode = 'accounts'
@@ -137,6 +147,8 @@ async function openCreateDialog() {
 }
 
 // 前端业务函数：协调 fetchTemplatesForSelect 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 fetchTemplatesForSelect 对应业务流程的处理结果。
 async function fetchTemplatesForSelect() {
   try {
     const res = await listTemplates({ limit: 100 })
@@ -147,6 +159,8 @@ async function fetchTemplatesForSelect() {
 }
 
 // 前端业务函数：协调 fetchAccountsForSelect 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 fetchAccountsForSelect 对应业务流程的处理结果。
 async function fetchAccountsForSelect() {
   try {
     const res = await listAccounts({ limit: 200 })
@@ -157,6 +171,8 @@ async function fetchAccountsForSelect() {
 }
 
 // 前端业务函数：协调 fetchGroupsForSelect 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 fetchGroupsForSelect 对应业务流程的处理结果。
 async function fetchGroupsForSelect() {
   try {
     const res = await listGroups({ limit: 100 })
@@ -167,6 +183,8 @@ async function fetchGroupsForSelect() {
 }
 
 // 前端业务函数：协调 fetchDevicesForSelect 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 fetchDevicesForSelect 对应业务流程的处理结果。
 async function fetchDevicesForSelect() {
   try {
     const res = await listDevices({ limit: 100 })
@@ -177,6 +195,8 @@ async function fetchDevicesForSelect() {
 }
 
 // 前端业务函数：协调 handleCreate 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleCreate 对应业务流程的处理结果。
 async function handleCreate() {
   if (!createForm.template_id) {
     createError.value = '请选择模板'
@@ -223,6 +243,8 @@ async function handleCreate() {
 
 // --- Detail dialog ---
 // 前端业务函数：协调 openDetailDialog 对应的页面流程、接口调用或状态转换。
+// 入参：instance 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 openDetailDialog 对应业务流程的处理结果。
 async function openDetailDialog(instance) {
   showDetailDialog.value = true
   detailLoading.value = true
@@ -239,12 +261,16 @@ async function openDetailDialog(instance) {
 
 // --- Cancel ---
 // 前端业务函数：协调 openCancelDialog 对应的页面流程、接口调用或状态转换。
+// 入参：instance 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 openCancelDialog 对应业务流程的处理结果。
 function openCancelDialog(instance) {
   cancellingInstance.value = instance
   showCancelDialog.value = true
 }
 
 // 前端业务函数：协调 handleCancel 对应的页面流程、接口调用或状态转换。
+// 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleCancel 对应业务流程的处理结果。
 async function handleCancel() {
   if (!cancellingInstance.value) return
   cancelling.value = true
@@ -262,6 +288,8 @@ async function handleCancel() {
 
 // --- Retry ---
 // 前端业务函数：协调 handleRetry 对应的页面流程、接口调用或状态转换。
+// 入参：instance 为该业务流程需要的上下文、标识或载荷。
+// 出参：返回 handleRetry 对应业务流程的处理结果。
 async function handleRetry(instance) {
   try {
     await retryInstance(instance.id)

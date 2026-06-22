@@ -209,7 +209,7 @@ async def _invoke_debate_role(
 ) -> dict[str, Any]:
     """业务函数：处理 _invoke_debate_role 对应的业务流程、校验或数据转换。
 
-    入参：db、orchestrator、common、stage_context、round_number、expert_id、role、opponent_summary 为该业务流程需要的上下文、标识或载荷。
+    入参：db、orchestrator、common、stage_context、round_number、expert_id、role、opponent_summary、policy 为该业务流程需要的上下文、标识或载荷。
     出参：返回该业务流程的处理结果；无显式返回值时返回 None。
     """
     context = {

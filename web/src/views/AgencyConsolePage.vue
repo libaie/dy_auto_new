@@ -88,7 +88,7 @@
         :summary="creativePatchSummary"
       />
 
-      <nav class="mb-5 inline-flex rounded-lg border border-white/10 bg-zinc-900/80 p-1" aria-label="专家控制台视图">
+      <nav class="mb-5 flex max-w-full flex-wrap rounded-lg border border-white/10 bg-zinc-900/80 p-1 sm:inline-flex" aria-label="专家控制台视图">
         <button
           type="button"
           data-tab="control"
@@ -118,7 +118,7 @@
         </button>
       </nav>
 
-      <section v-if="activeTab === 'control'" class="grid gap-4 2xl:grid-cols-[260px_minmax(0,1fr)_340px]">
+      <section v-if="activeTab === 'control'" class="grid min-w-0 gap-4 2xl:grid-cols-[260px_minmax(0,1fr)_340px]">
         <AgencyStageRail :stages="stageGraph" />
 
         <div class="min-w-0 space-y-4">
@@ -161,7 +161,7 @@
           />
         </div>
 
-        <aside class="space-y-4">
+        <aside class="min-w-0 space-y-4">
           <section class="rounded-lg border border-cyan-400/20 bg-cyan-950/20 p-4">
             <h2 class="text-base font-semibold text-cyan-50">专家席位</h2>
             <p class="mt-2 text-sm leading-6 text-cyan-100/80">核心专家与支援专家按阶段接力；需要看人物化空间关系时进入 3D 视图。</p>

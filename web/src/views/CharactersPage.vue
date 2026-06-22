@@ -1,12 +1,12 @@
 <!-- 管理端业务页面：承载 CharactersPage 页面流程，协调接口数据、用户操作和业务状态展示。 -->
 <template>
   <div class="p-6">
-    <div class="mb-6 flex items-center justify-between gap-4">
+    <div class="mb-6 flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div>
         <h1 class="text-2xl font-bold text-slate-100">角色资产库</h1>
         <p class="mt-1 text-sm text-slate-400">管理剧中角色，维护设定、外观和参考图。</p>
       </div>
-      <div class="flex gap-2">
+      <div class="flex flex-wrap gap-2">
         <button type="button" class="rounded-lg bg-cyan-600 px-4 py-2 text-sm text-white transition hover:bg-cyan-500 disabled:opacity-50" @click="showAiGen = true">
           AI 批量生成
         </button>
@@ -23,13 +23,13 @@
       <div class="mt-1 text-xs text-slate-600">创建角色后可在系列详情中关联到具体剧集。</div>
     </div>
 
-    <div v-else class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <div v-else class="grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-4">
       <button
         v-for="c in characters"
         :key="c.id"
         type="button"
         :data-test="`character-card-${c.id}`"
-        class="rounded-lg border border-slate-800 bg-slate-900/60 p-4 text-left transition hover:border-sky-500/50 hover:bg-slate-900"
+        class="min-w-0 rounded-lg border border-slate-800 bg-slate-900/60 p-4 text-left transition hover:border-sky-500/50 hover:bg-slate-900"
         @click="openCharacter(c)"
       >
         <div class="mx-auto mb-3 flex h-20 w-20 items-center justify-center rounded-full bg-slate-800 text-2xl text-slate-100">

@@ -15,8 +15,8 @@ const activeCategory = computed(() => getCategoryByRoute(route))
     <AppTopNav :activeCategory="activeCategory" />
     <div class="flex flex-1 overflow-hidden">
       <AppSidebar :activeCategory="activeCategory" />
-      <main class="flex-1 overflow-auto">
-        <div class="p-6 animate-in">
+      <main class="min-w-0 flex-1 overflow-auto">
+        <div class="min-w-0 p-6 animate-in">
           <RouterView />
         </div>
       </main>

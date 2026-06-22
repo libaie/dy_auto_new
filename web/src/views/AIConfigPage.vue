@@ -1029,6 +1029,45 @@ select.aicfg-input { cursor: pointer; appearance: none; background-image: url("d
 .msg-enter-active, .msg-leave-active { transition: opacity 0.2s ease, transform 0.2s ease; }
 .msg-enter-from, .msg-leave-to { opacity: 0; transform: translateY(-0.25rem); }
 
+@media (max-width: 767px) {
+  .aicfg-root { padding: 1rem; }
+  .aicfg-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .aicfg-title { overflow-wrap: anywhere; }
+  .aicfg-btn-add {
+    justify-content: center;
+    width: 100%;
+  }
+  .aicfg-main {
+    flex-direction: column;
+    overflow: visible;
+  }
+  .aicfg-left {
+    width: 100%;
+    padding-right: 0;
+  }
+  .aicfg-right {
+    width: 100%;
+    overflow: visible;
+  }
+  .aicfg-card { padding: 1rem; }
+  .aicfg-card-header {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .aicfg-card-meta { flex-wrap: wrap; }
+  .aicfg-fields { grid-template-columns: 1fr; }
+  .aicfg-actions,
+  .aicfg-actions-left {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .aicfg-btn { min-height: 2.75rem; }
+}
+
 /* ---- Reduced motion ---- */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

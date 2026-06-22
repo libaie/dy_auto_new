@@ -84,6 +84,11 @@
 }
 
 /* === Buttons === */
+button {
+  word-break: keep-all;
+  overflow-wrap: normal;
+}
+
 .btn-primary {
   display: inline-flex;
   align-items: center;

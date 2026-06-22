@@ -47,8 +47,8 @@
 
     <div v-if="loading" class="py-12 text-center text-slate-400">正在加载审查队列...</div>
     <div v-else-if="error" class="py-12 text-center text-red-400">{{ error }}</div>
-    <div v-else class="grid grid-cols-[320px_1fr] gap-4">
-      <aside class="overflow-hidden rounded-xl border border-gray-700/50" style="background: rgba(15, 23, 42, 0.55);">
+    <div v-else class="grid min-w-0 grid-cols-1 gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
+      <aside class="min-w-0 overflow-hidden rounded-xl border border-gray-700/50" style="background: rgba(15, 23, 42, 0.55);">
         <div class="border-b border-gray-700/50 px-4 py-3 text-sm text-slate-300">
           <div class="mb-3 grid grid-cols-3 gap-2">
             <button
@@ -108,7 +108,7 @@
         </div>
       </aside>
 
-      <section class="min-h-[520px] rounded-xl border border-gray-700/50 p-5" style="background: rgba(15, 23, 42, 0.55);">
+      <section class="min-h-[520px] min-w-0 rounded-xl border border-gray-700/50 p-5" style="background: rgba(15, 23, 42, 0.55);">
         <template v-if="selected">
           <div class="mb-4 flex justify-between gap-4">
             <div>

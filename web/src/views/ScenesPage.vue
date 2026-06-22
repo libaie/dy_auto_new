@@ -1,12 +1,12 @@
 <!-- 管理端业务页面：承载 ScenesPage 页面流程，协调接口数据、用户操作和业务状态展示。 -->
 <template>
   <div class="p-6">
-    <div class="mb-6 flex items-center justify-between gap-4">
+    <div class="mb-6 flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div>
         <h1 class="text-2xl font-bold text-slate-100">场景资产库</h1>
         <p class="mt-1 text-sm text-slate-400">管理拍摄场景，维护地点、光照、氛围和参考图。</p>
       </div>
-      <div class="flex gap-2">
+      <div class="flex flex-wrap gap-2">
         <button type="button" class="rounded-lg bg-cyan-600 px-4 py-2 text-sm text-white transition hover:bg-cyan-500" @click="showAiGen = true">
           AI 批量生成
         </button>
@@ -23,13 +23,13 @@
       <div class="mt-1 text-xs text-slate-600">创建场景后可在系列详情中关联到具体剧集。</div>
     </div>
 
-    <div v-else class="grid gap-4 lg:grid-cols-3">
+    <div v-else class="grid min-w-0 gap-4 lg:grid-cols-3">
       <button
         v-for="s in scenes"
         :key="s.id"
         type="button"
         :data-test="`scene-card-${s.id}`"
-        class="rounded-lg border border-slate-800 bg-slate-900/60 p-4 text-left transition hover:border-sky-500/50 hover:bg-slate-900"
+        class="min-w-0 overflow-hidden rounded-lg border border-slate-800 bg-slate-900/60 p-4 text-left transition hover:border-sky-500/50 hover:bg-slate-900"
         @click="openScene(s)"
       >
         <h3 class="font-semibold text-slate-100">{{ s.name }}</h3>
@@ -38,7 +38,7 @@
           <span class="rounded bg-slate-800 px-2 py-1 text-slate-400">{{ lightingLabel(s.lighting) || '-' }}</span>
           <span class="rounded bg-slate-800 px-2 py-1 text-slate-400">{{ moodLabel(s.mood) || '-' }}</span>
         </div>
-        <p class="mt-3 line-clamp-2 text-sm text-slate-400">{{ s.location_desc || '无地点描述' }}</p>
+        <p class="mt-3 line-clamp-2 break-words text-sm text-slate-400">{{ s.location_desc || '无地点描述' }}</p>
         <div class="mt-3 flex flex-wrap gap-2 text-xs">
           <span :class="s.reference_wideshot_url ? 'text-emerald-400' : 'text-slate-600'">广角 {{ s.reference_wideshot_url ? '已配置' : '待生成' }}</span>
           <span :class="s.reference_midshot_url ? 'text-emerald-400' : 'text-slate-600'">中景 {{ s.reference_midshot_url ? '已配置' : '待生成' }}</span>

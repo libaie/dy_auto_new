@@ -1,12 +1,12 @@
 <!-- 专家团队业务组件：展示或操作专家团队、审查、返修和创意补丁相关业务状态。 -->
 <template>
-  <nav class="rounded-lg border border-white/10 bg-zinc-900/80 p-4" aria-label="生产阶段">
+  <nav class="min-w-0 overflow-hidden rounded-lg border border-white/10 bg-zinc-900/80 p-4" aria-label="生产阶段">
     <div class="mb-4">
       <h2 class="text-lg font-semibold text-white">阶段流转</h2>
       <p class="mt-1 text-xs leading-5 text-zinc-500">从风格锁定到合成交付，逐段追踪质量门。</p>
     </div>
 
-    <ol v-if="stages.length" class="flex gap-3 overflow-x-auto pb-1 2xl:block 2xl:space-y-3 2xl:overflow-visible">
+    <ol v-if="stages.length" class="flex w-full min-w-0 gap-3 overflow-x-auto pb-1 2xl:block 2xl:space-y-3 2xl:overflow-visible">
       <li v-for="(stage, index) in stages" :key="stage.stage" class="min-w-44 2xl:min-w-0">
         <div class="relative rounded-md border p-3" :class="stageClass(stage.status)">
           <div class="flex items-start gap-3">

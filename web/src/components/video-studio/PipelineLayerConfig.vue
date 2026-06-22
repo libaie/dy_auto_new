@@ -63,7 +63,7 @@ onMounted(async () => {
       <span v-if="loading" class="text-slate-600 text-[10px]">加载中...</span>
       <span v-else class="text-slate-600 text-[10px]">— 在系统字典中管理</span>
     </h3>
-    <div class="grid grid-cols-5 gap-3">
+    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
       <div v-for="layer in layers" :key="layer.key" class="relative">
         <div class="flex items-center gap-1.5 mb-2">
           <div class="w-5 h-5 rounded flex items-center justify-center" :class="colorMap[layer.color].dot" style="--tw-bg-opacity: 0.2;">

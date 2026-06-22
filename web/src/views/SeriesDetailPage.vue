@@ -5,11 +5,11 @@
     <div v-if="loading" class="text-slate-400 text-center py-12">加载中...</div>
     <div v-else-if="error" class="text-red-400 text-center py-12">{{ error }}</div>
     <template v-else-if="series">
-      <div class="flex justify-between items-start mb-6">
-        <div>
-          <h1 class="text-2xl font-bold text-slate-100">{{ series.title }}</h1>
-          <p class="text-slate-400 mt-1">{{ series.logline }}</p>
-          <div class="flex gap-3 mt-2 text-sm text-slate-500">
+      <div class="mb-6 flex flex-col items-start gap-4 lg:flex-row lg:justify-between">
+        <div class="min-w-0">
+          <h1 class="break-words text-2xl font-bold text-slate-100">{{ series.title }}</h1>
+          <p class="mt-1 break-words text-slate-400">{{ series.logline }}</p>
+          <div class="mt-2 flex flex-wrap gap-3 text-sm text-slate-500">
             <span>{{ series.total_episodes }} 集</span><span>{{ series.genre }}</span>
             <span>{{ series.mode === 'fully_automatic' ? '全自动' : '逐步确认' }}</span>
             <span :class="styleLock?.locked ? 'text-emerald-400' : 'text-amber-400'">
@@ -17,7 +17,7 @@
             </span>
           </div>
         </div>
-        <div class="flex gap-2">
+        <div class="flex flex-wrap gap-2">
           <button data-test="edit-series" @click="beginEditSeries"
                   class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg text-sm transition cursor-pointer">
             编辑系列
@@ -119,8 +119,8 @@
         </div>
       </div>
 
-      <div class="grid gap-4 lg:grid-cols-2 mb-6">
-        <section class="rounded-xl border border-slate-700 bg-slate-950/50 p-4">
+      <div class="mb-6 grid min-w-0 gap-4 lg:grid-cols-2">
+        <section class="min-w-0 overflow-hidden rounded-xl border border-slate-700 bg-slate-950/50 p-4">
           <div class="mb-3 flex items-center justify-between">
             <h2 class="text-lg font-semibold text-slate-100">关联角色</h2>
             <span class="text-xs text-slate-500">{{ (series.characters || []).length }} 个</span>
@@ -129,9 +129,9 @@
             {{ unlinkErrors.character }}
           </div>
           <div v-if="!(series.characters || []).length" class="text-sm text-slate-500">尚未关联角色</div>
-          <div v-for="character in series.characters || []" :key="character.id" class="mb-2 flex items-center justify-between gap-3 rounded bg-slate-900/60 p-3">
+          <div v-for="character in series.characters || []" :key="character.id" class="mb-2 flex flex-col items-start gap-3 rounded bg-slate-900/60 p-3 sm:flex-row sm:items-center sm:justify-between">
             <div class="flex min-w-0 items-center gap-3">
-              <div v-if="linkedCharacterReferences(character).length" class="flex max-w-[13rem] shrink-0 flex-wrap gap-1.5">
+              <div v-if="linkedCharacterReferences(character).length" class="flex max-w-full shrink-0 flex-wrap gap-1.5 sm:max-w-[13rem]">
                 <a
                   v-for="slot in linkedCharacterReferences(character)"
                   :key="slot.key"
@@ -167,7 +167,7 @@
           </div>
         </section>
 
-        <section class="rounded-xl border border-slate-700 bg-slate-950/50 p-4">
+        <section class="min-w-0 overflow-hidden rounded-xl border border-slate-700 bg-slate-950/50 p-4">
           <div class="mb-3 flex items-center justify-between">
             <h2 class="text-lg font-semibold text-slate-100">关联场景</h2>
             <span class="text-xs text-slate-500">{{ (series.scenes || []).length }} 个</span>
@@ -176,9 +176,9 @@
             {{ unlinkErrors.scene }}
           </div>
           <div v-if="!(series.scenes || []).length" class="text-sm text-slate-500">尚未关联场景</div>
-          <div v-for="scene in series.scenes || []" :key="scene.id" class="mb-2 flex items-center justify-between gap-3 rounded bg-slate-900/60 p-3">
+          <div v-for="scene in series.scenes || []" :key="scene.id" class="mb-2 flex flex-col items-start gap-3 rounded bg-slate-900/60 p-3 sm:flex-row sm:items-center sm:justify-between">
             <div class="flex min-w-0 items-center gap-3">
-              <div v-if="linkedSceneReferences(scene).length" class="flex max-w-[10rem] shrink-0 flex-wrap gap-1.5">
+              <div v-if="linkedSceneReferences(scene).length" class="flex max-w-full shrink-0 flex-wrap gap-1.5 sm:max-w-[10rem]">
                 <a
                   v-for="slot in linkedSceneReferences(scene)"
                   :key="slot.key"

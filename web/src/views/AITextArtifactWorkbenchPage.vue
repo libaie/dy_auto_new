@@ -11,18 +11,18 @@
 
     <div v-if="loading" class="rounded border border-slate-800 bg-slate-900/70 p-6 text-slate-400">加载中...</div>
     <div v-else-if="error" class="rounded border border-red-500/40 bg-red-500/10 p-4 text-red-200">{{ error }}</div>
-    <div v-else class="grid gap-4 lg:grid-cols-[20rem_1fr]">
-      <aside class="rounded border border-slate-800 bg-slate-900/60">
+    <div v-else class="grid min-w-0 gap-4 lg:grid-cols-[20rem_minmax(0,1fr)]">
+      <aside class="min-w-0 rounded border border-slate-800 bg-slate-900/60">
         <div class="border-b border-slate-800 px-4 py-3 text-sm font-medium text-slate-300">文本产物</div>
         <button
           v-for="artifact in artifacts"
           :key="artifact.id"
-          class="block w-full border-b border-slate-800 px-4 py-3 text-left hover:bg-slate-800/70"
+          class="block min-w-0 w-full border-b border-slate-800 px-4 py-3 text-left hover:bg-slate-800/70"
           :class="selectedArtifact?.id === artifact.id ? 'bg-slate-800' : ''"
           @click="selectArtifact(artifact)"
         >
-          <div class="flex items-center justify-between gap-2 text-sm">
-            <span class="font-medium text-slate-100">{{ artifactListTitle(artifact) }}</span>
+          <div class="flex min-w-0 items-center justify-between gap-2 text-sm">
+            <span class="min-w-0 truncate font-medium text-slate-100">{{ artifactListTitle(artifact) }}</span>
             <span class="rounded bg-slate-950 px-2 py-0.5 text-xs text-slate-300">v{{ artifact.version }}</span>
           </div>
           <div class="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
@@ -34,9 +34,9 @@
         <div v-if="!artifacts.length" class="px-4 py-6 text-sm text-slate-500">暂无 AI 文本产物</div>
       </aside>
 
-      <main v-if="selectedArtifact" class="space-y-4">
+      <main v-if="selectedArtifact" class="min-w-0 space-y-4">
         <section class="rounded border border-slate-800 bg-slate-900/60 p-4">
-          <div class="mb-3 flex items-center justify-between gap-3">
+          <div class="mb-3 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 class="text-lg font-semibold">{{ selectedArtifact.artifact_type }} v{{ selectedArtifact.version }}</h2>
               <div class="mt-1 text-xs text-slate-500">
@@ -44,7 +44,7 @@
                 <span v-if="artifactTargetLabel(selectedArtifact)"> · {{ artifactTargetLabel(selectedArtifact) }}</span>
               </div>
             </div>
-            <div class="flex gap-2">
+            <div class="flex flex-wrap gap-2">
               <button data-test="artifact-save-edit" class="rounded bg-cyan-600 px-3 py-2 text-sm text-white hover:bg-cyan-500" @click="saveEdit">保存人工编辑</button>
               <button data-test="artifact-regenerate" class="rounded bg-indigo-600 px-3 py-2 text-sm text-white hover:bg-indigo-500" @click="regenerate">AI 重新生成</button>
               <button data-test="artifact-approve" class="rounded bg-emerald-600 px-3 py-2 text-sm text-white hover:bg-emerald-500" @click="approve">批准</button>

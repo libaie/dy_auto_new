@@ -740,7 +740,7 @@ class AgencyOrchestrator:
             "invocations": all_results,
         }
         if self.enable_debate:
-            from app.domains.agency_operations.agency_debate_audit import DEBATE_STAGES
+            from app.domains.agency_operations.agency_debate_policy import DEBATE_STAGES
 
             if stage not in DEBATE_STAGES:
                 return trace

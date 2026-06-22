@@ -125,7 +125,7 @@ async def test_story_planning_review_uses_story_team_without_debate_roles(db):
     async def fake_runtime(**kwargs):
         return RuntimeResult(expert_id=kwargs["expert_id"])
 
-    orchestrator = AgencyOrchestrator(runtime_invoke=fake_runtime)
+    orchestrator = AgencyOrchestrator(runtime_invoke=fake_runtime, enable_debate=False)
     result = await orchestrator.run_story_planning_review(
         db,
         series_id=series.id,
@@ -198,14 +198,40 @@ async def test_stage_appends_two_round_debate_by_default(db):
     )
 
     assert result["stage_status"] == "completed"
+    assert result["debate"]["schema_version"] == "agency.debate.v2"
     assert result["debate"]["status"] == "consensus_pass"
     assert result["debate"]["rounds"] == 2
-    assert calls[-4:] == [
+    assert calls[-5:] == [
         ("crit", "visual_storyteller"),
-        ("def", "video_stage_quality_reviewer"),
+        ("def", "narrative_designer"),
         ("crit", "visual_storyteller"),
-        ("def", "video_stage_quality_reviewer"),
+        ("def", "narrative_designer"),
+        ("arb", "storyboard_quality_reviewer"),
     ]
+
+
+@pytest.mark.asyncio
+async def test_story_planning_runs_policy_debate_when_enabled(db):
+    series = _series(db)
+    calls = []
+
+    async def fake_runtime(**kwargs):
+        calls.append((kwargs["stage"], kwargs["role"], kwargs["expert_id"]))
+        return RuntimeResult(expert_id=kwargs["expert_id"])
+
+    orchestrator = AgencyOrchestrator(runtime_invoke=fake_runtime, enable_debate=True)
+    result = await orchestrator.run_story_planning_review(
+        db,
+        series_id=series.id,
+        stage_context={"story_plan": {"episode_count": 3}},
+        runtime_config=_runtime_config(),
+    )
+
+    assert result["stage_status"] == "completed"
+    assert result["debate"]["schema_version"] == "agency.debate.v2"
+    assert ("story_planning", "crit", "narrative_designer") in calls
+    assert ("story_planning", "def", "story_generator") in calls
+    assert ("story_planning", "arb", "douyin_strategist") in calls
 
 
 @pytest.mark.asyncio

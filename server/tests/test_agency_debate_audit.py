@@ -156,6 +156,34 @@ async def test_debate_passes_when_second_round_reaches_consensus(db):
 
 
 @pytest.mark.asyncio
+async def test_debate_passes_when_arbiter_accepts_critic_defender_disagreement(db):
+    series = Series(title="Debate Arbiter Pass", logline="case", genre="drama")
+    db.add(series)
+    db.commit()
+
+    async def fake_runtime(**kwargs):
+        if kwargs["role"] == "crit":
+            return DebateRuntimeResult("failed", 45, "fail", kwargs["expert_id"])
+        return DebateRuntimeResult("passed", 91, "pass", kwargs["expert_id"])
+
+    trace = await run_debate_audit(
+        db,
+        series_id=series.id,
+        stage="video_stage",
+        stage_context={"frames": [{"frame_id": "shot-001"}]},
+        runtime_config={"provider": "mock", "model": "mock", "api_key": "x"},
+        runtime_invoke=fake_runtime,
+    )
+
+    assert trace["stage_status"] == "completed"
+    assert trace["debate"]["status"] == "consensus_pass"
+    assert trace["debate"]["critic_scorecard"]["verdict"] == "fail"
+    assert trace["debate"]["defender_scorecard"]["verdict"] == "pass"
+    assert trace["debate"]["arbiter_scorecard"]["verdict"] == "pass"
+    assert trace["debate"]["repair_intent"] == "none"
+
+
+@pytest.mark.asyncio
 async def test_debate_blocks_when_runtime_passes_without_scorecard(db):
     series = Series(title="Debate Pass Legacy", logline="case", genre="drama")
     db.add(series)

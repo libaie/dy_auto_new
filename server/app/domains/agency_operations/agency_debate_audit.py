@@ -11,26 +11,19 @@ from sqlalchemy.orm import Session
 
 from app.db.models.agency_operations import AgencyExpertInvocation
 from app.db.models import ProductionAuditEvent, ProductionJob
+from app.domains.agency_operations.agency_debate_policy import (
+    DEBATE_STAGES,
+    DebatePolicy,
+    debate_policy_for_stage,
+)
 from app.domains.agency_operations.agency_scorecard_contracts import normalize_scorecard, scorecard_blocks_stage
 from app.domains.video_production.production_status import JOB_LEASED, JOB_QUEUED, JOB_RETRY_WAIT, JOB_RUNNING
 from app.domains.agency_operations.agency_orchestrator import AgencyOrchestrator, _hash_context
 from app.domains.video_production.production_queue_service import enqueue_job
 
 
-DEBATE_SCHEMA_VERSION = "agency.debate.v1"
+DEBATE_SCHEMA_VERSION = "agency.debate.v2"
 AUTO_REPAIR_STAGE = "agency_auto_repair"
-DEBATE_STAGES = {
-    "style_lock",
-    "storyboard",
-    "image_stage",
-    "image_review",
-    "video_stage",
-    "video_review",
-    "compose_preflight",
-    "compose",
-}
-CRITIC_EXPERT_ID = "visual_storyteller"
-DEFENDER_EXPERT_ID = "video_stage_quality_reviewer"
 ACTIVE_REPAIR_JOB_STATUSES = {JOB_QUEUED, JOB_LEASED, JOB_RUNNING, JOB_RETRY_WAIT}
 
 
@@ -69,6 +62,7 @@ async def run_debate_audit(
         "stage": stage,
         "runtime_config": runtime_config,
     }
+    policy = debate_policy_for_stage(stage)
 
     first_critic = await _invoke_debate_role(
         db,
@@ -76,9 +70,10 @@ async def run_debate_audit(
         common,
         stage_context=stage_context,
         round_number=1,
-        expert_id=CRITIC_EXPERT_ID,
+        expert_id=policy.critic,
         role="crit",
         opponent_summary=None,
+        policy=policy,
     )
     first_defender = await _invoke_debate_role(
         db,
@@ -86,9 +81,10 @@ async def run_debate_audit(
         common,
         stage_context=stage_context,
         round_number=1,
-        expert_id=DEFENDER_EXPERT_ID,
+        expert_id=policy.defender,
         role="def",
         opponent_summary=_summary_for_invocation(db, first_critic["id"]),
+        policy=policy,
     )
     second_critic = await _invoke_debate_role(
         db,
@@ -96,9 +92,10 @@ async def run_debate_audit(
         common,
         stage_context=stage_context,
         round_number=2,
-        expert_id=CRITIC_EXPERT_ID,
+        expert_id=policy.critic,
         role="crit",
         opponent_summary=_summary_for_invocation(db, first_defender["id"]),
+        policy=policy,
     )
     second_defender = await _invoke_debate_role(
         db,
@@ -106,12 +103,27 @@ async def run_debate_audit(
         common,
         stage_context=stage_context,
         round_number=2,
-        expert_id=DEFENDER_EXPERT_ID,
+        expert_id=policy.defender,
         role="def",
         opponent_summary=_summary_for_invocation(db, second_critic["id"]),
+        policy=policy,
+    )
+    arbiter = await _invoke_debate_role(
+        db,
+        orchestrator,
+        common,
+        stage_context=stage_context,
+        round_number=3,
+        expert_id=policy.arbiter,
+        role="arb",
+        opponent_summary={
+            "critic": _summary_for_invocation(db, second_critic["id"]),
+            "defender": _summary_for_invocation(db, second_defender["id"]),
+        },
+        policy=policy,
     )
 
-    invocations = [first_critic, first_defender, second_critic, second_defender]
+    invocations = [first_critic, first_defender, second_critic, second_defender, arbiter]
     critic_card, critic_has_scorecard = _scorecard_for_invocation(
         db,
         second_critic["id"],
@@ -122,21 +134,23 @@ async def run_debate_audit(
         second_defender["id"],
         second_defender["result_status"],
     )
-    critic_blocks = _result_blocks(second_critic, critic_card, critic_has_scorecard)
-    defender_blocks = _result_blocks(second_defender, defender_card, defender_has_scorecard)
+    arbiter_card, arbiter_has_scorecard = _scorecard_for_invocation(
+        db,
+        arbiter["id"],
+        arbiter["result_status"],
+    )
+    arbiter_blocks = _result_blocks(arbiter, arbiter_card, arbiter_has_scorecard)
     missing_scorecards = []
     if not critic_has_scorecard:
         missing_scorecards.append("critic")
     if not defender_has_scorecard:
         missing_scorecards.append("defender")
+    if not arbiter_has_scorecard:
+        missing_scorecards.append("arbiter")
 
-    if critic_blocks == defender_blocks:
-        debate_status = "consensus_fail" if critic_blocks else "consensus_pass"
-    else:
-        debate_status = "unresolved"
-
-    stage_status = "blocked" if debate_status != "consensus_pass" else "completed"
-    final_verdict = "block" if stage_status == "blocked" else "pass"
+    debate_status = "consensus_fail" if arbiter_blocks else "consensus_pass"
+    stage_status = "blocked" if arbiter_blocks else "completed"
+    final_verdict = "block" if arbiter_blocks else "pass"
     repair_intent = _repair_intent_for_stage(stage, final_verdict)
 
     trace = {
@@ -147,12 +161,18 @@ async def run_debate_audit(
         "debate": {
             "schema_version": DEBATE_SCHEMA_VERSION,
             "stage": stage,
+            "policy_id": policy.policy_id,
             "status": debate_status,
             "rounds": 2,
+            "critic_expert_id": policy.critic,
+            "defender_expert_id": policy.defender,
+            "arbiter_expert_id": policy.arbiter,
             "critic_invocation_ids": [first_critic["id"], second_critic["id"]],
             "defender_invocation_ids": [first_defender["id"], second_defender["id"]],
+            "arbiter_invocation_id": arbiter["id"],
             "critic_scorecard": critic_card,
             "defender_scorecard": defender_card,
+            "arbiter_scorecard": arbiter_card,
             "missing_scorecards": missing_scorecards,
             "final_verdict": final_verdict,
             "repair_intent": repair_intent,
@@ -185,6 +205,7 @@ async def _invoke_debate_role(
     expert_id: str,
     role: str,
     opponent_summary: dict[str, Any] | None,
+    policy: DebatePolicy,
 ) -> dict[str, Any]:
     """业务函数：处理 _invoke_debate_role 对应的业务流程、校验或数据转换。
 
@@ -195,9 +216,12 @@ async def _invoke_debate_role(
         **stage_context,
         "debate": {
             "round": round_number,
-            "role": "critic" if role == "crit" else "defender",
-            "critic_expert_id": CRITIC_EXPERT_ID,
-            "defender_expert_id": DEFENDER_EXPERT_ID,
+            "role": {"crit": "critic", "def": "defender", "arb": "arbiter"}[role],
+            "policy_id": policy.policy_id,
+            "critic_expert_id": policy.critic,
+            "defender_expert_id": policy.defender,
+            "arbiter_expert_id": policy.arbiter,
+            "focus": list(policy.focus),
             "opponent_summary": opponent_summary or {},
         },
     }
@@ -284,9 +308,7 @@ def _downgrade_reason(status: str, stage: str, missing_scorecards: list[str] | N
     if missing_scorecards:
         roles = ", ".join(missing_scorecards)
         return f"{stage} debate missing required scorecard from {roles}"
-    if status == "unresolved":
-        return f"{stage} debate stayed unresolved after two rounds"
-    return f"{stage} debate reached blocking consensus"
+    return f"{stage} debate arbiter blocked the stage"
 
 
 def _record_repair_intent(

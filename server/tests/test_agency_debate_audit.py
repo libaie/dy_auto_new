@@ -48,8 +48,11 @@ async def test_debate_blocks_when_second_round_still_disagrees(db):
     db.add(plan)
     db.commit()
 
+    calls = []
+
     async def fake_runtime(**kwargs):
-        if kwargs["expert_id"] == "visual_storyteller":
+        calls.append((kwargs["role"], kwargs["expert_id"]))
+        if kwargs["role"] in {"crit", "arb"}:
             return DebateRuntimeResult("failed", 45, "fail", kwargs["expert_id"])
         return DebateRuntimeResult("passed", 92, "pass", kwargs["expert_id"])
 
@@ -64,10 +67,23 @@ async def test_debate_blocks_when_second_round_still_disagrees(db):
     )
 
     assert trace["stage_status"] == "blocked"
-    assert trace["debate"]["status"] == "unresolved"
+    assert trace["debate"]["schema_version"] == "agency.debate.v2"
+    assert trace["debate"]["status"] == "consensus_fail"
+    assert trace["debate"]["critic_expert_id"] == "visual_storyteller"
+    assert trace["debate"]["defender_expert_id"] == "short_video_editing_coach"
+    assert trace["debate"]["arbiter_expert_id"] == "video_stage_quality_reviewer"
+    assert trace["debate"]["arbiter_invocation_id"]
     assert trace["debate"]["repair_intent"] == "regenerate_image"
+    assert calls == [
+        ("crit", "visual_storyteller"),
+        ("def", "short_video_editing_coach"),
+        ("crit", "visual_storyteller"),
+        ("def", "short_video_editing_coach"),
+        ("arb", "video_stage_quality_reviewer"),
+    ]
     assert db.query(AgencyExpertInvocation).filter_by(role="crit").count() == 2
     assert db.query(AgencyExpertInvocation).filter_by(role="def").count() == 2
+    assert db.query(AgencyExpertInvocation).filter_by(role="arb").count() == 1
     job = db.query(ProductionJob).one()
     event = db.query(ProductionAuditEvent).filter_by(event_type="agency_debate_repair_intent").one()
     assert job.stage == "agency_auto_repair:video_segment_failed"
@@ -85,7 +101,7 @@ async def test_completed_debate_repair_job_does_not_dedupe_next_blocking_cycle(d
     db.commit()
 
     async def fake_runtime(**kwargs):
-        if kwargs["expert_id"] == "visual_storyteller":
+        if kwargs["role"] in {"crit", "arb"}:
             return DebateRuntimeResult("failed", 45, "fail", kwargs["expert_id"])
         return DebateRuntimeResult("passed", 92, "pass", kwargs["expert_id"])
 
@@ -132,9 +148,11 @@ async def test_debate_passes_when_second_round_reaches_consensus(db):
     )
 
     assert trace["stage_status"] == "completed"
+    assert trace["debate"]["schema_version"] == "agency.debate.v2"
     assert trace["debate"]["status"] == "consensus_pass"
     assert trace["debate"]["final_verdict"] == "pass"
-    assert len(calls) == 4
+    assert trace["debate"]["arbiter_scorecard"]["verdict"] == "pass"
+    assert len(calls) == 5
 
 
 @pytest.mark.asyncio
@@ -158,5 +176,32 @@ async def test_debate_blocks_when_runtime_passes_without_scorecard(db):
     assert trace["stage_status"] == "blocked"
     assert trace["debate"]["status"] == "consensus_fail"
     assert trace["debate"]["final_verdict"] == "block"
-    assert trace["debate"]["missing_scorecards"] == ["critic", "defender"]
+    assert trace["debate"]["missing_scorecards"] == ["critic", "defender", "arbiter"]
     assert "scorecard" in trace["debate"]["downgrade_reason"]
+
+
+@pytest.mark.asyncio
+async def test_debate_blocks_when_arbiter_passes_without_scorecard(db):
+    series = Series(title="Debate Missing Arbiter", logline="case", genre="drama")
+    db.add(series)
+    db.commit()
+
+    async def fake_runtime(**kwargs):
+        if kwargs["role"] == "arb":
+            return DebateRuntimeResultWithoutScorecard("passed", kwargs["expert_id"])
+        return DebateRuntimeResult("passed", 91, "pass", kwargs["expert_id"])
+
+    trace = await run_debate_audit(
+        db,
+        series_id=series.id,
+        stage="style_lock",
+        stage_context={"style_lock": {"locked": True}},
+        runtime_config={"provider": "mock", "model": "mock", "api_key": "x"},
+        runtime_invoke=fake_runtime,
+    )
+
+    assert trace["stage_status"] == "blocked"
+    assert trace["debate"]["status"] == "consensus_fail"
+    assert trace["debate"]["final_verdict"] == "block"
+    assert trace["debate"]["missing_scorecards"] == ["arbiter"]
+    assert "arbiter" in trace["debate"]["downgrade_reason"]

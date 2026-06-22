@@ -48,7 +48,7 @@ def build_expert_prompt(
             "6. When you can improve the production content, put concrete rewrites in creative_patches instead of only writing recommendations.",
             "7. creative_patches must use known target ids from context and only update script, storyboard, image prompt, video prompt, or edit manifest fields.",
             "8. Every creative patch requires human approval; never claim it has already been applied.",
-            "9. For review, QA, crit, and def roles, include scorecard with overall_score 0-100, pass_threshold, verdict, dimensions, repair_intent, and confidence.",
+            "9. For review, QA, crit, def, and arb roles, include scorecard with overall_score 0-100, pass_threshold, verdict, dimensions, repair_intent, and confidence.",
             f"Expert id: {expert_id}",
             f"Stage: {stage}",
             f"Role: {role}",

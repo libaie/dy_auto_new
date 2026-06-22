@@ -43,6 +43,8 @@ repair task routes.
   audit events or auto-repair production jobs.
 - `agency_scorecard_contracts.py` owns `normalize_scorecard` and
   `scorecard_blocks_stage` for agency scorecard verdict contracts.
+- `agency_debate_policy.py` owns stage-specific debate role policies for
+  critic, defender, arbiter, and business focus checklists.
 - `agency_multimodal_review.py` owns `build_multimodal_asset_context` and
   `run_multimodal_asset_review` for real generated asset review handoff.
 - `agency_creative_patch_contracts.py` owns creative patch enums,

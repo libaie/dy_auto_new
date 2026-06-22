@@ -76,7 +76,7 @@ function handleCategoryClick(cat) {
         <span class="text-base font-extrabold tracking-tight gradient-text">抖音助手</span>
       </router-link>
 
-      <div class="hidden lg:flex items-center gap-1 tab-bar">
+      <div class="hidden lg:flex items-center gap-1 tab-bar top-category-tabs">
         <button
           v-for="cat in categories" :key="cat.key"
           class="no-underline"
@@ -117,3 +117,11 @@ function handleCategoryClick(cat) {
     </div>
   </header>
 </template>
+
+<style scoped>
+@media (max-width: 1023px) {
+  .top-category-tabs {
+    display: none;
+  }
+}
+</style>

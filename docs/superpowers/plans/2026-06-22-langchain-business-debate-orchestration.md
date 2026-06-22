@@ -456,6 +456,25 @@ git commit -m "feat: arbitrate agency debate by stage policy"
 
 - [ ] **Step 1: Add orchestrator story-planning debate test**
 
+First update the existing `test_story_planning_review_uses_story_team_without_debate_roles` so it remains a no-debate unit test:
+
+```python
+    orchestrator = AgencyOrchestrator(runtime_invoke=fake_runtime, enable_debate=False)
+```
+
+Then update `test_stage_appends_two_round_debate_by_default` to expect the stage policy defender and arbiter:
+
+```python
+    assert result["debate"]["schema_version"] == "agency.debate.v2"
+    assert calls[-5:] == [
+        ("crit", "visual_storyteller"),
+        ("def", "narrative_designer"),
+        ("crit", "visual_storyteller"),
+        ("def", "narrative_designer"),
+        ("arb", "storyboard_quality_reviewer"),
+    ]
+```
+
 Append this test to `server/tests/test_agency_orchestrator.py`:
 
 ```python

@@ -77,6 +77,25 @@ JS_DECLARATION_PATTERNS = [
         r"^\s*([A-Za-z_$][\w$]*)\s*:\s*(?:async\s+)?function\s*\(",
     )
 ]
+JS_DECLARATION_WITH_PARAMS_PATTERNS = [
+    re.compile(pattern)
+    for pattern in (
+        r"^\s*(?:export\s+)?(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\s*\(([^)]*)\)",
+        r"^\s*(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s+)?function\s*\(([^)]*)\)",
+        r"^\s*(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s+)?\(([^)]*)\)\s*=>",
+        r"^\s*([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+)\s*=\s*(?:async\s+)?function\s*\(([^)]*)\)",
+        r"^\s*([A-Za-z_$][\w$]*)\s*:\s*(?:async\s+)?function\s*\(([^)]*)\)",
+        r"^\s*(?:async\s+)?([A-Za-z_$][\w$]*)\s*\(([^)]*)\)\s*\{",
+    )
+]
+JS_CONTROL_KEYWORDS = {
+    "catch",
+    "for",
+    "if",
+    "switch",
+    "while",
+    "with",
+}
 
 
 @dataclass(frozen=True)
@@ -84,6 +103,7 @@ class CheckResult:
     module_missing: list[Path]
     risk_missing: list[tuple[Path, int, str]]
     declaration_missing: list[tuple[Path, int, str, str]]
+    contract_missing: list[tuple[Path, int, str, str, str]]
 
 
 def _has_chinese(text: str) -> bool:
@@ -193,6 +213,105 @@ def _js_declaration_gaps(path: Path) -> list[tuple[int, str, str]]:
     return gaps
 
 
+def _python_param_names(node: ast.FunctionDef | ast.AsyncFunctionDef) -> list[str]:
+    args = [
+        *node.args.posonlyargs,
+        *node.args.args,
+        *node.args.kwonlyargs,
+    ]
+    names = [arg.arg for arg in args if arg.arg not in {"self", "cls"}]
+    if node.args.vararg and node.args.vararg.arg not in {"self", "cls"}:
+        names.append(node.args.vararg.arg)
+    if node.args.kwarg and node.args.kwarg.arg not in {"self", "cls"}:
+        names.append(node.args.kwarg.arg)
+    return names
+
+
+def _python_class_param_names(node: ast.ClassDef) -> list[str]:
+    names = []
+    for item in node.body:
+        if isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name):
+            names.append(item.target.id)
+        elif isinstance(item, ast.Assign):
+            for target in item.targets:
+                if isinstance(target, ast.Name):
+                    names.append(target.id)
+    for item in node.body:
+        if isinstance(item, ast.FunctionDef) and item.name == "__init__":
+            names.extend(_python_param_names(item))
+    return sorted(set(name for name in names if not name.startswith("_")))
+
+
+def _has_input_output_contract(text: str, params: list[str]) -> bool:
+    if "入参" not in text:
+        return False
+    if "出参" not in text and "返回" not in text:
+        return False
+    return all(name in text for name in params)
+
+
+def _python_contract_gaps(path: Path) -> list[tuple[int, str, str, str]]:
+    tree = ast.parse(path.read_text(encoding="utf-8", errors="ignore"))
+    gaps: list[tuple[int, str, str, str]] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ClassDef):
+            doc = ast.get_docstring(node) or ""
+            params = _python_class_param_names(node)
+            if "类参数" not in doc or not all(name in doc for name in params):
+                gaps.append((node.lineno, "class", node.name, "missing 类参数/参数名"))
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            doc = ast.get_docstring(node) or ""
+            if not _has_input_output_contract(doc, _python_param_names(node)):
+                gaps.append((node.lineno, "function", node.name, "missing 入参/出参/参数名"))
+    return sorted(gaps)
+
+
+def _simple_js_param_names(raw: str) -> list[str]:
+    names = []
+    for item in raw.split(","):
+        item = item.strip()
+        if not item or any(char in item for char in "{}[]"):
+            continue
+        item = item.split("=", 1)[0].strip()
+        item = item.lstrip(".").strip()
+        if re.match(r"^[A-Za-z_$][\w$]*$", item):
+            names.append(item)
+    return names
+
+
+def _js_declaration_with_params(line: str) -> tuple[str, list[str]] | None:
+    for pattern in JS_DECLARATION_WITH_PARAMS_PATTERNS:
+        match = pattern.search(line)
+        if match:
+            name = match.group(1)
+            if name in JS_CONTROL_KEYWORDS:
+                return None
+            return name, _simple_js_param_names(match.group(2))
+    return None
+
+
+def _js_contract_gaps(path: Path) -> list[tuple[int, str, str, str]]:
+    lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
+    gaps: list[tuple[int, str, str, str]] = []
+    for index, line in enumerate(lines):
+        parsed = _js_declaration_with_params(line)
+        if not parsed:
+            continue
+        name, params = parsed
+        text = "\n".join(lines[max(0, index - 5):index])
+        if not _has_input_output_contract(text, params):
+            gaps.append((index + 1, "function", name, "missing 入参/出参/参数名"))
+    return gaps
+
+
+def contract_comment_gaps(path: Path) -> list[tuple[int, str, str, str]]:
+    if path.suffix == ".py":
+        return _python_contract_gaps(path)
+    if path.suffix in {".js", ".ts", ".tsx", ".vue"}:
+        return _js_contract_gaps(path)
+    return []
+
+
 def declaration_comment_gaps(path: Path) -> list[tuple[int, str, str]]:
     if path.suffix == ".py":
         return _python_declaration_gaps(path)
@@ -205,6 +324,7 @@ def check_files(paths: Iterable[Path], *, strict_risk: bool) -> CheckResult:
     module_missing = []
     risk_missing = []
     declaration_missing = []
+    contract_missing = []
     for path in paths:
         if not has_chinese_module_comment(path):
             module_missing.append(path)
@@ -213,10 +333,13 @@ def check_files(paths: Iterable[Path], *, strict_risk: bool) -> CheckResult:
                 risk_missing.append((path, line_no, line))
             for line_no, kind, name in declaration_comment_gaps(path):
                 declaration_missing.append((path, line_no, kind, name))
+            for line_no, kind, name, reason in contract_comment_gaps(path):
+                contract_missing.append((path, line_no, kind, name, reason))
     return CheckResult(
         module_missing=module_missing,
         risk_missing=risk_missing,
         declaration_missing=declaration_missing,
+        contract_missing=contract_missing,
     )
 
 
@@ -239,7 +362,8 @@ def main() -> int:
         f"checked={len(files)} "
         f"module_missing={len(result.module_missing)} "
         f"risk_missing={len(result.risk_missing)} "
-        f"declaration_missing={len(result.declaration_missing)}"
+        f"declaration_missing={len(result.declaration_missing)} "
+        f"contract_missing={len(result.contract_missing)}"
     )
     for path in result.module_missing:
         print(f"MODULE {_relative(path)}")
@@ -247,7 +371,16 @@ def main() -> int:
         print(f"RISK {_relative(path)}:{line_no} {line}")
     for path, line_no, kind, name in result.declaration_missing:
         print(f"DECL {_relative(path)}:{line_no} {kind} {name}")
-    return 1 if result.module_missing or result.risk_missing or result.declaration_missing else 0
+    for path, line_no, kind, name, reason in result.contract_missing:
+        print(f"CONTRACT {_relative(path)}:{line_no} {kind} {name} {reason}")
+    return (
+        1
+        if result.module_missing
+        or result.risk_missing
+        or result.declaration_missing
+        or result.contract_missing
+        else 0
+    )
 
 
 if __name__ == "__main__":

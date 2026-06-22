@@ -3,6 +3,7 @@ from pathlib import Path
 from scripts.check_chinese_comments import (
     CheckResult,
     check_files,
+    contract_comment_gaps,
     declaration_comment_gaps,
     has_chinese_module_comment,
     high_risk_comment_gaps,
@@ -83,6 +84,97 @@ def test_javascript_named_function_accepts_nearby_chinese_comment(tmp_path: Path
     )
 
     assert declaration_comment_gaps(path) == []
+
+
+def test_python_function_contract_requires_input_and_output_comments(tmp_path: Path):
+    path = tmp_path / "service.py"
+    path.write_text(
+        '"""视频生产服务。"""\n\n'
+        "def run(series_id: str) -> dict:\n"
+        '    """启动生产运行。"""\n'
+        "    return {'series_id': series_id}\n",
+        encoding="utf-8",
+    )
+
+    assert contract_comment_gaps(path) == [
+        (3, "function", "run", "missing 入参/出参/参数名")
+    ]
+
+
+def test_python_function_contract_accepts_parameter_and_return_comments(tmp_path: Path):
+    path = tmp_path / "service.py"
+    path.write_text(
+        '"""视频生产服务。"""\n\n'
+        "def run(series_id: str) -> dict:\n"
+        '    """启动生产运行。\\n\\n'
+        '    入参：series_id 为系列标识。\\n'
+        '    出参：返回生产运行结果。\\n'
+        '    """\n'
+        "    return {'series_id': series_id}\n",
+        encoding="utf-8",
+    )
+
+    assert contract_comment_gaps(path) == []
+
+
+def test_python_class_contract_requires_class_parameters(tmp_path: Path):
+    path = tmp_path / "models.py"
+    path.write_text(
+        '"""视频生产模型。"""\n\n'
+        "class RunCreate:\n"
+        '    """创建生产运行。"""\n'
+        "    series_id: str\n",
+        encoding="utf-8",
+    )
+
+    assert contract_comment_gaps(path) == [
+        (3, "class", "RunCreate", "missing 类参数/参数名")
+    ]
+
+
+def test_javascript_function_contract_requires_input_and_output_comments(tmp_path: Path):
+    path = tmp_path / "api.js"
+    path.write_text(
+        "// 前端 API 客户端。\n"
+        "// 创建生产运行。\n"
+        "export function createRun(seriesId) { return client.post('/runs', { seriesId }) }\n",
+        encoding="utf-8",
+    )
+
+    assert contract_comment_gaps(path) == [
+        (3, "function", "createRun", "missing 入参/出参/参数名")
+    ]
+
+
+def test_javascript_function_contract_accepts_input_and_output_comments(tmp_path: Path):
+    path = tmp_path / "api.js"
+    path.write_text(
+        "// 前端 API 客户端。\n"
+        "// 创建生产运行。\n"
+        "// 入参：seriesId 为系列标识。\n"
+        "// 出参：返回后端创建结果。\n"
+        "export function createRun(seriesId) { return client.post('/runs', { seriesId }) }\n",
+        encoding="utf-8",
+    )
+
+    assert contract_comment_gaps(path) == []
+
+
+def test_javascript_control_blocks_are_not_function_contracts(tmp_path: Path):
+    path = tmp_path / "handler.js"
+    path.write_text(
+        "// 设备处理器。\n"
+        "function run(flag) {\n"
+        "  if (flag) { return true }\n"
+        "  for (var i = 0; i < 1; i++) { flag = false }\n"
+        "  return false\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+    assert contract_comment_gaps(path) == [
+        (2, "function", "run", "missing 入参/出参/参数名")
+    ]
 
 
 def test_vue_file_accepts_leading_chinese_html_comment(tmp_path: Path):
@@ -174,7 +266,12 @@ def test_check_files_reports_missing_module_comment(tmp_path: Path):
 
     result = check_files([bad], strict_risk=False)
 
-    assert result == CheckResult(module_missing=[bad], risk_missing=[], declaration_missing=[])
+    assert result == CheckResult(
+        module_missing=[bad],
+        risk_missing=[],
+        declaration_missing=[],
+        contract_missing=[],
+    )
 
 
 def test_all_business_code_has_standard_chinese_comments():

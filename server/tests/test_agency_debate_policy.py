@@ -22,3 +22,4 @@ def test_debate_policy_experts_exist_in_manifest():
         assert policy.defender in known_experts
         assert policy.arbiter in known_experts
         assert policy.focus
+        assert policy.escalation_guidance

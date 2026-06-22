@@ -133,9 +133,11 @@ async def test_debate_passes_when_second_round_reaches_consensus(db):
     db.add(series)
     db.commit()
     calls = []
+    debate_contexts = []
 
     async def fake_runtime(**kwargs):
         calls.append((kwargs["role"], kwargs["expert_id"]))
+        debate_contexts.append(kwargs["stage_context"]["debate"])
         return DebateRuntimeResult("passed", 91, "pass", kwargs["expert_id"])
 
     trace = await run_debate_audit(
@@ -153,6 +155,8 @@ async def test_debate_passes_when_second_round_reaches_consensus(db):
     assert trace["debate"]["final_verdict"] == "pass"
     assert trace["debate"]["arbiter_scorecard"]["verdict"] == "pass"
     assert len(calls) == 5
+    assert debate_contexts[-1]["focus"]
+    assert debate_contexts[-1]["escalation_guidance"]
 
 
 @pytest.mark.asyncio
@@ -233,3 +237,30 @@ async def test_debate_blocks_when_arbiter_passes_without_scorecard(db):
     assert trace["debate"]["final_verdict"] == "block"
     assert trace["debate"]["missing_scorecards"] == ["arbiter"]
     assert "arbiter" in trace["debate"]["downgrade_reason"]
+
+
+@pytest.mark.asyncio
+async def test_arbiter_block_reason_wins_over_non_final_missing_scorecards(db):
+    series = Series(title="Debate Mixed Diagnostics", logline="case", genre="drama")
+    db.add(series)
+    db.commit()
+
+    async def fake_runtime(**kwargs):
+        if kwargs["role"] == "crit":
+            return DebateRuntimeResultWithoutScorecard("passed", kwargs["expert_id"])
+        if kwargs["role"] == "arb":
+            return DebateRuntimeResult("failed", 45, "fail", kwargs["expert_id"])
+        return DebateRuntimeResult("passed", 91, "pass", kwargs["expert_id"])
+
+    trace = await run_debate_audit(
+        db,
+        series_id=series.id,
+        stage="style_lock",
+        stage_context={"style_lock": {"locked": True}},
+        runtime_config={"provider": "mock", "model": "mock", "api_key": "x"},
+        runtime_invoke=fake_runtime,
+    )
+
+    assert trace["stage_status"] == "blocked"
+    assert trace["debate"]["missing_scorecards"] == ["critic"]
+    assert trace["debate"]["downgrade_reason"] == "style_lock debate arbiter blocked the stage"

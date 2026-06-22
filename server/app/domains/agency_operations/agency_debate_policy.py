@@ -12,7 +12,7 @@ from dataclasses import dataclass
 class DebatePolicy:
     """业务类：承载 DebatePolicy 相关的数据结构、状态或业务协作。
 
-    类参数：arbiter、critic、defender、focus、policy_id、stage 承载该类的业务配置、状态或数据字段。
+    类参数：arbiter、critic、defender、escalation_guidance、focus、policy_id、stage 承载该类的业务配置、状态或数据字段。
     """
     stage: str
     policy_id: str
@@ -20,6 +20,7 @@ class DebatePolicy:
     defender: str
     arbiter: str
     focus: tuple[str, ...]
+    escalation_guidance: tuple[str, ...]
 
 
 DEBATE_POLICIES: dict[str, DebatePolicy] = {
@@ -30,6 +31,7 @@ DEBATE_POLICIES: dict[str, DebatePolicy] = {
         defender="story_generator",
         arbiter="douyin_strategist",
         focus=("整季主线", "逐集差异", "连续性台账", "锁定角色和场景"),
+        escalation_guidance=("主线断裂", "逐集重复", "角色或场景锁定缺失"),
     ),
     "style_lock": DebatePolicy(
         stage="style_lock",
@@ -38,6 +40,7 @@ DEBATE_POLICIES: dict[str, DebatePolicy] = {
         defender="image_prompt_engineer",
         arbiter="style_lock_quality_reviewer",
         focus=("角色规则", "场景规则", "参考图准备度", "视觉继承"),
+        escalation_guidance=("角色锚点缺失", "场景规则冲突", "参考图无法支撑后续生成"),
     ),
     "storyboard": DebatePolicy(
         stage="storyboard",
@@ -46,6 +49,7 @@ DEBATE_POLICIES: dict[str, DebatePolicy] = {
         defender="narrative_designer",
         arbiter="storyboard_quality_reviewer",
         focus=("可执行分镜", "角色场景锚点", "连续性", "镜头时长"),
+        escalation_guidance=("分镜无法执行", "角色场景锚点断裂", "镜头时长不可生产"),
     ),
     "image_stage": DebatePolicy(
         stage="image_stage",
@@ -54,6 +58,7 @@ DEBATE_POLICIES: dict[str, DebatePolicy] = {
         defender="image_prompt_engineer",
         arbiter="image_stage_quality_reviewer",
         focus=("提示词完整性", "参考图继承", "provider 约束", "风格漂移风险"),
+        escalation_guidance=("提示词缺失关键约束", "参考继承失败", "provider 约束不可满足"),
     ),
     "image_review": DebatePolicy(
         stage="image_review",
@@ -62,6 +67,7 @@ DEBATE_POLICIES: dict[str, DebatePolicy] = {
         defender="visual_storyteller",
         arbiter="image_review_quality_reviewer",
         focus=("角色身份", "场景一致", "图片可用性", "图生视频准备度"),
+        escalation_guidance=("角色身份漂移", "场景不连续", "图片不可进入图生视频"),
     ),
     "video_stage": DebatePolicy(
         stage="video_stage",
@@ -70,6 +76,7 @@ DEBATE_POLICIES: dict[str, DebatePolicy] = {
         defender="short_video_editing_coach",
         arbiter="video_stage_quality_reviewer",
         focus=("片段时长", "动作意图", "首帧继承", "连续性"),
+        escalation_guidance=("动作意图不可执行", "首帧继承断裂", "片段时长不满足剪辑"),
     ),
     "video_review": DebatePolicy(
         stage="video_review",
@@ -78,6 +85,7 @@ DEBATE_POLICIES: dict[str, DebatePolicy] = {
         defender="short_video_editing_coach",
         arbiter="video_review_quality_reviewer",
         focus=("身份漂移", "运动稳定", "镜头意图", "合成准备度"),
+        escalation_guidance=("身份漂移不可接受", "运动稳定性失败", "镜头无法合成"),
     ),
     "compose_preflight": DebatePolicy(
         stage="compose_preflight",
@@ -86,6 +94,7 @@ DEBATE_POLICIES: dict[str, DebatePolicy] = {
         defender="video_optimization_specialist",
         arbiter="compose_quality_reviewer",
         focus=("剧集完整度", "节奏", "平台适配", "缺失资产"),
+        escalation_guidance=("缺失必需资产", "剧集结构不完整", "平台适配阻断发布"),
     ),
     "compose": DebatePolicy(
         stage="compose",
@@ -94,6 +103,7 @@ DEBATE_POLICIES: dict[str, DebatePolicy] = {
         defender="short_video_editing_coach",
         arbiter="compose_quality_reviewer",
         focus=("最终交付", "剪辑节奏", "音频字幕", "发布适配"),
+        escalation_guidance=("最终成片不可发布", "音频字幕缺失", "剪辑节奏破坏理解"),
     ),
 }
 DEBATE_STAGES = set(DEBATE_POLICIES)

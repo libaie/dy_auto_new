@@ -173,6 +173,8 @@ async def run_debate_audit(
             "critic_scorecard": critic_card,
             "defender_scorecard": defender_card,
             "arbiter_scorecard": arbiter_card,
+            "focus": list(policy.focus),
+            "escalation_guidance": list(policy.escalation_guidance),
             "missing_scorecards": missing_scorecards,
             "final_verdict": final_verdict,
             "repair_intent": repair_intent,
@@ -222,6 +224,7 @@ async def _invoke_debate_role(
             "defender_expert_id": policy.defender,
             "arbiter_expert_id": policy.arbiter,
             "focus": list(policy.focus),
+            "escalation_guidance": list(policy.escalation_guidance),
             "opponent_summary": opponent_summary or {},
         },
     }
@@ -305,9 +308,8 @@ def _downgrade_reason(status: str, stage: str, missing_scorecards: list[str] | N
     """
     if status == "consensus_pass":
         return ""
-    if missing_scorecards:
-        roles = ", ".join(missing_scorecards)
-        return f"{stage} debate missing required scorecard from {roles}"
+    if missing_scorecards and "arbiter" in missing_scorecards:
+        return f"{stage} debate missing required arbiter scorecard"
     return f"{stage} debate arbiter blocked the stage"
 
 

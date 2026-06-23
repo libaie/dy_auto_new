@@ -941,7 +941,16 @@ def check_reference_readiness(
     key_to_character: dict[str, Character],
     key_to_scene: dict[str, Scene],
 ) -> dict[str, Any]:
-    failed_progress = _failed_style_lock_progress(series)
+    target_asset_keys = {
+        ("character", str(character.id))
+        for character in key_to_character.values()
+        if character.id
+    } | {
+        ("scene", str(scene.id))
+        for scene in key_to_scene.values()
+        if scene.id
+    }
+    failed_progress = _failed_style_lock_progress(series, target_asset_keys)
     if failed_progress:
         return {"status": "reference_failed", "missing_assets": [], "failed_assets": failed_progress}
 
@@ -971,7 +980,7 @@ def check_reference_readiness(
     return {"status": "ready", "missing_assets": [], "failed_assets": []}
 
 
-def _failed_style_lock_progress(series: Series) -> list[dict[str, Any]]:
+def _failed_style_lock_progress(series: Series, target_asset_keys: set[tuple[str, str]]) -> list[dict[str, Any]]:
     story_bible = series.story_bible_json if isinstance(series.story_bible_json, dict) else {}
     style_lock = story_bible.get("style_lock")
     progress = style_lock.get("reference_progress") if isinstance(style_lock, dict) else []
@@ -981,7 +990,12 @@ def _failed_style_lock_progress(series: Series) -> list[dict[str, Any]]:
     return [
         item
         for item in progress
-        if isinstance(item, dict) and str(item.get("status") or "").strip().casefold() in failed_statuses
+        if isinstance(item, dict)
+        and str(item.get("status") or "").strip().casefold() in failed_statuses
+        and (
+            str(item.get("asset_type") or "").strip(),
+            str(item.get("asset_id") or "").strip(),
+        ) in target_asset_keys
     ]
 
 

@@ -546,6 +546,35 @@ def test_reference_readiness_records_missing_slots(db):
     assert set(exam_room["missing_reference_slots"]) == set(scene_reference_slot_names())
 
 
+def test_reference_readiness_ignores_unrelated_failed_progress(db):
+    series, ep1, ep2, lin, hallway = _series_with_episodes(db)
+    unrelated = Character(name="Legacy Failed Character", role_type="supporting")
+    series.characters.append(unrelated)
+    db.commit()
+    series.story_bible_json = {
+        **(series.story_bible_json or {}),
+        "style_lock": {
+            **((series.story_bible_json or {}).get("style_lock") or {}),
+            "reference_progress": [
+                {
+                    "asset_type": "character",
+                    "asset_id": unrelated.id,
+                    "slot": "avatar_front_url",
+                    "status": "failed",
+                    "error": "Legacy reference generation failed",
+                }
+            ],
+        },
+    }
+    db.commit()
+    _approved_sources(db, series, ep1, ep2)
+
+    result = apply_asset_director_plan(db, series.id, _plan(db, series, ep1, ep2, lin, hallway))
+
+    assert result["readiness"]["status"] == "needs_reference"
+    assert result["readiness"]["failed_assets"] == []
+
+
 @pytest.mark.asyncio
 async def test_reference_generation_is_scoped_to_director_assets(db, monkeypatch):
     from app.domains.ai_video_series.asset_director_service import ensure_asset_director_references
@@ -570,8 +599,8 @@ async def test_reference_generation_is_scoped_to_director_assets(db, monkeypatch
     captured = {}
 
     async def fake_fill_reference_assets(series_arg, db_arg, *, character_ids=None, scene_ids=None):
-        captured["character_ids"] = set(character_ids or [])
-        captured["scene_ids"] = set(scene_ids or [])
+        captured["character_ids"] = character_ids
+        captured["scene_ids"] = scene_ids
         return []
 
     monkeypatch.setattr(

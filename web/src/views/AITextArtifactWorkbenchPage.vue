@@ -227,6 +227,7 @@ async function saveEdit() {
 // 出参：返回 approve 对应业务流程的处理结果。
 async function approve() {
   if (!selectedArtifact.value) return
+  if (!confirmed('确认批准当前 AI 文本产物？批准后会进入后续生产链路。')) return
   const { data } = await approveAITextArtifact(selectedArtifact.value.id)
   await load(data?.artifact?.id || selectedArtifact.value.id)
 }
@@ -236,6 +237,7 @@ async function approve() {
 // 出参：返回 regenerate 对应业务流程的处理结果。
 async function regenerate() {
   if (!selectedArtifact.value) return
+  if (!confirmed('确认让 AI 重新生成当前文本产物？新版本会替代当前审阅焦点。')) return
   const { data } = await regenerateAITextArtifact(selectedArtifact.value.id, {
     input_json: {
       reason: 'manual_regenerate_request',
@@ -243,6 +245,10 @@ async function regenerate() {
     },
   })
   await load(data?.artifact?.id)
+}
+
+function confirmed(message) {
+  return window.confirm(message) !== false
 }
 
 onMounted(load)

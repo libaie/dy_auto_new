@@ -527,3 +527,47 @@ def test_fingerprint_changes_when_storyboard_changes(db):
     after = compute_asset_director_fingerprint(load_asset_director_inputs(db=db, series_id=series.id))
 
     assert before != after
+
+
+def test_reference_readiness_records_missing_slots(db):
+    series, ep1, ep2, lin, hallway = _series_with_episodes(db)
+    _approved_sources(db, series, ep1, ep2)
+
+    result = apply_asset_director_plan(db, series.id, _plan(db, series, ep1, ep2, lin, hallway))
+
+    missing = result["readiness"]["missing_assets"]
+    assert result["readiness"]["status"] == "needs_reference"
+    assert any(item["asset_type"] == "character" and item["stable_key"] == "patient_wu_ep1" for item in missing)
+    assert any(item["asset_type"] == "scene" and item["stable_key"] == "ep1_exam_room" for item in missing)
+
+
+@pytest.mark.asyncio
+async def test_reference_generation_is_scoped_to_director_assets(db, monkeypatch):
+    from app.domains.ai_video_series.asset_director_service import ensure_asset_director_references
+
+    series, ep1, ep2, lin, hallway = _series_with_episodes(db)
+    unrelated = Character(name="Unused Legacy Character", role_type="supporting")
+    series.characters.append(unrelated)
+    _approved_sources(db, series, ep1, ep2)
+    result = apply_asset_director_plan(db, series.id, _plan(db, series, ep1, ep2, lin, hallway))
+    director_character_ids = {
+        asset.id
+        for asset in series.characters
+        if isinstance(asset.meta_json, dict) and asset.meta_json.get("asset_director_plan_id") == result["artifact"].id
+    }
+    captured = {}
+
+    async def fake_fill_reference_assets(series_arg, db_arg, *, character_ids=None, scene_ids=None):
+        captured["character_ids"] = set(character_ids or [])
+        captured["scene_ids"] = set(scene_ids or [])
+        return []
+
+    monkeypatch.setattr(
+        "app.domains.ai_video_series.asset_director_service.fill_reference_assets",
+        fake_fill_reference_assets,
+    )
+
+    await ensure_asset_director_references(db, series.id)
+
+    assert captured["character_ids"] == director_character_ids
+    assert unrelated.id not in captured["character_ids"]

@@ -18,6 +18,11 @@ from app.domains.ai_video_series.episode_asset_scope_service import (
     linked_series_characters,
     linked_series_scenes,
 )
+from app.domains.ai_video_series.style_lock import (
+    character_reference_slot_names,
+    fill_reference_assets,
+    scene_reference_slot_names,
+)
 from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
 from app.domains.creative_library.reference_asset_service import reference_url_is_usable
 
@@ -25,17 +30,8 @@ from app.domains.creative_library.reference_asset_service import reference_url_i
 ASSET_DIRECTOR_ARTIFACT_TYPE = "asset_director_plan"
 ASSET_DIRECTOR_SOURCE = "asset_director"
 ASSET_SCOPES = {"series_recurring", "episode_only", "guest", "location_recurring"}
-CHARACTER_REFERENCE_SLOTS = (
-    "avatar_front_url",
-    "avatar_threequarter_url",
-    "avatar_side_url",
-    "avatar_fullbody_url",
-)
-SCENE_REFERENCE_SLOTS = (
-    "reference_wideshot_url",
-    "reference_midshot_url",
-    "reference_aerial_url",
-)
+CHARACTER_REFERENCE_SLOTS = character_reference_slot_names()
+SCENE_REFERENCE_SLOTS = scene_reference_slot_names()
 SERIES_SOURCE_ARTIFACT_TYPES = ("series_bible", "series_story_plan", "season_arc", "continuity_ledger")
 EPISODE_SOURCE_ARTIFACT_TYPES = ("episode_outline", "episode_script", "storyboard")
 
@@ -280,6 +276,46 @@ async def ensure_asset_director_plan_for_episode(
             {"series_id": series_id, "episode_id": episode_id, "readiness": readiness or {}},
         )
     return artifact
+
+
+async def ensure_asset_director_references(db: Session, series_id: str) -> dict[str, Any]:
+    inputs = load_asset_director_inputs(db=db, series_id=series_id)
+    service = AITextArtifactService(db)
+    artifact = service.latest_approved(
+        target_type="series",
+        target_id=series_id,
+        artifact_type=ASSET_DIRECTOR_ARTIFACT_TYPE,
+    )
+    if not artifact or not isinstance(artifact.content_json, dict):
+        raise AssetDirectorError(
+            "ASSET_DIRECTOR_INPUTS_MISSING",
+            "Asset director plan is missing.",
+            {"series_id": series_id},
+        )
+    key_to_character = {
+        (asset.meta_json or {}).get("asset_stable_key"): asset
+        for asset in inputs.series.characters or []
+        if isinstance(asset.meta_json, dict) and (asset.meta_json or {}).get("asset_director_plan_id") == artifact.id
+    }
+    key_to_scene = {
+        (asset.meta_json or {}).get("asset_stable_key"): asset
+        for asset in inputs.series.scenes or []
+        if isinstance(asset.meta_json, dict) and (asset.meta_json or {}).get("asset_director_plan_id") == artifact.id
+    }
+    await fill_reference_assets(
+        inputs.series,
+        db,
+        character_ids={asset.id for asset in key_to_character.values() if asset.id},
+        scene_ids={asset.id for asset in key_to_scene.values() if asset.id},
+    )
+    db.flush()
+    readiness = check_reference_readiness(inputs.series, key_to_character, key_to_scene)
+    content = dict(artifact.content_json)
+    content["readiness"] = readiness
+    artifact.content_json = content
+    db.commit()
+    db.refresh(artifact)
+    return readiness
 
 
 def _episode_missing_inputs(episode: Episode) -> dict[str, Any] | None:
@@ -907,32 +943,32 @@ def check_reference_readiness(
 ) -> dict[str, Any]:
     failed_progress = _failed_style_lock_progress(series)
     if failed_progress:
-        return {"status": "reference_failed", "failed_reference_progress": failed_progress}
+        return {"status": "reference_failed", "missing_assets": [], "failed_assets": failed_progress}
 
     missing: list[dict[str, Any]] = []
     for stable_key, character in key_to_character.items():
         slots = _missing_character_reference_slots(character)
         if slots:
             missing.append({
-                "type": "character",
-                "id": character.id,
+                "asset_type": "character",
+                "stable_key": stable_key,
+                "asset_id": character.id,
                 "name": character.name,
-                "asset_stable_key": stable_key,
                 "missing_reference_slots": slots,
             })
     for stable_key, scene in key_to_scene.items():
         slots = _missing_scene_reference_slots(scene)
         if slots:
             missing.append({
-                "type": "scene",
-                "id": scene.id,
+                "asset_type": "scene",
+                "stable_key": stable_key,
+                "asset_id": scene.id,
                 "name": scene.name,
-                "asset_stable_key": stable_key,
                 "missing_reference_slots": slots,
             })
     if missing:
-        return {"status": "needs_reference", "missing_reference_assets": missing}
-    return {"status": "ready", "missing_reference_assets": []}
+        return {"status": "needs_reference", "missing_assets": missing, "failed_assets": []}
+    return {"status": "ready", "missing_assets": [], "failed_assets": []}
 
 
 def _failed_style_lock_progress(series: Series) -> list[dict[str, Any]]:

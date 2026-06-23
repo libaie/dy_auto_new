@@ -86,6 +86,16 @@ _SCENE_REFERENCE_SLOTS = (
     ("reference_midshot_url", "mid-shot scene lighting reference"),
     ("reference_aerial_url", "high-angle environment layout reference"),
 )
+
+
+def character_reference_slot_names() -> tuple[str, ...]:
+    return tuple(field for field, _label in _CHARACTER_REFERENCE_SLOTS)
+
+
+def scene_reference_slot_names() -> tuple[str, ...]:
+    return tuple(field for field, _label in _SCENE_REFERENCE_SLOTS)
+
+
 STYLE_LOCK_REFERENCE_CONCURRENCY = 4
 
 
@@ -720,7 +730,13 @@ async def ensure_series_assets(series: Series, db: Session) -> tuple[list[Charac
     return created_chars, created_scenes
 
 
-async def fill_reference_assets(series: Series, db: Session) -> list[dict]:
+async def fill_reference_assets(
+    series: Series,
+    db: Session,
+    *,
+    character_ids: set[str] | None = None,
+    scene_ids: set[str] | None = None,
+) -> list[dict]:
     """业务函数：处理 fill_reference_assets 对应的业务流程、校验或数据转换。
 
     入参：series、db 为该业务流程需要的上下文、标识或载荷。
@@ -738,8 +754,18 @@ async def fill_reference_assets(series: Series, db: Session) -> list[dict]:
         [character.appearance_desc for character in series.characters],
         [scene.location_desc for scene in series.scenes],
     )
+    target_characters = [
+        character
+        for character in series.characters
+        if character_ids is None or character.id in character_ids
+    ]
+    target_scenes = [
+        scene
+        for scene in series.scenes
+        if scene_ids is None or scene.id in scene_ids
+    ]
 
-    for character in series.characters:
+    for character in target_characters:
         for field, angle_label in _CHARACTER_REFERENCE_SLOTS:
             prompt = f"{angle_label}, clear face, hairstyle, outfit, stable identity, consistent series style. "
             prompt += f"Name: {character.name}. Appearance: {character.appearance_desc or ''}. Outfit: {character.outfit_desc or ''}."
@@ -782,7 +808,7 @@ async def fill_reference_assets(series: Series, db: Session) -> list[dict]:
                 },
             })
 
-    for scene in series.scenes:
+    for scene in target_scenes:
         for field, reference_label in _SCENE_REFERENCE_SLOTS:
             prompt = f"{reference_label}, consistent palette, lighting, environment design, and series style. "
             prompt += (

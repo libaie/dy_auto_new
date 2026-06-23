@@ -24,7 +24,10 @@ export function ensureSeriesEpisodes(id) { return client.post(`/series/${id}/ens
 // 前端业务函数：协调 generateSeriesStoryPlan 对应的页面流程、接口调用或状态转换。
 // 入参：id 为该业务流程需要的上下文、标识或载荷。
 // 出参：返回 generateSeriesStoryPlan 对应业务流程的处理结果。
-export function generateSeriesStoryPlan(id) { return client.post(`/series/${id}/story-plan`) }
+export function generateSeriesStoryPlan(id, options = {}) {
+  if (options.force) return client.post(`/series/${id}/story-plan`, undefined, { params: { force: true } })
+  return client.post(`/series/${id}/story-plan`)
+}
 // 前端业务函数：协调 generateEpisodeScript 对应的页面流程、接口调用或状态转换。
 // 入参：seriesId、episodeId 为该业务流程需要的上下文、标识或载荷。
 // 出参：返回 generateEpisodeScript 对应业务流程的处理结果。

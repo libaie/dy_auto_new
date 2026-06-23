@@ -491,6 +491,9 @@ def _normalize_episode_outline(
         value = source.get(key)
         if isinstance(value, dict):
             normalized[key] = value
+    value = source.get("asset_scope_repair")
+    if isinstance(value, dict):
+        normalized["asset_scope_repair"] = value
 
     normalized["schema_version"] = "series.episode_outline.v1"
     normalized["episode_number"] = int(episode.episode_number)
@@ -515,6 +518,12 @@ def _normalize_and_scope_episode_outline(
     入参：db、series、episode、source、total_episodes、character_ids、scene_ids、source_type 为该业务流程需要的上下文、标识或载荷。
     出参：返回该业务流程的处理结果；无显式返回值时返回 None。
     """
+    source = _repair_mechanical_asset_pool_scope(
+        source,
+        episode_number=int(episode.episode_number),
+        character_ids=character_ids,
+        scene_ids=scene_ids,
+    )
     scoped_character_ids = character_ids if _source_has_ids(source, "character_ids") else []
     scoped_scene_ids = scene_ids if _source_has_ids(source, "scene_ids") else []
     outline = _normalize_episode_outline(
@@ -532,6 +541,85 @@ def _normalize_and_scope_episode_outline(
         outline,
         fallback_source=source_type or "episode_outline",
     )
+
+
+def _repair_mechanical_asset_pool_scope(
+    source: dict[str, Any] | None,
+    *,
+    episode_number: int,
+    character_ids: list[str],
+    scene_ids: list[str],
+) -> dict[str, Any] | None:
+    """业务函数：处理 _repair_mechanical_asset_pool_scope 对应的业务流程、校验或数据转换。
+
+    入参：source、episode_number、character_ids、scene_ids 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
+    if not isinstance(source, dict):
+        return source
+
+    repaired = dict(source)
+    repair_notes: dict[str, str] = {}
+    if _uses_full_asset_pool(source, "character_ids", character_ids):
+        repaired["character_ids"] = _episode_character_subset(character_ids, episode_number)
+        repair_notes["characters"] = "mechanical_full_pool"
+    if _uses_full_asset_pool(source, "scene_ids", scene_ids):
+        repaired["scene_ids"] = _episode_scene_subset(scene_ids, episode_number)
+        repair_notes["scenes"] = "mechanical_full_pool"
+    if repair_notes:
+        repaired["asset_scope_repair"] = repair_notes
+    return repaired
+
+
+def _uses_full_asset_pool(source: dict[str, Any], key: str, pool_ids: list[str]) -> bool:
+    """业务函数：处理 _uses_full_asset_pool 对应的业务流程、校验或数据转换。
+
+    入参：source、key、pool_ids 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
+    pool = _dedupe_ids(pool_ids)
+    values = _dedupe_ids(source.get(key))
+    return len(pool) > 1 and len(values) == len(pool) and set(values) == set(pool)
+
+
+def _episode_character_subset(character_ids: list[str], episode_number: int) -> list[str]:
+    """业务函数：处理 _episode_character_subset 对应的业务流程、校验或数据转换。
+
+    入参：character_ids、episode_number 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
+    ids = _dedupe_ids(character_ids)
+    if len(ids) <= 1:
+        return ids
+    if len(ids) == 2:
+        return ids if episode_number % 2 == 0 else [ids[0]]
+    support_index = 1 + ((max(1, episode_number) - 1) % (len(ids) - 1))
+    return [ids[0], ids[support_index]]
+
+
+def _episode_scene_subset(scene_ids: list[str], episode_number: int) -> list[str]:
+    """业务函数：处理 _episode_scene_subset 对应的业务流程、校验或数据转换。
+
+    入参：scene_ids、episode_number 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
+    ids = _dedupe_ids(scene_ids)
+    if len(ids) <= 1:
+        return ids
+    count = 1 if len(ids) == 2 else 2
+    start = (max(1, episode_number) - 1) % len(ids)
+    return [ids[(start + offset) % len(ids)] for offset in range(count)]
+
+
+def _dedupe_ids(value: Any) -> list[str]:
+    """业务函数：处理 _dedupe_ids 对应的业务流程、校验或数据转换。
+
+    入参：value 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
+    if isinstance(value, list):
+        return list(dict.fromkeys(str(item).strip() for item in value if str(item or "").strip()))
+    return []
 
 
 def _source_has_ids(source: dict[str, Any] | None, key: str) -> bool:

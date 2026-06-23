@@ -302,7 +302,7 @@ def ensure_series_episodes(series_id: str, db: Session = Depends(get_db),
 
 
 @router.post("/{series_id}/story-plan")
-async def create_series_story_plan(series_id: str, db: Session = Depends(get_db),
+async def create_series_story_plan(series_id: str, force: bool = Query(False), db: Session = Depends(get_db),
                                    user = Depends(verify_admin_token)):
     """业务函数：处理 create_series_story_plan 对应的业务流程、校验或数据转换。
 
@@ -313,7 +313,7 @@ async def create_series_story_plan(series_id: str, db: Session = Depends(get_db)
     if not series:
         raise HTTPException(404, "Series not found")
     try:
-        return story_planning.start_story_plan(db, series)
+        return story_planning.start_story_plan(db, series, force=force)
     except story_planning.StoryPlanningDomainError as exc:
         raise _domain_http_error(exc) from exc
 

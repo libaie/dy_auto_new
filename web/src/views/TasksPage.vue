@@ -58,6 +58,9 @@ const showKeywordDialog = ref(false)
 const showCancelDialog = ref(false)
 const cancellingTask = ref(null)
 const cancelling = ref(false)
+const showDeleteDialog = ref(false)
+const deletingTask = ref(null)
+const deleteMode = ref('single')
 
 // --- WebSocket ---
 // 前端业务函数：协调 wsUrl 对应的页面流程、接口调用或状态转换。
@@ -105,16 +108,35 @@ async function fetchTasks(silent) {
 // 入参：row 为该业务流程需要的上下文、标识或载荷。
 // 出参：返回 handleDeleteTask 对应业务流程的处理结果。
 async function handleDeleteTask(row) {
-  try { await deleteTask(row.id); toast.success('已删除'); fetchTasks() } catch { toast.error('删除失败') }
+  deletingTask.value = row
+  deleteMode.value = 'single'
+  showDeleteDialog.value = true
 }
 // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
 // 出参：返回 handleBatchDelete 对应业务流程的处理结果。
 async function handleBatchDelete() {
   if (!selectedTaskIds.value.length) { toast.error('请先选择任务'); return }
+  deleteMode.value = 'batch'
+  deletingTask.value = null
+  showDeleteDialog.value = true
+}
+
+async function confirmDeleteTask() {
   batchDeleting.value = true
-  try { const res = await batchDeleteTasks(selectedTaskIds.value); toast.success(`已删除 ${res.data.deleted} 个任务`); fetchTasks() }
-  catch { toast.error('批量删除失败') }
-  finally { batchDeleting.value = false }
+  try {
+    if (deleteMode.value === 'batch') {
+      const res = await batchDeleteTasks(selectedTaskIds.value)
+      toast.success(`已删除 ${res.data.deleted} 个任务`)
+    } else if (deletingTask.value) {
+      await deleteTask(deletingTask.value.id)
+      toast.success('已删除')
+    }
+    showDeleteDialog.value = false
+    deletingTask.value = null
+    fetchTasks()
+  } catch {
+    toast.error(deleteMode.value === 'batch' ? '批量删除失败' : '删除失败')
+  } finally { batchDeleting.value = false }
 }
 // 入参：col 为该业务流程需要的上下文、标识或载荷。
 // 出参：返回 handleSort 对应业务流程的处理结果。
@@ -390,7 +412,7 @@ onMounted(() => { fetchTasks(); fetchChannels(); loadRefData() })
       <template #cell-actions="{ row }">
         <div class="flex justify-end gap-2">
           <button v-if="row.status === 'pending' || row.status === 'running'" class="btn-danger text-xs" @click="openCancelDialog(row)">取消</button>
-          <button v-if="row.status === 'failed' || row.status === 'cancelled'" class="px-3 py-1 text-xs font-medium text-orange-400 hover:text-orange-300 hover:bg-orange-400/10 rounded-lg transition-colors" @click="handleDeleteTask(row)">删除</button>
+          <button v-if="row.status === 'failed' || row.status === 'cancelled'" class="btn-danger text-xs" @click="handleDeleteTask(row)">删除</button>
         </div>
       </template>
     </DataTable>
@@ -399,6 +421,16 @@ onMounted(() => { fetchTasks(); fetchChannels(); loadRefData() })
     <TaskCreateDialog :open="showCreateDialog" :accounts="accounts" :groups="groups" :devices="devices" :templates="templates" :prompt-templates="promptTemplates" @close="showCreateDialog = false" @created="onCreated" />
     <KeywordSearchDialog :open="showKeywordDialog" :accounts="accounts" :groups="groups" :devices="devices" :templates="templates" :prompt-templates="promptTemplates" @close="showKeywordDialog = false" @created="onCreated" />
     <ConfirmDialog :open="showCancelDialog" title="取消任务" message="确定要取消该任务吗？" confirm-text="取消任务" :danger="true" @confirm="handleCancel" @cancel="showCancelDialog = false" />
+    <ConfirmDialog
+      :open="showDeleteDialog"
+      title="删除任务"
+      :message="deleteMode === 'batch' ? `确定要删除选中的 ${selectedTaskIds.length} 个任务吗？此操作不可撤销。` : `确定要删除任务「${deletingTask?.id || ''}」吗？此操作不可撤销。`"
+      confirm-text="删除"
+      :danger="true"
+      :loading="batchDeleting"
+      @confirm="confirmDeleteTask"
+      @cancel="showDeleteDialog = false"
+    />
     <ChannelDetail v-if="detailChannel" :channel="detailChannel" @close="detailChannel = null" @refresh="onChannelRefresh" />
   </div>
 </template>

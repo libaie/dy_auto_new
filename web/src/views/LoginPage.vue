@@ -55,12 +55,12 @@ async function handleLogin() {
         <form @submit.prevent="handleLogin" class="space-y-5">
           <div>
             <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5" for="username">用户名</label>
-            <input id="username" v-model="username" type="text" required class="w-full px-3 py-2.5 rounded-lg text-sm" placeholder="请输入用户名" />
+            <input id="username" v-model="username" type="text" required class="min-h-11 w-full px-3 py-2.5 rounded-lg text-sm" placeholder="请输入用户名" />
           </div>
 
           <div>
             <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5" for="password">密码</label>
-            <input id="password" v-model="password" type="password" required class="w-full px-3 py-2.5 rounded-lg text-sm" placeholder="请输入密码" />
+            <input id="password" v-model="password" type="password" required class="min-h-11 w-full px-3 py-2.5 rounded-lg text-sm" placeholder="请输入密码" />
           </div>
 
           <div v-if="error" class="text-red-400 text-xs bg-red-500/8 border border-red-500/15 p-2.5 rounded-lg flex items-center gap-2">
@@ -68,7 +68,7 @@ async function handleLogin() {
             {{ error }}
           </div>
 
-          <button type="submit" :disabled="loading" class="btn-primary w-full py-2.5 text-sm justify-center">
+          <button type="submit" :disabled="loading" class="btn-primary min-h-11 w-full justify-center py-2.5 text-sm">
             {{ loading ? '验证中...' : '进入指挥中心' }}
           </button>
         </form>

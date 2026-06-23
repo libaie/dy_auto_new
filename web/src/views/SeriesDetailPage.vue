@@ -111,10 +111,11 @@
         </div>
       </div>
 
-      <div v-if="storyPlanError || storyPlanResult || storyPlanEpisodeCount || storyPlanSeriesArtifact" data-test="story-plan-status" class="rounded-xl border border-gray-700/50 px-4 py-3 mb-6 text-sm text-slate-400" style="background: rgba(15, 23, 42, 0.5);">
+      <div v-if="storyPlanError || storyPlanResult || storyPlanEpisodeCount || storyPlanSeriesArtifact || storyPlanNeedsScopeRepair" data-test="story-plan-status" class="rounded-xl border border-gray-700/50 px-4 py-3 mb-6 text-sm text-slate-400" style="background: rgba(15, 23, 42, 0.5);">
         <div class="flex flex-wrap gap-4">
           <span>故事规划 {{ storyPlanEpisodeCount }}/{{ targetEpisodeCount }} 集</span>
           <span v-if="storyPlanSeriesArtifact" :class="storyPlanSourceClass">{{ storyPlanSourceText }}</span>
+          <span v-if="storyPlanNeedsScopeRepair" class="text-amber-300">分集角色/场景重复，建议重建规划</span>
           <span v-if="storyPlanError" class="text-red-300">{{ storyPlanError }}</span>
         </div>
       </div>
@@ -161,7 +162,7 @@
                 <span v-else-if="hasRawReference(character, CHARACTER_REFERENCE_SLOT_DEFS)" class="text-xs text-red-300">链接无效</span>
               </div>
             </div>
-            <button :data-test="`unlink-character-${character.id}`" class="shrink-0 rounded border border-slate-700 px-3 py-2 text-xs text-slate-300 hover:bg-slate-800" @click="removeCharacter(character.id)">
+            <button :data-test="`unlink-character-${character.id}`" class="min-h-11 shrink-0 rounded border border-slate-700 px-3 py-2 text-xs text-slate-300 hover:bg-slate-800" @click="removeCharacter(character.id)">
               取消关联
             </button>
           </div>
@@ -208,7 +209,7 @@
                 <span v-else-if="hasRawReference(scene, SCENE_REFERENCE_SLOT_DEFS)" class="text-xs text-red-300">链接无效</span>
               </div>
             </div>
-            <button :data-test="`unlink-scene-${scene.id}`" class="shrink-0 rounded border border-slate-700 px-3 py-2 text-xs text-slate-300 hover:bg-slate-800" @click="removeScene(scene.id)">
+            <button :data-test="`unlink-scene-${scene.id}`" class="min-h-11 shrink-0 rounded border border-slate-700 px-3 py-2 text-xs text-slate-300 hover:bg-slate-800" @click="removeScene(scene.id)">
               取消关联
             </button>
           </div>
@@ -448,6 +449,7 @@ const storyboardImageBusy = reactive({})
 const storyboardImageErrors = reactive({})
 const episodeScriptGenerating = reactive({})
 const episodeScriptErrors = reactive({})
+const textBackfillProgress = ref(null)
 const autostartRequested = ref(route.query?.autostart === 'production')
 const autostartRunning = ref(false)
 const MANAGED_IMAGE_PREFIXES = ['/static/', '/api/image-creation/pixelle-files/']
@@ -527,11 +529,12 @@ const hasProducingEpisode = computed(() => episodes.value.some(ep => episodeHasP
 const targetEpisodeCount = computed(() => Math.max(0, Number(series.value?.total_episodes || 0)))
 const persistedEpisodeTargetReached = computed(() => episodes.value.length >= targetEpisodeCount.value)
 const hasMissingEpisodePlaceholders = computed(() => targetEpisodeCount.value > episodes.value.length)
-const incompleteTextEpisode = computed(() => episodes.value.find(ep => (
+const incompleteTextEpisodes = computed(() => episodes.value.filter(ep => (
   finishedEpisodeStatuses.has(ep.status)
   && !episodeIsBusy(ep)
   && !episodeTextReady(ep)
-)) || null)
+)))
+const incompleteTextEpisode = computed(() => incompleteTextEpisodes.value[0] || null)
 const allPersistedEpisodesFinished = computed(() => (
   episodes.value.length > 0
   && persistedEpisodeTargetReached.value
@@ -549,20 +552,33 @@ const storyPlanningState = computed(() => {
 const storyPlanningStatus = computed(() => String(storyPlanningState.value.status || '').toLowerCase())
 const storyPlanningInProgress = computed(() => storyPlanning.value || activeStoryPlanningStatuses.has(storyPlanningStatus.value))
 const storyPlanningClosed = computed(() => closedStoryPlanningStatuses.has(storyPlanningStatus.value))
-const storyPlanButtonDisabled = computed(() => storyPlanningInProgress.value || storyPlanningClosed.value)
+const storyPlanCoversTarget = computed(() => storyPlanningClosed.value || storyPlanEpisodeCount.value >= targetEpisodeCount.value)
+const storyPlanNeedsScopeRepair = computed(() => (
+  !storyPlanningInProgress.value
+  && repeatedFullAssetPoolScope.value
+  && targetEpisodeCount.value > 1
+  && storyPlanCoversTarget.value
+))
+const storyPlanButtonDisabled = computed(() => storyPlanningInProgress.value || (storyPlanningClosed.value && !storyPlanNeedsScopeRepair.value))
 const storyPlanButtonText = computed(() => {
   if (storyPlanningInProgress.value) return '故事规划中...'
+  if (storyPlanNeedsScopeRepair.value) return '重建分集角色/场景规划'
   if (storyPlanningClosed.value) return '故事规划已完成'
   return '生成整季故事规划'
 })
 const pipelineStartDisabled = computed(() => pipelineStarting.value || (!runnableEpisode.value && !activeProductionRoute.value && !hasMissingEpisodePlaceholders.value && !incompleteTextEpisode.value))
 const pipelineButtonText = computed(() => {
+  if (textBackfillProgress.value) return `补齐剧本/分镜 ${textBackfillProgress.value.done}/${textBackfillProgress.value.total}`
   if (pipelineStarting.value) return '启动中...'
   if (canContinueActiveProduction.value) return hasProducingEpisode.value ? '剧集生产中，打开监控' : '继续生产计划'
   if (hasProducingEpisode.value) return '剧集生产中'
   if (hasBusyEpisode.value) return '生产计划已创建'
   if (hasMissingEpisodePlaceholders.value && !runnableEpisode.value) return '补齐剧集占位'
-  if (!runnableEpisode.value && incompleteTextEpisode.value) return `补齐第 ${incompleteTextEpisode.value.episode_number} 集剧本/分镜`
+  if (!runnableEpisode.value && incompleteTextEpisode.value) {
+    return incompleteTextEpisodes.value.length > 1
+      ? `补齐 ${incompleteTextEpisodes.value.length} 集剧本/分镜`
+      : `补齐第 ${incompleteTextEpisode.value.episode_number} 集剧本/分镜`
+  }
   if (!episodes.value.length) return '没有可启动剧集'
   if (!runnableEpisode.value) return allPersistedEpisodesFinished.value ? '全部剧集已完成' : '没有可启动剧集'
   return `生成第 ${runnableEpisode.value.episode_number} 集`
@@ -584,6 +600,15 @@ const storyPlanSourceText = computed(() => {
   return artifact.source_type || '故事规划已生成'
 })
 const storyPlanSourceClass = computed(() => storyPlanSourceText.value.includes('回退') ? 'text-amber-300' : 'text-cyan-300')
+const repeatedFullAssetPoolScope = computed(() => {
+  const characterIds = (series.value?.characters || []).map(item => item?.id).filter(Boolean)
+  const sceneIds = (series.value?.scenes || []).map(item => item?.id).filter(Boolean)
+  const scopedEpisodes = episodes.value.filter(ep => ep?.asset_scope)
+  if (scopedEpisodes.length < 2) return false
+  const repeatedCharacters = characterIds.length > 1 && scopedEpisodes.every(ep => sameIdSet(ep.asset_scope?.character_ids, characterIds))
+  const repeatedScenes = sceneIds.length > 1 && scopedEpisodes.every(ep => sameIdSet(ep.asset_scope?.scene_ids, sceneIds))
+  return repeatedCharacters || repeatedScenes
+})
 // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
 // 出参：返回 load 对应业务流程的处理结果。
 async function load() {
@@ -633,6 +658,11 @@ function beginEditSeries() {
 function errorMessage(e, fallback) {
   const detail = e.response?.data?.detail
   return detail?.message || detail || e.message || fallback
+}
+function sameIdSet(a, b) {
+  const left = new Set((Array.isArray(a) ? a : []).map(item => String(item)).filter(Boolean))
+  const right = new Set((Array.isArray(b) ? b : []).map(item => String(item)).filter(Boolean))
+  return left.size === right.size && [...left].every(item => right.has(item))
 }
 // 前端业务函数：协调 isManagedImagePath 对应的页面流程、接口调用或状态转换。
 // 入参：path 为该业务流程需要的上下文、标识或载荷。
@@ -963,20 +993,45 @@ async function generateFrameImage(ep, frame, index) {
 }
 // 入参：ep 为该业务流程需要的上下文、标识或载荷。
 // 出参：返回 generateScriptForEpisode 对应业务流程的处理结果。
-async function generateScriptForEpisode(ep) {
+function episodeTargetDuration(ep) {
+  return Number(series.value?.target_duration || ep?.duration_seconds || 60)
+}
+
+async function generateScriptForEpisode(ep, options = {}) {
   if (!ep?.id || !series.value?.id || episodeScriptGenerating[ep.id]) return
   episodeScriptGenerating[ep.id] = true
   episodeScriptErrors[ep.id] = ''
   try {
     await generateEpisodeScript(series.value.id, ep.id, {
-      target_duration_seconds: Number(series.value?.target_duration || ep.duration_seconds || 60),
+      target_duration_seconds: episodeTargetDuration(ep),
     })
-    await load()
-    await refreshEpisodeTextArtifacts()
+    if (options.refresh !== false) {
+      await load()
+      await refreshEpisodeTextArtifacts()
+    }
   } catch (e) {
     episodeScriptErrors[ep.id] = errorMessage(e, '剧本生成失败')
   } finally {
     delete episodeScriptGenerating[ep.id]
+  }
+}
+async function backfillIncompleteEpisodeTexts() {
+  const missingEpisodes = [...incompleteTextEpisodes.value].sort((a, b) => Number(a.episode_number) - Number(b.episode_number))
+  if (!missingEpisodes.length) return
+  textBackfillProgress.value = { done: 0, total: missingEpisodes.length }
+  try {
+    for (const ep of missingEpisodes) {
+      await generateScriptForEpisode(ep, { refresh: false })
+      if (episodeScriptErrors[ep.id]) {
+        error.value = `第 ${ep.episode_number} 集剧本/分镜补齐失败：${episodeScriptErrors[ep.id]}`
+        break
+      }
+      textBackfillProgress.value = { done: textBackfillProgress.value.done + 1, total: missingEpisodes.length }
+    }
+    await load()
+    await refreshEpisodeTextArtifacts()
+  } finally {
+    textBackfillProgress.value = null
   }
 }
 // 入参：ep 为该业务流程需要的上下文、标识或载荷。
@@ -1064,6 +1119,7 @@ async function saveSeries() {
 // 入参：characterId 为该业务流程需要的上下文、标识或载荷。
 // 出参：返回 removeCharacter 对应业务流程的处理结果。
 async function removeCharacter(characterId) {
+  if (!confirmed('确定取消关联这个角色吗？')) return
   unlinkErrors.character = ''
   try {
     await unlinkCharacter(route.params.id, characterId)
@@ -1075,6 +1131,7 @@ async function removeCharacter(characterId) {
 // 入参：sceneId 为该业务流程需要的上下文、标识或载荷。
 // 出参：返回 removeScene 对应业务流程的处理结果。
 async function removeScene(sceneId) {
+  if (!confirmed('确定取消关联这个场景吗？')) return
   unlinkErrors.scene = ''
   try {
     await unlinkScene(route.params.id, sceneId)
@@ -1103,10 +1160,13 @@ async function removeSeries() {
 // 出参：返回 generateStoryPlan 对应业务流程的处理结果。
 async function generateStoryPlan() {
   if (storyPlanButtonDisabled.value) return
+  const forceStoryPlan = storyPlanNeedsScopeRepair.value
   storyPlanning.value = true
   storyPlanError.value = ''
   try {
-    const { data } = await generateSeriesStoryPlan(route.params.id)
+    const { data } = forceStoryPlan
+      ? await generateSeriesStoryPlan(route.params.id, { force: true })
+      : await generateSeriesStoryPlan(route.params.id)
     storyPlanResult.value = data
     if (data?.story_planning && series.value) {
       series.value = {
@@ -1222,10 +1282,8 @@ async function startPipelineRun() {
   }
   if (!runnableEpisode.value && incompleteTextEpisode.value) {
     pipelineStarting.value = true; error.value = ''
-    const ep = incompleteTextEpisode.value
     try {
-      await generateScriptForEpisode(ep)
-      if (episodeScriptErrors[ep.id]) error.value = episodeScriptErrors[ep.id]
+      await backfillIncompleteEpisodeTexts()
     } finally { pipelineStarting.value = false }
     return
   }
@@ -1259,7 +1317,7 @@ async function maybeAutostartProduction() {
     autostartRequested.value = false
     return
   }
-  if (!runnableEpisode.value) {
+  if (!runnableEpisode.value && !activeProductionRoute.value && !hasMissingEpisodePlaceholders.value && !incompleteTextEpisode.value) {
     autostartRequested.value = false
     return
   }
@@ -1296,5 +1354,6 @@ function epStatusClass(s) { return { pending: 'bg-gray-800 text-slate-400', rend
 // 入参：s 为该业务流程需要的上下文、标识或载荷。
 // 出参：返回 runStatusClass 对应业务流程的处理结果。
 function runStatusClass(s) { return { running: 'bg-sky-900/40 text-sky-400', completed: 'bg-emerald-900/40 text-emerald-400', failed: 'bg-red-900/40 text-red-400', pending: 'bg-gray-800 text-slate-400' }[s] || 'bg-gray-800 text-slate-400' }
+function confirmed(message) { return window.confirm(message) !== false }
 onMounted(load)
 </script>

@@ -101,14 +101,14 @@ const goToPage = (p) => {
         <div class="flex gap-1">
           <button
             :disabled="page <= 1"
-            class="rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-sm text-slate-300 hover:bg-white/10 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+            class="min-h-11 rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-sm text-slate-300 hover:bg-white/10 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
             @click="goToPage(page - 1)"
           >
             上一页
           </button>
           <button
             :disabled="page >= totalPages()"
-            class="rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-sm text-slate-300 hover:bg-white/10 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+            class="min-h-11 rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-sm text-slate-300 hover:bg-white/10 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
             @click="goToPage(page + 1)"
           >
             下一页

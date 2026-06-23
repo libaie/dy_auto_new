@@ -4,6 +4,7 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../../stores/auth.js'
 import { getRealtimeStats } from '../../api/stats.js'
+import ConfirmDialog from '../ConfirmDialog.vue'
 
 const props = defineProps({
   activeCategory: { type: String, required: true },
@@ -15,6 +16,7 @@ const auth = useAuthStore()
 
 const stats = ref({ online_devices: 0, running_tasks: 0, pending_tasks: 0 })
 const currentTime = ref('')
+const showLogoutConfirm = ref(false)
 let clockTimer = null
 let statsTimer = null
 
@@ -41,7 +43,13 @@ onUnmounted(() => { clearInterval(clockTimer); clearInterval(statsTimer) })
 // 前端业务函数：协调 handleLogout 对应的页面流程、接口调用或状态转换。
 // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
 // 出参：返回 handleLogout 对应业务流程的处理结果。
-function handleLogout() { auth.logout(); router.push('/login') }
+function handleLogout() { showLogoutConfirm.value = true }
+
+function confirmLogout() {
+  showLogoutConfirm.value = false
+  auth.logout()
+  router.push('/login')
+}
 
 const categories = [
   { key: 'ops', label: '运营', to: '/' },
@@ -67,7 +75,7 @@ function handleCategoryClick(cat) {
   >
     <!-- Left -->
     <div class="flex items-center gap-6">
-      <router-link to="/" class="flex items-center gap-2.5 no-underline group">
+      <router-link to="/" class="flex min-h-11 items-center gap-2.5 no-underline group">
         <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background: linear-gradient(135deg, var(--accent-600), var(--accent-500));">
           <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -109,13 +117,27 @@ function handleCategoryClick(cat) {
     <div class="flex items-center gap-4">
       <span class="hidden sm:block font-mono text-sm text-slate-300 tabular-nums tracking-wider">{{ currentTime }}</span>
       <span class="text-sm font-medium text-slate-200">{{ auth.username }}</span>
-      <button @click="handleLogout" class="p-1.5 rounded-lg text-slate-300 hover:text-red-400 hover:bg-red-400/5 transition-all" title="退出">
+      <button
+        @click="handleLogout"
+        class="inline-flex h-11 w-11 items-center justify-center rounded-lg text-slate-300 transition-all hover:bg-red-400/5 hover:text-red-400"
+        title="退出"
+        aria-label="退出登录"
+      >
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
         </svg>
       </button>
     </div>
   </header>
+  <ConfirmDialog
+    :open="showLogoutConfirm"
+    title="退出登录"
+    message="确定要退出当前账号吗？未保存的页面编辑不会自动保存。"
+    confirm-text="退出登录"
+    :danger="true"
+    @confirm="confirmLogout"
+    @cancel="showLogoutConfirm = false"
+  />
 </template>
 
 <style scoped>

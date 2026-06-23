@@ -77,6 +77,26 @@
       </transition>
     </Teleport>
 
+    <Teleport to="body">
+      <transition name="modal">
+        <div v-if="deletingItem" class="modal-overlay" @click.self="deletingItem = null">
+          <div class="modal-card modal-card--sm">
+            <div class="modal-header">
+              <h3 class="modal-title text-red-400">删除选项</h3>
+            </div>
+            <div class="modal-body">
+              <p class="text-slate-300 text-sm">确定要删除选项 <span class="text-white font-semibold">「{{ deletingItem.label }}」</span> 吗？</p>
+              <p class="text-slate-500 text-xs mt-2">此操作不可撤销。</p>
+            </div>
+            <div class="modal-footer">
+              <button @click="deletingItem = null" class="btn btn--secondary">取消</button>
+              <button @click="doDeleteItem" class="btn btn--danger">确认删除</button>
+            </div>
+          </div>
+        </div>
+      </transition>
+    </Teleport>
+
     <!-- Delete Confirmation Modal -->
     <Teleport to="body">
       <transition name="modal">
@@ -156,7 +176,7 @@
             </button>
 
             <!-- Delete -->
-            <button @click="removeItem(item)" class="list-item-delete" title="删除此选项">
+            <button @click="confirmDeleteItem(item)" class="list-item-delete" title="删除此选项">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
             </button>
           </div>
@@ -188,6 +208,7 @@ const editingCat = ref(null)
 const editCatKey = ref('')
 const editCatLabel = ref('')
 const deletingCat = ref(null)
+const deletingItem = ref(null)
 
 // 前端业务函数：协调 startAddCat 对应的页面流程、接口调用或状态转换。
 // 入参：无显式入参 为该业务流程需要的上下文、标识或载荷。
@@ -314,11 +335,18 @@ async function toggleItem(item) {
   await updateItem(item.id, { enabled: !item.enabled }); await load()
 }
 
-// 前端业务函数：协调 removeItem 对应的页面流程、接口调用或状态转换。
+function confirmDeleteItem(item) {
+  deletingItem.value = item
+}
+
+// 前端业务函数：协调 doDeleteItem 对应的页面流程、接口调用或状态转换。
 // 入参：item 为该业务流程需要的上下文、标识或载荷。
-// 出参：返回 removeItem 对应业务流程的处理结果。
-async function removeItem(item) {
-  await deleteItem(item.id); await load()
+// 出参：返回 doDeleteItem 对应业务流程的处理结果。
+async function doDeleteItem() {
+  if (!deletingItem.value) return
+  await deleteItem(deletingItem.value.id)
+  deletingItem.value = null
+  await load()
 }
 
 watch(currentCat, load)

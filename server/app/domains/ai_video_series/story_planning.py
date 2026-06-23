@@ -96,6 +96,7 @@ def set_story_planning_state(
     job_id: str | None = None,
     error: str | None = None,
     result: dict | None = None,
+    force: bool | None = None,
 ) -> dict:
     """业务函数：处理 set_story_planning_state 对应的业务流程、校验或数据转换。
 
@@ -118,6 +119,8 @@ def set_story_planning_state(
         current.pop("error", None)
     if result is not None:
         current["result"] = result
+    if force is not None:
+        current["force"] = force
     if status in {"completed", "fallback", "failed"}:
         current["completed_at"] = _utc_now_iso()
     story_bible["story_planning"] = current
@@ -171,7 +174,7 @@ def enqueue_story_plan_job(db: Session, series: Series, version: int) -> Product
     return job
 
 
-def start_story_plan(db: Session, series: Series) -> dict:
+def start_story_plan(db: Session, series: Series, *, force: bool = False) -> dict:
     """业务函数：处理 start_story_plan 对应的业务流程、校验或数据转换。
 
     入参：db、series 为该业务流程需要的上下文、标识或载荷。
@@ -180,7 +183,7 @@ def start_story_plan(db: Session, series: Series) -> dict:
     if active_story_plan_job(db, series.id):
         raise story_planning_in_progress_error()
     completed_payload = completed_story_plan_payload(db, series)
-    if completed_payload:
+    if completed_payload and not force:
         return completed_payload
 
     story_bible = dict(series.story_bible_json or {})
@@ -194,6 +197,7 @@ def start_story_plan(db: Session, series: Series) -> dict:
         status="queued",
         version=version,
         job_id=job.id,
+        force=force,
     )
     return {
         "ok": True,
@@ -219,8 +223,9 @@ async def run_story_plan_job(series_id: str, db: Session | None = None) -> dict:
 
         current = (series.story_bible_json or {}).get("story_planning", {})
         version = int(current.get("version") or 1) if isinstance(current, dict) else 1
+        force = bool(current.get("force")) if isinstance(current, dict) else False
         set_story_planning_state(db, series, status="running", version=version)
-        result = await generate_series_story_plan(db, series_id)
+        result = await generate_series_story_plan(db, series_id, force=force)
         trace = result.model_trace if hasattr(result, "model_trace") else {}
         terminal_status = "fallback" if isinstance(trace, dict) and trace.get("stage_status") == "fallback" else "completed"
         result_payload = result.__dict__ if hasattr(result, "__dict__") else result

@@ -20,7 +20,7 @@ const visibleItems = computed(() => {
 <template>
   <nav
     class="flex flex-col shrink-0 border-r transition-all duration-300 relative z-10"
-    :class="expanded ? 'w-52' : 'w-[56px]'"
+    :class="expanded ? 'w-52' : 'w-[64px]'"
     style="background: rgba(10, 15, 30, 0.5); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-color: var(--border-subtle);"
     @mouseenter="expanded = true"
     @mouseleave="expanded = false"
@@ -39,7 +39,7 @@ const visibleItems = computed(() => {
         v-for="item in visibleItems"
         :key="item.path"
         :to="item.path"
-        class="flex items-center h-10 mx-2 rounded-lg transition-all duration-200 group relative no-underline"
+        class="flex h-11 items-center mx-2 rounded-lg transition-all duration-200 group relative no-underline"
         :class="route.path === item.path
           ? 'text-sky-300'
           : 'text-slate-300 hover:text-slate-100'"
@@ -53,7 +53,7 @@ const visibleItems = computed(() => {
         ></div>
 
         <!-- Icon -->
-        <div class="w-[56px] flex items-center justify-center shrink-0">
+        <div class="w-[60px] flex items-center justify-center shrink-0">
           <svg class="w-5 h-5 transition-transform duration-200 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" :d="item.icon" />
           </svg>

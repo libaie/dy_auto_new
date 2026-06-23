@@ -568,7 +568,7 @@ def _validate_frame_bindings(episode: Episode, episode_payload: dict[str, Any], 
                 "Asset director frame binding references an unknown scene stable key.",
                 {"episode_id": episode.id, "frame_id": frame_id, "stable_key": scene_key},
             )
-        for stable_key in dedupe_asset_ids(binding.get("character_stable_keys")):
+        for stable_key in _director_string_list(binding.get("character_stable_keys"), "character_stable_keys"):
             if stable_key not in character_keys:
                 raise AssetDirectorError(
                     "ASSET_DIRECTOR_BINDING_UNKNOWN_ASSET",
@@ -607,6 +607,29 @@ def _resolve_character(
     missing_slots = _missing_character_reference_slots(character)
     _merge_asset_meta(series, episode, character, item, artifact_id, missing_slots, created=created)
     return character
+
+
+def _director_string_list(value: Any, field_name: str) -> list[str]:
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise AssetDirectorError(
+            "ASSET_DIRECTOR_INVALID_JSON",
+            f"Asset director plan field {field_name} must be a list of strings.",
+            {"field": field_name},
+        )
+    result: list[str] = []
+    for item in value:
+        if not isinstance(item, str):
+            raise AssetDirectorError(
+                "ASSET_DIRECTOR_INVALID_JSON",
+                f"Asset director plan field {field_name} must be a list of strings.",
+                {"field": field_name},
+            )
+        clean = item.strip()
+        if clean:
+            result.append(clean)
+    return list(dict.fromkeys(result))
 
 
 def _resolve_scene(
@@ -817,7 +840,7 @@ def _apply_episode_bindings(
             used_scenes.append(scene)
         characters = [
             key_to_character[stable_key]
-            for stable_key in dedupe_asset_ids(binding.get("character_stable_keys"))
+            for stable_key in _director_string_list(binding.get("character_stable_keys"), "character_stable_keys")
             if stable_key in key_to_character
         ]
         if characters:

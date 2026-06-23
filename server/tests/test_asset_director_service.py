@@ -442,6 +442,18 @@ def test_malformed_collection_fields_raise_registry_codes(db, mutation, expected
     assert exc.value.code == expected_code
 
 
+def test_malformed_character_stable_keys_raise_invalid_json(db):
+    series, ep1, ep2, lin, hallway = _series_with_episodes(db)
+    _approved_sources(db, series, ep1, ep2)
+    plan = _plan(db, series, ep1, ep2, lin, hallway)
+    plan["episode_assets"][0]["frame_bindings"][0]["character_stable_keys"] = {"bad": "shape"}
+
+    with pytest.raises(AssetDirectorError) as exc:
+        apply_asset_director_plan(db, series.id, plan)
+
+    assert exc.value.code == "ASSET_DIRECTOR_INVALID_JSON"
+
+
 def test_duplicate_stable_keys_raise_ambiguous_match(db):
     series, ep1, ep2, lin, hallway = _series_with_episodes(db)
     _approved_sources(db, series, ep1, ep2)

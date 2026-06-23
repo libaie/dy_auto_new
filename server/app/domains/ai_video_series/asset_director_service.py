@@ -203,7 +203,7 @@ def _apply_asset_director_plan(db: Session, series_id: str, plan: dict[str, Any]
         key_to_scene[str(item["stable_key"]).strip()] = scene
 
     for episode_payload in plan.get("episode_assets") or []:
-        episode = episodes_by_number[int(episode_payload["episode_number"])]
+        episode = _episode_by_number(episodes_by_number, episode_payload.get("episode_number"), series_id)
         for item in episode_payload.get("characters") or []:
             character = _resolve_character(db, inputs.series, episode, item, artifact.id)
             key_to_character[str(item["stable_key"]).strip()] = character
@@ -213,7 +213,7 @@ def _apply_asset_director_plan(db: Session, series_id: str, plan: dict[str, Any]
 
     db.flush()
     for episode_payload in plan.get("episode_assets") or []:
-        episode = episodes_by_number[int(episode_payload["episode_number"])]
+        episode = _episode_by_number(episodes_by_number, episode_payload.get("episode_number"), series_id)
         _apply_episode_bindings(episode, episode_payload, key_to_character, key_to_scene)
 
     resolved_assets = {
@@ -359,7 +359,7 @@ def _validate_plan(plan: Any, inputs: AssetDirectorInputs, expected_fingerprint:
         raise AssetDirectorError("ASSET_DIRECTOR_PLAN_INVALID", "Asset director plan must be a JSON object.")
     if plan.get("series_id") != inputs.series.id:
         raise AssetDirectorError(
-            "ASSET_DIRECTOR_PLAN_INVALID",
+            "ASSET_DIRECTOR_SERIES_MISMATCH",
             "Asset director plan series_id does not match.",
             {"expected_series_id": inputs.series.id, "actual_series_id": plan.get("series_id")},
         )
@@ -385,6 +385,13 @@ def _validate_plan(plan: Any, inputs: AssetDirectorInputs, expected_fingerprint:
             "ASSET_DIRECTOR_PLAN_INVALID",
             "Asset director plan must cover every target episode.",
             {"target_episode_numbers": sorted(target_numbers), "covered_episode_numbers": sorted(covered_numbers)},
+        )
+    unknown_numbers = sorted((covered_numbers | payload_numbers) - target_numbers)
+    if unknown_numbers:
+        raise AssetDirectorError(
+            "ASSET_DIRECTOR_EPISODE_NOT_FOUND",
+            "Asset director plan references an episode outside the series.",
+            {"series_id": inputs.series.id, "episode_numbers": unknown_numbers},
         )
 
     character_keys: set[str] = set()
@@ -440,29 +447,45 @@ def _required_int(value: Any, field_name: str) -> int:
         ) from exc
 
 
+def _episode_by_number(
+    episodes_by_number: dict[int, Episode],
+    value: Any,
+    series_id: str,
+) -> Episode:
+    episode_number = _required_int(value, "episode_number")
+    episode = episodes_by_number.get(episode_number)
+    if episode is None:
+        raise AssetDirectorError(
+            "ASSET_DIRECTOR_EPISODE_NOT_FOUND",
+            "Asset director plan references an episode outside the series.",
+            {"series_id": series_id, "episode_number": episode_number},
+        )
+    return episode
+
+
 def _validate_asset_item(item: Any) -> str:
     if not isinstance(item, dict):
-        raise AssetDirectorError("ASSET_DIRECTOR_PLAN_INVALID", "Asset director asset item must be an object.")
+        raise AssetDirectorError("ASSET_DIRECTOR_INVALID_ASSET", "Asset director asset item must be an object.")
     stable_key = str(item.get("stable_key") or "").strip()
     if not stable_key:
-        raise AssetDirectorError("ASSET_DIRECTOR_PLAN_INVALID", "Asset director asset item requires stable_key.")
+        raise AssetDirectorError("ASSET_DIRECTOR_INVALID_ASSET", "Asset director asset item requires stable_key.")
     if not str(item.get("name") or "").strip():
         raise AssetDirectorError(
-            "ASSET_DIRECTOR_PLAN_INVALID",
+            "ASSET_DIRECTOR_INVALID_ASSET",
             "Asset director asset item requires name.",
             {"stable_key": stable_key},
         )
     asset_scope = str(item.get("asset_scope") or "").strip()
     if asset_scope not in ASSET_SCOPES:
         raise AssetDirectorError(
-            "ASSET_DIRECTOR_PLAN_INVALID",
+            "ASSET_DIRECTOR_INVALID_ASSET",
             "Asset director asset item has invalid asset_scope.",
             {"stable_key": stable_key, "asset_scope": asset_scope},
         )
     confidence = str(item.get("match_confidence") or "").strip()
     if confidence not in {"new", "high", "medium", "low"}:
         raise AssetDirectorError(
-            "ASSET_DIRECTOR_PLAN_INVALID",
+            "ASSET_DIRECTOR_INVALID_ASSET",
             "Asset director asset item has invalid match_confidence.",
             {"stable_key": stable_key, "match_confidence": confidence},
         )

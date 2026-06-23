@@ -330,6 +330,62 @@ def test_low_confidence_name_match_blocks(db):
     assert db.query(Character).filter(Character.name == "Patient Wu").count() == 1
 
 
+def test_wrong_series_plan_raises_series_mismatch(db):
+    series, ep1, ep2, lin, hallway = _series_with_episodes(db)
+    other = Series(title="Other", genre="drama", total_episodes=1, status="draft")
+    db.add(other)
+    db.commit()
+    _approved_sources(db, series, ep1, ep2)
+    plan = _plan(db, series, ep1, ep2, lin, hallway)
+    plan["series_id"] = other.id
+
+    with pytest.raises(AssetDirectorError) as exc:
+        apply_asset_director_plan(db, series.id, plan)
+
+    assert exc.value.code == "ASSET_DIRECTOR_SERIES_MISMATCH"
+
+
+def test_plan_payload_for_unknown_episode_raises_episode_not_found(db):
+    series, ep1, ep2, lin, hallway = _series_with_episodes(db)
+    _approved_sources(db, series, ep1, ep2)
+    plan = _plan(db, series, ep1, ep2, lin, hallway)
+    plan["covered_episode_numbers"].append(999)
+    plan["episode_assets"].append(
+        {
+            "episode_number": 999,
+            "characters": [],
+            "scenes": [],
+            "frame_bindings": [],
+        }
+    )
+
+    with pytest.raises(AssetDirectorError) as exc:
+        apply_asset_director_plan(db, series.id, plan)
+
+    assert exc.value.code == "ASSET_DIRECTOR_EPISODE_NOT_FOUND"
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        lambda item: item.pop("stable_key"),
+        lambda item: item.pop("name"),
+        lambda item: item.update({"asset_scope": "invalid_scope"}),
+        lambda item: item.update({"match_confidence": "certain"}),
+    ],
+)
+def test_invalid_asset_payload_raises_invalid_asset(db, mutation):
+    series, ep1, ep2, lin, hallway = _series_with_episodes(db)
+    _approved_sources(db, series, ep1, ep2)
+    plan = _plan(db, series, ep1, ep2, lin, hallway)
+    mutation(plan["recurring_characters"][0])
+
+    with pytest.raises(AssetDirectorError) as exc:
+        apply_asset_director_plan(db, series.id, plan)
+
+    assert exc.value.code == "ASSET_DIRECTOR_INVALID_ASSET"
+
+
 def test_invalid_frame_binding_rolls_back_without_partial_assets(db):
     series, ep1, ep2, lin, hallway = _series_with_episodes(db)
     _approved_sources(db, series, ep1, ep2)

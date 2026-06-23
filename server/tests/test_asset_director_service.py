@@ -8,6 +8,7 @@ from app.domains.ai_video_series.asset_director_service import (
     AssetDirectorError,
     apply_asset_director_plan,
     compute_asset_director_fingerprint,
+    ensure_asset_director_plan_for_episode,
     load_asset_director_inputs,
 )
 from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
@@ -384,6 +385,102 @@ def test_invalid_asset_payload_raises_invalid_asset(db, mutation):
         apply_asset_director_plan(db, series.id, plan)
 
     assert exc.value.code == "ASSET_DIRECTOR_INVALID_ASSET"
+
+
+def test_scalar_covered_episode_numbers_raises_invalid_json(db):
+    series, ep1, ep2, lin, hallway = _series_with_episodes(db)
+    _approved_sources(db, series, ep1, ep2)
+    plan = _plan(db, series, ep1, ep2, lin, hallway)
+    plan["covered_episode_numbers"] = "1"
+
+    with pytest.raises(AssetDirectorError) as exc:
+        apply_asset_director_plan(db, series.id, plan)
+
+    assert exc.value.code == "ASSET_DIRECTOR_INVALID_JSON"
+
+
+def test_scalar_episode_characters_raises_invalid_asset(db):
+    series, ep1, ep2, lin, hallway = _series_with_episodes(db)
+    _approved_sources(db, series, ep1, ep2)
+    plan = _plan(db, series, ep1, ep2, lin, hallway)
+    plan["episode_assets"][0]["characters"] = "patient_wu_ep1"
+
+    with pytest.raises(AssetDirectorError) as exc:
+        apply_asset_director_plan(db, series.id, plan)
+
+    assert exc.value.code == "ASSET_DIRECTOR_INVALID_ASSET"
+
+
+def test_non_list_aliases_raises_invalid_asset(db):
+    series, ep1, ep2, lin, hallway = _series_with_episodes(db)
+    _approved_sources(db, series, ep1, ep2)
+    plan = _plan(db, series, ep1, ep2, lin, hallway)
+    plan["episode_assets"][0]["characters"][0]["aliases"] = "吴病人"
+
+    with pytest.raises(AssetDirectorError) as exc:
+        apply_asset_director_plan(db, series.id, plan)
+
+    assert exc.value.code == "ASSET_DIRECTOR_INVALID_ASSET"
+
+
+@pytest.mark.parametrize(
+    ("mutation", "expected_code"),
+    [
+        (lambda plan: plan.update({"recurring_characters": "lead_doctor"}), "ASSET_DIRECTOR_INVALID_ASSET"),
+        (lambda plan: plan["episode_assets"][0].update({"frame_bindings": "ep1-f1"}), "ASSET_DIRECTOR_INVALID_JSON"),
+    ],
+)
+def test_malformed_collection_fields_raise_registry_codes(db, mutation, expected_code):
+    series, ep1, ep2, lin, hallway = _series_with_episodes(db)
+    _approved_sources(db, series, ep1, ep2)
+    plan = _plan(db, series, ep1, ep2, lin, hallway)
+    mutation(plan)
+
+    with pytest.raises(AssetDirectorError) as exc:
+        apply_asset_director_plan(db, series.id, plan)
+
+    assert exc.value.code == expected_code
+
+
+def test_duplicate_stable_keys_raise_ambiguous_match(db):
+    series, ep1, ep2, lin, hallway = _series_with_episodes(db)
+    _approved_sources(db, series, ep1, ep2)
+    plan = _plan(db, series, ep1, ep2, lin, hallway)
+    plan["episode_assets"][0]["characters"][0]["stable_key"] = "lead_doctor"
+
+    with pytest.raises(AssetDirectorError) as exc:
+        apply_asset_director_plan(db, series.id, plan)
+
+    assert exc.value.code == "ASSET_DIRECTOR_AMBIGUOUS_MATCH"
+
+
+@pytest.mark.asyncio
+async def test_ensure_asset_director_plan_maps_reference_failed(db):
+    series, ep1, ep2, _lin, _hallway = _series_with_episodes(db)
+    _approved_sources(db, series, ep1, ep2)
+    inputs = load_asset_director_inputs(db=db, series_id=series.id)
+    artifact_service = AITextArtifactService(db)
+    artifact = artifact_service.create_artifact(
+        series_id=series.id,
+        target_type="series",
+        target_id=series.id,
+        artifact_type=ASSET_DIRECTOR_ARTIFACT_TYPE,
+        source_type="asset_director",
+        content_json={
+            "series_id": series.id,
+            "covered_episode_numbers": [1, 2],
+            "input_fingerprint": compute_asset_director_fingerprint(inputs),
+            "readiness": {"status": "reference_failed"},
+        },
+        commit=False,
+    )
+    artifact_service.approve_artifact(artifact.id, commit=False)
+    db.commit()
+
+    with pytest.raises(AssetDirectorError) as exc:
+        await ensure_asset_director_plan_for_episode(db, series.id, ep1.id)
+
+    assert exc.value.code == "ASSET_DIRECTOR_REFERENCES_FAILED"
 
 
 def test_invalid_frame_binding_rolls_back_without_partial_assets(db):

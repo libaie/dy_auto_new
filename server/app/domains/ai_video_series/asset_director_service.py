@@ -267,6 +267,12 @@ async def ensure_asset_director_plan_for_episode(
     _assert_artifact_fresh(artifact, inputs)
     readiness = (artifact.content_json or {}).get("readiness")
     status = readiness.get("status") if isinstance(readiness, dict) else None
+    if status == "reference_failed":
+        raise AssetDirectorError(
+            "ASSET_DIRECTOR_REFERENCES_FAILED",
+            "Asset director reference generation failed.",
+            {"series_id": series_id, "episode_id": episode_id, "readiness": readiness},
+        )
     if status != "ready":
         raise AssetDirectorError(
             "ASSET_DIRECTOR_REFERENCES_MISSING",
@@ -356,7 +362,7 @@ def _normalize_name(value: Any) -> str:
 
 def _validate_plan(plan: Any, inputs: AssetDirectorInputs, expected_fingerprint: str) -> None:
     if not isinstance(plan, dict):
-        raise AssetDirectorError("ASSET_DIRECTOR_PLAN_INVALID", "Asset director plan must be a JSON object.")
+        raise AssetDirectorError("ASSET_DIRECTOR_INVALID_JSON", "Asset director plan must be a JSON object.")
     if plan.get("series_id") != inputs.series.id:
         raise AssetDirectorError(
             "ASSET_DIRECTOR_SERIES_MISMATCH",
@@ -371,20 +377,27 @@ def _validate_plan(plan: Any, inputs: AssetDirectorInputs, expected_fingerprint:
         )
 
     target_numbers = {episode.episode_number for episode in inputs.episodes}
-    covered_numbers = _int_set(plan.get("covered_episode_numbers") or [])
-    payloads = plan.get("episode_assets")
-    if not isinstance(payloads, list):
-        payloads = []
+    covered_numbers = _int_set(_json_list(plan.get("covered_episode_numbers"), "covered_episode_numbers"))
+    payloads = _json_list(plan.get("episode_assets"), "episode_assets")
+    for payload in payloads:
+        if not isinstance(payload, dict):
+            raise AssetDirectorError("ASSET_DIRECTOR_INVALID_JSON", "Episode asset payload must be an object.")
     payload_numbers = _int_set(
-        payload.get("episode_number")
-        for payload in payloads
-        if isinstance(payload, dict) and payload.get("episode_number") is not None
+        [
+            payload.get("episode_number")
+            for payload in payloads
+            if payload.get("episode_number") is not None
+        ]
     )
     if not target_numbers.issubset(covered_numbers) or not target_numbers.issubset(payload_numbers):
         raise AssetDirectorError(
-            "ASSET_DIRECTOR_PLAN_INVALID",
+            "ASSET_DIRECTOR_EPISODE_NOT_FOUND",
             "Asset director plan must cover every target episode.",
-            {"target_episode_numbers": sorted(target_numbers), "covered_episode_numbers": sorted(covered_numbers)},
+            {
+                "target_episode_numbers": sorted(target_numbers),
+                "covered_episode_numbers": sorted(covered_numbers),
+                "payload_episode_numbers": sorted(payload_numbers),
+            },
         )
     unknown_numbers = sorted((covered_numbers | payload_numbers) - target_numbers)
     if unknown_numbers:
@@ -397,16 +410,14 @@ def _validate_plan(plan: Any, inputs: AssetDirectorInputs, expected_fingerprint:
     character_keys: set[str] = set()
     scene_keys: set[str] = set()
     all_keys: set[str] = set()
-    for item in plan.get("recurring_characters") or []:
+    for item in _asset_list(plan, "recurring_characters"):
         _register_asset_key(item, all_keys, character_keys)
-    for item in plan.get("recurring_scenes") or []:
+    for item in _asset_list(plan, "recurring_scenes"):
         _register_asset_key(item, all_keys, scene_keys)
     for payload in payloads:
-        if not isinstance(payload, dict):
-            raise AssetDirectorError("ASSET_DIRECTOR_PLAN_INVALID", "Episode asset payload must be an object.")
-        for item in payload.get("characters") or []:
+        for item in _asset_list(payload, "characters"):
             _register_asset_key(item, all_keys, character_keys)
-        for item in payload.get("scenes") or []:
+        for item in _asset_list(payload, "scenes"):
             _register_asset_key(item, all_keys, scene_keys)
 
     episodes_by_number = {episode.episode_number: episode for episode in inputs.episodes}
@@ -417,11 +428,41 @@ def _validate_plan(plan: Any, inputs: AssetDirectorInputs, expected_fingerprint:
             _validate_frame_bindings(episodes_by_number[episode_number], payload, known_keys)
 
 
+def _json_list(value: Any, field_name: str) -> list[Any]:
+    if isinstance(value, list):
+        return value
+    raise AssetDirectorError(
+        "ASSET_DIRECTOR_INVALID_JSON",
+        f"Asset director plan field {field_name} must be a list.",
+        {"field": field_name},
+    )
+
+
+def _optional_json_list(payload: dict[str, Any], field_name: str) -> list[Any]:
+    value = payload.get(field_name)
+    if value is None:
+        return []
+    return _json_list(value, field_name)
+
+
+def _asset_list(payload: dict[str, Any], field_name: str) -> list[Any]:
+    value = payload.get(field_name)
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return value
+    raise AssetDirectorError(
+        "ASSET_DIRECTOR_INVALID_ASSET",
+        f"Asset director asset field {field_name} must be a list.",
+        {"field": field_name},
+    )
+
+
 def _register_asset_key(item: Any, all_keys: set[str], type_keys: set[str]) -> None:
     stable_key = _validate_asset_item(item)
     if stable_key in all_keys:
         raise AssetDirectorError(
-            "ASSET_DIRECTOR_DUPLICATE_STABLE_KEY",
+            "ASSET_DIRECTOR_AMBIGUOUS_MATCH",
             "Asset director stable keys must be unique.",
             {"stable_key": stable_key},
         )
@@ -441,7 +482,7 @@ def _required_int(value: Any, field_name: str) -> int:
         return int(value)
     except (TypeError, ValueError) as exc:
         raise AssetDirectorError(
-            "ASSET_DIRECTOR_PLAN_INVALID",
+            "ASSET_DIRECTOR_INVALID_JSON",
             f"Asset director plan has invalid {field_name}.",
             {field_name: value},
         ) from exc
@@ -475,6 +516,13 @@ def _validate_asset_item(item: Any) -> str:
             "Asset director asset item requires name.",
             {"stable_key": stable_key},
         )
+    aliases = item.get("aliases")
+    if aliases is not None and not isinstance(aliases, list):
+        raise AssetDirectorError(
+            "ASSET_DIRECTOR_INVALID_ASSET",
+            "Asset director asset aliases must be a list.",
+            {"stable_key": stable_key},
+        )
     asset_scope = str(item.get("asset_scope") or "").strip()
     if asset_scope not in ASSET_SCOPES:
         raise AssetDirectorError(
@@ -503,9 +551,9 @@ def _validate_frame_bindings(episode: Episode, episode_payload: dict[str, Any], 
         scene_keys = all_keys
 
     frame_ids = {_frame_identity(frame, index) for index, frame in enumerate(_storyboard_frames(episode.storyboard_json))}
-    for binding in episode_payload.get("frame_bindings") or []:
+    for binding in _optional_json_list(episode_payload, "frame_bindings"):
         if not isinstance(binding, dict):
-            raise AssetDirectorError("ASSET_DIRECTOR_PLAN_INVALID", "Frame binding must be an object.")
+            raise AssetDirectorError("ASSET_DIRECTOR_INVALID_JSON", "Frame binding must be an object.")
         frame_id = str(binding.get("frame_id") or binding.get("shot_id") or binding.get("id") or "").strip()
         if frame_id not in frame_ids:
             raise AssetDirectorError(
@@ -880,10 +928,10 @@ def _failed_style_lock_progress(series: Series) -> list[dict[str, Any]]:
 
 def _assert_artifact_covers_episode(artifact: AITextArtifact, episode: Episode) -> None:
     content = artifact.content_json if isinstance(artifact.content_json, dict) else {}
-    numbers = _int_set(content.get("covered_episode_numbers") or [])
+    numbers = _int_set(_json_list(content.get("covered_episode_numbers"), "covered_episode_numbers"))
     if int(episode.episode_number) not in numbers:
         raise AssetDirectorError(
-            "ASSET_DIRECTOR_EPISODE_NOT_COVERED",
+            "ASSET_DIRECTOR_EPISODE_NOT_FOUND",
             "Asset director plan does not cover the requested episode.",
             {"artifact_id": artifact.id, "episode_id": episode.id, "episode_number": episode.episode_number},
         )

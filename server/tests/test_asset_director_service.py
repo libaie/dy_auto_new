@@ -614,3 +614,44 @@ async def test_reference_generation_is_scoped_to_director_assets(db, monkeypatch
     assert unrelated.id not in captured["character_ids"]
     assert captured["scene_ids"] == director_scene_ids
     assert unrelated_scene.id not in captured["scene_ids"]
+
+
+def test_prompt_does_not_force_full_cast_per_frame(db):
+    series, ep1, ep2, _lin, _hallway = _series_with_episodes(db)
+    _approved_sources(db, series, ep1, ep2)
+    from app.domains.ai_video_series.asset_director_service import (
+        build_asset_director_prompt,
+        load_asset_director_inputs,
+    )
+
+    prompt = build_asset_director_prompt(load_asset_director_inputs(db=db, series_id=series.id))
+
+    assert "do not assign the full series cast to every frame" in prompt
+    assert "stable_key is required" in prompt
+    assert ep1.id in prompt
+    assert ep2.id in prompt
+
+
+@pytest.mark.asyncio
+async def test_ensure_missing_asset_director_plan_generates_and_applies(db, monkeypatch):
+    from app.domains.ai_video_series import asset_director_service
+
+    series, ep1, ep2, lin, hallway = _series_with_episodes(db)
+    _approved_sources(db, series, ep1, ep2)
+
+    async def fake_generate_asset_director_plan(db_arg, inputs_arg):
+        assert db_arg is db
+        assert inputs_arg.series.id == series.id
+        return _plan(db, series, ep1, ep2, lin, hallway)
+
+    monkeypatch.setattr(
+        asset_director_service,
+        "generate_asset_director_plan",
+        fake_generate_asset_director_plan,
+    )
+
+    result = await ensure_asset_director_plan_for_episode(db, series.id, ep1.id)
+
+    assert result["artifact"].status == "approved"
+    assert result["artifact"].artifact_type == ASSET_DIRECTOR_ARTIFACT_TYPE
+    assert result["readiness"]["status"] == "needs_reference"

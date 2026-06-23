@@ -182,6 +182,18 @@ def _series_scenes(series: Series) -> list[Scene]:
     return list(series.scenes or [])
 
 
+def dedupe_asset_ids(value: Any) -> list[str]:
+    return _dedupe_strings(value)
+
+
+def linked_series_characters(series: Series) -> list[Character]:
+    return _series_characters(series)
+
+
+def linked_series_scenes(series: Series) -> list[Scene]:
+    return _series_scenes(series)
+
+
 def _find_series_character_by_name(series: Series, name: str) -> Character | None:
     """业务函数：处理 _find_series_character_by_name 对应的业务流程、校验或数据转换。
 

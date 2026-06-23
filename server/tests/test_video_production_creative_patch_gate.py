@@ -167,7 +167,7 @@ def _linked_run_with_worker_job(db):
 def test_real_worker_step_blocks_pending_creative_patch_before_provider(db, monkeypatch):
     from app.domains.video_production.production_worker_service import run_real_worker_step
 
-    run, _segment, patch = _linked_run_with_worker_job(db)
+    run, segment, patch = _linked_run_with_worker_job(db)
 
     def fake_config(db, scene_key):
         return {
@@ -197,3 +197,7 @@ def test_real_worker_step_blocks_pending_creative_patch_before_provider(db, monk
     assert result["items"][0]["error_code"] == ProductionErrorCode.REVIEW_GATE_BLOCKED.value
     assert patch.id in result["items"][0]["repair"]["affected_ids"]
     assert result["items"][0]["repair"]["repair_route"].endswith("?tab=workbench")
+    job = db.query(ProductionJob).filter_by(plan_id=run.production_plan_id).one()
+    db.refresh(segment)
+    assert job.status == "blocked"
+    assert segment.status == "blocked_by_review"

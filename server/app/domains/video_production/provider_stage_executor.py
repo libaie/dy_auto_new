@@ -236,6 +236,7 @@ class ProviderStageExecutor:
         else:
             try:
                 submit_payload = _submit_payload_with_external_task(payload, task_id=task_id)
+                # 提交 provider 前已完成预算、幂等、容量和部署单 worker 校验。
                 submit_result = await self.client.submit(submit_payload)
                 provider_task_id = _provider_task_id(submit_result)
             except ProductionRepairableError as exc:
@@ -757,6 +758,9 @@ def _is_retryable_quota_failure(sync_result: dict, failed_assets: list[dict] | N
 
     text = " ".join(text_parts).lower()
     quota_seen = any(token in text for token in ("429", "quota", "rate limit", "rate_limit", "throttle", "限流", "额度"))
+    billing_seen = any(token in text for token in ("overdue-payment", "overdue payment", "欠费"))
+    access_denied_billing_seen = "access denied" in text and any(token in text for token in ("good standing", "overdue"))
+    quota_seen = quota_seen or billing_seen or access_denied_billing_seen
     return retryable_seen and quota_seen
 
 
@@ -913,13 +917,20 @@ def _mark_terminal_provider_failure(
     入参：db、task、sync_result、terminal_status、error_code、archive_idempotency_key 为该业务流程需要的上下文、标识或载荷。
     出参：返回该业务流程的处理结果；无显式返回值时返回 None。
     """
+    message = str(sync_result.get("error") or sync_result.get("message") or "Provider task ended without success.")
     if task.status == terminal_status:
+        if archive_idempotency_key and ":archived:" not in str(task.idempotency_key or ""):
+            task.idempotency_key = _archived_idempotency_key(task)
+        if error_code:
+            task.error_code = error_code
+        task.error_message = message
         task.response_summary_json = sync_result
+        task.completed_at = task.completed_at or bj_now()
+        task.updated_at = bj_now()
         db.commit()
         db.refresh(task)
         return task
-    message = str(sync_result.get("error") or sync_result.get("message") or "Provider task ended without success.")
-    if archive_idempotency_key:
+    if archive_idempotency_key and ":archived:" not in str(task.idempotency_key or ""):
         task.idempotency_key = _archived_idempotency_key(task)
     return set_task_status(
         db,

@@ -221,7 +221,7 @@ def test_worker_dispatches_agency_auto_repair_job(db):
     job = ProductionJob(
         plan_id=plan.id,
         target_type="episode",
-        target_id="episode-1",
+        target_id=run.episode_id,
         stage="agency_auto_repair:storyboard_missing_references",
         status=JOB_QUEUED,
         idempotency_key="repair:worker",

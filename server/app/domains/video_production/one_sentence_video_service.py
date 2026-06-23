@@ -25,6 +25,7 @@ from app.db.models import (
 )
 from app.domains.agency_operations.agency_orchestrator import AgencyOrchestrator
 from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
+from app.domains.ai_video_series.episode_asset_scope_service import normalize_episode_asset_scope
 from app.domains.ai_video_series.series_planning_service import ensure_episode_placeholders
 from app.domains.creative_library import reference_asset_service
 from app.domains.creative_library.reference_asset_service import ReferenceAssetError
@@ -631,16 +632,22 @@ def _record_one_sentence_text_artifacts(
     style_lock = story_bible.get("style_lock", {}) if isinstance(story_bible, dict) else {}
     characters = style_lock.get("characters", []) if isinstance(style_lock, dict) else []
     scenes = style_lock.get("scenes", []) if isinstance(style_lock, dict) else []
-    episode_outlines = [
-        _build_one_sentence_episode_outline(
+    episode_outlines = []
+    for ep in all_episodes:
+        outline = _build_one_sentence_episode_outline(
             prompt=prompt,
             episode_number=ep.episode_number,
             total_episodes=series.total_episodes,
             character_ids=[item.get("id") for item in characters if item.get("id")],
             scene_ids=[item.get("id") for item in scenes if item.get("id")],
         )
-        for ep in all_episodes
-    ]
+        episode_outlines.append(normalize_episode_asset_scope(
+            db,
+            series,
+            ep,
+            outline,
+            fallback_source="one_sentence",
+        ))
     continuity_ledger = {
         "schema_version": "series.continuity.v1",
         "series_id": series.id,
@@ -856,6 +863,28 @@ def _build_one_sentence_episode_outline(
         if episode_number >= total_episodes
         else f"留下通往第 {episode_number + 1} 集的新线索。"
     )
+    scoped_character_ids = character_ids if episode_number == 1 else []
+    scoped_scene_ids = scene_ids if episode_number == 1 else []
+    generated_assets = {"characters": [], "scenes": []}
+    if episode_number > 1:
+        generated_assets = {
+            "characters": [{
+                "name": f"Episode {episode_number} Story Catalyst",
+                "role_type": "supporting",
+                "gender": "unknown",
+                "personality": "Pushes this episode's clue, conflict, or reveal forward.",
+                "appearance_desc": f"Distinct supporting character for episode {episode_number}, grounded in: {prompt}",
+                "usage": f"第 {episode_number} 集专属剧情角色，用于制造新线索或反转。",
+            }],
+            "scenes": [{
+                "name": f"Episode {episode_number} Key Location",
+                "scene_type": "mixed",
+                "location_desc": f"Episode {episode_number} location derived from the main story premise: {prompt}",
+                "lighting": "cinematic",
+                "mood": "dramatic",
+                "usage": f"第 {episode_number} 集专属关键场景，用于承载新线索。",
+            }],
+        }
     return {
         "schema_version": "series.episode_outline.v1",
         "episode_number": episode_number,
@@ -871,14 +900,15 @@ def _build_one_sentence_episode_outline(
         "reversal": f"第 {episode_number} 集中段让主角对线索、人物关系或危险来源产生新的误判。",
         "cliffhanger": next_hook,
         "next_episode_handoff": next_hook,
-        "character_ids": character_ids,
-        "scene_ids": scene_ids,
+        "character_ids": scoped_character_ids,
+        "scene_ids": scoped_scene_ids,
+        "generated_assets": generated_assets,
         "character_state_changes": [
             {
                 "character_id": character_id,
                 "change": "introduced" if episode_number == 1 else "state advances from previous episode",
             }
-            for character_id in character_ids
+            for character_id in scoped_character_ids
         ],
         "foreshadowing_introduced": [] if episode_number >= total_episodes else [next_hook],
         "foreshadowing_resolved": [] if episode_number == 1 else [previous_handoff],

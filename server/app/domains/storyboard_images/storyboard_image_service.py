@@ -363,6 +363,26 @@ def _context_matches_storyboard_frame(context: dict[str, Any] | None, *, run_id:
     )
 
 
+def _context_matches_storyboard_frame_for_promote(
+    context: dict[str, Any] | None,
+    *,
+    run_id: str,
+    frame_id: str,
+    episode_id: str | None,
+) -> bool:
+    """业务函数：处理 _context_matches_storyboard_frame_for_promote 对应的业务流程、校验或数据转换。
+
+    入参：context、run_id、frame_id、episode_id 为该业务流程需要的上下文、标识或载荷。
+    出参：返回该业务流程的处理结果；无显式返回值时返回 None。
+    """
+    if not isinstance(context, dict) or str(context.get("frame_id") or "") != str(frame_id):
+        return False
+    existing_run_id = context.get("run_id")
+    if existing_run_id:
+        return str(existing_run_id) == str(run_id)
+    return not episode_id or str(context.get("episode_id") or "") == str(episode_id)
+
+
 def _latest_tasks_by_frame(db: Session, *, series_id: str, episode_id: str, run_id: str | None = None) -> dict[str, ImageCreationTask]:
     """业务函数：处理 _latest_tasks_by_frame 对应的业务流程、校验或数据转换。
 
@@ -492,6 +512,8 @@ def promote_storyboard_image_asset(
     asset = db.query(ImageCreationAsset).filter(ImageCreationAsset.id == asset_id).first()
     if not asset:
         raise image_error(404, "SOURCE_ASSET_NOT_FOUND", "Source image asset not found.", "Pick another image asset.", retryable=False)
+    run = db.query(VideoProductionRun).filter(VideoProductionRun.id == run_id).first()
+    effective_episode_id = episode_id or (run.episode_id if run else None)
     task = db.query(ImageCreationTask).filter(ImageCreationTask.id == asset.task_id).first()
     if not review_gate_passed(task, asset):
         raise image_error(
@@ -502,8 +524,8 @@ def promote_storyboard_image_asset(
             retryable=False,
             affected_ids=[asset.id],
         )
-    if not _context_matches_storyboard_frame(asset.destination_context_json, run_id=run_id, frame_id=frame_id) or (
-        task is not None and not _context_matches_storyboard_frame(task.destination_context_json, run_id=run_id, frame_id=frame_id)
+    if not _context_matches_storyboard_frame_for_promote(asset.destination_context_json, run_id=run_id, frame_id=frame_id, episode_id=effective_episode_id) or (
+        task is not None and not _context_matches_storyboard_frame_for_promote(task.destination_context_json, run_id=run_id, frame_id=frame_id, episode_id=effective_episode_id)
     ):
         raise image_error(
             409,
@@ -520,7 +542,7 @@ def promote_storyboard_image_asset(
     payload = {
         "run_id": run_id,
         "frame_id": frame_id,
-        "episode_id": episode_id or asset.episode_id,
+        "episode_id": effective_episode_id or asset.episode_id,
         "asset_version": asset_version,
         "destination_role": "storyboard_frame",
         "user_id": user_id,

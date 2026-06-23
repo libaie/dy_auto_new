@@ -39,6 +39,8 @@ def test_get_masks_sensitive_keys(client, db):
     _clean_settings(db)
     _set_setting(db, "ai_api_key", "sk-secret-12345")
     _set_setting(db, "pixelle_api_key", "stage-secret")
+    _set_setting(db, "seedance_api_key", "seedance-secret")
+    _set_setting(db, "kling_secret_key", "kling-secret")
     _set_setting(db, "ai_base_url", "https://api.deepseek.com")
     _set_setting(db, "ai_model", "deepseek-chat")
 
@@ -49,6 +51,8 @@ def test_get_masks_sensitive_keys(client, db):
     # Sensitive fields masked
     assert data.get("ai_api_key") == "****"
     assert data.get("pixelle_api_key") == "****"
+    assert data.get("seedance_api_key") == "****"
+    assert data.get("kling_secret_key") == "****"
     # Non-sensitive fields returned as-is
     assert data.get("ai_base_url") == "https://api.deepseek.com"
     assert data.get("ai_model") == "deepseek-chat"
@@ -58,11 +62,13 @@ def test_put_skips_masked_value(client, db):
     """When value is '****', PUT should skip updating that key."""
     _clean_settings(db)
     _set_setting(db, "ai_api_key", "sk-original-key")
+    _set_setting(db, "seedance_api_key", "seedance-original")
 
     # Send masked value — should NOT overwrite
     resp = client.put("/api/settings", json={
         "settings": {
             "ai_api_key": "****",
+            "seedance_api_key": "****",
             "ai_base_url": "https://new.example.com",
         }
     })
@@ -71,6 +77,8 @@ def test_put_skips_masked_value(client, db):
     # Verify: api_key unchanged, base_url updated
     actual = db.query(SystemSetting).filter(SystemSetting.key == "ai_api_key").first()
     assert actual.value == "sk-original-key"
+    actual_seedance = db.query(SystemSetting).filter(SystemSetting.key == "seedance_api_key").first()
+    assert actual_seedance.value == "seedance-original"
 
     actual_url = db.query(SystemSetting).filter(SystemSetting.key == "ai_base_url").first()
     assert actual_url.value == "https://new.example.com"

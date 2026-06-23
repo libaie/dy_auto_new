@@ -7,7 +7,7 @@ from types import SimpleNamespace
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.db.models import AIModel
+from app.db.models import AIModel, SystemSetting
 from app.main import app
 
 
@@ -128,6 +128,101 @@ def test_provider_capability_health_requires_paid_ready_model_per_runtime_scene(
     assert result["scene_readiness"]["video_rendering"]["status"] == "ok"
     assert result["scene_readiness"]["video_composition"]["status"] == "blocked"
 
+
+def test_provider_capability_health_accepts_pixelle_settings_for_video_composition(db, monkeypatch):
+    import app.domains.system_operations.system_health_router as system_health
+
+    monkeypatch.setenv("DY_AUTO_PROVIDER_SUBMIT_WORKER_COUNT", "1")
+    db.add_all([
+        SystemSetting(key="pixelle_video_url", value="http://pixelle:8500"),
+        SystemSetting(key="pixelle_api_key", value="stage-secret"),
+    ])
+    for scene_key, capability_key in (
+        ("image_generation", "supports_text_to_image"),
+        ("video_rendering", "supports_image_to_video"),
+        ("video_composition", "supports_video_composition"),
+    ):
+        db.add(AIModel(
+            name=f"{scene_key}-model",
+            model_type="video",
+            provider="pixelle" if scene_key == "video_composition" else "seedance",
+            base_url="   " if scene_key == "video_composition" else "https://ark.cn-beijing.volces.com/api/plan/v3",
+            api_key="   " if scene_key == "video_composition" else "encrypted-placeholder",
+            model_name=f"{scene_key}-model-name",
+            config_json={
+                "scene_key": scene_key,
+                "real_paid_allowed": True,
+                "supports_external_task_id": True,
+                "supports_task_query": True,
+                "returns_asset_url": True,
+                "returns_usage": True,
+                "estimated_cost": 0.01,
+                capability_key: True,
+            },
+            enabled=True,
+        ))
+    db.commit()
+
+    result = system_health._provider_capability_health(db)
+
+    assert result["status"] == "ok"
+    assert result["scene_readiness"]["video_composition"]["status"] == "ok"
+    assert result["scene_readiness"]["video_composition"]["blocked"] == []
+
+def _paid_capability(**overrides):
+    capability = {
+        "real_paid_allowed": True,
+        "supports_external_task_id": True,
+        "supports_task_query": True,
+        "returns_asset_url": True,
+        "returns_usage": True,
+        "supports_video_composition": True,
+    }
+    capability.update(overrides)
+    return capability
+
+
+def test_provider_capability_health_treats_whitespace_connection_values_as_missing():
+    import app.domains.system_operations.system_health_router as system_health
+
+    model = AIModel(
+        provider="pixelle",
+        base_url="   ",
+        api_key="   ",
+        model_name="   ",
+        config_json={"estimated_cost": 0.01},
+    )
+
+    missing = system_health._missing_real_provider_requirements(
+        model,
+        _paid_capability(),
+        scene_key="video_composition",
+        settings={"pixelle_video_url": "   ", "pixelle_api_key": "   "},
+    )
+
+    assert {"api_key", "base_url", "model_name"} <= set(missing)
+
+
+def test_provider_capability_health_does_not_apply_pixelle_settings_to_other_providers():
+    import app.domains.system_operations.system_health_router as system_health
+
+    model = AIModel(
+        provider="seedance",
+        base_url="",
+        api_key="",
+        model_name="seedance-compose",
+        config_json={"estimated_cost": 0.01},
+    )
+
+    missing = system_health._missing_real_provider_requirements(
+        model,
+        _paid_capability(),
+        scene_key="video_composition",
+        settings={"pixelle_video_url": "http://pixelle:8500", "pixelle_api_key": "stage-secret"},
+    )
+
+    assert "api_key" in missing
+    assert "base_url" in missing
 
 def test_system_health_reports_missing_required_boundary_column(monkeypatch):
     import app.domains.system_operations.system_health_router as system_health

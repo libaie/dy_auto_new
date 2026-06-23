@@ -32,6 +32,11 @@ ACTIVE_RUN_STATUSES = {
     "composing",
     "final_review_pending",
 }
+IMAGE_START_READY_RUN_STATUSES = {"draft", "storyboard_ready"}
+BLOCKED_RUN_STATUS_TO_CODE = {
+    "blocked": "RUN_BLOCKED",
+    "reference_generation_blocked": "REFERENCE_GENERATION_BLOCKED",
+}
 COMPLETED_RUN_STATUSES = {"completed", "done"}
 FAILED_RUN_STATUSES = {"failed", "cancelled", "canceled"}
 REVIEW_RUN_STATUSES = {
@@ -337,6 +342,8 @@ def _episode_status_payload(
 
     if run and run.status in COMPLETED_RUN_STATUSES:
         payload["production_status"] = "completed"
+    elif run and run.status in IMAGE_START_READY_RUN_STATUSES:
+        payload["production_status"] = "ready_for_image"
     elif run and run.status in READY_RUN_STATUS_TO_PRODUCTION_STATUS:
         payload["production_status"] = READY_RUN_STATUS_TO_PRODUCTION_STATUS[run.status]
     elif run and run.status in REVIEW_RUN_STATUSES:
@@ -350,6 +357,9 @@ def _episode_status_payload(
     elif run and run.status in FAILED_RUN_STATUSES:
         payload["production_status"] = "blocked"
         payload["blocking_code"] = "RUN_FAILED"
+    elif run and run.status in BLOCKED_RUN_STATUS_TO_CODE:
+        payload["production_status"] = "blocked"
+        payload["blocking_code"] = BLOCKED_RUN_STATUS_TO_CODE[run.status]
     elif run:
         payload["production_status"] = "blocked"
         payload["blocking_code"] = "RUN_STATE_UNCLASSIFIED"

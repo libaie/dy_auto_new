@@ -475,6 +475,197 @@ def test_promote_storyboard_image_asset_promotes_same_run_asset(db):
     assert video_asset.url == "/static/image-creation/storyboard-happy.png"
 
 
+def test_promote_storyboard_image_asset_promotes_episode_scoped_asset_to_run(db):
+    from app.domains.storyboard_images.storyboard_image_service import promote_storyboard_image_asset
+
+    series, episode = _series_episode(db)
+    run = VideoProductionRun(
+        series_id=series.id,
+        episode_id=episode.id,
+        status="storyboard_ready",
+        current_stage="storyboard_ready",
+        storyboard_json=episode.storyboard_json,
+    )
+    db.add(run)
+    db.flush()
+    context = {"episode_id": episode.id, "frame_id": "shot-001"}
+    task = ImageCreationTask(
+        id="task-promote-episode-scoped",
+        mode="text_to_image",
+        output_mode="single",
+        capability_key="text_to_image",
+        status="completed",
+        series_id=series.id,
+        episode_id=episode.id,
+        prompt="prompt",
+        destination_role="storyboard_frame",
+        destination_context_json=context,
+        count=1,
+        target_count=1,
+    )
+    db.add(task)
+    db.flush()
+    asset = ImageCreationAsset(
+        id="asset-promote-episode-scoped",
+        task_id=task.id,
+        series_id=series.id,
+        episode_id=episode.id,
+        url="/static/image-creation/storyboard-episode.png",
+        status="approved",
+        version=1,
+        destination_role="storyboard_frame",
+        destination_context_json=context,
+    )
+    db.add(asset)
+    db.commit()
+
+    result = promote_storyboard_image_asset(
+        db,
+        asset_id=asset.id,
+        run_id=run.id,
+        frame_id="shot-001",
+        episode_id=episode.id,
+        asset_version=1,
+    )
+
+    db.refresh(asset)
+    video_asset = db.query(VideoProductionAsset).filter(VideoProductionAsset.run_id == run.id).one()
+    assert result["ok"] is True
+    assert asset.destination_context_json["run_id"] == run.id
+    assert video_asset.url == "/static/image-creation/storyboard-episode.png"
+
+
+def test_promote_storyboard_image_asset_rejects_episode_scoped_asset_for_other_run_when_episode_omitted(db):
+    from app.domains.storyboard_images.storyboard_image_service import promote_storyboard_image_asset
+
+    series, episode = _series_episode(db)
+    other_episode = Episode(
+        series_id=series.id,
+        episode_number=2,
+        title="Episode 2",
+        duration_seconds=4,
+        storyboard_json=episode.storyboard_json,
+    )
+    db.add(other_episode)
+    db.flush()
+    run = VideoProductionRun(
+        series_id=series.id,
+        episode_id=other_episode.id,
+        status="storyboard_ready",
+        current_stage="storyboard_ready",
+        storyboard_json=other_episode.storyboard_json,
+    )
+    db.add(run)
+    db.flush()
+    context = {"episode_id": episode.id, "frame_id": "shot-001"}
+    task = ImageCreationTask(
+        id="task-cross-episode-omitted",
+        mode="text_to_image",
+        output_mode="single",
+        capability_key="text_to_image",
+        status="completed",
+        series_id=series.id,
+        episode_id=episode.id,
+        prompt="prompt",
+        destination_role="storyboard_frame",
+        destination_context_json=context,
+        count=1,
+        target_count=1,
+    )
+    db.add(task)
+    db.flush()
+    asset = ImageCreationAsset(
+        id="asset-cross-episode-omitted",
+        task_id=task.id,
+        series_id=series.id,
+        episode_id=episode.id,
+        url="/static/image-creation/storyboard-wrong-episode.png",
+        status="approved",
+        version=1,
+        destination_role="storyboard_frame",
+        destination_context_json=context,
+    )
+    db.add(asset)
+    db.commit()
+
+    with pytest.raises(HTTPException) as exc:
+        promote_storyboard_image_asset(
+            db,
+            asset_id=asset.id,
+            run_id=run.id,
+            frame_id="shot-001",
+            asset_version=1,
+        )
+
+    assert exc.value.status_code == 409
+    assert exc.value.detail["error_code"] == "IMAGE_ASSET_SCOPE_CONFLICT"
+
+
+def test_promote_storyboard_image_asset_rejects_legacy_asset_for_other_episode_when_episode_omitted(db):
+    from app.domains.storyboard_images.storyboard_image_service import promote_storyboard_image_asset
+
+    series, episode = _series_episode(db)
+    other_episode = Episode(
+        series_id=series.id,
+        episode_number=2,
+        title="Episode 2",
+        duration_seconds=4,
+        storyboard_json=episode.storyboard_json,
+    )
+    db.add(other_episode)
+    db.flush()
+    run = VideoProductionRun(
+        series_id=series.id,
+        episode_id=other_episode.id,
+        status="storyboard_ready",
+        current_stage="storyboard_ready",
+        storyboard_json=other_episode.storyboard_json,
+    )
+    db.add(run)
+    db.flush()
+    context = {"episode_id": episode.id, "frame_id": "shot-001"}
+    task = ImageCreationTask(
+        id="task-legacy-cross-episode-omitted",
+        mode="text_to_image",
+        output_mode="single",
+        capability_key="text_to_image",
+        status="completed",
+        series_id=series.id,
+        episode_id=None,
+        prompt="prompt",
+        destination_role="storyboard_frame",
+        destination_context_json=context,
+        count=1,
+        target_count=1,
+    )
+    db.add(task)
+    db.flush()
+    asset = ImageCreationAsset(
+        id="asset-legacy-cross-episode-omitted",
+        task_id=task.id,
+        series_id=series.id,
+        episode_id=None,
+        url="/static/image-creation/storyboard-legacy-wrong-episode.png",
+        status="approved",
+        version=1,
+        destination_role="storyboard_frame",
+        destination_context_json=context,
+    )
+    db.add(asset)
+    db.commit()
+
+    with pytest.raises(HTTPException) as exc:
+        promote_storyboard_image_asset(
+            db,
+            asset_id=asset.id,
+            run_id=run.id,
+            frame_id="shot-001",
+            asset_version=1,
+        )
+
+    assert exc.value.status_code == 409
+    assert exc.value.detail["error_code"] == "IMAGE_ASSET_SCOPE_CONFLICT"
+
 def test_promote_storyboard_image_asset_rejects_cross_run_assets(db):
     from app.domains.storyboard_images.storyboard_image_service import promote_storyboard_image_asset
 

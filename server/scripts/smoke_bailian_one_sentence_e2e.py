@@ -44,6 +44,39 @@ from app.domains.video_production.video_production_service import approve_asset,
 ALLOW_ENV = "DY_AUTO_ALLOW_REAL_PROVIDER_E2E"
 EXPECTED_EXPERT_GATE_PROVIDER = "bailian"
 EXPECTED_EXPERT_GATE_MODEL = "qwen3.7-plus"
+IMAGE_STAGE_DONE_STATUSES = {
+    "image_review_pending",
+    "image_human_review_required",
+    "image_approved",
+    "video_batch_running",
+    "video_review_pending",
+    "video_human_review_required",
+    "video_segments_approved",
+    "composing",
+    "final_review_pending",
+    "completed",
+}
+VIDEO_STAGE_STARTED_STATUSES = {
+    "video_batch_running",
+    "video_review_pending",
+    "video_human_review_required",
+    "video_segments_approved",
+    "composing",
+    "final_review_pending",
+    "completed",
+}
+VIDEO_STAGE_DONE_STATUSES = {
+    "video_review_pending",
+    "video_human_review_required",
+    "video_segments_approved",
+    "composing",
+    "final_review_pending",
+    "completed",
+}
+COMPOSE_STAGE_STARTED_STATUSES = {"composing", "final_review_pending", "completed"}
+COMPOSE_STAGE_DONE_STATUSES = {"final_review_pending", "completed"}
+STOP_ON_ERROR_CODES = {"PROVIDER_THROTTLED", "BUDGET_BLOCKED"}
+PAID_SMOKE_WORKER_BATCH_SIZE = 1
 
 
 def _log(event: str, **payload) -> None:
@@ -59,6 +92,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--worker-batch-size", type=int, default=1)
     parser.add_argument("--max-worker-rounds", type=int, default=80)
     parser.add_argument("--resume-run-id", default="")
+    parser.add_argument("--retry-provider-blockers", action="store_true")
     parser.add_argument(
         "--bypass-expert-gates",
         action="store_true",
@@ -180,12 +214,21 @@ def _run_stage_until(
     lease_prefix: str,
     batch_size: int,
     max_rounds: int,
+    retry_provider_blockers: bool = False,
 ) -> None:
+    if batch_size != PAID_SMOKE_WORKER_BATCH_SIZE:
+        _log("worker_batch_size_forced", requested=batch_size, effective=PAID_SMOKE_WORKER_BATCH_SIZE)
+        batch_size = PAID_SMOKE_WORKER_BATCH_SIZE
     for index in range(max_rounds):
         run = db.query(VideoProductionRun).filter(VideoProductionRun.id == run_id).one()
         if run.status in done_statuses:
             _log("stage_ready", stage=stage, run_status=run.status)
             return
+        if retry_provider_blockers:
+            _clear_stage_stop_error_codes(db, run, stage)
+        existing_stop_code = _existing_stage_stop_error_code(db, run, stage)
+        if existing_stop_code:
+            raise RuntimeError(f"Stage {stage} stopped on existing {existing_stop_code}; run_status={run.status}")
         result = run_real_worker_step(
             db,
             run_id,
@@ -206,6 +249,9 @@ def _run_stage_until(
                 for item in result.get("items", [])
             ],
         )
+        stop_code = _stage_stop_error_code(result)
+        if stop_code:
+            raise RuntimeError(f"Stage {stage} stopped on {stop_code}; run_status={run.status}")
         if result["processed"] > 0:
             continue
         delay = _next_retry_delay_seconds(db, run.production_plan_id, stage)
@@ -216,6 +262,107 @@ def _run_stage_until(
         time.sleep(sleep_seconds)
     run = db.query(VideoProductionRun).filter(VideoProductionRun.id == run_id).one()
     raise RuntimeError(f"Stage {stage} did not reach {sorted(done_statuses)}; run_status={run.status}")
+
+
+def _stage_stop_error_code(result: dict) -> str | None:
+    for item in result.get("items", []):
+        code = item.get("error_code")
+        if code in STOP_ON_ERROR_CODES:
+            return code
+    return None
+
+
+def _existing_stage_stop_error_code(db, run: VideoProductionRun, stage: str) -> str | None:
+    if not run.production_episode_id:
+        return None
+    row = db.execute(
+        text("""
+        select error_code
+        from production_jobs job
+        where job.plan_id = :plan_id
+          and job.stage = :stage
+          and job.status = 'retry_wait'
+          and job.error_code in ('PROVIDER_THROTTLED', 'BUDGET_BLOCKED')
+          and (
+            (job.target_type = 'production_episode' and job.target_id = :production_episode_id)
+            or (
+              job.target_type = 'production_segment'
+              and job.target_id in (
+                select segment.id
+                from production_segments segment
+                join production_shots shot on segment.shot_plan_id = shot.id
+                join production_scenes scene on shot.scene_plan_id = scene.id
+                where scene.episode_plan_id = :production_episode_id
+              )
+            )
+          )
+        order by job.updated_at desc
+        limit 1
+        """),
+        {"plan_id": run.production_plan_id, "production_episode_id": run.production_episode_id, "stage": stage},
+    ).first()
+    return str(row[0]) if row else None
+
+
+def _clear_stage_stop_error_codes(db, run: VideoProductionRun, stage: str) -> None:
+    if not run.production_episode_id:
+        raise RuntimeError("Cannot retry provider blockers without a production episode scope.")
+    result = db.execute(
+        text("""
+        update production_jobs
+        set error_code = null,
+            error_message = null,
+            retry_after = null
+        where plan_id = :plan_id
+          and stage = :stage
+          and status = 'retry_wait'
+          and error_code in ('PROVIDER_THROTTLED', 'BUDGET_BLOCKED')
+          and (
+            (target_type = 'production_episode' and target_id = :production_episode_id)
+            or (
+              target_type = 'production_segment'
+              and target_id in (
+                select segment.id
+                from production_segments segment
+                join production_shots shot on segment.shot_plan_id = shot.id
+                join production_scenes scene on shot.scene_plan_id = scene.id
+                where scene.episode_plan_id = :production_episode_id
+              )
+            )
+          )
+        """),
+        {"plan_id": run.production_plan_id, "production_episode_id": run.production_episode_id, "stage": stage},
+    )
+    db.commit()
+    if result.rowcount:
+        _log("stage_provider_blockers_retry_enabled", stage=stage, cleared_jobs=result.rowcount)
+
+
+def _run_stage_unless_done(
+    db,
+    run_id: str,
+    *,
+    stage: str,
+    done_statuses: set[str],
+    lease_prefix: str,
+    batch_size: int,
+    max_rounds: int,
+    retry_provider_blockers: bool = False,
+) -> None:
+    run = db.query(VideoProductionRun).filter(VideoProductionRun.id == run_id).one()
+    if run.status in done_statuses:
+        _log("stage_skip", stage=stage, run_status=run.status)
+        return
+    _run_stage_until(
+        db,
+        run_id,
+        stage=stage,
+        done_statuses=done_statuses,
+        lease_prefix=lease_prefix,
+        batch_size=batch_size,
+        max_rounds=max_rounds,
+        retry_provider_blockers=retry_provider_blockers,
+    )
 
 
 def _next_retry_delay_seconds(db, plan_id: str, stage: str) -> int | None:
@@ -300,42 +447,51 @@ def _main() -> None:
             )
 
         run = _complete_background_reference_if_pending(db, run.id)
-        _run_stage_until(
+        _run_stage_unless_done(
             db,
             run.id,
             stage="image_generation",
-            done_statuses={"image_review_pending", "image_human_review_required", "image_approved"},
+            done_statuses=IMAGE_STAGE_DONE_STATUSES,
             lease_prefix="smoke-images",
             batch_size=args.worker_batch_size,
             max_rounds=args.max_worker_rounds,
+            retry_provider_blockers=args.retry_provider_blockers,
         )
         _approve_assets(db, run.id, "image")
 
         run = db.query(VideoProductionRun).filter(VideoProductionRun.id == run.id).one()
-        _log("start_video_stage", run_status=run.status)
-        asyncio.run(start_video_stage(db, run.id))
-        _run_stage_until(
+        if run.status in VIDEO_STAGE_STARTED_STATUSES:
+            _log("start_video_stage_skip", run_status=run.status)
+        else:
+            _log("start_video_stage", run_status=run.status)
+            asyncio.run(start_video_stage(db, run.id))
+        _run_stage_unless_done(
             db,
             run.id,
             stage="video_generation",
-            done_statuses={"video_review_pending", "video_human_review_required", "video_segments_approved"},
+            done_statuses=VIDEO_STAGE_DONE_STATUSES,
             lease_prefix="smoke-videos",
             batch_size=args.worker_batch_size,
             max_rounds=args.max_worker_rounds,
+            retry_provider_blockers=args.retry_provider_blockers,
         )
         _approve_assets(db, run.id, "video_segment")
 
         run = db.query(VideoProductionRun).filter(VideoProductionRun.id == run.id).one()
-        _log("start_compose_stage", run_status=run.status)
-        asyncio.run(start_compose_stage(db, run.id))
-        _run_stage_until(
+        if run.status in COMPOSE_STAGE_STARTED_STATUSES:
+            _log("start_compose_stage_skip", run_status=run.status)
+        else:
+            _log("start_compose_stage", run_status=run.status)
+            asyncio.run(start_compose_stage(db, run.id))
+        _run_stage_unless_done(
             db,
             run.id,
             stage="episode_compose",
-            done_statuses={"final_review_pending", "completed"},
+            done_statuses=COMPOSE_STAGE_DONE_STATUSES,
             lease_prefix="smoke-compose",
             batch_size=1,
             max_rounds=args.max_worker_rounds,
+            retry_provider_blockers=args.retry_provider_blockers,
         )
         _approve_assets(db, run.id, "final_video")
 

@@ -277,6 +277,8 @@ def test_completed_run_is_completed(db):
     [
         ("image_approved", "ready_for_video"),
         ("video_segments_approved", "ready_for_compose"),
+        ("draft", "ready_for_image"),
+        ("storyboard_ready", "ready_for_image"),
     ],
 )
 def test_ready_gate_run_statuses_are_not_blocked(db, run_status, expected_production_status):
@@ -303,6 +305,8 @@ def test_ready_gate_run_statuses_are_not_blocked(db, run_status, expected_produc
     ("run_status", "blocking_code"),
     [
         ("failed", "RUN_FAILED"),
+        ("blocked", "RUN_BLOCKED"),
+        ("reference_generation_blocked", "REFERENCE_GENERATION_BLOCKED"),
         ("image_review_pending", "RUN_REQUIRES_REVIEW"),
         ("mystery_state", "RUN_STATE_UNCLASSIFIED"),
     ],

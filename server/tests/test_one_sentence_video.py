@@ -202,6 +202,10 @@ def test_one_sentence_video_creates_locked_storyboard_and_run(db, monkeypatch):
     assert outline_by_episode[1].content_json["hook"]
     assert outline_by_episode[1].content_json["cliffhanger"]
     assert outline_by_episode[2].content_json["previous_episode_handoff"]
+    assert outline_by_episode[2].content_json["character_ids"] != outline_by_episode[1].content_json["character_ids"]
+    assert outline_by_episode[2].content_json["scene_ids"] != outline_by_episode[1].content_json["scene_ids"]
+    assert outline_by_episode[2].content_json["asset_usage"]["characters"][0]["source"] == "generated"
+    assert outline_by_episode[2].content_json["asset_usage"]["scenes"][0]["source"] == "generated"
     continuity = next(artifact for artifact in artifacts if artifact.artifact_type == "continuity_ledger")
     assert continuity.content_json["total_episodes"] == 30
     assert continuity.content_json["character_states"][0]["character_id"]

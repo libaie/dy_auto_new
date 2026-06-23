@@ -34,23 +34,41 @@ def _run_with_jobs(db, *, job_count=3, run_type=REAL_SHORT_E2E):
     plan = ProductionPlan(series_id=series.id, status="ready", active_version=1, budget_limit=5.0)
     db.add(plan)
     db.flush()
+    production_episode = None
+    if run_type == REAL_SHORT_E2E:
+        production_episode = ProductionEpisode(plan_id=plan.id, episode_id=episode.id, order_index=1, status="ready")
+        db.add(production_episode)
+        db.flush()
     run = VideoProductionRun(
         series_id=series.id,
         episode_id=episode.id,
         run_type=run_type,
         production_plan_id=plan.id,
+        production_episode_id=production_episode.id if production_episode else None,
         production_link_status="linked",
+        status="image_batch_running",
+        current_stage="image_generation",
     )
     db.add(run)
     db.flush()
     for index in range(job_count):
+        if production_episode:
+            segment = _segment_for_production_episode(
+                db,
+                production_episode,
+                scene_key=f"scene-{index + 1}",
+                segment_key=f"seg-{index + 1}",
+            )
+            target_id = segment.id
+        else:
+            target_id = f"seg-{index + 1}"
         db.add(ProductionJob(
             plan_id=plan.id,
             target_type="production_segment",
-            target_id=f"seg-{index + 1}",
+            target_id=target_id,
             stage="image_generation",
             status="queued",
-            idempotency_key=f"{run.id}:seg-{index + 1}:image:v1",
+            idempotency_key=f"{run.id}:{target_id}:image:v1",
             priority=index,
             scheduled_at=bj_now(),
         ))
@@ -122,6 +140,28 @@ def _linked_run_with_image_job_refs(db, *, reference_roles_json):
     return run, segment
 
 
+def _segment_for_production_episode(db, production_episode, *, scene_key, segment_key):
+    scene = ProductionScene(episode_plan_id=production_episode.id, scene_id=scene_key, order_index=1, status="ready")
+    db.add(scene)
+    db.flush()
+    shot = ProductionShot(scene_plan_id=scene.id, shot_id=f"{scene_key}-shot", order_index=1, status="ready", duration_seconds=6)
+    db.add(shot)
+    db.flush()
+    segment = ProductionSegment(
+        shot_plan_id=shot.id,
+        segment_id=segment_key,
+        order_index=1,
+        status="planned",
+        duration_seconds=6,
+        image_prompt=segment_key,
+        video_prompt=segment_key,
+        reference_roles_json=[],
+    )
+    db.add(segment)
+    db.flush()
+    return segment
+
+
 def _route_provider_agent_to_direct_helper(monkeypatch):
     from app.domains.ai_video_series.langchain_runtime import provider_tools
     from app.domains.video_production import production_worker_service
@@ -162,6 +202,319 @@ def test_real_worker_step_claims_limited_batch_and_returns_visible_summary(db, m
     assert all(item["job_id"] for item in result["items"])
     assert db.query(ProductionJob).filter_by(plan_id=run.production_plan_id, status="queued").count() == 1
 
+
+def test_real_worker_step_claims_only_jobs_for_run_episode_scope(db, monkeypatch):
+    from app.domains.video_production.production_worker_service import run_real_worker_step
+
+    series = Series(title="Shared Plan", logline="Shared Plan", genre="drama")
+    db.add(series)
+    db.flush()
+    episode_a = Episode(series_id=series.id, episode_number=1, title="A")
+    episode_b = Episode(series_id=series.id, episode_number=2, title="B")
+    db.add_all([episode_a, episode_b])
+    db.flush()
+    plan = ProductionPlan(series_id=series.id, status="ready", active_version=1, budget_limit=5.0)
+    db.add(plan)
+    db.flush()
+    production_episode_a = ProductionEpisode(plan_id=plan.id, episode_id=episode_a.id, order_index=1, status="ready")
+    production_episode_b = ProductionEpisode(plan_id=plan.id, episode_id=episode_b.id, order_index=2, status="ready")
+    db.add_all([production_episode_a, production_episode_b])
+    db.flush()
+    segment_a = _segment_for_production_episode(db, production_episode_a, scene_key="scene-a", segment_key="segment-a")
+    segment_b = _segment_for_production_episode(db, production_episode_b, scene_key="scene-b", segment_key="segment-b")
+    run_a = VideoProductionRun(
+        series_id=series.id,
+        episode_id=episode_a.id,
+        run_type=REAL_SHORT_E2E,
+        production_plan_id=plan.id,
+        production_episode_id=production_episode_a.id,
+        production_link_status="linked",
+        status="image_batch_running",
+        current_stage="image_generation",
+    )
+    db.add(run_a)
+    db.flush()
+    db.add_all([
+        ProductionJob(
+            plan_id=plan.id,
+            target_type="production_segment",
+            target_id=segment_b.id,
+            stage="image_generation",
+            status="queued",
+            idempotency_key=f"other-run:{segment_b.id}:image_generation:v1",
+            priority=0,
+            scheduled_at=bj_now(),
+        ),
+        ProductionJob(
+            plan_id=plan.id,
+            target_type="production_segment",
+            target_id=segment_a.id,
+            stage="image_generation",
+            status="queued",
+            idempotency_key=f"{run_a.id}:{segment_a.id}:image_generation:v1",
+            priority=10,
+            scheduled_at=bj_now(),
+        ),
+    ])
+    db.commit()
+    processed_targets = []
+
+    async def fake_execute_job(db, run, job):
+        processed_targets.append(job.target_id)
+        job.status = "completed"
+        db.commit()
+        return {"job_id": job.id, "status": job.status}
+
+    monkeypatch.setattr("app.domains.video_production.production_worker_service.execute_real_job", fake_execute_job)
+
+    result = run_real_worker_step(db, run_a.id, lease_id="worker-a", batch_size=1)
+
+    assert result["processed"] == 1
+    assert processed_targets == [segment_a.id]
+    assert db.query(ProductionJob).filter_by(target_id=segment_b.id).one().status == "queued"
+
+
+def test_real_worker_step_claims_episode_repair_job_for_run_episode_scope(db, monkeypatch):
+    from app.domains.video_production.production_worker_service import run_real_worker_step
+
+    series = Series(title="Episode Repair Scope", logline="Scope", genre="drama")
+    db.add(series)
+    db.flush()
+    episode_a = Episode(series_id=series.id, episode_number=1, title="A")
+    episode_b = Episode(series_id=series.id, episode_number=2, title="B")
+    db.add_all([episode_a, episode_b])
+    db.flush()
+    plan = ProductionPlan(series_id=series.id, status="ready", active_version=1, budget_limit=5.0)
+    db.add(plan)
+    db.flush()
+    production_episode_a = ProductionEpisode(plan_id=plan.id, episode_id=episode_a.id, order_index=1, status="ready")
+    production_episode_b = ProductionEpisode(plan_id=plan.id, episode_id=episode_b.id, order_index=2, status="ready")
+    db.add_all([production_episode_a, production_episode_b])
+    db.flush()
+    run_a = VideoProductionRun(
+        series_id=series.id,
+        episode_id=episode_a.id,
+        run_type=REAL_SHORT_E2E,
+        production_plan_id=plan.id,
+        production_episode_id=production_episode_a.id,
+        production_link_status="linked",
+        status="image_batch_running",
+        current_stage="image_generation",
+    )
+    db.add(run_a)
+    db.flush()
+    db.add_all([
+        ProductionJob(
+            plan_id=plan.id,
+            target_type="episode",
+            target_id=episode_b.id,
+            stage="agency_auto_repair:storyboard_missing_references",
+            status="queued",
+            idempotency_key=f"repair:{episode_b.id}",
+            priority=0,
+            scheduled_at=bj_now(),
+        ),
+        ProductionJob(
+            plan_id=plan.id,
+            target_type="episode",
+            target_id=episode_a.id,
+            stage="agency_auto_repair:storyboard_missing_references",
+            status="queued",
+            idempotency_key=f"repair:{episode_a.id}",
+            priority=10,
+            scheduled_at=bj_now(),
+        ),
+    ])
+    db.commit()
+    processed_targets = []
+
+    async def fake_execute_job(db, run, job):
+        processed_targets.append(job.target_id)
+        job.status = "completed"
+        db.commit()
+        return {"job_id": job.id, "status": job.status}
+
+    monkeypatch.setattr("app.domains.video_production.production_worker_service.execute_real_job", fake_execute_job)
+
+    result = run_real_worker_step(db, run_a.id, lease_id="worker-a", batch_size=1)
+
+    assert result["processed"] == 1
+    assert processed_targets == [episode_a.id]
+    assert db.query(ProductionJob).filter_by(target_id=episode_b.id).one().status == "queued"
+
+
+def test_real_worker_queue_step_skips_shared_plan_runs_without_scoped_jobs(db, monkeypatch):
+    from app.domains.video_production import production_worker_service
+
+    series = Series(title="Shared Queue", logline="Shared Queue", genre="drama")
+    db.add(series)
+    db.flush()
+    episode_a = Episode(series_id=series.id, episode_number=1, title="A")
+    episode_b = Episode(series_id=series.id, episode_number=2, title="B")
+    db.add_all([episode_a, episode_b])
+    db.flush()
+    plan = ProductionPlan(series_id=series.id, status="ready", active_version=1, budget_limit=5.0)
+    db.add(plan)
+    db.flush()
+    production_episode_a = ProductionEpisode(plan_id=plan.id, episode_id=episode_a.id, order_index=1, status="ready")
+    production_episode_b = ProductionEpisode(plan_id=plan.id, episode_id=episode_b.id, order_index=2, status="ready")
+    db.add_all([production_episode_a, production_episode_b])
+    db.flush()
+    segment_b = _segment_for_production_episode(db, production_episode_b, scene_key="scene-b", segment_key="segment-b")
+    run_a = VideoProductionRun(
+        series_id=series.id,
+        episode_id=episode_a.id,
+        run_type=REAL_SHORT_E2E,
+        production_plan_id=plan.id,
+        production_episode_id=production_episode_a.id,
+        production_link_status="linked",
+        status="image_batch_running",
+        current_stage="image_generation",
+    )
+    run_b = VideoProductionRun(
+        series_id=series.id,
+        episode_id=episode_b.id,
+        run_type=REAL_SHORT_E2E,
+        production_plan_id=plan.id,
+        production_episode_id=production_episode_b.id,
+        production_link_status="linked",
+        status="image_batch_running",
+        current_stage="image_generation",
+    )
+    db.add_all([run_a, run_b])
+    db.flush()
+    db.add(ProductionJob(
+        plan_id=plan.id,
+        target_type="production_segment",
+        target_id=segment_b.id,
+        stage="image_generation",
+        status="queued",
+        idempotency_key=f"{run_b.id}:{segment_b.id}:image_generation:v1",
+        priority=0,
+        scheduled_at=bj_now(),
+    ))
+    db.commit()
+    processed = []
+
+    async def fake_execute_job(db, run, job):
+        processed.append((run.id, job.target_id))
+        job.status = "completed"
+        db.commit()
+        return {"job_id": job.id, "status": job.status}
+
+    monkeypatch.setattr(production_worker_service, "execute_real_job", fake_execute_job)
+
+    result = production_worker_service.run_real_worker_queue_step(db, lease_id="real-queue-worker", batch_size=1)
+
+    assert result["processed"] == 1
+    assert processed == [(run_b.id, segment_b.id)]
+
+
+def test_real_worker_queue_step_processes_only_real_short_runs(db, monkeypatch):
+    from app.domains.video_production import production_worker_service
+
+    real_run = _run_with_jobs(db, job_count=1, run_type=REAL_SHORT_E2E)
+    _run_with_jobs(db, job_count=1, run_type=MOCK_SERIES_SCALE)
+    calls = []
+
+    def fake_run_real_worker_step(db_arg, run_id, *, lease_id, batch_size):
+        calls.append((run_id, lease_id, batch_size))
+        return {"ok": True, "processed": 1, "items": [{"ok": True, "job_id": "job-1"}]}
+
+    monkeypatch.setattr(production_worker_service, "run_real_worker_step", fake_run_real_worker_step)
+
+    result = production_worker_service.run_real_worker_queue_step(db, lease_id="real-queue-worker", batch_size=1)
+
+    assert result["processed"] == 1
+    assert calls == [(real_run.id, "real-queue-worker", 1)]
+
+
+@pytest.mark.parametrize("inactive_status", [
+    "completed",
+    "failed",
+    "cancelled",
+    "image_human_review_required",
+    "video_human_review_required",
+    "final_review_pending",
+])
+def test_real_worker_queue_step_skips_inactive_real_short_runs(db, monkeypatch, inactive_status):
+    from app.domains.video_production import production_worker_service
+
+    run = _run_with_jobs(db, job_count=1, run_type=REAL_SHORT_E2E)
+    run.status = inactive_status
+    db.commit()
+
+    def fail_if_called(*args, **kwargs):
+        raise AssertionError("inactive real_short runs must not be processed by the background queue")
+
+    monkeypatch.setattr(production_worker_service, "run_real_worker_step", fail_if_called)
+
+    result = production_worker_service.run_real_worker_queue_step(db, lease_id="real-queue-worker", batch_size=1)
+
+    assert result["processed"] == 0
+    assert db.query(ProductionJob).filter_by(plan_id=run.production_plan_id, status="queued").count() == 1
+
+
+def test_real_worker_queue_step_does_not_starve_active_runs_behind_many_empty_review_runs(db, monkeypatch):
+    from app.domains.video_production import production_worker_service
+
+    for index in range(1001):
+        stale_run = _run_with_jobs(db, job_count=0, run_type=REAL_SHORT_E2E)
+        stale_run.status = "image_human_review_required"
+        stale_run.updated_at = bj_now().replace(year=2020, microsecond=index)
+    active_run = _run_with_jobs(db, job_count=1, run_type=REAL_SHORT_E2E)
+    db.commit()
+    calls = []
+
+    def fake_run_real_worker_step(db_arg, run_id, *, lease_id, batch_size):
+        calls.append(run_id)
+        return {"ok": True, "processed": 1, "items": [{"ok": True, "job_id": "job-1"}]}
+
+    monkeypatch.setattr(production_worker_service, "run_real_worker_step", fake_run_real_worker_step)
+
+    result = production_worker_service.run_real_worker_queue_step(db, lease_id="real-queue-worker", batch_size=1)
+
+    assert result["processed"] == 1
+    assert calls == [active_run.id]
+
+def test_real_worker_queue_step_processes_review_state_agency_repair_jobs(db, monkeypatch):
+    from app.domains.video_production import production_worker_service
+
+    run = _run_with_jobs(db, job_count=1, run_type=REAL_SHORT_E2E)
+    normal_job = db.query(ProductionJob).filter_by(
+        plan_id=run.production_plan_id,
+        stage="image_generation",
+    ).one()
+    normal_job.priority = -10
+    run.status = "image_human_review_required"
+    repair_job = ProductionJob(
+        plan_id=run.production_plan_id,
+        target_type="production_segment",
+        target_id=normal_job.target_id,
+        stage="agency_auto_repair:image_generation_failed",
+        status="queued",
+        idempotency_key=f"repair:{normal_job.target_id}:image_generation_failed",
+        priority=0,
+        scheduled_at=bj_now(),
+    )
+    db.add(repair_job)
+    db.commit()
+    processed_stages = []
+
+    async def fake_execute_job(db, run, job):
+        processed_stages.append(job.stage)
+        job.status = "completed"
+        db.commit()
+        return {"job_id": job.id, "status": job.status}
+
+    monkeypatch.setattr(production_worker_service, "execute_real_job", fake_execute_job)
+
+    result = production_worker_service.run_real_worker_queue_step(db, lease_id="real-queue-worker", batch_size=1)
+
+    assert result["processed"] == 1
+    assert processed_stages == ["agency_auto_repair:image_generation_failed"]
+    assert db.query(ProductionJob).filter_by(id=normal_job.id).one().status == "queued"
+    assert db.query(ProductionJob).filter_by(id=repair_job.id).one().status == "completed"
 
 def test_real_worker_step_route_accepts_background_mode(db, monkeypatch):
     run = _run_with_jobs(db, job_count=1)
@@ -205,6 +558,133 @@ def test_real_worker_step_does_not_process_more_than_batch_size_and_reports_rema
     assert len(processed) == 2
     assert result["processed"] == 2
     assert result["remaining"] == 3
+
+
+def test_real_worker_step_skips_real_run_missing_production_episode_scope(db, monkeypatch):
+    from app.domains.video_production.production_worker_service import run_real_worker_step
+
+    run = _run_with_jobs(db, job_count=1, run_type=REAL_SHORT_E2E)
+    run.production_episode_id = None
+    db.commit()
+
+    async def fail_execute_job(*args, **kwargs):
+        raise AssertionError("real worker must not process plan-wide jobs without production_episode_id")
+
+    monkeypatch.setattr("app.domains.video_production.production_worker_service.execute_real_job", fail_execute_job)
+
+    result = run_real_worker_step(db, run.id, lease_id="worker-a", batch_size=1)
+
+    assert result["processed"] == 0
+    assert result["remaining"] == 0
+    assert db.query(ProductionJob).filter_by(plan_id=run.production_plan_id, status="queued").count() == 1
+
+
+def test_real_worker_step_without_production_episode_scope_only_claims_own_episode_repair(db, monkeypatch):
+    from app.domains.video_production.production_worker_service import run_real_worker_step
+
+    run = _run_with_jobs(db, job_count=0, run_type=REAL_SHORT_E2E)
+    run.production_episode_id = None
+    other_episode = Episode(series_id=run.series_id, episode_number=2, title="Other")
+    db.add(other_episode)
+    db.flush()
+    db.add_all([
+        ProductionJob(
+            plan_id=run.production_plan_id,
+            target_type="episode",
+            target_id=other_episode.id,
+            stage="agency_auto_repair:storyboard_missing_references",
+            status="queued",
+            idempotency_key=f"repair:{other_episode.id}",
+            priority=0,
+            scheduled_at=bj_now(),
+        ),
+        ProductionJob(
+            plan_id=run.production_plan_id,
+            target_type="production_segment",
+            target_id="unknown-segment",
+            stage="agency_auto_repair:image_generation_failed",
+            status="queued",
+            idempotency_key="repair:unknown-segment",
+            priority=1,
+            scheduled_at=bj_now(),
+        ),
+        ProductionJob(
+            plan_id=run.production_plan_id,
+            target_type="episode",
+            target_id=run.episode_id,
+            stage="agency_auto_repair:storyboard_missing_references",
+            status="queued",
+            idempotency_key=f"repair:{run.episode_id}",
+            priority=10,
+            scheduled_at=bj_now(),
+        ),
+    ])
+    db.commit()
+    processed_targets = []
+
+    async def fake_execute_job(db, run, job):
+        processed_targets.append(job.target_id)
+        job.status = "completed"
+        db.commit()
+        return {"job_id": job.id, "status": job.status}
+
+    monkeypatch.setattr("app.domains.video_production.production_worker_service.execute_real_job", fake_execute_job)
+
+    result = run_real_worker_step(db, run.id, lease_id="worker-a", batch_size=3)
+
+    assert result["processed"] == 1
+    assert processed_targets == [run.episode_id]
+    assert db.query(ProductionJob).filter_by(target_id=other_episode.id).one().status == "queued"
+    assert db.query(ProductionJob).filter_by(target_id="unknown-segment").one().status == "queued"
+
+
+def test_worker_status_sync_ignores_other_episode_jobs_in_shared_plan(db):
+    from app.domains.video_production.production_worker_service import _update_run_status_after_stage_job
+
+    series = Series(title="Status Scope", logline="Status Scope", genre="drama")
+    db.add(series)
+    db.flush()
+    episode_a = Episode(series_id=series.id, episode_number=1, title="A")
+    episode_b = Episode(series_id=series.id, episode_number=2, title="B")
+    db.add_all([episode_a, episode_b])
+    db.flush()
+    plan = ProductionPlan(series_id=series.id, status="ready", active_version=1, budget_limit=5.0)
+    db.add(plan)
+    db.flush()
+    production_episode_a = ProductionEpisode(plan_id=plan.id, episode_id=episode_a.id, order_index=1, status="ready")
+    production_episode_b = ProductionEpisode(plan_id=plan.id, episode_id=episode_b.id, order_index=2, status="ready")
+    db.add_all([production_episode_a, production_episode_b])
+    db.flush()
+    segment_b = _segment_for_production_episode(db, production_episode_b, scene_key="scene-b", segment_key="segment-b")
+    run_a = VideoProductionRun(
+        series_id=series.id,
+        episode_id=episode_a.id,
+        run_type=REAL_SHORT_E2E,
+        production_plan_id=plan.id,
+        production_episode_id=production_episode_a.id,
+        production_link_status="linked",
+        status="image_batch_running",
+        current_stage="image_generation",
+    )
+    db.add(run_a)
+    db.flush()
+    db.add(ProductionJob(
+        plan_id=plan.id,
+        target_type="production_segment",
+        target_id=segment_b.id,
+        stage="image_generation",
+        status="failed",
+        idempotency_key=f"other-run:{segment_b.id}:image_generation:v1",
+        priority=0,
+        scheduled_at=bj_now(),
+    ))
+    db.commit()
+
+    _update_run_status_after_stage_job(db, run_a, "image_generation")
+
+    db.refresh(run_a)
+    assert run_a.status == "image_review_pending"
+    assert run_a.current_stage == "image_review"
 
 
 @pytest.mark.parametrize(

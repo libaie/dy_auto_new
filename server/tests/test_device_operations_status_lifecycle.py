@@ -196,6 +196,9 @@ async def test_lifespan_starts_and_cancels_offline_checker_task(monkeypatch):
     async def fake_one_sentence_reference_worker():
         return None
 
+    async def fake_real_video_production_worker():
+        return None
+
     def fake_create_task(coro):
         name = coro.cr_code.co_name
         created_task_names.append(name)
@@ -212,8 +215,10 @@ async def test_lifespan_starts_and_cancels_offline_checker_task(monkeypatch):
     monkeypatch.setattr(main, "_style_lock_worker", fake_style_lock_worker)
     monkeypatch.setattr(main, "_story_plan_worker", fake_story_plan_worker)
     monkeypatch.setattr(main, "_one_sentence_reference_worker", fake_one_sentence_reference_worker)
+    monkeypatch.setattr(main, "_real_video_production_worker", fake_real_video_production_worker)
     monkeypatch.setattr(main.asyncio, "create_task", fake_create_task)
     monkeypatch.setattr(main.asyncio, "gather", fake_gather)
+    monkeypatch.setenv("REAL_VIDEO_WORKER_ENABLED", "1")
     monkeypatch.setattr(main.ai_generator, "aclose", AsyncMock())
     close_pixelle_client = AsyncMock()
     monkeypatch.setattr(pixelle_client, "close_client", close_pixelle_client)
@@ -228,15 +233,16 @@ async def test_lifespan_starts_and_cancels_offline_checker_task(monkeypatch):
                 "fake_style_lock_worker",
                 "fake_story_plan_worker",
                 "fake_one_sentence_reference_worker",
+                "fake_real_video_production_worker",
             ]
-            assert len(created_tasks) == 4
+            assert len(created_tasks) == 5
     finally:
         if previous_override is sentinel:
             main.app.dependency_overrides.pop(main.get_db, None)
         else:
             main.app.dependency_overrides[main.get_db] = previous_override
 
-    assert [task.cancelled for task in created_tasks] == [True, True, True, True]
+    assert [task.cancelled for task in created_tasks] == [True, True, True, True, True]
     main.ai_generator.aclose.assert_awaited_once()
     close_pixelle_client.assert_awaited_once()
 

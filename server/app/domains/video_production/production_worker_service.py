@@ -8,13 +8,15 @@ import copy
 import inspect
 import os
 import re
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 from app.config import PIXELLE_CONFIG_PATH, bj_now
-from app.db.models.video_production import ProductionJob, ProductionSegment, VideoProductionRun
+from app.db.models.video_production import ProductionJob, ProductionPlan, ProductionScene, ProductionSegment, ProductionShot, VideoProductionRun
 from app.domains.agency_operations.agency_creative_patch_service import unresolved_patch_gate
 from app.domains.agency_operations.agency_repair_executor import execute_repair_job, is_agency_repair_stage
 from app.domains.agency_operations.agency_runtime_contracts import AgencyRuntimeError
@@ -35,6 +37,8 @@ from app.domains.video_production.production_status import (
     JOB_QUEUED,
     JOB_RETRY_WAIT,
     JOB_RUNNING,
+    PLAN_READY,
+    PLAN_RUNNING,
     SEGMENT_BLOCKED_BY_REVIEW,
     SEGMENT_FAILED,
     SEGMENT_IMAGE_RUNNING,
@@ -49,6 +53,13 @@ from app.domains.video_production.video_production_run_types import MOCK_SERIES_
 MAX_WORKER_STEP_BATCH_SIZE = 100
 COMPOSE_STAGES = {"composition", "episode_compose"}
 DEFERRED_STAGE_GATE_TIMEOUT_SECONDS = 30
+REAL_WORKER_QUEUE_RUN_STATUSES = {"running", "image_batch_running", "video_batch_running", "composing"}
+REAL_WORKER_REPAIR_QUEUE_RUN_STATUSES = {
+    "image_human_review_required",
+    "video_human_review_required",
+    "final_review_pending",
+}
+REAL_WORKER_QUEUE_ELIGIBLE_RUN_STATUSES = REAL_WORKER_QUEUE_RUN_STATUSES | REAL_WORKER_REPAIR_QUEUE_RUN_STATUSES
 CREATIVE_PATCH_STAGE_GATES = {
     "image_generation": "image_stage",
     "video_generation": "video_stage",
@@ -86,6 +97,20 @@ async def execute_real_job(db: Session, run: VideoProductionRun, job: Production
     """
     if is_agency_repair_stage(job.stage):
         return await execute_repair_job(db, job)
+    try:
+        _guard_creative_patch_job(db, run, job)
+    except ProductionRepairableError as exc:
+        if exc.code != ProductionErrorCode.REVIEW_GATE_BLOCKED:
+            raise
+        return ProductionActionResult.blocked(
+            exc.code,
+            exc.message,
+            exc.repair_action,
+            repair_route=exc.repair_route,
+            affected_ids=exc.affected_ids,
+            retryable=exc.retryable,
+            data=to_http_detail(exc),
+        )
     try:
         parsed = await run_provider_stage_agent(
             db,
@@ -317,6 +342,7 @@ def run_real_worker_step(db: Session, run_id: str, *, lease_id: str, batch_size:
     run = db.query(VideoProductionRun).filter(VideoProductionRun.id == run_id).first()
     if not run:
         raise ValueError("Run not found")
+    db.refresh(run)
     if get_run_type(run) == MOCK_SERIES_SCALE:
         raise ProductionRepairableError(
             code=ProductionErrorCode.INVALID_RUN_TYPE,
@@ -343,7 +369,7 @@ def run_real_worker_step(db: Session, run_id: str, *, lease_id: str, batch_size:
     limit = max(1, min(int(batch_size or 1), MAX_WORKER_STEP_BATCH_SIZE))
     items: list[dict[str, Any]] = []
     for _ in range(limit):
-        job = claim_next_job(db, lease_id=lease_id, plan_id=run.production_plan_id)
+        job = _claim_next_real_run_job(db, run, lease_id=lease_id)
         if not job:
             break
         items.append(_process_claimed_job(db, run, job))
@@ -353,7 +379,203 @@ def run_real_worker_step(db: Session, run_id: str, *, lease_id: str, batch_size:
         "lease_id": lease_id,
         "run_id": run.id,
         "processed": len(items),
-        "remaining": _remaining_claimable_jobs(db, run.production_plan_id),
+        "remaining": _remaining_real_run_claimable_jobs(db, run),
+        "items": items,
+    }
+
+
+def _claim_next_real_run_job(
+    db: Session,
+    run: VideoProductionRun,
+    *,
+    lease_id: str,
+    lease_seconds: int = 300,
+) -> ProductionJob | None:
+    """按 run 的生产剧集作用域领取真实生产 job，避免串到同 plan 其他剧集。
+
+    入参：db 数据库会话，run 当前视频生产 run，lease_id worker 租约标识，lease_seconds 租约秒数。
+    出参：返回已租约的 ProductionJob；没有可处理任务时返回 None。
+    """
+    if not run.production_episode_id:
+        if get_run_type(run) == REAL_SHORT_E2E:
+            return _claim_next_unscoped_agency_repair_job(db, run, lease_id=lease_id, lease_seconds=lease_seconds)
+        return claim_next_job(db, lease_id=lease_id, plan_id=run.production_plan_id)
+
+    skipped_ids: set[str] = set()
+    while True:
+        now = bj_now()
+        query = _real_run_claimable_jobs_query(db, run, now)
+        if skipped_ids:
+            query = query.filter(~ProductionJob.id.in_(skipped_ids))
+        job = query.order_by(
+            ProductionJob.priority.asc(), ProductionJob.scheduled_at.asc(), ProductionJob.created_at.asc()
+        ).first()
+        if not job:
+            return None
+
+        updated = _real_run_claimable_jobs_query(db, run, now).filter(ProductionJob.id == job.id).update(
+            {
+                "status": JOB_LEASED,
+                "lease_id": lease_id,
+                "leased_until": now + timedelta(seconds=lease_seconds),
+                "updated_at": now,
+            },
+            synchronize_session=False,
+        )
+        db.commit()
+        if not updated:
+            skipped_ids.add(job.id)
+            continue
+        db.refresh(job)
+        return job
+
+
+def _claim_next_unscoped_agency_repair_job(
+    db: Session,
+    run: VideoProductionRun,
+    *,
+    lease_id: str,
+    lease_seconds: int = 300,
+) -> ProductionJob | None:
+    """为缺少 production_episode_id 的 real_short run 只领取专家自动修复 job。
+
+    入参：db 数据库会话，run 当前视频生产 run，lease_id worker 租约标识，lease_seconds 租约秒数。
+    出参：返回已租约的专家修复 ProductionJob；没有可处理任务时返回 None。
+    """
+    skipped_ids: set[str] = set()
+    while True:
+        now = bj_now()
+        query = _unscoped_agency_repair_jobs_query(db, run, now)
+        if skipped_ids:
+            query = query.filter(~ProductionJob.id.in_(skipped_ids))
+        job = query.order_by(
+            ProductionJob.priority.asc(), ProductionJob.scheduled_at.asc(), ProductionJob.created_at.asc()
+        ).first()
+        if not job:
+            return None
+        updated = _unscoped_agency_repair_jobs_query(db, run, now).filter(ProductionJob.id == job.id).update(
+            {
+                "status": JOB_LEASED,
+                "lease_id": lease_id,
+                "leased_until": now + timedelta(seconds=lease_seconds),
+                "updated_at": now,
+            },
+            synchronize_session=False,
+        )
+        db.commit()
+        if not updated:
+            skipped_ids.add(job.id)
+            continue
+        db.refresh(job)
+        return job
+
+
+def _unscoped_agency_repair_jobs_query(db: Session, run: VideoProductionRun, now):
+    """构造无生产剧集作用域时允许领取的专家自动修复 job 查询。
+
+    入参：db 数据库会话，run 当前视频生产 run，now 当前时间。
+    出参：返回 SQLAlchemy 查询对象。
+    """
+    return (
+        db.query(ProductionJob)
+        .filter(ProductionJob.plan_id == run.production_plan_id)
+        .filter(ProductionJob.plan_id.in_(db.query(ProductionPlan.id).filter(ProductionPlan.status.in_([PLAN_READY, PLAN_RUNNING]))))
+        .filter(ProductionJob.stage.like("agency_auto_repair:%"))
+        .filter(ProductionJob.target_type == "episode")
+        .filter(ProductionJob.target_id == run.episode_id)
+        .filter(ProductionJob.status.in_([JOB_QUEUED, JOB_RETRY_WAIT]))
+        .filter((ProductionJob.retry_after.is_(None)) | (ProductionJob.retry_after <= now))
+        .filter(ProductionJob.scheduled_at <= now)
+    )
+
+
+def _real_run_claimable_jobs_query(db: Session, run: VideoProductionRun, now):
+    """构造限定在当前 production_episode_id 或业务 episode_id 内的可领取 job 查询。
+
+    入参：db 数据库会话，run 当前视频生产 run，now 当前时间。
+    出参：返回 SQLAlchemy 查询对象。
+    """
+    segment_ids = (
+        db.query(ProductionSegment.id)
+        .join(ProductionShot, ProductionSegment.shot_plan_id == ProductionShot.id)
+        .join(ProductionScene, ProductionShot.scene_plan_id == ProductionScene.id)
+        .filter(ProductionScene.episode_plan_id == run.production_episode_id)
+    )
+    provider_targets = or_(
+        and_(ProductionJob.target_type == "production_segment", ProductionJob.target_id.in_(segment_ids)),
+        and_(ProductionJob.target_type == "production_episode", ProductionJob.target_id == run.production_episode_id),
+    )
+    repair_targets = and_(
+        ProductionJob.stage.like("agency_auto_repair:%"),
+        or_(
+            and_(ProductionJob.target_type == "production_segment", ProductionJob.target_id.in_(segment_ids)),
+            and_(ProductionJob.target_type == "production_episode", ProductionJob.target_id == run.production_episode_id),
+            and_(ProductionJob.target_type == "episode", ProductionJob.target_id == run.episode_id),
+        ),
+    )
+    scoped_targets = or_(provider_targets, repair_targets) if run.status in REAL_WORKER_QUEUE_RUN_STATUSES else repair_targets
+    return (
+        db.query(ProductionJob)
+        .filter(ProductionJob.plan_id == run.production_plan_id)
+        .filter(ProductionJob.plan_id.in_(db.query(ProductionPlan.id).filter(ProductionPlan.status.in_([PLAN_READY, PLAN_RUNNING]))))
+        .filter(ProductionJob.status.in_([JOB_QUEUED, JOB_RETRY_WAIT]))
+        .filter((ProductionJob.retry_after.is_(None)) | (ProductionJob.retry_after <= now))
+        .filter(ProductionJob.scheduled_at <= now)
+        .filter(scoped_targets)
+    )
+
+
+def _remaining_real_run_claimable_jobs(db: Session, run: VideoProductionRun) -> int:
+    """统计当前 run 作用域内仍可被真实 worker 领取的 job 数。
+
+    入参：db 数据库会话，run 当前视频生产 run。
+    出参：返回可领取 job 数量。
+    """
+    if not run.production_episode_id:
+        if get_run_type(run) == REAL_SHORT_E2E:
+            return _unscoped_agency_repair_jobs_query(db, run, bj_now()).count()
+        return _remaining_claimable_jobs(db, run.production_plan_id)
+    return _real_run_claimable_jobs_query(db, run, bj_now()).count()
+
+
+def run_real_worker_queue_step(db: Session, *, lease_id: str, batch_size: int = 1) -> dict:
+    """后台真实视频 worker 扫描活跃 real_short run 并按作用域处理队列。
+
+    入参：db 数据库会话，lease_id worker 租约标识，batch_size 本轮最多处理数量。
+    出参：返回处理结果摘要，包含 processed 和 items。
+    """
+    limit = max(1, min(int(batch_size or 1), MAX_WORKER_STEP_BATCH_SIZE))
+    items: list[dict[str, Any]] = []
+    page_size = 100
+    offset = 0
+    while len(items) < limit:
+        runs = (
+            db.query(VideoProductionRun)
+            .join(ProductionPlan, ProductionPlan.id == VideoProductionRun.production_plan_id)
+            .filter(VideoProductionRun.run_type == REAL_SHORT_E2E)
+            .filter(VideoProductionRun.status.in_(REAL_WORKER_QUEUE_ELIGIBLE_RUN_STATUSES))
+            .filter(ProductionPlan.status.in_([PLAN_READY, PLAN_RUNNING]))
+            .filter(VideoProductionRun.production_plan_id.isnot(None))
+            .order_by(VideoProductionRun.updated_at.asc(), VideoProductionRun.created_at.asc(), VideoProductionRun.id.asc())
+            .offset(offset)
+            .limit(page_size)
+            .all()
+        )
+        if not runs:
+            break
+        offset += len(runs)
+        for run in runs:
+            if len(items) >= limit:
+                break
+            db.refresh(run)
+            if _remaining_real_run_claimable_jobs(db, run) <= 0:
+                continue
+            result = run_real_worker_step(db, run.id, lease_id=lease_id, batch_size=limit - len(items))
+            items.extend(result.get("items") or [])
+    return {
+        "ok": True,
+        "lease_id": lease_id,
+        "processed": len(items),
         "items": items,
     }
 
@@ -1091,43 +1313,56 @@ def _remaining_claimable_jobs(db: Session, plan_id: str) -> int:
     ).count()
 
 
-def _open_stage_jobs(db: Session, plan_id: str, stage: str) -> int:
+def _stage_jobs_query(db: Session, run: VideoProductionRun, stage: str):
+    """按 run 的生产剧集作用域构造阶段 job 查询，避免状态汇总串集。
+
+    入参：db 数据库会话，run 当前视频生产 run，stage 生产阶段。
+    出参：返回 SQLAlchemy 查询对象。
+    """
+    query = db.query(ProductionJob).filter(ProductionJob.plan_id == run.production_plan_id, ProductionJob.stage == stage)
+    if run.production_episode_id:
+        segment_ids = (
+            db.query(ProductionSegment.id)
+            .join(ProductionShot, ProductionSegment.shot_plan_id == ProductionShot.id)
+            .join(ProductionScene, ProductionShot.scene_plan_id == ProductionScene.id)
+            .filter(ProductionScene.episode_plan_id == run.production_episode_id)
+        )
+        query = query.filter(
+            or_(
+                and_(ProductionJob.target_type == "production_segment", ProductionJob.target_id.in_(segment_ids)),
+                and_(ProductionJob.target_type == "production_episode", ProductionJob.target_id == run.production_episode_id),
+            )
+        )
+    return query
+
+
+def _open_stage_jobs(db: Session, run: VideoProductionRun, stage: str) -> int:
     """业务函数：处理 _open_stage_jobs 对应的业务流程、校验或数据转换。
 
-    入参：db、plan_id、stage 为该业务流程需要的上下文、标识或载荷。
+    入参：db、run、stage 为该业务流程需要的上下文、标识或载荷。
     出参：返回该业务流程的处理结果；无显式返回值时返回 None。
     """
-    return db.query(ProductionJob).filter(
-        ProductionJob.plan_id == plan_id,
-        ProductionJob.stage == stage,
-        ProductionJob.status.in_([JOB_QUEUED, JOB_LEASED, JOB_RUNNING, JOB_RETRY_WAIT]),
+    return _stage_jobs_query(db, run, stage).filter(
+        ProductionJob.status.in_([JOB_QUEUED, JOB_LEASED, JOB_RUNNING, JOB_RETRY_WAIT])
     ).count()
 
 
-def _failed_stage_jobs(db: Session, plan_id: str, stage: str) -> int:
+def _failed_stage_jobs(db: Session, run: VideoProductionRun, stage: str) -> int:
     """业务函数：处理 _failed_stage_jobs 对应的业务流程、校验或数据转换。
 
-    入参：db、plan_id、stage 为该业务流程需要的上下文、标识或载荷。
+    入参：db、run、stage 为该业务流程需要的上下文、标识或载荷。
     出参：返回该业务流程的处理结果；无显式返回值时返回 None。
     """
-    return db.query(ProductionJob).filter(
-        ProductionJob.plan_id == plan_id,
-        ProductionJob.stage == stage,
-        ProductionJob.status == JOB_FAILED,
-    ).count()
+    return _stage_jobs_query(db, run, stage).filter(ProductionJob.status == JOB_FAILED).count()
 
 
-def _blocked_stage_jobs(db: Session, plan_id: str, stage: str) -> int:
+def _blocked_stage_jobs(db: Session, run: VideoProductionRun, stage: str) -> int:
     """业务函数：处理 _blocked_stage_jobs 对应的业务流程、校验或数据转换。
 
-    入参：db、plan_id、stage 为该业务流程需要的上下文、标识或载荷。
+    入参：db、run、stage 为该业务流程需要的上下文、标识或载荷。
     出参：返回该业务流程的处理结果；无显式返回值时返回 None。
     """
-    return db.query(ProductionJob).filter(
-        ProductionJob.plan_id == plan_id,
-        ProductionJob.stage == stage,
-        ProductionJob.status == JOB_BLOCKED,
-    ).count()
+    return _stage_jobs_query(db, run, stage).filter(ProductionJob.status == JOB_BLOCKED).count()
 
 
 def _update_run_status_after_stage_job(db: Session, run: VideoProductionRun, stage: str) -> None:
@@ -1144,14 +1379,14 @@ def _update_run_status_after_stage_job(db: Session, run: VideoProductionRun, sta
         return
     if stage in COMPOSE_STAGES and run.status == "completed":
         return
-    if _failed_stage_jobs(db, run.production_plan_id, stage):
+    if _failed_stage_jobs(db, run, stage):
         run.status = "failed"
         run.current_stage = stage
         run.updated_at = bj_now()
         db.commit()
         db.refresh(run)
         return
-    if _blocked_stage_jobs(db, run.production_plan_id, stage):
+    if _blocked_stage_jobs(db, run, stage):
         if stage == "image_generation":
             run.status = "image_human_review_required"
             run.current_stage = "image_review"
@@ -1165,7 +1400,7 @@ def _update_run_status_after_stage_job(db: Session, run: VideoProductionRun, sta
         db.commit()
         db.refresh(run)
         return
-    stage_open_jobs = _open_stage_jobs(db, run.production_plan_id, stage)
+    stage_open_jobs = _open_stage_jobs(db, run, stage)
     if stage == "image_generation":
         if stage_open_jobs:
             run.status = "image_batch_running"

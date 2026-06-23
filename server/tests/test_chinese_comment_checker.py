@@ -197,6 +197,39 @@ def test_high_risk_line_requires_nearby_chinese_comment(tmp_path: Path):
     assert high_risk_comment_gaps(good) == []
 
 
+def test_client_submit_requires_nearby_chinese_comment(tmp_path: Path):
+    bad = tmp_path / "provider.py"
+    bad.write_text("async def run():\n    await self.client.submit(payload)\n", encoding="utf-8")
+    good = tmp_path / "provider_ok.py"
+    good.write_text(
+        "async def run():\n"
+        "    # 提交 provider 前已完成预算、幂等和容量校验。\n"
+        "    await self.client.submit(payload)\n",
+        encoding="utf-8",
+    )
+
+    assert high_risk_comment_gaps(bad) == [(2, "await self.client.submit(payload)")]
+    assert high_risk_comment_gaps(good) == []
+
+
+def test_python_function_contract_checks_keyword_and_variadic_parameters(tmp_path: Path):
+    path = tmp_path / "service.py"
+    path.write_text(
+        '"""视频生产服务。"""\n\n'
+        "def run(series_id: str, *items, force: bool = False, **options) -> dict:\n"
+        '    """启动生产运行。\\n\\n'
+        '    入参：series_id 为系列标识，force 为强制标记。\\n'
+        '    出参：返回生产运行结果。\\n'
+        '    """\n'
+        "    return {'series_id': series_id}\n",
+        encoding="utf-8",
+    )
+
+    assert contract_comment_gaps(path) == [
+        (3, "function", "run", "missing 入参/出参/参数名")
+    ]
+
+
 def test_database_query_is_not_high_risk_by_itself(tmp_path: Path):
     path = tmp_path / "read_model.py"
     path.write_text(

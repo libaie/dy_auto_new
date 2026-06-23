@@ -300,6 +300,22 @@ describe('API Clients', () => {
     })
   })
 
+  describe('settings API', () => {
+    it('calls settings endpoints', async () => {
+      const { getSettings, updateSettings } = await import('../api/settings.js')
+      mockGet.mockResolvedValue({ data: { settings: {} } })
+      mockPut.mockResolvedValue({ data: { ok: true } })
+
+      await getSettings()
+      await updateSettings({ pixelle_video_url: 'http://pixelle:8500' })
+
+      expect(mockGet).toHaveBeenCalledWith('/settings')
+      expect(mockPut).toHaveBeenCalledWith('/settings', {
+        settings: { pixelle_video_url: 'http://pixelle:8500' },
+      })
+    })
+  })
+
   describe('video production API', () => {
     it('createVideoProductionRun calls POST /video-production/runs', async () => {
       const { createVideoProductionRun } = await import('../api/videoProduction.js')

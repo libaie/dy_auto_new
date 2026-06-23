@@ -100,6 +100,10 @@ def _get_artifact_or_404(db: Session, artifact_id: str) -> AITextArtifact:
 def list_artifacts(
     series_id: str | None = Query(None),
     episode_id: str | None = Query(None),
+    run_id: str | None = Query(None),
+    production_plan_id: str | None = Query(None),
+    target_type: str | None = Query(None),
+    target_id: str | None = Query(None),
     artifact_type: str | None = Query(None),
     status: str | None = Query(None),
     db: Session = Depends(get_db),
@@ -107,7 +111,7 @@ def list_artifacts(
 ):
     """业务函数：处理 list_artifacts 对应的业务流程、校验或数据转换。
 
-    入参：series_id、episode_id、artifact_type、status、db、user 为该业务流程需要的上下文、标识或载荷。
+    入参：series_id、episode_id、run_id、production_plan_id、target_type、target_id、artifact_type、status、db、user 为该业务流程需要的上下文、标识或载荷。
     出参：返回该业务流程的处理结果；无显式返回值时返回 None。
     """
     query = db.query(AITextArtifact)
@@ -115,6 +119,14 @@ def list_artifacts(
         query = query.filter(AITextArtifact.series_id == series_id)
     if episode_id:
         query = query.filter(AITextArtifact.episode_id == episode_id)
+    if run_id:
+        query = query.filter(AITextArtifact.run_id == run_id)
+    if production_plan_id:
+        query = query.filter(AITextArtifact.production_plan_id == production_plan_id)
+    if target_type:
+        query = query.filter(AITextArtifact.target_type == target_type)
+    if target_id:
+        query = query.filter(AITextArtifact.target_id == target_id)
     if artifact_type:
         query = query.filter(AITextArtifact.artifact_type == artifact_type)
     if status:

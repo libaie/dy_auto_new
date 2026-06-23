@@ -272,8 +272,15 @@ async def test_executor_rejects_completed_provider_result_with_failed_assets(db)
     assert reservation.status == COST_STALE_NEEDS_REPAIR
 
 
+@pytest.mark.parametrize(
+    "message",
+    [
+        "Seedance video submit failed: HTTP 429: The request has exceeded the quota.",
+        "DashScope video submit failed: HTTP 400: Access denied, please make sure your account is in good standing. For details, see: https://help.aliyun.com/zh/model-studio/error-code#overdue-payment",
+    ],
+)
 @pytest.mark.asyncio
-async def test_retryable_quota_failed_asset_archives_stage_task_key_for_new_submit(db):
+async def test_retryable_quota_failed_asset_archives_stage_task_key_for_new_submit(db, message):
     plan, run, job = _context(db, key_suffix="seg-quota-asset")
     client = FakeProviderClient(sync_result={
         "status": "completed",
@@ -282,7 +289,7 @@ async def test_retryable_quota_failed_asset_archives_stage_task_key_for_new_subm
             "asset_type": "video_segment",
             "status": "failed",
             "error_code": "VIDEO_RENDER_FAILED",
-            "message": "Seedance video submit failed: HTTP 429: The request has exceeded the quota.",
+            "message": message,
             "retryable": True,
         }],
         "usage": {"cost": 0.37},
@@ -343,6 +350,100 @@ async def test_retryable_quota_failed_asset_archives_stage_task_key_for_new_subm
         "provider_stage_task_id": new_task.id,
         "provider_idempotency_key": new_task.id,
     }]
+
+
+@pytest.mark.asyncio
+async def test_retryable_quota_existing_failed_task_archives_key_for_new_submit(db):
+    plan, run, job = _context(db, key_suffix="seg-existing-failed-quota")
+    payload = {"prompt": "make a clip", "duration": 4}
+    task = ProviderStageTask(
+        run_id=run.id,
+        plan_id=plan.id,
+        job_id=job.id,
+        target_type="production_segment",
+        target_id="seg-existing-failed-quota",
+        stage="video_generation",
+        provider="seedance",
+        model_name="seedance-v1",
+        request_hash=_request_hash(payload),
+        idempotency_key=f"{run.id}:video_generation:production_segment:seg-existing-failed-quota:seedance:seedance-v1",
+        status=PROVIDER_TASK_FAILED,
+        provider_task_id="provider-failed-quota",
+        error_code=ProductionErrorCode.PROVIDER_TASK_FAILED.value,
+    )
+    db.add(task)
+    db.flush()
+    _reservation(db, plan, task, status=COST_SUBMITTED)
+    db.commit()
+    client = FakeProviderClient(sync_result={
+        "status": "completed",
+        "assets": [{
+            "frame_id": "seg-existing-failed-quota",
+            "asset_type": "video_segment",
+            "status": "failed",
+            "message": "DashScope video submit failed: HTTP 400: Access denied, please make sure your account is in good standing. For details, see: https://help.aliyun.com/zh/model-studio/error-code#overdue-payment",
+            "retryable": True,
+        }],
+        "usage": {"cost": 0.37},
+    })
+
+    result = await ProviderStageExecutor(client).execute(
+        db,
+        run_id=run.id,
+        plan_id=plan.id,
+        job_id=job.id,
+        target_type="production_segment",
+        target_id="seg-existing-failed-quota",
+        stage="video_generation",
+        provider="seedance",
+        model_name="seedance-v1",
+        estimated_cost=0.5,
+        payload=payload,
+        capability=_capability(),
+    )
+
+    assert result.code == ProductionErrorCode.PROVIDER_THROTTLED
+    db.refresh(task)
+    assert task.status == PROVIDER_TASK_FAILED
+    assert task.error_code == ProductionErrorCode.PROVIDER_THROTTLED.value
+    assert task.idempotency_key.endswith(f":archived:{task.id}")
+    assert client.submits == []
+
+
+@pytest.mark.asyncio
+async def test_retryable_access_denied_without_billing_is_not_quota_failure(db):
+    plan, run, job = _context(db, key_suffix="seg-access-denied")
+    client = FakeProviderClient(sync_result={
+        "status": "completed",
+        "assets": [{
+            "frame_id": "seg-access-denied",
+            "asset_type": "video_segment",
+            "status": "failed",
+            "message": "Provider submit failed: HTTP 403: Access denied for this API key.",
+            "retryable": True,
+        }],
+        "usage": {"cost": 0.37},
+    })
+
+    result = await ProviderStageExecutor(client).execute(
+        db,
+        run_id=run.id,
+        plan_id=plan.id,
+        job_id=job.id,
+        target_type="production_segment",
+        target_id="seg-access-denied",
+        stage="video_generation",
+        provider="seedance",
+        model_name="seedance-v1",
+        estimated_cost=0.5,
+        payload={"prompt": "make a clip", "duration": 4},
+        capability=_capability(),
+    )
+
+    assert result.code == ProductionErrorCode.PROVIDER_TASK_FAILED
+    task = db.query(ProviderStageTask).one()
+    assert task.status == PROVIDER_TASK_FAILED
+    assert ":archived:" not in task.idempotency_key
 
 
 @pytest.mark.asyncio

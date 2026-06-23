@@ -208,6 +208,60 @@ async def _one_sentence_reference_worker(interval_seconds: float | None = None, 
             db.close()
 
 
+def _run_real_video_production_worker_cycle(lease_id: str, batch_size: int) -> dict:
+    """打开独立数据库会话并执行一轮真实视频生产后台 worker。
+
+    入参：lease_id worker 租约标识，batch_size 本轮最多处理数量。
+    出参：返回 worker 队列处理摘要。
+    """
+    from app.domains.video_production.production_worker_service import run_real_worker_queue_step
+
+    db = SessionLocal()
+    try:
+        return run_real_worker_queue_step(db, lease_id=lease_id, batch_size=batch_size)
+    finally:
+        db.close()
+
+
+async def _real_video_production_worker(interval_seconds: float | None = None, batch_size: int | None = None):
+    """按配置周期循环执行真实视频生产后台 worker，异常时记录日志并重试。
+
+    入参：interval_seconds 空闲轮询间隔秒数，batch_size 每轮最多处理数量。
+    出参：长期运行协程，无正常返回值。
+    """
+    import logging
+
+    interval = interval_seconds
+    if interval is None:
+        interval = float(os.getenv("REAL_VIDEO_WORKER_INTERVAL_SECONDS", "5"))
+    interval = max(0.1, float(interval))
+    worker_batch_size = batch_size
+    if worker_batch_size is None:
+        worker_batch_size = int(os.getenv("REAL_VIDEO_WORKER_BATCH_SIZE", "1"))
+    worker_batch_size = max(1, min(int(worker_batch_size), 20))
+    lease_id = f"real-video-worker:{os.getpid()}"
+    log = logging.getLogger("app.real_video_worker")
+
+    while True:
+        try:
+            result = await asyncio.to_thread(_run_real_video_production_worker_cycle, lease_id, worker_batch_size)
+            await asyncio.sleep(0 if result.get("processed", 0) > 0 else interval)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            log.warning("real video production worker cycle failed", exc_info=True)
+            await asyncio.sleep(interval)
+
+
+def _real_video_worker_enabled() -> bool:
+    """读取 REAL_VIDEO_WORKER_ENABLED，显式开启时才启动真实视频后台 worker。
+
+    入参：无显式入参，读取环境变量。
+    出参：返回是否启用真实视频后台 worker。
+    """
+    return (os.getenv("REAL_VIDEO_WORKER_ENABLED") or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 async def _offline_checker():
     """业务函数：处理 _offline_checker 对应的业务流程、校验或数据转换。
 
@@ -241,12 +295,17 @@ async def lifespan(app: FastAPI):
     style_lock_task = asyncio.create_task(_style_lock_worker())
     story_plan_task = asyncio.create_task(_story_plan_worker())
     one_sentence_reference_task = asyncio.create_task(_one_sentence_reference_worker())
+    real_video_task = asyncio.create_task(_real_video_production_worker()) if _real_video_worker_enabled() else None
     yield
     task.cancel()
     style_lock_task.cancel()
     story_plan_task.cancel()
     one_sentence_reference_task.cancel()
-    await asyncio.gather(task, style_lock_task, story_plan_task, one_sentence_reference_task, return_exceptions=True)
+    tasks = [task, style_lock_task, story_plan_task, one_sentence_reference_task]
+    if real_video_task is not None:
+        real_video_task.cancel()
+        tasks.append(real_video_task)
+    await asyncio.gather(*tasks, return_exceptions=True)
     await ai_generator.aclose()
     from app.domains.pixelle_integration import pixelle_client
     await pixelle_client.close_client()

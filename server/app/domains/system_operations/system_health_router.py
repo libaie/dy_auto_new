@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.db.models import (
     AIModel,
+    SystemSetting,
     ProductionAuditEvent,
     ProviderCostReservation,
     ProviderStageTask,
@@ -178,6 +179,43 @@ def _positive_estimated_cost(model: AIModel) -> bool:
     return False
 
 
+def _configured_value_present(value: object) -> bool:
+    """业务函数：处理 _configured_value_present 对应的业务流程、校验或数据转换。
+
+    入参：value 为该业务流程需要的上下文、标识或载荷。
+    出参：返回 value 是否为非空配置值；字符串会去除首尾空白。
+    """
+    if isinstance(value, str):
+        return bool(value.strip())
+    return bool(value)
+
+
+def _system_settings(db: Session) -> dict[str, str]:
+    """业务函数：处理 _system_settings 对应的业务流程、校验或数据转换。
+
+    入参：db 为该业务流程需要的上下文、标识或载荷。
+    出参：返回 system_settings 的 key/value 映射。
+    """
+    return {row.key: row.value for row in db.query(SystemSetting).all()}
+
+
+def _provider_connection_presence(model: AIModel, settings: dict[str, str] | None = None) -> tuple[bool, bool]:
+    """业务函数：处理 _provider_connection_presence 对应的业务流程、校验或数据转换。
+
+    入参：model、settings 为该业务流程需要的上下文、标识或载荷。
+    出参：返回 provider 运行所需 base_url/api_key 是否存在。
+    """
+    base_url = getattr(model, "base_url", None)
+    api_key = getattr(model, "api_key", None)
+    if getattr(model, "provider", None) == "pixelle":
+        settings = settings or {}
+        if not _configured_value_present(base_url):
+            base_url = settings.get("pixelle_video_url")
+        if not _configured_value_present(api_key):
+            api_key = settings.get("pixelle_api_key")
+    return _configured_value_present(base_url), _configured_value_present(api_key)
+
+
 def _worker_runtime_health() -> dict:
     """业务函数：处理 _worker_runtime_health 对应的业务流程、校验或数据转换。
 
@@ -199,10 +237,10 @@ def _worker_runtime_health() -> dict:
     }
 
 
-def _missing_real_provider_requirements(model: AIModel, capability: dict, scene_key: str | None = None) -> list[str]:
+def _missing_real_provider_requirements(model: AIModel, capability: dict, scene_key: str | None = None, settings: dict[str, str] | None = None) -> list[str]:
     """业务函数：处理 _missing_real_provider_requirements 对应的业务流程、校验或数据转换。
 
-    入参：model、capability、scene_key 为该业务流程需要的上下文、标识或载荷。
+    入参：model、capability、scene_key、settings 为该业务流程需要的上下文、标识或载荷。
     出参：返回该业务流程的处理结果；无显式返回值时返回 None。
     """
     missing = [
@@ -214,21 +252,22 @@ def _missing_real_provider_requirements(model: AIModel, capability: dict, scene_
             key for key in _SCENE_CAPABILITY_REQUIRED.get(scene_key, ())
             if capability.get(key) is not True
         )
-    if not getattr(model, "api_key", None):
+    has_base_url, has_api_key = _provider_connection_presence(model, settings)
+    if not has_api_key:
         missing.append("api_key")
-    if not getattr(model, "base_url", None):
+    if not has_base_url:
         missing.append("base_url")
-    if not getattr(model, "model_name", None):
+    if not _configured_value_present(getattr(model, "model_name", None)):
         missing.append("model_name")
     if not _positive_estimated_cost(model):
         missing.append("estimated_cost")
     return missing
 
 
-def _scene_readiness(models: list[AIModel]) -> dict[str, dict]:
+def _scene_readiness(models: list[AIModel], settings: dict[str, str] | None = None) -> dict[str, dict]:
     """业务函数：处理 _scene_readiness 对应的业务流程、校验或数据转换。
 
-    入参：models 为该业务流程需要的上下文、标识或载荷。
+    入参：models、settings 为该业务流程需要的上下文、标识或载荷。
     出参：返回该业务流程的处理结果；无显式返回值时返回 None。
     """
     readiness = {}
@@ -241,7 +280,7 @@ def _scene_readiness(models: list[AIModel]) -> dict[str, dict]:
         blocked = []
         for model in scene_models:
             capability = _capability_for_model(model)
-            missing = _missing_real_provider_requirements(model, capability, scene_key)
+            missing = _missing_real_provider_requirements(model, capability, scene_key, settings)
             if missing:
                 blocked.append({**_model_summary(model), "missing": missing})
             else:
@@ -295,12 +334,13 @@ def _provider_capability_health(db: Session) -> dict:
     """
     try:
         models = db.query(AIModel).filter(AIModel.enabled == True).all()
+        settings = _system_settings(db)
         paid_ready = []
         blocked = []
 
         for model in models:
             capability = _capability_for_model(model)
-            missing = _missing_real_provider_requirements(model, capability)
+            missing = _missing_real_provider_requirements(model, capability, settings=settings)
             summary = _model_summary(model)
             if missing:
                 blocked.append({**summary, "missing": missing})
@@ -320,7 +360,7 @@ def _provider_capability_health(db: Session) -> dict:
         )
 
     worker_runtime = _worker_runtime_health()
-    scene_readiness = _scene_readiness(models)
+    scene_readiness = _scene_readiness(models, settings)
     repair_actions = []
     if worker_runtime["status"] != "ok":
         repair_actions.extend(worker_runtime["repair_actions"])

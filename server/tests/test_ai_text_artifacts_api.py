@@ -63,6 +63,49 @@ def test_ai_text_artifacts_api_lists_and_edits_versions(db):
     assert [item["version"] for item in lineage_resp.json()["artifacts"]] == [1, 2]
 
 
+def test_ai_text_artifacts_api_filters_by_run_plan_and_target(db):
+    from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
+
+    series, episode = _create_series_episode(db)
+    service = AITextArtifactService(db)
+    wanted = service.create_artifact(
+        series_id=series.id,
+        episode_id=episode.id,
+        run_id="run-wanted",
+        production_plan_id="plan-wanted",
+        target_type="episode",
+        target_id=episode.id,
+        artifact_type="storyboard",
+        source_type="ai",
+        content_text="wanted",
+    )
+    service.create_artifact(
+        series_id=series.id,
+        episode_id=episode.id,
+        run_id="run-other",
+        production_plan_id="plan-wanted",
+        target_type="episode",
+        target_id=episode.id,
+        artifact_type="storyboard",
+        source_type="ai",
+        content_text="other",
+    )
+
+    resp = client.get(
+        "/api/ai-text-artifacts",
+        params={
+            "series_id": series.id,
+            "run_id": "run-wanted",
+            "production_plan_id": "plan-wanted",
+            "target_type": "episode",
+            "target_id": episode.id,
+        },
+    )
+
+    assert resp.status_code == 200
+    assert [item["id"] for item in resp.json()["artifacts"]] == [wanted.id]
+
+
 def test_ai_text_artifact_read_routes_require_auth(real_auth):
     list_resp = client.get("/api/ai-text-artifacts")
     detail_resp = client.get("/api/ai-text-artifacts/artifact-1")

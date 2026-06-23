@@ -287,12 +287,14 @@ def unresolved_patch_gate(db: Session, run: VideoProductionRun, *, stage: str) -
         .filter(AgencyCreativePatch.status.in_(list(BLOCKING_STATUSES)))
         .all()
     )
+    series_id = getattr(run, "series_id", None)
+    repair_route = f"/series/{series_id}/agency-console?tab=workbench" if series_id else f"/video-production/{run.id}"
     return {
         "blocked": bool(rows),
         "blocking_count": len(rows),
         "patch_ids": [row.id for row in rows],
         "repair_action": "打开短视频导演台处理专家改稿补丁",
-        "repair_route": f"/series/{run.series_id}/agency-console?tab=workbench",
+        "repair_route": repair_route,
     }
 
 

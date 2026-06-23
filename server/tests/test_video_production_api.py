@@ -153,6 +153,56 @@ def test_regenerate_without_persistence_fields_returns_storage_failed_asset(db):
     assert body["asset"]["copy_status"] == "storage_failed"
 
 
+def test_sync_regeneration_creates_reviewable_new_version(db, monkeypatch):
+    from app.domains.video_production.video_production_service import create_run_from_episode, mark_image_stage_assets
+
+    async def fake_get_stage_task(db, task_id):
+        return {
+            "status": "completed",
+            "assets": [{
+                "frame_id": "seg-1",
+                "url": "https://cdn.test/v2.png",
+                "copy_status": "persisted",
+                "checksum": "sha256-v2",
+                "storage_path": "assets/v2.png",
+                "production_segment_id": "seg-1",
+                "target_type": "production_segment",
+                "target_id": "seg-1",
+                "provider_stage_task_id": "provider-stage-1",
+            }],
+        }
+
+    monkeypatch.setattr("app.domains.video_production.video_production_service.get_stage_task", fake_get_stage_task)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.run_ai_audit_for_assets", lambda *_args, **_kwargs: None)
+    series, episode = _episode(db)
+    run = create_run_from_episode(db, series.id, episode.id)
+    old = mark_image_stage_assets(db, run, [{
+        "frame_id": "frame-001",
+        "asset_type": "image",
+        "url": "https://cdn.test/v1.png",
+        "local_path": "output/v1.png",
+        "production_segment_id": "seg-1",
+        "target_type": "production_segment",
+        "target_id": "seg-1",
+        "metadata": {},
+    }], pixelle_task_id="stage-1")[0]
+    old.pixelle_task_id = "regen-task-1"
+    db.commit()
+
+    resp = client.post(f"/api/video-production/assets/{old.id}/sync-regeneration")
+
+    assert resp.status_code == 200, resp.text
+    asset = resp.json()["asset"]
+    assert asset["version"] == 2
+    assert asset["status"] == "review_pending"
+    assert asset["production_segment_id"] == "seg-1"
+    new_asset = db.query(VideoProductionAsset).filter_by(id=asset["id"]).one()
+    assert new_asset.is_latest is True
+    db.refresh(old)
+    assert old.is_latest is False
+    assert old.status == "regenerating"
+
+
 def test_review_items_defaults_to_actionable_statuses(db):
     from app.domains.video_production.video_production_service import create_run_from_episode
 

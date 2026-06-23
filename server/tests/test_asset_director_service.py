@@ -11,6 +11,7 @@ from app.domains.ai_video_series.asset_director_service import (
     ensure_asset_director_plan_for_episode,
     load_asset_director_inputs,
 )
+from app.domains.ai_video_series.style_lock import character_reference_slot_names, scene_reference_slot_names
 from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
 
 
@@ -536,9 +537,13 @@ def test_reference_readiness_records_missing_slots(db):
     result = apply_asset_director_plan(db, series.id, _plan(db, series, ep1, ep2, lin, hallway))
 
     missing = result["readiness"]["missing_assets"]
+    patient = next(
+        item for item in missing if item["asset_type"] == "character" and item["stable_key"] == "patient_wu_ep1"
+    )
+    exam_room = next(item for item in missing if item["asset_type"] == "scene" and item["stable_key"] == "ep1_exam_room")
     assert result["readiness"]["status"] == "needs_reference"
-    assert any(item["asset_type"] == "character" and item["stable_key"] == "patient_wu_ep1" for item in missing)
-    assert any(item["asset_type"] == "scene" and item["stable_key"] == "ep1_exam_room" for item in missing)
+    assert set(patient["missing_reference_slots"]) == set(character_reference_slot_names())
+    assert set(exam_room["missing_reference_slots"]) == set(scene_reference_slot_names())
 
 
 @pytest.mark.asyncio
@@ -547,12 +552,19 @@ async def test_reference_generation_is_scoped_to_director_assets(db, monkeypatch
 
     series, ep1, ep2, lin, hallway = _series_with_episodes(db)
     unrelated = Character(name="Unused Legacy Character", role_type="supporting")
+    unrelated_scene = Scene(name="Unused Legacy Scene", scene_type="indoor")
     series.characters.append(unrelated)
+    series.scenes.append(unrelated_scene)
     _approved_sources(db, series, ep1, ep2)
     result = apply_asset_director_plan(db, series.id, _plan(db, series, ep1, ep2, lin, hallway))
     director_character_ids = {
         asset.id
         for asset in series.characters
+        if isinstance(asset.meta_json, dict) and asset.meta_json.get("asset_director_plan_id") == result["artifact"].id
+    }
+    director_scene_ids = {
+        asset.id
+        for asset in series.scenes
         if isinstance(asset.meta_json, dict) and asset.meta_json.get("asset_director_plan_id") == result["artifact"].id
     }
     captured = {}
@@ -571,3 +583,5 @@ async def test_reference_generation_is_scoped_to_director_assets(db, monkeypatch
 
     assert captured["character_ids"] == director_character_ids
     assert unrelated.id not in captured["character_ids"]
+    assert captured["scene_ids"] == director_scene_ids
+    assert unrelated_scene.id not in captured["scene_ids"]

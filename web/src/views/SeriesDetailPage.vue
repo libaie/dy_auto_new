@@ -1,7 +1,7 @@
 <!-- 管理端业务页面：承载 SeriesDetailPage 页面流程，协调接口数据、用户操作和业务状态展示。 -->
 <template>
   <div class="p-6">
-    <button @click="$router.push('/series')" class="text-sky-400 hover:text-sky-300 mb-4 transition cursor-pointer">&larr; 返回系列列表</button>
+    <button @click="$router.push('/series')" class="mb-4 min-h-9 rounded px-2 text-sky-400 transition hover:bg-slate-900/60 hover:text-sky-300 cursor-pointer">&larr; 返回系列列表</button>
     <div v-if="loading" class="text-slate-400 text-center py-12">加载中...</div>
     <div v-else-if="error" class="text-red-400 text-center py-12">{{ error }}</div>
     <template v-else-if="series">
@@ -221,7 +221,7 @@
         <div v-if="aiTextArtifactsError" class="border-b border-red-500/30 bg-red-950/30 px-5 py-3 text-sm text-red-200">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <span>AI 文本加载失败：{{ aiTextArtifactsError }}</span>
-            <button data-test="retry-ai-text-artifacts" type="button" class="rounded border border-red-400/40 px-3 py-1.5 text-xs text-red-100 hover:bg-red-900/50" @click="refreshEpisodeTextArtifacts">
+            <button data-test="retry-ai-text-artifacts" type="button" class="min-h-9 rounded border border-red-400/40 px-3 py-1.5 text-xs text-red-100 hover:bg-red-900/50" @click="refreshEpisodeTextArtifacts">
               重试
             </button>
           </div>
@@ -238,7 +238,7 @@
               <button
                 :data-test="`episode-text-toggle-${ep.id}`"
                 type="button"
-                class="shrink-0 rounded border border-slate-700 px-3 py-1.5 text-xs text-slate-200 hover:bg-slate-800"
+                class="min-h-9 shrink-0 rounded border border-slate-700 px-3 py-1.5 text-xs text-slate-200 hover:bg-slate-800"
                 @click="toggleEpisodeText(ep.id)"
               >
                 {{ expandedEpisodeId === ep.id ? '收起文本' : '查看文本' }}

@@ -154,4 +154,28 @@ describe('AITextArtifactWorkbenchPage', () => {
     expect(wrapper.text()).toContain('episode_outline · E02 · Second Hook')
     expect(wrapper.text()).toContain('E02 · Second Hook')
   })
+
+  it('lists asset director plan artifacts', async () => {
+    mocks.listAITextArtifacts.mockResolvedValueOnce({
+      data: {
+        ok: true,
+        artifacts: [
+          artifact({
+            id: 'asset-director-1',
+            artifact_type: 'asset_director_plan',
+            target_type: 'series',
+            target_id: 'sid',
+            content_text: '资产导演计划',
+            content_json: { readiness: { status: 'ready' } },
+          }),
+        ],
+      },
+    })
+
+    const wrapper = mount(AITextArtifactWorkbenchPage)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('asset_director_plan')
+    expect(wrapper.text()).toContain('资产导演计划')
+  })
 })

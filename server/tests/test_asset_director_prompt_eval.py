@@ -44,6 +44,7 @@ def test_thirty_episode_prompt_contains_series_wide_context_without_full_cast_in
 
     assert "do not assign the full series cast to every frame" in prompt
     assert payload["series"]["title"] == "Long Clinic"
+    assert payload["series"]["logline"] == "Thirty compact medical mysteries."
     assert payload["series"]["genre"] == "medical"
     assert payload["asset_pool"]["characters"][0]["name"] == "Dr Lin"
     assert payload["asset_pool"]["scenes"][0]["name"] == "Clinic Hallway"
@@ -57,6 +58,3 @@ def test_thirty_episode_prompt_contains_series_wide_context_without_full_cast_in
         f"ep{index}-f1" for index in range(1, 31)
     ]
     assert "ep30-f1" in prompt
-
-
-

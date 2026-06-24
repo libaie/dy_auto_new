@@ -9,6 +9,7 @@ from app.domains.ai_video_series.asset_director_service import (
     AssetDirectorError,
     apply_asset_director_plan,
     compute_asset_director_fingerprint,
+    ensure_asset_director_references,
     ensure_asset_director_plan_for_episode,
     generate_asset_director_plan,
     load_asset_director_inputs,
@@ -505,25 +506,25 @@ def test_duplicate_stable_keys_raise_ambiguous_match(db):
 
 @pytest.mark.asyncio
 async def test_ensure_asset_director_plan_maps_reference_failed(db):
-    series, ep1, ep2, _lin, _hallway = _series_with_episodes(db)
+    series, ep1, ep2, lin, hallway = _series_with_episodes(db)
     _approved_sources(db, series, ep1, ep2)
-    inputs = load_asset_director_inputs(db=db, series_id=series.id)
-    artifact_service = AITextArtifactService(db)
-    artifact = artifact_service.create_artifact(
-        series_id=series.id,
-        target_type="series",
-        target_id=series.id,
-        artifact_type=ASSET_DIRECTOR_ARTIFACT_TYPE,
-        source_type="asset_director",
-        content_json={
-            "series_id": series.id,
-            "covered_episode_numbers": [1, 2],
-            "input_fingerprint": compute_asset_director_fingerprint(inputs),
-            "readiness": {"status": "reference_failed"},
+    apply_asset_director_plan(db, series.id, _plan(db, series, ep1, ep2, lin, hallway))
+    patient = _assets_by_stable_key(db, Character, "patient_wu_ep1", series.id)[0]
+    series.story_bible_json = {
+        **(series.story_bible_json or {}),
+        "style_lock": {
+            **((series.story_bible_json or {}).get("style_lock") or {}),
+            "reference_progress": [
+                {
+                    "asset_type": "character",
+                    "asset_id": patient.id,
+                    "slot": "avatar_front_url",
+                    "status": "failed",
+                    "error": "Reference generation failed",
+                }
+            ],
         },
-        commit=False,
-    )
-    artifact_service.approve_artifact(artifact.id, commit=False)
+    }
     db.commit()
 
     with pytest.raises(AssetDirectorError) as exc:
@@ -744,6 +745,96 @@ async def test_reference_generation_refreshes_director_asset_meta_and_payload(db
     payload_patient = next(item for item in payload["characters"] if item["name"] == "Patient Wu")
     assert payload_patient["asset_readiness"] == "ready"
     assert payload_patient["missing_reference_slots"] == []
+
+
+@pytest.mark.asyncio
+async def test_ensure_plan_recomputes_reference_readiness_from_current_assets(db, monkeypatch):
+    series, ep1, ep2, lin, hallway = _series_with_episodes(db)
+    _approved_sources(db, series, ep1, ep2)
+    apply_asset_director_plan(db, series.id, _plan(db, series, ep1, ep2, lin, hallway))
+
+    async def fake_fill_reference_assets(series_arg, db_arg, *, character_ids=None, scene_ids=None):
+        for character in db_arg.query(Character).filter(Character.id.in_(character_ids or [])).all():
+            for slot in character_reference_slot_names():
+                setattr(character, slot, f"https://cdn.test/{character.id}-{slot}.png")
+        for scene in db_arg.query(Scene).filter(Scene.id.in_(scene_ids or [])).all():
+            for slot in scene_reference_slot_names():
+                setattr(scene, slot, f"https://cdn.test/{scene.id}-{slot}.png")
+        return []
+
+    monkeypatch.setattr(
+        "app.domains.ai_video_series.asset_director_service.fill_reference_assets",
+        fake_fill_reference_assets,
+    )
+    await ensure_asset_director_references(db, series.id)
+    patient = _assets_by_stable_key(db, Character, "patient_wu_ep1", series.id)[0]
+    patient.avatar_front_url = ""
+    db.commit()
+
+    with pytest.raises(AssetDirectorError) as exc:
+        await ensure_asset_director_plan_for_episode(db, series.id, ep1.id)
+
+    assert exc.value.code == "ASSET_DIRECTOR_REFERENCES_MISSING"
+    db.refresh(patient)
+    assert patient.meta_json["asset_readiness"] == "needs_reference"
+    assert "avatar_front_url" in patient.meta_json["missing_reference_slots"]
+
+    db.rollback()
+    persisted_patient = _assets_by_stable_key(db, Character, "patient_wu_ep1", series.id)[0]
+    persisted_artifact = AITextArtifactService(db).latest_approved(
+        target_type="series",
+        target_id=series.id,
+        artifact_type=ASSET_DIRECTOR_ARTIFACT_TYPE,
+    )
+    assert persisted_patient.meta_json["asset_readiness"] == "needs_reference"
+    assert "avatar_front_url" in persisted_patient.meta_json["missing_reference_slots"]
+    assert persisted_artifact.content_json["readiness"]["status"] == "needs_reference"
+
+
+@pytest.mark.asyncio
+async def test_ensure_plan_ignores_stale_failed_progress_after_slots_repaired(db, monkeypatch):
+    series, ep1, ep2, lin, hallway = _series_with_episodes(db)
+    _approved_sources(db, series, ep1, ep2)
+    apply_asset_director_plan(db, series.id, _plan(db, series, ep1, ep2, lin, hallway))
+
+    async def fake_fill_reference_assets(series_arg, db_arg, *, character_ids=None, scene_ids=None):
+        for character in db_arg.query(Character).filter(Character.id.in_(character_ids or [])).all():
+            for slot in character_reference_slot_names():
+                setattr(character, slot, f"https://cdn.test/{character.id}-{slot}.png")
+        for scene in db_arg.query(Scene).filter(Scene.id.in_(scene_ids or [])).all():
+            for slot in scene_reference_slot_names():
+                setattr(scene, slot, f"https://cdn.test/{scene.id}-{slot}.png")
+        return []
+
+    monkeypatch.setattr(
+        "app.domains.ai_video_series.asset_director_service.fill_reference_assets",
+        fake_fill_reference_assets,
+    )
+    await ensure_asset_director_references(db, series.id)
+    patient = _assets_by_stable_key(db, Character, "patient_wu_ep1", series.id)[0]
+    series.story_bible_json = {
+        **(series.story_bible_json or {}),
+        "style_lock": {
+            **((series.story_bible_json or {}).get("style_lock") or {}),
+            "reference_progress": [
+                {
+                    "asset_type": "character",
+                    "asset_id": patient.id,
+                    "slot": "avatar_front_url",
+                    "status": "failed",
+                    "error": "Old failure before manual repair",
+                }
+            ],
+        },
+    }
+    db.commit()
+
+    artifact = await ensure_asset_director_plan_for_episode(db, series.id, ep1.id)
+
+    assert artifact.artifact_type == ASSET_DIRECTOR_ARTIFACT_TYPE
+    db.refresh(patient)
+    assert patient.meta_json["asset_readiness"] == "ready"
+    assert patient.meta_json["missing_reference_slots"] == []
 
 
 @pytest.mark.asyncio

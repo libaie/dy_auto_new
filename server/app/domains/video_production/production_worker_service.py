@@ -188,6 +188,10 @@ async def execute_provider_job_direct(db: Session, run: VideoProductionRun, job:
     入参：db、run、job 为该业务流程需要的上下文、标识或载荷。
     出参：返回该业务流程的处理结果；无显式返回值时返回 None。
     """
+    if job.stage == "image_generation":
+        from app.domains.video_production import video_production_service as video_service
+
+        await video_service._enforce_asset_director_for_series_episode_run(db, run)
     job_spec = _job_spec(db, run, job)
     gate_result = await _run_deferred_stage_gates(db, run, job, job_spec)
     if gate_result is not None:

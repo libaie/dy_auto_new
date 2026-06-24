@@ -407,8 +407,17 @@ async def ensure_asset_director_plan_for_episode(
         return apply_asset_director_plan(db, series_id, generated_plan)
     _assert_artifact_covers_episode(artifact, episode)
     _assert_artifact_fresh(artifact, inputs)
-    readiness = (artifact.content_json or {}).get("readiness")
+    key_to_character, key_to_scene = _director_assets_for_artifact(inputs.series, artifact.id)
+    readiness = check_reference_readiness(inputs.series, key_to_character, key_to_scene)
+    _refresh_asset_readiness_meta(readiness, key_to_character, key_to_scene)
+    content = dict(artifact.content_json or {})
+    content["readiness"] = readiness
+    artifact.content_json = content
+    flag_modified(artifact, "content_json")
+    db.flush()
     status = readiness.get("status") if isinstance(readiness, dict) else None
+    if status != "ready":
+        db.commit()
     if status == "reference_failed":
         raise AssetDirectorError(
             "ASSET_DIRECTOR_REFERENCES_FAILED",
@@ -438,16 +447,7 @@ async def ensure_asset_director_references(db: Session, series_id: str) -> dict[
             "Asset director plan is missing.",
             {"series_id": series_id},
         )
-    key_to_character = {
-        (asset.meta_json or {}).get("asset_stable_key"): asset
-        for asset in inputs.series.characters or []
-        if isinstance(asset.meta_json, dict) and (asset.meta_json or {}).get("asset_director_plan_id") == artifact.id
-    }
-    key_to_scene = {
-        (asset.meta_json or {}).get("asset_stable_key"): asset
-        for asset in inputs.series.scenes or []
-        if isinstance(asset.meta_json, dict) and (asset.meta_json or {}).get("asset_director_plan_id") == artifact.id
-    }
+    key_to_character, key_to_scene = _director_assets_for_artifact(inputs.series, artifact.id)
     await fill_reference_assets(
         inputs.series,
         db,
@@ -464,6 +464,19 @@ async def ensure_asset_director_references(db: Session, series_id: str) -> dict[
     db.refresh(artifact)
     return readiness
 
+
+def _director_assets_for_artifact(series: Series, artifact_id: str) -> tuple[dict[str, Character], dict[str, Scene]]:
+    key_to_character = {
+        (asset.meta_json or {}).get("asset_stable_key"): asset
+        for asset in series.characters or []
+        if isinstance(asset.meta_json, dict) and (asset.meta_json or {}).get("asset_director_plan_id") == artifact_id
+    }
+    key_to_scene = {
+        (asset.meta_json or {}).get("asset_stable_key"): asset
+        for asset in series.scenes or []
+        if isinstance(asset.meta_json, dict) and (asset.meta_json or {}).get("asset_director_plan_id") == artifact_id
+    }
+    return key_to_character, key_to_scene
 
 def _episode_missing_inputs(episode: Episode) -> dict[str, Any] | None:
     missing: list[str] = []
@@ -1192,14 +1205,12 @@ def check_reference_readiness(
         for scene in key_to_scene.values()
         if scene.id
     }
-    failed_progress = _failed_style_lock_progress(series, target_asset_keys)
-    if failed_progress:
-        return {"status": "reference_failed", "missing_assets": [], "failed_assets": failed_progress}
-
     missing: list[dict[str, Any]] = []
+    missing_slots_by_asset: dict[tuple[str, str], set[str]] = {}
     for stable_key, character in key_to_character.items():
         slots = _missing_character_reference_slots(character)
         if slots:
+            missing_slots_by_asset[("character", str(character.id))] = set(slots)
             missing.append({
                 "asset_type": "character",
                 "stable_key": stable_key,
@@ -1210,6 +1221,7 @@ def check_reference_readiness(
     for stable_key, scene in key_to_scene.items():
         slots = _missing_scene_reference_slots(scene)
         if slots:
+            missing_slots_by_asset[("scene", str(scene.id))] = set(slots)
             missing.append({
                 "asset_type": "scene",
                 "stable_key": stable_key,
@@ -1217,10 +1229,24 @@ def check_reference_readiness(
                 "name": scene.name,
                 "missing_reference_slots": slots,
             })
+
+    failed_progress = []
+    for item in _failed_style_lock_progress(series, target_asset_keys):
+        asset_key = (
+            str(item.get("asset_type") or "").strip(),
+            str(item.get("asset_id") or "").strip(),
+        )
+        missing_slots = missing_slots_by_asset.get(asset_key)
+        if not missing_slots:
+            continue
+        failed_slot = str(item.get("slot") or "").strip()
+        if not failed_slot or failed_slot in missing_slots:
+            failed_progress.append(item)
+    if failed_progress:
+        return {"status": "reference_failed", "missing_assets": [], "failed_assets": failed_progress}
     if missing:
         return {"status": "needs_reference", "missing_assets": missing, "failed_assets": []}
     return {"status": "ready", "missing_assets": [], "failed_assets": []}
-
 
 def _failed_style_lock_progress(series: Series, target_asset_keys: set[tuple[str, str]]) -> list[dict[str, Any]]:
     story_bible = series.story_bible_json if isinstance(series.story_bible_json, dict) else {}

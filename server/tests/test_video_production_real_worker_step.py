@@ -1013,12 +1013,16 @@ def test_real_worker_step_blocks_stale_asset_director_plan_before_provider_submi
             affected_ids=[run.episode_id],
         )
 
+    def fail_image_stage_frames(*args, **kwargs):
+        raise AssertionError("worker built an image payload before the asset director gate")
+
     async def fail_submit_image_batch(*args, **kwargs):
         raise AssertionError("worker submitted a paid image task with a stale asset director plan")
 
     monkeypatch.setenv("DY_AUTO_PROVIDER_SUBMIT_WORKER_COUNT", "1")
     monkeypatch.setattr("app.domains.video_production.production_worker_service.resolve_runtime_model_config", fake_config)
     monkeypatch.setattr("app.domains.video_production.video_production_service._enforce_asset_director_for_series_episode_run", stale_asset_director_plan)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.image_stage_frames", fail_image_stage_frames)
     monkeypatch.setattr("app.domains.video_production.video_production_service.submit_image_batch", fail_submit_image_batch)
     agent_calls = _route_provider_agent_to_direct_helper(monkeypatch, stub_asset_director_gate=False)
 

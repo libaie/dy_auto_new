@@ -618,6 +618,87 @@ async def test_reference_generation_is_scoped_to_director_assets(db, monkeypatch
     assert unrelated_scene.id not in captured["scene_ids"]
 
 
+@pytest.mark.asyncio
+async def test_reference_generation_refreshes_director_asset_meta_and_payload(db, monkeypatch):
+    from app.domains.ai_video_series.asset_director_service import ensure_asset_director_references
+    from app.domains.ai_video_series.read_models import episode_asset_scope_payload
+
+    series, ep1, ep2, lin, hallway = _series_with_episodes(db)
+    _approved_sources(db, series, ep1, ep2)
+    result = apply_asset_director_plan(db, series.id, _plan(db, series, ep1, ep2, lin, hallway))
+
+    async def fake_fill_reference_assets(series_arg, db_arg, *, character_ids=None, scene_ids=None):
+        for character in db_arg.query(Character).filter(Character.id.in_(character_ids or [])).all():
+            for slot in character_reference_slot_names():
+                setattr(character, slot, f"https://cdn.test/{character.id}-{slot}.png")
+        for scene in db_arg.query(Scene).filter(Scene.id.in_(scene_ids or [])).all():
+            for slot in scene_reference_slot_names():
+                setattr(scene, slot, f"https://cdn.test/{scene.id}-{slot}.png")
+        return []
+
+    monkeypatch.setattr(
+        "app.domains.ai_video_series.asset_director_service.fill_reference_assets",
+        fake_fill_reference_assets,
+    )
+
+    readiness = await ensure_asset_director_references(db, series.id)
+
+    assert readiness["status"] == "ready"
+    patient = _assets_by_stable_key(db, Character, "patient_wu_ep1", series.id)[0]
+    exam_room = _assets_by_stable_key(db, Scene, "ep1_exam_room", series.id)[0]
+    assert patient.meta_json["asset_director_plan_id"] == result["artifact"].id
+    assert patient.meta_json["asset_readiness"] == "ready"
+    assert patient.meta_json["missing_reference_slots"] == []
+    assert exam_room.meta_json["asset_readiness"] == "ready"
+    assert exam_room.meta_json["missing_reference_slots"] == []
+
+    payload = episode_asset_scope_payload(db, ep1)
+    payload_patient = next(item for item in payload["characters"] if item["name"] == "Patient Wu")
+    assert payload_patient["asset_readiness"] == "ready"
+    assert payload_patient["missing_reference_slots"] == []
+
+
+@pytest.mark.asyncio
+async def test_reference_generation_refreshes_failed_director_asset_meta(db, monkeypatch):
+    from app.domains.ai_video_series.asset_director_service import ensure_asset_director_references
+
+    series, ep1, ep2, lin, hallway = _series_with_episodes(db)
+    _approved_sources(db, series, ep1, ep2)
+    apply_asset_director_plan(db, series.id, _plan(db, series, ep1, ep2, lin, hallway))
+    patient = _assets_by_stable_key(db, Character, "patient_wu_ep1", series.id)[0]
+    series.story_bible_json = {
+        **(series.story_bible_json or {}),
+        "style_lock": {
+            **((series.story_bible_json or {}).get("style_lock") or {}),
+            "reference_progress": [
+                {
+                    "asset_type": "character",
+                    "asset_id": patient.id,
+                    "slot": "avatar_front_url",
+                    "status": "failed",
+                    "error": "Reference generation failed",
+                }
+            ],
+        },
+    }
+    db.commit()
+
+    async def fake_fill_reference_assets(series_arg, db_arg, *, character_ids=None, scene_ids=None):
+        return []
+
+    monkeypatch.setattr(
+        "app.domains.ai_video_series.asset_director_service.fill_reference_assets",
+        fake_fill_reference_assets,
+    )
+
+    readiness = await ensure_asset_director_references(db, series.id)
+
+    db.refresh(patient)
+    assert readiness["status"] == "reference_failed"
+    assert patient.meta_json["asset_readiness"] == "reference_failed"
+    assert set(patient.meta_json["missing_reference_slots"]) == set(character_reference_slot_names())
+
+
 def test_prompt_does_not_force_full_cast_per_frame(db):
     series, ep1, ep2, _lin, _hallway = _series_with_episodes(db)
     _approved_sources(db, series, ep1, ep2)

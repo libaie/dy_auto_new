@@ -456,6 +456,7 @@ async def ensure_asset_director_references(db: Session, series_id: str) -> dict[
     )
     db.flush()
     readiness = check_reference_readiness(inputs.series, key_to_character, key_to_scene)
+    _refresh_asset_readiness_meta(readiness, key_to_character, key_to_scene)
     content = dict(artifact.content_json)
     content["readiness"] = readiness
     artifact.content_json = content
@@ -473,6 +474,40 @@ def _episode_missing_inputs(episode: Episode) -> dict[str, Any] | None:
     if not missing:
         return None
     return {"episode_id": episode.id, "episode_number": episode.episode_number, "missing": missing}
+
+
+def _refresh_asset_readiness_meta(
+    readiness: dict[str, Any],
+    key_to_character: dict[str, Character],
+    key_to_scene: dict[str, Scene],
+) -> None:
+    missing_by_asset = {
+        (str(item.get("asset_type") or "").strip(), str(item.get("asset_id") or "").strip()): list(
+            item.get("missing_reference_slots") or []
+        )
+        for item in readiness.get("missing_assets") or []
+        if isinstance(item, dict)
+    }
+    failed_assets = {
+        (str(item.get("asset_type") or "").strip(), str(item.get("asset_id") or "").strip())
+        for item in readiness.get("failed_assets") or []
+        if isinstance(item, dict)
+    }
+    for asset_type, assets, missing_func in (
+        ("character", key_to_character.values(), _missing_character_reference_slots),
+        ("scene", key_to_scene.values(), _missing_scene_reference_slots),
+    ):
+        for asset in assets:
+            key = (asset_type, str(asset.id or "").strip())
+            missing_slots = missing_by_asset.get(key, missing_func(asset))
+            meta = dict(asset.meta_json or {})
+            meta["missing_reference_slots"] = missing_slots
+            if key in failed_assets:
+                meta["asset_readiness"] = "reference_failed"
+            else:
+                meta["asset_readiness"] = "needs_reference" if missing_slots else "ready"
+            asset.meta_json = meta
+            flag_modified(asset, "meta_json")
 
 
 def _storyboard_frames(storyboard_json: Any) -> list[dict[str, Any]]:

@@ -1122,6 +1122,15 @@ def test_start_flow_binds_latest_approved_text_artifacts_to_run(db):
         content_json={"logline": "approved bible"},
     )
     service.approve_artifact(series_bible.id)
+    asset_director = service.create_artifact(
+        series_id=series.id,
+        target_type="series",
+        target_id=series.id,
+        artifact_type="asset_director_plan",
+        source_type="ai",
+        content_json={"readiness": {"status": "ready"}},
+    )
+    service.approve_artifact(asset_director.id)
     client = TestClient(app)
 
     resp = client.post("/api/video-production/runs/start", json={
@@ -1139,6 +1148,7 @@ def test_start_flow_binds_latest_approved_text_artifacts_to_run(db):
         ("series_story_plan", 1),
         ("season_arc", 1),
         ("continuity_ledger", 1),
+        ("asset_director_plan", 1),
         ("episode_outline", 1),
         ("episode_script", 1),
         ("storyboard", 2),
@@ -1148,6 +1158,7 @@ def test_start_flow_binds_latest_approved_text_artifacts_to_run(db):
     ]
     consumed_by_type = {item["artifact_type"]: item for item in consumed}
     assert consumed_by_type["series_bible"]["artifact_id"] == series_bible.id
+    assert consumed_by_type["asset_director_plan"]["artifact_id"] == asset_director.id
     assert consumed_by_type["storyboard"]["artifact_id"] == latest_storyboard.id
     assert db.query(AITextArtifactConsumer).filter_by(
         consumer_type="video_production_run",

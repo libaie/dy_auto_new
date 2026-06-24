@@ -43,8 +43,20 @@ def test_thirty_episode_prompt_contains_series_wide_context_without_full_cast_in
     episodes = payload["episodes"]
 
     assert "do not assign the full series cast to every frame" in prompt
+    assert payload["series"]["title"] == "Long Clinic"
+    assert payload["series"]["genre"] == "medical"
+    assert payload["asset_pool"]["characters"][0]["name"] == "Dr Lin"
+    assert payload["asset_pool"]["scenes"][0]["name"] == "Clinic Hallway"
     assert payload["output_schema"]["covered_episode_numbers"] == list(range(1, 31))
     assert [episode["episode_number"] for episode in episodes] == list(range(1, 31))
+    assert [episode["script_json"]["script"] for episode in episodes] == [
+        f"Episode {index} uses Dr Lin and a one-off guest only when written."
+        for index in range(1, 31)
+    ]
+    assert [episode["storyboard_json"]["frames"][0]["frame_id"] for episode in episodes] == [
+        f"ep{index}-f1" for index in range(1, 31)
+    ]
     assert "ep30-f1" in prompt
+
 
 

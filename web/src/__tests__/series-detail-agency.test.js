@@ -317,6 +317,16 @@ describe('SeriesDetailPage agency team status', () => {
     expect(wrapper.text()).toContain('绑定 3')
     expect(wrapper.text()).toContain('查看文本产物')
 
+    const repairButton = wrapper.findAll('button').find(btn => btn.text().includes('查看文本产物'))
+    expect(repairButton).toBeTruthy()
+    await repairButton.trigger('click')
+    expect(mocks.push).toHaveBeenCalledWith('/series/sid/ai-text-artifacts')
+
+    const statusRegion = wrapper.find('[role="status"]')
+    expect(statusRegion.exists()).toBe(true)
+    expect(statusRegion.text()).toContain('资产导演')
+    expect(statusRegion.text()).not.toContain('查看文本产物')
+
     const html = wrapper.html()
     const statusIndex = html.indexOf('资产导演')
     expect(statusIndex).toBeGreaterThan(-1)
@@ -326,6 +336,54 @@ describe('SeriesDetailPage agency team status', () => {
     expect(statusIndex).toBeLessThan(html.indexOf('>分镜剧本</h3>'))
   })
 
+  it('derives asset director status from real asset metadata without director summary', async () => {
+    mocks.getSeries.mockResolvedValueOnce({
+      data: {
+        ok: true,
+        series: {
+          id: 'sid',
+          title: 'City Healer',
+          logline: 'One sentence story',
+          total_episodes: 1,
+          genre: 'drama',
+          mode: 'step_by_step',
+          target_duration: 60,
+        },
+        episodes: [{
+          id: 'ep1',
+          episode_number: 1,
+          title: 'Pilot',
+          status: 'done',
+          asset_scope: {
+            source: 'episode_outline',
+            characters: [{
+              id: 'char-guest',
+              name: '吴病人',
+              asset_source: 'asset_director',
+              asset_readiness: 'needs_reference',
+              missing_reference_slots: ['avatar_front_url'],
+            }],
+            scenes: [{
+              id: 'scene-room',
+              name: '诊室',
+              asset_source: 'asset_director',
+              asset_readiness: 'ready',
+              missing_reference_slots: [],
+            }],
+          },
+        }],
+      },
+    })
+
+    const wrapper = mount(SeriesDetailPage)
+    await flushPromises()
+
+    await wrapper.find('[data-test="episode-text-toggle-ep1"]').trigger('click')
+
+    expect(wrapper.text()).toContain('资产导演')
+    expect(wrapper.text()).toContain('缺参考')
+    expect(wrapper.text()).not.toContain('尚未运行')
+  })
   it('shows asset director empty state for episodes without director scope', async () => {
     mocks.getSeries.mockResolvedValueOnce({
       data: {

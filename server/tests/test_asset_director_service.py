@@ -817,3 +817,10 @@ def test_episode_asset_scope_payload_exposes_director_metadata(db):
     assert patient["asset_stable_key"] == "patient_wu_ep1"
     assert patient["asset_readiness"] == "needs_reference"
     assert patient["missing_reference_slots"]
+    summary = payload["director_summary"]
+    assert summary["status"] == "needs_reference"
+    assert summary["created_count"] == 2
+    assert summary["reused_count"] == 1
+    assert summary["frame_binding_count"] == 1
+    assert "avatar_front_url" in summary["blockers"]
+    assert summary["repair_route"] == f"/series/{series.id}/ai-text-artifacts"

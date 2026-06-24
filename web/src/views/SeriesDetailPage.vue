@@ -245,8 +245,8 @@
               </button>
             </div>
             <div v-if="expandedEpisodeId === ep.id" class="border-t border-slate-800/70 bg-slate-950/50 px-5 py-4">
-              <div role="status" aria-live="polite" class="mb-3 flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3 text-sm text-slate-300">
-                <div class="flex min-w-0 flex-wrap items-center gap-2">
+              <div class="mb-3 flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3 text-sm text-slate-300">
+                <div role="status" aria-live="polite" class="flex min-w-0 flex-wrap items-center gap-2">
                   <span class="font-medium text-slate-200">资产导演</span>
                   <span>{{ assetReadinessLabel(episodeAssetDirectorSummary(ep).status) || episodeAssetDirectorSummary(ep).status }}</span>
                   <span>新建 {{ episodeAssetDirectorSummary(ep).created_count || 0 }}</span>
@@ -911,7 +911,21 @@ function assetReadinessLabel(readiness) {
 function episodeAssetDirectorSummary(ep) {
   const scope = episodeAssetScope(ep)
   if (scope.director_summary && typeof scope.director_summary === 'object') return scope.director_summary
-  return { status: scope.source === 'asset_director' ? 'ready' : 'not_run', created_count: 0, reused_count: 0, frame_binding_count: 0, blockers: [] }
+  const directorAssets = [...episodeAssetCharacters(ep), ...episodeAssetScenes(ep)]
+    .filter(item => item?.asset_source === 'asset_director')
+  const blockers = [...new Set(directorAssets.flatMap(item => item?.missing_reference_slots || []).filter(Boolean))]
+  const readiness = directorAssets.map(item => item?.asset_readiness)
+  let status = 'not_run'
+  if (directorAssets.length) {
+    if (readiness.includes('reference_failed')) status = 'reference_failed'
+    else if (blockers.length || readiness.includes('needs_reference')) status = 'needs_reference'
+    else if (readiness.includes('reference_generating')) status = 'reference_generating'
+    else if (readiness.includes('needs_repair')) status = 'needs_repair'
+    else if (readiness.includes('stale')) status = 'stale'
+    else status = 'ready'
+  }
+  const created_count = directorAssets.filter(item => item?.asset_created_by_director === true).length
+  return { status, created_count, reused_count: directorAssets.length - created_count, frame_binding_count: 0, blockers }
 }
 
 function assetDirectorRepairRoute() {

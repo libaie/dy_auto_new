@@ -91,6 +91,7 @@ def episode_asset_usage_items(
         item["asset_source"] = meta.get("asset_source")
         item["asset_stable_key"] = meta.get("asset_stable_key")
         item["asset_director_plan_id"] = meta.get("asset_director_plan_id")
+        item["asset_created_by_director"] = meta.get("asset_created_by_director") is True
         item["match_confidence"] = meta.get("match_confidence")
         item["asset_readiness"] = meta.get("asset_readiness")
         item["missing_reference_slots"] = meta.get("missing_reference_slots") or []
@@ -98,6 +99,56 @@ def episode_asset_usage_items(
         item["episode_id"] = meta.get("episode_id")
         result.append(item)
     return result
+
+
+def episode_asset_director_summary(episode: Episode, characters: list[dict], scenes: list[dict]) -> dict:
+    director_assets = [
+        item
+        for item in [*characters, *scenes]
+        if item.get("asset_source") == "asset_director"
+    ]
+    blockers = list(dict.fromkeys(
+        slot
+        for item in director_assets
+        for slot in (item.get("missing_reference_slots") or [])
+        if slot
+    ))
+    readiness = [item.get("asset_readiness") for item in director_assets]
+    if not director_assets:
+        status = "not_run"
+    elif "reference_failed" in readiness:
+        status = "reference_failed"
+    elif blockers or "needs_reference" in readiness:
+        status = "needs_reference"
+    elif "reference_generating" in readiness:
+        status = "reference_generating"
+    elif "needs_repair" in readiness:
+        status = "needs_repair"
+    elif "stale" in readiness:
+        status = "stale"
+    else:
+        status = "ready"
+
+    director_ids = {item.get("id") for item in director_assets if item.get("id")}
+    frames = episode.storyboard_json.get("frames", []) if isinstance(episode.storyboard_json, dict) else []
+    frame_binding_count = sum(
+        1
+        for frame in frames
+        if isinstance(frame, dict)
+        and (
+            frame.get("scene_id") in director_ids
+            or any(character_id in director_ids for character_id in (frame.get("character_ids") or []))
+        )
+    )
+    created_count = sum(1 for item in director_assets if item.get("asset_created_by_director") is True)
+    return {
+        "status": status,
+        "created_count": created_count,
+        "reused_count": len(director_assets) - created_count,
+        "frame_binding_count": frame_binding_count,
+        "blockers": blockers,
+        "repair_route": f"/series/{episode.series_id}/ai-text-artifacts",
+    }
 
 
 def episode_asset_scope_payload(db: Session, episode: Episode) -> dict:
@@ -119,23 +170,26 @@ def episode_asset_scope_payload(db: Session, episode: Episode) -> dict:
     scene_ids = list(dict.fromkeys(str(item) for item in (content.get("scene_ids") or script_scope.get("scene_ids") or []) if item))
     asset_usage = content.get("asset_usage") if isinstance(content.get("asset_usage"), dict) else {}
     generated_assets = content.get("generated_assets") if isinstance(content.get("generated_assets"), dict) else {"characters": [], "scenes": []}
+    characters = episode_asset_usage_items(
+        db,
+        model=Character,
+        ids=character_ids,
+        usage_items=asset_usage.get("characters") if isinstance(asset_usage.get("characters"), list) else [],
+    )
+    scenes = episode_asset_usage_items(
+        db,
+        model=Scene,
+        ids=scene_ids,
+        usage_items=asset_usage.get("scenes") if isinstance(asset_usage.get("scenes"), list) else [],
+    )
     return {
         "character_ids": character_ids,
         "scene_ids": scene_ids,
-        "characters": episode_asset_usage_items(
-            db,
-            model=Character,
-            ids=character_ids,
-            usage_items=asset_usage.get("characters") if isinstance(asset_usage.get("characters"), list) else [],
-        ),
-        "scenes": episode_asset_usage_items(
-            db,
-            model=Scene,
-            ids=scene_ids,
-            usage_items=asset_usage.get("scenes") if isinstance(asset_usage.get("scenes"), list) else [],
-        ),
+        "characters": characters,
+        "scenes": scenes,
         "generated_assets": generated_assets,
         "source": "episode_outline" if artifact else script_scope.get("source", "missing"),
+        "director_summary": episode_asset_director_summary(episode, characters, scenes),
     }
 
 

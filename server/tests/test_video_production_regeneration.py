@@ -13,7 +13,19 @@ from app.db.models import (
     VideoReviewRecord,
 )
 from app.domains.video_production.video_production_service import VideoProductionError, start_asset_regeneration, sync_regenerated_asset
+from app.domains.video_production.production_errors import ProductionRepairableError
 from app.domains.video_production.video_production_run_types import REAL_SHORT_E2E
+
+
+@pytest.fixture(autouse=True)
+def stub_asset_director_ready(monkeypatch):
+    async def fake_director(db_arg, series_id, episode_id):
+        return {"status": "ready", "artifact": None, "readiness": {"status": "ready"}}
+
+    monkeypatch.setattr(
+        "app.domains.video_production.video_production_service.ensure_asset_director_plan_for_episode",
+        fake_director,
+    )
 
 
 def _asset_run(db, asset_type="image", frame_id="frame-001"):
@@ -221,6 +233,28 @@ async def test_linked_image_regeneration_uses_segment_frame_and_preserves_target
     assert new_asset.source_version == segment.version
     assert new_asset.provider_task_id == "new-provider-image-task"
     assert new_asset.pixelle_task_id == "regen-linked-image-task"
+
+
+@pytest.mark.asyncio
+async def test_linked_image_regeneration_blocks_stale_asset_director_before_provider_submit(db, monkeypatch):
+    _run, _segment, asset = _linked_asset_run(db, "image")
+
+    async def stale_director(db_arg, series_id, episode_id):
+        return {"status": "stale", "artifact": None, "readiness": {"status": "stale"}}
+
+    async def fail_submit_image_batch(*args, **kwargs):
+        raise AssertionError("regeneration submitted provider work before asset director gate")
+
+    monkeypatch.setattr(
+        "app.domains.video_production.video_production_service.ensure_asset_director_plan_for_episode",
+        stale_director,
+    )
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_image_batch", fail_submit_image_batch)
+
+    with pytest.raises(ProductionRepairableError) as exc:
+        await start_asset_regeneration(db, asset.id)
+
+    assert exc.value.cause == "ASSET_DIRECTOR_PLAN_STALE"
 
 
 @pytest.mark.asyncio

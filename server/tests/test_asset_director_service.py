@@ -265,6 +265,16 @@ def test_load_inputs_collects_context_artifacts_and_reusable_assets(db):
     assert {asset.meta_json["asset_stable_key"] for asset in inputs.series.scenes} == {"clinic_hallway"}
 
 
+def test_load_inputs_requires_approved_source_artifacts(db):
+    series, _ep1, _ep2, _lin, _hallway = _series_with_episodes(db)
+
+    with pytest.raises(AssetDirectorError) as exc:
+        load_asset_director_inputs(db=db, series_id=series.id)
+
+    assert exc.value.code == "ASSET_DIRECTOR_INPUTS_MISSING"
+    assert "series_bible" in exc.value.details["missing_source_artifacts"]
+
+
 def test_apply_plan_creates_episode_assets_and_binds_frames(db):
     series, ep1, ep2, lin, hallway = _series_with_episodes(db)
     _approved_sources(db, series, ep1, ep2)
@@ -638,7 +648,7 @@ def test_duplicate_storyboard_frame_ids_roll_back_without_partial_assets(db):
     with pytest.raises(AssetDirectorError) as exc:
         apply_asset_director_plan(db, series.id, plan)
 
-    assert exc.value.code == "ASSET_DIRECTOR_DUPLICATE_FRAME"
+    assert exc.value.code == "ASSET_DIRECTOR_INVALID_JSON"
     assert exc.value.details["duplicate_frame_ids"] == ["ep1-f1"]
     assert db.query(Character).filter(Character.name == "Patient Wu").count() == 0
     assert db.query(Scene).filter(Scene.name == "Exam Room One").count() == 0
@@ -830,6 +840,43 @@ async def test_ensure_plan_recomputes_reference_readiness_from_current_assets(db
     assert persisted_patient.meta_json["asset_readiness"] == "needs_reference"
     assert "avatar_front_url" in persisted_patient.meta_json["missing_reference_slots"]
     assert persisted_artifact.content_json["readiness"]["status"] == "needs_reference"
+
+
+@pytest.mark.asyncio
+async def test_ensure_plan_blocks_when_resolved_director_asset_loses_plan_link(db, monkeypatch):
+    series, ep1, ep2, lin, hallway = _series_with_episodes(db)
+    _approved_sources(db, series, ep1, ep2)
+    apply_asset_director_plan(db, series.id, _plan(db, series, ep1, ep2, lin, hallway))
+
+    async def fake_fill_reference_assets(series_arg, db_arg, *, character_ids=None, scene_ids=None):
+        for character in db_arg.query(Character).filter(Character.id.in_(character_ids or [])).all():
+            for slot in character_reference_slot_names():
+                setattr(character, slot, f"https://cdn.test/{character.id}-{slot}.png")
+        for scene in db_arg.query(Scene).filter(Scene.id.in_(scene_ids or [])).all():
+            for slot in scene_reference_slot_names():
+                setattr(scene, slot, f"https://cdn.test/{scene.id}-{slot}.png")
+        return []
+
+    monkeypatch.setattr(
+        "app.domains.ai_video_series.asset_director_service.fill_reference_assets",
+        fake_fill_reference_assets,
+    )
+    await ensure_asset_director_references(db, series.id)
+    patient = _assets_by_stable_key(db, Character, "patient_wu_ep1", series.id)[0]
+    patient.meta_json = {**patient.meta_json, "asset_director_plan_id": "lost-link"}
+    db.commit()
+
+    with pytest.raises(AssetDirectorError) as exc:
+        await ensure_asset_director_plan_for_episode(db, series.id, ep1.id)
+
+    assert exc.value.code == "ASSET_DIRECTOR_REFERENCES_MISSING"
+    artifact = AITextArtifactService(db).latest_approved(
+        target_type="series",
+        target_id=series.id,
+        artifact_type=ASSET_DIRECTOR_ARTIFACT_TYPE,
+    )
+    assert artifact.content_json["readiness"]["status"] == "needs_repair"
+    assert artifact.content_json["readiness"]["missing_assets"][0]["stable_key"] == "patient_wu_ep1"
 
 
 @pytest.mark.asyncio

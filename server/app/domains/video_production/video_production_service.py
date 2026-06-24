@@ -2439,6 +2439,7 @@ async def start_asset_regeneration(db: Session, asset_id: str) -> VideoProductio
     _assert_real_provider_path_run_type(run)
     _assert_regeneration_not_direct_paid_run(run)
     _assert_real_short_provider_budget(db, run)
+    await _enforce_asset_director_for_series_episode_run(db, run)
     if asset.asset_type == "image":
         frame = image_stage_frame_for_asset(db, run, asset.frame_id)
         scene_key = "image_generation"

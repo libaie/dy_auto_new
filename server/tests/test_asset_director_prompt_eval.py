@@ -5,6 +5,36 @@ from app.domains.ai_video_series.asset_director_service import (
     build_asset_director_prompt,
     load_asset_director_inputs,
 )
+from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
+
+
+def _approve_prompt_sources(db, series):
+    service = AITextArtifactService(db)
+    for artifact_type in ("series_bible", "series_story_plan", "season_arc", "continuity_ledger"):
+        artifact = service.create_artifact(
+            series_id=series.id,
+            target_type="series",
+            target_id=series.id,
+            artifact_type=artifact_type,
+            source_type="test",
+            content_json={"artifact_type": artifact_type},
+            commit=False,
+        )
+        service.approve_artifact(artifact.id, commit=False)
+    for episode in series.episodes:
+        for artifact_type in ("episode_outline", "episode_script", "storyboard"):
+            artifact = service.create_artifact(
+                series_id=series.id,
+                episode_id=episode.id,
+                target_type="episode",
+                target_id=episode.id,
+                artifact_type=artifact_type,
+                source_type="test",
+                content_json={"episode_number": episode.episode_number},
+                commit=False,
+            )
+            service.approve_artifact(artifact.id, commit=False)
+    db.commit()
 
 
 def test_thirty_episode_prompt_contains_series_wide_context_without_full_cast_instruction(db):
@@ -37,6 +67,7 @@ def test_thirty_episode_prompt_contains_series_wide_context_without_full_cast_in
             )
         )
     db.commit()
+    _approve_prompt_sources(db, series)
 
     prompt = build_asset_director_prompt(load_asset_director_inputs(db=db, series_id=series.id))
     payload = json.loads(prompt)

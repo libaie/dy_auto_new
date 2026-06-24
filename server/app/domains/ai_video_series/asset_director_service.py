@@ -97,6 +97,7 @@ def load_asset_director_inputs(
 
     artifact_service = AITextArtifactService(db)
     source_artifacts: list[dict[str, Any]] = []
+    missing_artifacts: list[str] = []
     for artifact_type in SERIES_SOURCE_ARTIFACT_TYPES:
         artifact = artifact_service.latest_approved(
             target_type="series",
@@ -105,6 +106,8 @@ def load_asset_director_inputs(
         )
         if artifact:
             source_artifacts.append(_artifact_ref(artifact))
+        else:
+            missing_artifacts.append(artifact_type)
     for episode in episodes:
         for artifact_type in EPISODE_SOURCE_ARTIFACT_TYPES:
             artifact = artifact_service.latest_approved(
@@ -114,6 +117,14 @@ def load_asset_director_inputs(
             )
             if artifact:
                 source_artifacts.append(_artifact_ref(artifact))
+            else:
+                missing_artifacts.append(f"episode:{episode.id}:{artifact_type}")
+    if missing_artifacts:
+        raise AssetDirectorError(
+            "ASSET_DIRECTOR_INPUTS_MISSING",
+            "Asset director inputs are missing approved source artifacts.",
+            {"series_id": series_id, "missing_source_artifacts": missing_artifacts},
+        )
 
     return AssetDirectorInputs(
         series=series,
@@ -408,7 +419,12 @@ async def ensure_asset_director_plan_for_episode(
     _assert_artifact_covers_episode(artifact, episode)
     _assert_artifact_fresh(artifact, inputs)
     key_to_character, key_to_scene = _director_assets_for_artifact(inputs.series, artifact.id)
-    readiness = check_reference_readiness(inputs.series, key_to_character, key_to_scene)
+    missing_director_assets = _missing_resolved_director_assets(artifact, key_to_character, key_to_scene)
+    readiness = (
+        {"status": "needs_repair", "missing_assets": missing_director_assets, "failed_assets": []}
+        if missing_director_assets
+        else check_reference_readiness(inputs.series, key_to_character, key_to_scene)
+    )
     _refresh_asset_readiness_meta(readiness, key_to_character, key_to_scene)
     content = dict(artifact.content_json or {})
     content["readiness"] = readiness
@@ -448,6 +464,15 @@ async def ensure_asset_director_references(db: Session, series_id: str) -> dict[
             {"series_id": series_id},
         )
     key_to_character, key_to_scene = _director_assets_for_artifact(inputs.series, artifact.id)
+    missing_director_assets = _missing_resolved_director_assets(artifact, key_to_character, key_to_scene)
+    if missing_director_assets:
+        readiness = {"status": "needs_repair", "missing_assets": missing_director_assets, "failed_assets": []}
+        content = dict(artifact.content_json)
+        content["readiness"] = readiness
+        artifact.content_json = content
+        db.commit()
+        db.refresh(artifact)
+        return readiness
     await fill_reference_assets(
         inputs.series,
         db,
@@ -477,6 +502,39 @@ def _director_assets_for_artifact(series: Series, artifact_id: str) -> tuple[dic
         if isinstance(asset.meta_json, dict) and (asset.meta_json or {}).get("asset_director_plan_id") == artifact_id
     }
     return key_to_character, key_to_scene
+
+
+def _missing_resolved_director_assets(
+    artifact: AITextArtifact,
+    key_to_character: dict[str, Character],
+    key_to_scene: dict[str, Scene],
+) -> list[dict[str, Any]]:
+    content = artifact.content_json if isinstance(artifact.content_json, dict) else {}
+    resolved_assets = content.get("resolved_assets") if isinstance(content.get("resolved_assets"), dict) else {}
+    missing: list[dict[str, Any]] = []
+    for asset_type, assets, by_key in (
+        ("character", resolved_assets.get("characters") or [], key_to_character),
+        ("scene", resolved_assets.get("scenes") or [], key_to_scene),
+    ):
+        asset_items = assets if isinstance(assets, list) else []
+        for item in asset_items:
+            if not isinstance(item, dict):
+                continue
+            stable_key = str(item.get("asset_stable_key") or "").strip()
+            asset_id = str(item.get("id") or "").strip()
+            asset = by_key.get(stable_key)
+            if stable_key and asset and str(asset.id) == asset_id:
+                continue
+            missing.append({
+                "asset_type": asset_type,
+                "stable_key": stable_key,
+                "asset_id": asset_id,
+                "name": item.get("name"),
+                "missing_reference_slots": [],
+                "missing_reason": "director_asset_unlinked",
+            })
+    return missing
+
 
 def _episode_missing_inputs(episode: Episode) -> dict[str, Any] | None:
     missing: list[str] = []
@@ -789,7 +847,7 @@ def _validate_frame_bindings(episode: Episode, episode_payload: dict[str, Any], 
         frame_ids.add(frame_id)
     if duplicate_frame_ids:
         raise AssetDirectorError(
-            "ASSET_DIRECTOR_DUPLICATE_FRAME",
+            "ASSET_DIRECTOR_INVALID_JSON",
             "Storyboard frames must have unique frame identities.",
             {
                 "episode_id": episode.id,

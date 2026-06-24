@@ -824,3 +824,42 @@ def test_episode_asset_scope_payload_exposes_director_metadata(db):
     assert summary["frame_binding_count"] == 1
     assert "avatar_front_url" in summary["blockers"]
     assert summary["repair_route"] == f"/series/{series.id}/ai-text-artifacts"
+
+
+def test_episode_asset_scope_payload_prefers_asset_director_scope_over_stale_outline(db):
+    series, ep1, ep2, lin, hallway = _series_with_episodes(db)
+    _approved_sources(db, series, ep1, ep2)
+
+    outline = AITextArtifactService(db).latest_approved(
+        target_type="episode",
+        target_id=ep1.id,
+        artifact_type="episode_outline",
+    )
+    outline.content_json = {
+        **outline.content_json,
+        "character_ids": [lin.id],
+        "scene_ids": [hallway.id],
+        "asset_usage": {
+            "characters": [{"id": lin.id, "name": lin.name, "usage": "Stale outline lead."}],
+            "scenes": [{"id": hallway.id, "name": hallway.name, "usage": "Stale outline location."}],
+        },
+    }
+    db.commit()
+
+    apply_asset_director_plan(db, series.id, _plan(db, series, ep1, ep2, lin, hallway))
+
+    from app.domains.ai_video_series.read_models import episode_asset_scope_payload
+
+    payload = episode_asset_scope_payload(db, ep1)
+    character_names = {item["name"] for item in payload["characters"]}
+    scene_names = {item["name"] for item in payload["scenes"]}
+    assert payload["source"] == "asset_director"
+    assert "Patient Wu" in character_names
+    assert "Exam Room One" in scene_names
+    summary = payload["director_summary"]
+    assert summary["status"] == "needs_reference"
+    assert summary["created_count"] == 2
+    assert summary["reused_count"] == 1
+    assert summary["frame_binding_count"] == 1
+    assert "avatar_front_url" in summary["blockers"]
+    assert "reference_wideshot_url" in summary["blockers"]

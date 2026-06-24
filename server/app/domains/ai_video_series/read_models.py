@@ -166,10 +166,18 @@ def episode_asset_scope_payload(db: Session, episode: Episode) -> dict:
     content = artifact.content_json if artifact and isinstance(artifact.content_json, dict) else {}
     script = episode.script_json if isinstance(episode.script_json, dict) else {}
     script_scope = script.get("episode_asset_scope") if isinstance(script.get("episode_asset_scope"), dict) else {}
-    character_ids = list(dict.fromkeys(str(item) for item in (content.get("character_ids") or script_scope.get("character_ids") or []) if item))
-    scene_ids = list(dict.fromkeys(str(item) for item in (content.get("scene_ids") or script_scope.get("scene_ids") or []) if item))
-    asset_usage = content.get("asset_usage") if isinstance(content.get("asset_usage"), dict) else {}
-    generated_assets = content.get("generated_assets") if isinstance(content.get("generated_assets"), dict) else {"characters": [], "scenes": []}
+    use_script_scope = script_scope.get("source") == "asset_director"
+    scope_content = script_scope if use_script_scope else content
+    character_ids = list(dict.fromkeys(str(item) for item in (scope_content.get("character_ids") or []) if item))
+    scene_ids = list(dict.fromkeys(str(item) for item in (scope_content.get("scene_ids") or []) if item))
+    if not use_script_scope:
+        character_ids = character_ids or list(dict.fromkeys(str(item) for item in (script_scope.get("character_ids") or []) if item))
+        scene_ids = scene_ids or list(dict.fromkeys(str(item) for item in (script_scope.get("scene_ids") or []) if item))
+    asset_usage = scope_content.get("asset_usage") if isinstance(scope_content.get("asset_usage"), dict) else {}
+    generated_assets = (script_scope if use_script_scope and isinstance(script_scope.get("generated_assets"), dict) else content).get("generated_assets")
+    if not isinstance(generated_assets, dict):
+        generated_assets = {"characters": [], "scenes": []}
+    source = script_scope.get("source", "missing") if use_script_scope else ("episode_outline" if artifact else script_scope.get("source", "missing"))
     characters = episode_asset_usage_items(
         db,
         model=Character,
@@ -188,7 +196,7 @@ def episode_asset_scope_payload(db: Session, episode: Episode) -> dict:
         "characters": characters,
         "scenes": scenes,
         "generated_assets": generated_assets,
-        "source": "episode_outline" if artifact else script_scope.get("source", "missing"),
+        "source": source,
         "director_summary": episode_asset_director_summary(episode, characters, scenes),
     }
 

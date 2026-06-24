@@ -10,6 +10,7 @@ from app.domains.ai_video_series.asset_director_service import (
     apply_asset_director_plan,
     compute_asset_director_fingerprint,
     ensure_asset_director_plan_for_episode,
+    generate_asset_director_plan,
     load_asset_director_inputs,
 )
 from app.domains.ai_video_series.style_lock import character_reference_slot_names, scene_reference_slot_names
@@ -629,6 +630,13 @@ def test_prompt_does_not_force_full_cast_per_frame(db):
     payload = json.loads(prompt)
     character_item = payload["asset_pool"]["characters"][0]
     scene_item = payload["asset_pool"]["scenes"][0]
+    output_schema = payload["output_schema"]
+    recurring_character = output_schema["recurring_characters"][0]
+    recurring_scene = output_schema["recurring_scenes"][0]
+    episode_assets = output_schema["episode_assets"][0]
+    episode_character = episode_assets["characters"][0]
+    episode_scene = episode_assets["scenes"][0]
+    frame_binding = episode_assets["frame_bindings"][0]
 
     assert "do not assign the full series cast to every frame" in prompt
     assert "stable_key is required" in prompt
@@ -643,6 +651,50 @@ def test_prompt_does_not_force_full_cast_per_frame(db):
     assert "asset_stable_key" not in character_item
     assert "asset_scope" not in character_item
     assert "asset_readiness" not in character_item
+    assert {"stable_key", "name", "asset_scope", "match_confidence", "reuse_character_id"} <= set(
+        recurring_character
+    )
+    assert {"stable_key", "name", "asset_scope", "match_confidence", "reuse_scene_id"} <= set(recurring_scene)
+    assert {"stable_key", "name", "asset_scope", "match_confidence"} <= set(episode_character)
+    assert {"stable_key", "name", "asset_scope", "match_confidence"} <= set(episode_scene)
+    assert "frame_bindings" in episode_assets
+    assert {"frame_id", "scene_stable_key", "character_stable_keys"} <= set(frame_binding)
+
+
+@pytest.mark.asyncio
+async def test_generate_asset_director_plan_uses_validate_json_only_and_rejects_non_object(db, monkeypatch):
+    series, ep1, ep2, _lin, _hallway = _series_with_episodes(db)
+    _approved_sources(db, series, ep1, ep2)
+    inputs = load_asset_director_inputs(db=db, series_id=series.id)
+    runtime_config = {"provider": "test", "model_name": "fake"}
+    captured = {}
+
+    def fake_resolve_runtime_model_config(db_arg, scene_key):
+        assert db_arg is db
+        assert scene_key == "script_generation"
+        return runtime_config
+
+    async def fake_run_structured_ai_video_json(**kwargs):
+        captured.update(kwargs)
+        return []
+
+    monkeypatch.setattr(
+        "app.domains.model_configuration.runtime_model_config.resolve_runtime_model_config",
+        fake_resolve_runtime_model_config,
+    )
+    monkeypatch.setattr(
+        "app.domains.ai_video_series.langchain_runtime.agent_runner.run_structured_ai_video_json",
+        fake_run_structured_ai_video_json,
+    )
+
+    with pytest.raises(AssetDirectorError) as exc:
+        await generate_asset_director_plan(db, inputs)
+
+    assert exc.value.code == "ASSET_DIRECTOR_INVALID_JSON"
+    assert captured["db"] is db
+    assert captured["runtime_config"] is runtime_config
+    assert captured["allowed_tools"] == ["validate_json"]
+    assert "output_schema" in json.loads(captured["user_prompt"])
 
 
 @pytest.mark.asyncio

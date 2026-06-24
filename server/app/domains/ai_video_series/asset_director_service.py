@@ -153,6 +153,9 @@ def compute_asset_director_fingerprint(inputs: AssetDirectorInputs) -> str:
 
 
 def build_asset_director_prompt(inputs: AssetDirectorInputs) -> str:
+    example_episode = inputs.episodes[0]
+    example_frames = _storyboard_frames(example_episode.storyboard_json)
+    example_frame_id = _frame_identity(example_frames[0], 0) if example_frames else "frame-001"
     asset_pool = {
         "characters": [_asset_prompt_item(asset) for asset in inputs.series.characters or []],
         "scenes": [_asset_prompt_item(asset) for asset in inputs.series.scenes or []],
@@ -177,6 +180,69 @@ def build_asset_director_prompt(inputs: AssetDirectorInputs) -> str:
             "recurring_characters": [],
             "recurring_scenes": [],
             "episode_assets": [],
+        },
+        "output_schema": {
+            "series_id": inputs.series.id,
+            "covered_episode_numbers": [episode.episode_number for episode in inputs.episodes],
+            "style_lock_version": inputs.style_lock_version,
+            "input_fingerprint": compute_asset_director_fingerprint(inputs),
+            "source_artifacts": inputs.source_artifacts,
+            "recurring_characters": [
+                {
+                    "stable_key": "series_character_key",
+                    "name": "Recurring Character Name",
+                    "asset_scope": "series_recurring",
+                    "match_confidence": "high",
+                    "reuse_character_id": None,
+                    "aliases": [],
+                    "episode_numbers": [example_episode.episode_number],
+                    "usage": "Why this character recurs.",
+                }
+            ],
+            "recurring_scenes": [
+                {
+                    "stable_key": "recurring_scene_key",
+                    "name": "Recurring Scene Name",
+                    "asset_scope": "location_recurring",
+                    "match_confidence": "high",
+                    "reuse_scene_id": None,
+                    "episode_numbers": [example_episode.episode_number],
+                    "usage": "Why this scene recurs.",
+                }
+            ],
+            "episode_assets": [
+                {
+                    "episode_number": example_episode.episode_number,
+                    "characters": [
+                        {
+                            "stable_key": "episode_character_key",
+                            "name": "Episode Character Name",
+                            "asset_scope": "episode_only",
+                            "match_confidence": "new",
+                            "aliases": [],
+                            "episode_numbers": [example_episode.episode_number],
+                            "usage": "Why this character appears in this episode.",
+                        }
+                    ],
+                    "scenes": [
+                        {
+                            "stable_key": "episode_scene_key",
+                            "name": "Episode Scene Name",
+                            "asset_scope": "episode_only",
+                            "match_confidence": "new",
+                            "episode_numbers": [example_episode.episode_number],
+                            "usage": "Why this scene appears in this episode.",
+                        }
+                    ],
+                    "frame_bindings": [
+                        {
+                            "frame_id": example_frame_id,
+                            "scene_stable_key": "episode_scene_key",
+                            "character_stable_keys": ["series_character_key", "episode_character_key"],
+                        }
+                    ],
+                }
+            ],
         },
         "rules": [
             "stable_key is required for every asset",
@@ -219,7 +285,7 @@ async def generate_asset_director_plan(db: Session, inputs: AssetDirectorInputs)
         user_prompt=build_asset_director_prompt(inputs),
         runtime_config=resolve_runtime_model_config(db, "script_generation"),
         db=db,
-        allowed_tools=["validate_json", "read_series_context"],
+        allowed_tools=["validate_json"],
     )
     if not isinstance(result, dict):
         raise AssetDirectorError(

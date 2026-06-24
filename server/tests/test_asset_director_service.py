@@ -552,6 +552,32 @@ def test_invalid_frame_binding_rolls_back_without_partial_assets(db):
     assert ep1.storyboard_json == storyboard_before
 
 
+def test_partial_frame_bindings_roll_back_without_partial_assets(db):
+    series, ep1, ep2, lin, hallway = _series_with_episodes(db)
+    ep1.storyboard_json = {
+        "frames": [
+            {"frame_id": "ep1-f1", "visual": "Lin and Wu in exam room."},
+            {"frame_id": "ep1-f2", "visual": "Wu waits alone."},
+        ]
+    }
+    db.commit()
+    _approved_sources(db, series, ep1, ep2)
+    script_before = copy.deepcopy(ep1.script_json)
+    storyboard_before = copy.deepcopy(ep1.storyboard_json)
+    plan = _plan(db, series, ep1, ep2, lin, hallway)
+
+    with pytest.raises(AssetDirectorError) as exc:
+        apply_asset_director_plan(db, series.id, plan)
+
+    assert exc.value.code == "ASSET_DIRECTOR_FRAME_NOT_FOUND"
+    assert exc.value.details["missing_frame_ids"] == ["ep1-f2"]
+    assert db.query(Character).filter(Character.name == "Patient Wu").count() == 0
+    assert db.query(Scene).filter(Scene.name == "Exam Room One").count() == 0
+    assert db.query(AITextArtifact).filter(AITextArtifact.artifact_type == ASSET_DIRECTOR_ARTIFACT_TYPE).count() == 0
+    db.refresh(ep1)
+    assert ep1.script_json == script_before
+    assert ep1.storyboard_json == storyboard_before
+
 def test_fingerprint_changes_when_storyboard_changes(db):
     series, ep1, ep2, lin, hallway = _series_with_episodes(db)
     _approved_sources(db, series, ep1, ep2)

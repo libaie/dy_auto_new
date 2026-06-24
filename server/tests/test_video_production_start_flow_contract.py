@@ -154,6 +154,11 @@ def stub_series_story_plan_for_start_flow(monkeypatch):
         "app.domains.video_production.production_run_service.ensure_asset_director_plan_for_episode",
         fake_asset_director,
     )
+    monkeypatch.setattr(
+        "app.domains.video_production.video_production_service.ensure_asset_director_plan_for_episode",
+        fake_asset_director,
+        raising=False,
+    )
 
 
 def _series_episode(db, *, locked=True, storyboard=True):
@@ -339,6 +344,61 @@ def test_legacy_start_images_blocks_on_asset_director_non_ready_return(db, monke
     assert detail["retryable"] is True
     assert detail["affected_ids"] == [episode.id]
 
+@pytest.mark.parametrize(
+    ("director_result", "expected_cause"),
+    [
+        (
+            AssetDirectorError(
+                code="ASSET_DIRECTOR_PLAN_STALE",
+                message="Asset director plan input fingerprint is stale.",
+                details={"status": "stale"},
+            ),
+            "ASSET_DIRECTOR_PLAN_STALE",
+        ),
+        ({"status": "stale", "artifact": None, "readiness": {"status": "stale"}}, "ASSET_DIRECTOR_PLAN_STALE"),
+    ],
+)
+def test_linked_start_images_blocks_on_asset_director_gate(db, monkeypatch, director_result, expected_cause):
+    async def fake_director(db_arg, series_id, episode_id):
+        if isinstance(director_result, AssetDirectorError):
+            raise director_result
+        return director_result
+
+    monkeypatch.setattr(
+        "app.domains.video_production.video_production_service.ensure_asset_director_plan_for_episode",
+        fake_director,
+        raising=False,
+    )
+    series, episode = _series_episode(db)
+    plan = ProductionPlan(series_id=series.id, status="ready", active_version=1, budget_limit=1)
+    db.add(plan)
+    db.flush()
+    production_episode = ProductionEpisode(plan_id=plan.id, episode_id=episode.id, order_index=1, status="ready")
+    db.add(production_episode)
+    db.flush()
+    run = VideoProductionRun(
+        series_id=series.id,
+        episode_id=episode.id,
+        production_plan_id=plan.id,
+        production_episode_id=production_episode.id,
+        production_link_status="linked",
+        status="storyboard_ready",
+        current_stage="storyboard_ready",
+        storyboard_json=episode.storyboard_json,
+    )
+    db.add(run)
+    db.commit()
+    client = TestClient(app)
+
+    resp = client.post(f"/api/video-production/runs/{run.id}/start-images")
+
+    assert resp.status_code == 409
+    detail = resp.json()["detail"]
+    assert detail["error_code"] == "EPISODE_ASSET_SCOPE_MISSING"
+    assert detail["cause"] == expected_cause
+    assert detail["repair_route"] == f"/series/{series.id}/ai-text-artifacts"
+    assert detail["retryable"] is True
+    assert detail["affected_ids"] == [episode.id]
 
 def test_start_flow_auto_generates_missing_storyboard_before_creating_run(db, monkeypatch):
     series, episode = _series_episode(db, storyboard=False)

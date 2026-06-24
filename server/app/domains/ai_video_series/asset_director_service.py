@@ -768,6 +768,7 @@ def _validate_frame_bindings(episode: Episode, episode_payload: dict[str, Any], 
         scene_keys = all_keys
 
     frame_ids = {_frame_identity(frame, index) for index, frame in enumerate(_storyboard_frames(episode.storyboard_json))}
+    bound_frame_ids: set[str] = set()
     for binding in _optional_json_list(episode_payload, "frame_bindings"):
         if not isinstance(binding, dict):
             raise AssetDirectorError("ASSET_DIRECTOR_INVALID_JSON", "Frame binding must be an object.")
@@ -778,6 +779,7 @@ def _validate_frame_bindings(episode: Episode, episode_payload: dict[str, Any], 
                 "Asset director frame binding references a missing frame.",
                 {"episode_id": episode.id, "episode_number": episode.episode_number, "frame_id": frame_id},
             )
+        bound_frame_ids.add(frame_id)
         scene_key = str(binding.get("scene_stable_key") or "").strip()
         if scene_key and scene_key not in scene_keys:
             raise AssetDirectorError(
@@ -792,6 +794,17 @@ def _validate_frame_bindings(episode: Episode, episode_payload: dict[str, Any], 
                     "Asset director frame binding references an unknown character stable key.",
                     {"episode_id": episode.id, "frame_id": frame_id, "stable_key": stable_key},
                 )
+    missing_frame_ids = sorted(frame_ids - bound_frame_ids)
+    if missing_frame_ids:
+        raise AssetDirectorError(
+            "ASSET_DIRECTOR_FRAME_NOT_FOUND",
+            "Asset director frame bindings must cover every storyboard frame.",
+            {
+                "episode_id": episode.id,
+                "episode_number": episode.episode_number,
+                "missing_frame_ids": missing_frame_ids,
+            },
+        )
 
 
 def _resolve_character(

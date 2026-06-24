@@ -134,7 +134,7 @@ def _raise_asset_director_repairable(series_id: str, episode_id: str, error: Ass
 
 
 async def _enforce_asset_director_for_series_episode_run(db: Session, run: VideoProductionRun) -> None:
-    if _is_linked_run(run) or not run.series_id or not run.episode_id or not asset_director_required_enabled():
+    if not run.series_id or not run.episode_id or not asset_director_required_enabled():
         return
     try:
         result = await ensure_asset_director_plan_for_episode(db, run.series_id, run.episode_id)
@@ -143,10 +143,11 @@ async def _enforce_asset_director_for_series_episode_run(db: Session, run: Video
             raise _asset_director_error_for_status(run.series_id, run.episode_id, status)
     except AssetDirectorError as error:
         _raise_asset_director_repairable(run.series_id, run.episode_id, error)
-    episode = db.query(Episode).filter(Episode.id == run.episode_id, Episode.series_id == run.series_id).first()
-    if episode and isinstance(episode.storyboard_json, dict):
-        run.storyboard_json = episode.storyboard_json
-        db.flush()
+    if not _is_linked_run(run):
+        episode = db.query(Episode).filter(Episode.id == run.episode_id, Episode.series_id == run.series_id).first()
+        if episode and isinstance(episode.storyboard_json, dict):
+            run.storyboard_json = episode.storyboard_json
+            db.flush()
 
 
 class VideoProductionError(ValueError):

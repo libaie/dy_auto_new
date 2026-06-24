@@ -230,6 +230,113 @@ describe('SeriesDetailPage agency team status', () => {
     expect(wrapper.text()).toContain('新增')
   })
 
+  it('shows asset director status and scoped asset badges', async () => {
+    mocks.getSeries.mockResolvedValueOnce({
+      data: {
+        ok: true,
+        series: {
+          id: 'sid',
+          title: 'City Healer',
+          logline: 'One sentence story',
+          total_episodes: 1,
+          genre: 'drama',
+          mode: 'step_by_step',
+          target_duration: 60,
+        },
+        episodes: [{
+          id: 'ep1',
+          episode_number: 1,
+          title: 'Pilot',
+          status: 'done',
+          asset_scope: {
+            characters: [
+              {
+                id: 'char-recurring',
+                name: '林医生',
+                source: 'director_binding',
+                asset_scope: 'series_recurring',
+                asset_readiness: 'ready',
+              },
+              {
+                id: 'char-guest',
+                name: '吴病人',
+                source: 'director_binding',
+                asset_scope: 'episode_only',
+                asset_readiness: 'needs_reference',
+                missing_reference_slots: ['avatar_front_url'],
+              },
+            ],
+            scenes: [
+              {
+                id: 'scene-location',
+                name: '医院走廊',
+                source: 'director_binding',
+                asset_scope: 'location_recurring',
+                asset_readiness: 'ready',
+              },
+            ],
+            director_summary: {
+              status: 'needs_reference',
+              created_count: 2,
+              reused_count: 1,
+              frame_binding_count: 3,
+              blockers: ['avatar_front_url'],
+              repair_route: '/series/sid/ai-text-artifacts',
+            },
+          },
+        }],
+      },
+    })
+
+    const wrapper = mount(SeriesDetailPage)
+    await flushPromises()
+
+    await wrapper.find('[data-test="episode-text-toggle-ep1"]').trigger('click')
+
+    expect(wrapper.text()).toContain('资产导演')
+    expect(wrapper.text()).toContain('单集')
+    expect(wrapper.text()).toContain('常驻')
+    expect(wrapper.text()).toContain('常驻地点')
+    expect(wrapper.text()).toContain('缺参考')
+    expect(wrapper.text()).toContain('新建 2')
+    expect(wrapper.text()).toContain('复用 1')
+    expect(wrapper.text()).toContain('绑定 3')
+    expect(wrapper.text()).toContain('查看文本产物')
+  })
+
+  it('shows asset director empty state for episodes without director scope', async () => {
+    mocks.getSeries.mockResolvedValueOnce({
+      data: {
+        ok: true,
+        series: {
+          id: 'sid',
+          title: 'City Healer',
+          logline: 'One sentence story',
+          total_episodes: 1,
+          genre: 'drama',
+          mode: 'step_by_step',
+          target_duration: 60,
+        },
+        episodes: [{
+          id: 'ep1',
+          episode_number: 1,
+          title: 'Pilot',
+          status: 'done',
+          asset_scope: {},
+        }],
+      },
+    })
+
+    const wrapper = mount(SeriesDetailPage)
+    await flushPromises()
+
+    await wrapper.find('[data-test="episode-text-toggle-ep1"]').trigger('click')
+
+    expect(wrapper.text()).toContain('资产导演')
+    expect(wrapper.text()).toContain('尚未运行')
+    expect(wrapper.text()).toContain('查看文本产物')
+  })
+
   it('does not label deduped generated asset specs as newly created', async () => {
     mocks.getSeries.mockResolvedValueOnce({
       data: {

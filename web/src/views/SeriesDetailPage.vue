@@ -249,6 +249,23 @@
                 <div class="mb-2 text-xs font-medium text-cyan-300">剧集大纲</div>
                 <pre class="max-h-44 overflow-auto whitespace-pre-wrap text-xs leading-5 text-slate-300">{{ episodeOutlineText(ep) }}</pre>
               </div>
+              <div role="status" aria-live="polite" class="mb-3 flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3 text-sm text-slate-300">
+                <div class="flex min-w-0 flex-wrap items-center gap-2">
+                  <span class="font-medium text-slate-200">资产导演</span>
+                  <span>{{ assetReadinessLabel(episodeAssetDirectorSummary(ep).status) || episodeAssetDirectorSummary(ep).status }}</span>
+                  <span>新建 {{ episodeAssetDirectorSummary(ep).created_count || 0 }}</span>
+                  <span>复用 {{ episodeAssetDirectorSummary(ep).reused_count || 0 }}</span>
+                  <span>绑定 {{ episodeAssetDirectorSummary(ep).frame_binding_count || 0 }}</span>
+                </div>
+                <button
+                  v-if="episodeAssetDirectorSummary(ep).status !== 'ready'"
+                  type="button"
+                  class="min-h-9 shrink-0 rounded border border-slate-700 px-3 py-1.5 text-xs text-slate-200 hover:bg-slate-800"
+                  @click="router.push(assetDirectorRepairRoute())"
+                >
+                  查看文本产物
+                </button>
+              </div>
               <div class="mb-4 grid gap-3 md:grid-cols-2">
                 <section class="rounded border border-slate-800 bg-slate-950/70 p-3">
                   <h3 class="text-xs font-medium text-slate-200">本集角色</h3>
@@ -260,6 +277,8 @@
                     >
                       {{ character.name || character.id }}
                       <span v-if="character.source === 'generated'" class="ml-1 text-emerald-300">新增</span>
+                      <span v-if="assetScopeLabel(character.asset_scope)" class="ml-1 text-cyan-300">{{ assetScopeLabel(character.asset_scope) }}</span>
+                      <span v-if="assetReadinessLabel(character.asset_readiness) && character.asset_readiness !== 'ready'" class="ml-1 text-amber-300">{{ assetReadinessLabel(character.asset_readiness) }}</span>
                     </span>
                   </div>
                   <p v-else class="mt-2 text-xs text-amber-300">缺少本集角色</p>
@@ -274,6 +293,8 @@
                     >
                       {{ scene.name || scene.id }}
                       <span v-if="scene.source === 'generated'" class="ml-1 text-emerald-300">新增</span>
+                      <span v-if="assetScopeLabel(scene.asset_scope)" class="ml-1 text-cyan-300">{{ assetScopeLabel(scene.asset_scope) }}</span>
+                      <span v-if="assetReadinessLabel(scene.asset_readiness) && scene.asset_readiness !== 'ready'" class="ml-1 text-amber-300">{{ assetReadinessLabel(scene.asset_readiness) }}</span>
                     </span>
                   </div>
                   <p v-else class="mt-2 text-xs text-amber-300">缺少本集场景</p>
@@ -864,6 +885,37 @@ function episodeOutlineText(ep) {
 // 出参：返回 episodeAssetScope 对应业务流程的处理结果。
 function episodeAssetScope(ep) {
   return ep?.asset_scope && typeof ep.asset_scope === 'object' ? ep.asset_scope : {}
+}
+
+function assetScopeLabel(scope) {
+  return {
+    series_recurring: '常驻',
+    episode_only: '单集',
+    guest: '客串',
+    location_recurring: '常驻地点',
+  }[scope] || ''
+}
+
+function assetReadinessLabel(readiness) {
+  return {
+    not_run: '尚未运行',
+    ready: '就绪',
+    needs_reference: '缺参考',
+    reference_generating: '生成中',
+    reference_failed: '参考失败',
+    needs_repair: '需修复',
+    stale: '已过期',
+  }[readiness] || ''
+}
+
+function episodeAssetDirectorSummary(ep) {
+  const scope = episodeAssetScope(ep)
+  if (scope.director_summary && typeof scope.director_summary === 'object') return scope.director_summary
+  return { status: scope.source === 'asset_director' ? 'ready' : 'not_run', created_count: 0, reused_count: 0, frame_binding_count: 0, blockers: [] }
+}
+
+function assetDirectorRepairRoute() {
+  return `/series/${route.params.id}/ai-text-artifacts`
 }
 // 前端业务函数：协调 episodeAssetCharacters 对应的页面流程、接口调用或状态转换。
 // 入参：ep 为该业务流程需要的上下文、标识或载荷。

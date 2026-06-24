@@ -162,9 +162,20 @@ def _segment_for_production_episode(db, production_episode, *, scene_key, segmen
     return segment
 
 
-def _route_provider_agent_to_direct_helper(monkeypatch):
+def _route_provider_agent_to_direct_helper(monkeypatch, *, stub_asset_director_gate=True):
     from app.domains.ai_video_series.langchain_runtime import provider_tools
     from app.domains.video_production import production_worker_service
+    from app.domains.video_production import video_production_service
+
+    if stub_asset_director_gate:
+        async def allow_asset_director_gate(db, run):
+            return None
+
+        monkeypatch.setattr(
+            video_production_service,
+            "_enforce_asset_director_for_series_episode_run",
+            allow_asset_director_gate,
+        )
 
     calls = []
 
@@ -968,6 +979,60 @@ def test_real_worker_step_blocks_image_job_without_reference_urls_before_provide
     job = db.query(ProductionJob).filter_by(plan_id=run.production_plan_id).one()
     assert job.status == "failed"
 
+
+
+def test_real_worker_step_blocks_stale_asset_director_plan_before_provider_submit(db, monkeypatch):
+    from app.domains.video_production.production_worker_service import run_real_worker_step
+
+    run, _segment = _linked_run_with_image_job(db)
+
+    def fake_config(db, scene_key):
+        return {
+            "provider": "pixelle",
+            "model": scene_key,
+            "config": {
+                "real_paid_allowed": True,
+                "supports_external_task_id": True,
+                "supports_task_query": True,
+                "returns_asset_url": True,
+                "returns_usage": True,
+                "estimated_cost": 0.01,
+                "max_concurrent_tasks": 1,
+            },
+        }
+
+    async def stale_asset_director_plan(db, checked_run):
+        assert checked_run.id == run.id
+        raise ProductionRepairableError(
+            code=ProductionErrorCode.EPISODE_ASSET_SCOPE_MISSING,
+            message="Asset director plan input fingerprint is stale.",
+            cause="ASSET_DIRECTOR_PLAN_STALE",
+            repair_action="Regenerate the asset director plan from the latest scripts, storyboards, and style lock, then retry production.",
+            repair_route=f"/series/{run.series_id}/ai-text-artifacts",
+            retryable=True,
+            affected_ids=[run.episode_id],
+        )
+
+    async def fail_submit_image_batch(*args, **kwargs):
+        raise AssertionError("worker submitted a paid image task with a stale asset director plan")
+
+    monkeypatch.setenv("DY_AUTO_PROVIDER_SUBMIT_WORKER_COUNT", "1")
+    monkeypatch.setattr("app.domains.video_production.production_worker_service.resolve_runtime_model_config", fake_config)
+    monkeypatch.setattr("app.domains.video_production.video_production_service._enforce_asset_director_for_series_episode_run", stale_asset_director_plan)
+    monkeypatch.setattr("app.domains.video_production.video_production_service.submit_image_batch", fail_submit_image_batch)
+    agent_calls = _route_provider_agent_to_direct_helper(monkeypatch, stub_asset_director_gate=False)
+
+    result = run_real_worker_step(db, run.id, lease_id="worker-a", batch_size=1)
+
+    assert result["processed"] == 1
+    assert [call[2] for call in agent_calls] == ["image_generation"]
+    item = result["items"][0]
+    assert item["ok"] is False
+    assert item["error_code"] == ProductionErrorCode.EPISODE_ASSET_SCOPE_MISSING.value
+    assert item["repair"]["cause"] == "ASSET_DIRECTOR_PLAN_STALE"
+    assert item["repair"]["affected_ids"] == [run.episode_id]
+    job = db.query(ProductionJob).filter_by(plan_id=run.production_plan_id).one()
+    assert job.status == "retry_wait"
 
 def test_real_worker_step_persists_registered_provider_asset_before_audit(db, monkeypatch):
     from app.domains.video_production.production_worker_service import run_real_worker_step

@@ -1146,6 +1146,9 @@ class PixelleStageClientAdapter:
         model_config = payload["model_config"]
         provider_template = _provider_stage_template(payload)
         if self.job.stage == "image_generation":
+            enforce_asset_director = getattr(video_service, "_enforce_asset_director_for_series_episode_run", None)
+            if enforce_asset_director:
+                await enforce_asset_director(self.db, self.run)
             # worker 执行真实 provider 阶段时只调用封装服务，保留预算、审计和状态回写边界。
             response = await video_service.submit_image_batch(
                 db=self.db,

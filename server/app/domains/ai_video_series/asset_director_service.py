@@ -767,7 +767,23 @@ def _validate_frame_bindings(episode: Episode, episode_payload: dict[str, Any], 
         character_keys = all_keys
         scene_keys = all_keys
 
-    frame_ids = {_frame_identity(frame, index) for index, frame in enumerate(_storyboard_frames(episode.storyboard_json))}
+    frame_ids: set[str] = set()
+    duplicate_frame_ids: set[str] = set()
+    for index, frame in enumerate(_storyboard_frames(episode.storyboard_json)):
+        frame_id = _frame_identity(frame, index)
+        if frame_id in frame_ids:
+            duplicate_frame_ids.add(frame_id)
+        frame_ids.add(frame_id)
+    if duplicate_frame_ids:
+        raise AssetDirectorError(
+            "ASSET_DIRECTOR_DUPLICATE_FRAME",
+            "Storyboard frames must have unique frame identities.",
+            {
+                "episode_id": episode.id,
+                "episode_number": episode.episode_number,
+                "duplicate_frame_ids": sorted(duplicate_frame_ids),
+            },
+        )
     bound_frame_ids: set[str] = set()
     for binding in _optional_json_list(episode_payload, "frame_bindings"):
         if not isinstance(binding, dict):

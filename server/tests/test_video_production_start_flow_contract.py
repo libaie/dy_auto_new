@@ -204,9 +204,11 @@ def _series_episode(db, *, locked=True, storyboard=True):
 
 def test_start_flow_requires_asset_director_before_run_creation(db, monkeypatch):
     calls = []
+    run_counts_at_call = []
 
     async def fake_director(db_arg, series_id, episode_id):
         calls.append((series_id, episode_id))
+        run_counts_at_call.append(db_arg.query(VideoProductionRun).count())
         return {"status": "ready", "artifact": None, "readiness": {"status": "ready"}}
 
     monkeypatch.setattr(
@@ -225,6 +227,7 @@ def test_start_flow_requires_asset_director_before_run_creation(db, monkeypatch)
 
     assert resp.status_code == 200
     assert calls == [(series.id, episode.id)]
+    assert run_counts_at_call == [0]
 
 
 @pytest.mark.parametrize(

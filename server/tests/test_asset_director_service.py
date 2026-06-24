@@ -328,6 +328,47 @@ def test_apply_plan_rebuilds_frame_reference_urls_from_director_assets(db):
     assert frame["reference_instructions"]
 
 
+def test_apply_plan_preserves_empty_character_frame_binding(db):
+    series, ep1, ep2, lin, hallway = _series_with_episodes(db)
+    ep1.storyboard_json = {
+        "frames": [
+            {
+                "frame_id": "ep1-empty",
+                "visual": "The exam room is briefly empty.",
+                "character_ids": [lin.id],
+            },
+            {
+                "frame_id": "ep1-f1",
+                "visual": "Lin and Wu in exam room.",
+            },
+        ]
+    }
+    db.commit()
+    _approved_sources(db, series, ep1, ep2)
+    plan = _plan(db, series, ep1, ep2, lin, hallway)
+    plan["episode_assets"][0]["frame_bindings"] = [
+        {
+            "frame_id": "ep1-empty",
+            "scene_stable_key": "ep1_exam_room",
+            "character_stable_keys": [],
+        },
+        {
+            "frame_id": "ep1-f1",
+            "scene_stable_key": "ep1_exam_room",
+            "character_stable_keys": ["lead_doctor", "patient_wu_ep1"],
+        },
+    ]
+
+    apply_asset_director_plan(db, series.id, plan)
+
+    patient = db.query(Character).filter(Character.name == "Patient Wu").one()
+    db.refresh(ep1)
+    frames = {frame["frame_id"]: frame for frame in ep1.storyboard_json["frames"]}
+    assert frames["ep1-empty"]["character_ids"] == []
+    assert frames["ep1-f1"]["character_ids"] == [lin.id, patient.id]
+
+
+
 def test_plan_rerun_is_idempotent_by_stable_key(db):
     series, ep1, ep2, lin, hallway = _series_with_episodes(db)
     _approved_sources(db, series, ep1, ep2)

@@ -548,7 +548,8 @@ def _real_short_storyboard_needs_reference_rebuild(storyboard: dict) -> bool:
     for frame in frames:
         if not isinstance(frame, dict):
             return True
-        if not frame.get("reference_urls") or not frame.get("scene_id") or not frame.get("character_ids"):
+        missing_character_binding = "character_ids" not in frame or frame.get("character_ids") is None
+        if not frame.get("reference_urls") or not frame.get("scene_id") or missing_character_binding:
             return True
     return False
 
@@ -586,7 +587,10 @@ def _style_locked_reference_payload(series: Series, frame_index: int, frame: dic
     scenes = style_lock.get("scenes") if isinstance(style_lock.get("scenes"), list) else []
     visual_style = style_lock.get("visual_style") if isinstance(style_lock.get("visual_style"), dict) else {}
     style_refs = _dedupe_refs(visual_style.get("reference_urls") or [], 3)
-    character_ids = frame.get("character_ids") or [item.get("id") for item in characters if item.get("id")][:1]
+    if "character_ids" in frame and frame.get("character_ids") is not None:
+        character_ids = frame.get("character_ids") or []
+    else:
+        character_ids = [item.get("id") for item in characters if item.get("id")][:1]
     scene = scenes[frame_index % len(scenes)] if scenes else {}
     scene_id = frame.get("scene_id") or scene.get("id")
     character_reference_urls = []
@@ -994,6 +998,7 @@ def _apply_episode_asset_scope_to_storyboard(storyboard: dict, scope: dict) -> d
     scene_ids = [str(item) for item in scope.get("scene_ids") or [] if item]
     character_ids = list(dict.fromkeys(str(item) for item in scope.get("character_ids") or [] if item))
     scene_map = scope.get("scene_by_scene_number") if isinstance(scope.get("scene_by_scene_number"), dict) else {}
+    asset_director_scope = scope.get("source") == "asset_director"
     enriched_frames = []
     for frame in frames:
         if not isinstance(frame, dict):
@@ -1008,7 +1013,8 @@ def _apply_episode_asset_scope_to_storyboard(storyboard: dict, scope: dict) -> d
             enriched["scene_id"] = scene_ids[0]
         elif enriched.get("scene_id") and str(enriched["scene_id"]) not in scene_ids:
             enriched.pop("scene_id", None)
-        if not enriched.get("character_ids"):
+        has_frame_character_ids = "character_ids" in enriched and enriched.get("character_ids") is not None
+        if not has_frame_character_ids:
             enriched["character_ids"] = character_ids
         else:
             scoped_frame_character_ids = [
@@ -1016,12 +1022,12 @@ def _apply_episode_asset_scope_to_storyboard(storyboard: dict, scope: dict) -> d
                 for item in enriched.get("character_ids") or []
                 if str(item) in character_ids
             ]
-            enriched["character_ids"] = scoped_frame_character_ids or character_ids
+            enriched["character_ids"] = scoped_frame_character_ids if asset_director_scope else scoped_frame_character_ids or character_ids
         enriched_frames.append(enriched)
     return {**storyboard, "frames": enriched_frames}
 
 
-def _storyboard_has_frame_asset_scope(storyboard: dict) -> bool:
+def _storyboard_has_frame_asset_scope(storyboard: dict, *, allow_empty_character_ids: bool = False) -> bool:
     """业务函数：处理 _storyboard_has_frame_asset_scope 对应的业务流程、校验或数据转换。
 
     入参：storyboard 为该业务流程需要的上下文、标识或载荷。
@@ -1029,7 +1035,12 @@ def _storyboard_has_frame_asset_scope(storyboard: dict) -> bool:
     """
     frames = storyboard.get("frames") if isinstance(storyboard.get("frames"), list) else []
     return bool(frames) and all(
-        isinstance(frame, dict) and frame.get("scene_id") and frame.get("character_ids")
+        isinstance(frame, dict)
+        and frame.get("scene_id")
+        and (
+            frame.get("character_ids")
+            or (allow_empty_character_ids and isinstance(frame.get("character_ids"), list))
+        )
         for frame in frames
     )
 
@@ -1040,7 +1051,10 @@ def _ensure_episode_asset_scope_ready(series: Series, episode: Episode, storyboa
     入参：series、episode、storyboard、scope 为该业务流程需要的上下文、标识或载荷。
     出参：返回该业务流程的处理结果；无显式返回值时返回 None。
     """
-    if _scope_has_assets(scope) and _storyboard_has_frame_asset_scope(storyboard):
+    if _scope_has_assets(scope) and _storyboard_has_frame_asset_scope(
+        storyboard,
+        allow_empty_character_ids=(scope or {}).get("source") == "asset_director",
+    ):
         return
     _raise_episode_asset_scope_missing(series, episode)
 

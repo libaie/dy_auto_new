@@ -1134,9 +1134,8 @@ def _apply_episode_bindings(
         frame.update(_frame_reference_payload(scene, characters))
         if scene is None:
             frame.pop("scene_name", None)
-        if characters:
-            frame["character_ids"] = dedupe_asset_ids([character.id for character in characters])
-            used_characters.extend(characters)
+        frame["character_ids"] = dedupe_asset_ids([character.id for character in characters])
+        used_characters.extend(characters)
 
     character_ids = dedupe_asset_ids([character.id for character in used_characters])
     scene_ids = dedupe_asset_ids([scene.id for scene in used_scenes])

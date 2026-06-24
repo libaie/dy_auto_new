@@ -933,6 +933,61 @@ def test_start_flow_applies_episode_asset_scope_to_storyboard_frames(db):
     assert production_shot.character_ids == [character.id]
 
 
+def test_start_flow_preserves_asset_director_empty_frame_character_ids(db):
+    series, episode = _series_episode(db)
+    character = Character(name="Director Lead", role_type="protagonist", gender="female")
+    scene = Scene(name="Director Room", scene_type="indoor")
+    series.characters.append(character)
+    series.scenes.append(scene)
+    db.flush()
+    episode.script_json = {
+        "episode_asset_scope": {
+            "source": "asset_director",
+            "character_ids": [character.id],
+            "scene_ids": [scene.id],
+        }
+    }
+    episode.storyboard_json = {
+        "frames": [
+            {
+                "frame_id": "shot-empty",
+                "scene_id": scene.id,
+                "character_ids": [],
+                "duration": 1,
+                "image_prompt": "An empty room.",
+                "video_prompt": "Hold on the empty room.",
+            },
+            {
+                "frame_id": "shot-lead",
+                "scene_id": scene.id,
+                "character_ids": [character.id],
+                "duration": 1,
+                "image_prompt": "The lead enters.",
+                "video_prompt": "The lead enters.",
+            },
+        ]
+    }
+    db.commit()
+    client = TestClient(app)
+
+    resp = client.post("/api/video-production/runs/start", json={
+        "series_id": series.id,
+        "episode_id": episode.id,
+        "target_duration_seconds": 2,
+        "autostart_images": False,
+    })
+
+    assert resp.status_code == 200
+    db.refresh(episode)
+    frames = {frame["frame_id"]: frame for frame in episode.storyboard_json["frames"]}
+    assert frames["shot-empty"]["character_ids"] == []
+    assert frames["shot-lead"]["character_ids"] == [character.id]
+    shots = {shot.shot_id: shot for shot in db.query(ProductionShot).all()}
+    assert shots["shot-empty"].character_ids == []
+    assert shots["shot-lead"].character_ids == [character.id]
+
+
+
 def test_start_flow_replaces_stale_storyboard_frame_asset_ids_with_episode_scope(db):
     from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
 

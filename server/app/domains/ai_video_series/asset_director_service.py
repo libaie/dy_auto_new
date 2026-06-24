@@ -202,10 +202,10 @@ def _asset_prompt_item(asset: Character | Scene) -> dict[str, Any]:
     return {
         "id": asset.id,
         "name": asset.name,
-        "asset_stable_key": meta.get("asset_stable_key"),
-        "asset_scope": meta.get("asset_scope"),
+        "stable_key": meta.get("asset_stable_key"),
+        "scope": meta.get("asset_scope"),
         "aliases": meta.get("aliases") or [],
-        "asset_readiness": meta.get("asset_readiness"),
+        "readiness": meta.get("asset_readiness"),
         "missing_reference_slots": meta.get("missing_reference_slots") or [],
     }
 

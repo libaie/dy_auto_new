@@ -1,4 +1,5 @@
 import copy
+import json
 
 import pytest
 
@@ -625,11 +626,23 @@ def test_prompt_does_not_force_full_cast_per_frame(db):
     )
 
     prompt = build_asset_director_prompt(load_asset_director_inputs(db=db, series_id=series.id))
+    payload = json.loads(prompt)
+    character_item = payload["asset_pool"]["characters"][0]
+    scene_item = payload["asset_pool"]["scenes"][0]
 
     assert "do not assign the full series cast to every frame" in prompt
     assert "stable_key is required" in prompt
     assert ep1.id in prompt
     assert ep2.id in prompt
+    assert character_item["stable_key"] == "lead_doctor"
+    assert character_item["scope"] == "series_recurring"
+    assert "readiness" in character_item
+    assert scene_item["stable_key"] == "clinic_hallway"
+    assert scene_item["scope"] == "location_recurring"
+    assert "readiness" in scene_item
+    assert "asset_stable_key" not in character_item
+    assert "asset_scope" not in character_item
+    assert "asset_readiness" not in character_item
 
 
 @pytest.mark.asyncio

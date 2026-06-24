@@ -905,6 +905,37 @@ def _raise_asset_director_error(series_id: str, episode_id: str, error: AssetDir
     )
 
 
+def _asset_director_result_status(result: object) -> str | None:
+    if isinstance(result, dict):
+        readiness = result.get("readiness")
+        if isinstance(readiness, dict) and readiness.get("status"):
+            return str(readiness["status"])
+        status = result.get("status")
+        return str(status) if status else None
+    content = getattr(result, "content_json", None)
+    readiness = content.get("readiness") if isinstance(content, dict) else None
+    if isinstance(readiness, dict) and readiness.get("status"):
+        return str(readiness["status"])
+    return None
+
+
+def _raise_if_asset_director_not_ready(series_id: str, episode_id: str, result: object) -> None:
+    status = _asset_director_result_status(result)
+    if status == "ready":
+        return
+    if status == "reference_failed":
+        raise AssetDirectorError(
+            code="ASSET_DIRECTOR_REFERENCES_FAILED",
+            message="Asset director reference generation failed.",
+            details={"series_id": series_id, "episode_id": episode_id, "status": status},
+        )
+    raise AssetDirectorError(
+        code="ASSET_DIRECTOR_REFERENCES_MISSING",
+        message="Asset director references are not ready.",
+        details={"series_id": series_id, "episode_id": episode_id, "status": status},
+    )
+
+
 def _validate_episode_asset_scope_ids(db: Session, series: Series, episode: Episode, scope: dict) -> None:
     """业务函数：处理 _validate_episode_asset_scope_ids 对应的业务流程、校验或数据转换。
 
@@ -1582,7 +1613,8 @@ async def start_episode_production(
                 db.flush()
     if prepare_text_artifacts and asset_director_required_enabled():
         try:
-            await ensure_asset_director_plan_for_episode(db, series_id, episode_id)
+            director_result = await ensure_asset_director_plan_for_episode(db, series_id, episode_id)
+            _raise_if_asset_director_not_ready(series_id, episode_id, director_result)
             db.refresh(series)
             db.refresh(episode)
             storyboard = episode.storyboard_json if isinstance(episode.storyboard_json, dict) else storyboard

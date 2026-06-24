@@ -260,9 +260,54 @@ def test_start_flow_blocks_on_asset_director_error(db, monkeypatch, code):
     assert resp.status_code == 409
     detail = resp.json()["detail"]
     assert detail["error_code"] == "EPISODE_ASSET_SCOPE_MISSING"
+    assert detail["message"] == f"{code} message"
     assert detail["cause"] == code
+    assert detail["repair_action"] == {
+        "ASSET_DIRECTOR_INPUTS_MISSING": "Open AI text artifacts, generate the missing scripts/storyboards or asset director plan, then retry production.",
+        "ASSET_DIRECTOR_PLAN_STALE": "Regenerate the asset director plan from the latest scripts, storyboards, and style lock, then retry production.",
+        "ASSET_DIRECTOR_REFERENCES_MISSING": "Generate missing character and scene reference images, then retry production.",
+        "ASSET_DIRECTOR_REFERENCES_FAILED": "Fix failed reference image generation in the AI text artifact or asset workflow, then retry production.",
+    }[code]
     assert detail["repair_route"] == f"/series/{series.id}/ai-text-artifacts"
+    assert detail["retryable"] is True
+    assert detail["affected_ids"] == [episode.id]
     assert db.query(VideoProductionRun).count() == 0
+
+
+@pytest.mark.parametrize(
+    ("status", "expected_cause"),
+    [
+        ("needs_reference", "ASSET_DIRECTOR_REFERENCES_MISSING"),
+        ("reference_failed", "ASSET_DIRECTOR_REFERENCES_FAILED"),
+    ],
+)
+def test_start_flow_blocks_on_asset_director_non_ready_return(db, monkeypatch, status, expected_cause):
+    async def fake_director(db_arg, series_id, episode_id):
+        return {"status": status, "artifact": None, "readiness": {"status": status}}
+
+    monkeypatch.setattr(
+        "app.domains.video_production.production_run_service.ensure_asset_director_plan_for_episode",
+        fake_director,
+    )
+    series, episode = _series_episode(db)
+    client = TestClient(app)
+
+    resp = client.post("/api/video-production/runs/start", json={
+        "series_id": series.id,
+        "episode_id": episode.id,
+        "target_duration_seconds": 10,
+        "autostart_images": False,
+    })
+
+    assert resp.status_code == 409
+    detail = resp.json()["detail"]
+    assert detail["error_code"] == "EPISODE_ASSET_SCOPE_MISSING"
+    assert detail["cause"] == expected_cause
+    assert detail["repair_route"] == f"/series/{series.id}/ai-text-artifacts"
+    assert detail["retryable"] is True
+    assert detail["affected_ids"] == [episode.id]
+    assert db.query(VideoProductionRun).count() == 0
+    assert db.query(ProductionPlan).count() == 0
 
 
 def test_start_flow_auto_generates_missing_storyboard_before_creating_run(db, monkeypatch):

@@ -720,3 +720,19 @@ async def test_ensure_missing_asset_director_plan_generates_and_applies(db, monk
     assert result["artifact"].status == "approved"
     assert result["artifact"].artifact_type == ASSET_DIRECTOR_ARTIFACT_TYPE
     assert result["readiness"]["status"] == "needs_reference"
+
+
+def test_episode_asset_scope_payload_exposes_director_metadata(db):
+    series, ep1, ep2, lin, hallway = _series_with_episodes(db)
+    _approved_sources(db, series, ep1, ep2)
+    apply_asset_director_plan(db, series.id, _plan(db, series, ep1, ep2, lin, hallway))
+
+    from app.domains.ai_video_series.read_models import episode_asset_scope_payload
+
+    payload = episode_asset_scope_payload(db, ep1)
+    patient = next(item for item in payload["characters"] if item["name"] == "Patient Wu")
+    assert patient["asset_scope"] == "episode_only"
+    assert patient["asset_source"] == "asset_director"
+    assert patient["asset_stable_key"] == "patient_wu_ep1"
+    assert patient["asset_readiness"] == "needs_reference"
+    assert patient["missing_reference_slots"]

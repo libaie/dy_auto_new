@@ -76,15 +76,26 @@ def episode_asset_usage_items(
         if isinstance(item, dict) and item.get("id")
     }
     rows = db.query(model).filter(model.id.in_(ids)).all() if ids else []
-    names = {row.id: row.name for row in rows}
+    by_id = {row.id: row for row in rows}
     result = []
     for asset_id in ids:
+        row = by_id.get(asset_id)
+        meta = row.meta_json if row and isinstance(row.meta_json, dict) else {}
         item = dict(usage_by_id.get(asset_id) or {})
         item["id"] = asset_id
-        item.setdefault("name", names.get(asset_id, asset_id))
+        item.setdefault("name", row.name if row else asset_id)
         item.setdefault("source", "existing")
         if not item.get("usage"):
             item["usage"] = "本集剧情资产。"
+        item["asset_scope"] = meta.get("asset_scope")
+        item["asset_source"] = meta.get("asset_source")
+        item["asset_stable_key"] = meta.get("asset_stable_key")
+        item["asset_director_plan_id"] = meta.get("asset_director_plan_id")
+        item["match_confidence"] = meta.get("match_confidence")
+        item["asset_readiness"] = meta.get("asset_readiness")
+        item["missing_reference_slots"] = meta.get("missing_reference_slots") or []
+        item["series_id"] = meta.get("series_id")
+        item["episode_id"] = meta.get("episode_id")
         result.append(item)
     return result
 

@@ -16,7 +16,13 @@ from app.db.models.ai_text_artifacts import AITextArtifact, AITextArtifactConsum
 from app.db.models import Episode, Series, VideoProductionRun
 
 
-SERIES_RUN_ARTIFACT_TYPES = ("series_bible", "series_story_plan", "season_arc", "continuity_ledger")
+SERIES_RUN_ARTIFACT_TYPES = (
+    "series_bible",
+    "series_story_plan",
+    "season_arc",
+    "continuity_ledger",
+    "asset_director_plan",
+)
 EPISODE_RUN_ARTIFACT_TYPES = (
     "episode_outline",
     "episode_script",

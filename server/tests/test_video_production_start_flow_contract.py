@@ -310,6 +310,36 @@ def test_start_flow_blocks_on_asset_director_non_ready_return(db, monkeypatch, s
     assert db.query(ProductionPlan).count() == 0
 
 
+def test_legacy_start_images_blocks_on_asset_director_non_ready_return(db, monkeypatch):
+    async def fake_director(db_arg, series_id, episode_id):
+        return {"status": "stale", "artifact": None, "readiness": {"status": "stale"}}
+
+    monkeypatch.setattr(
+        "app.domains.video_production.video_production_service.ensure_asset_director_plan_for_episode",
+        fake_director,
+        raising=False,
+    )
+    series, episode = _series_episode(db)
+    client = TestClient(app)
+
+    create_resp = client.post("/api/video-production/runs", json={
+        "series_id": series.id,
+        "episode_id": episode.id,
+    })
+    assert create_resp.status_code == 200
+    run_id = create_resp.json()["run"]["id"]
+
+    resp = client.post(f"/api/video-production/runs/{run_id}/start-images")
+
+    assert resp.status_code == 409
+    detail = resp.json()["detail"]
+    assert detail["error_code"] == "EPISODE_ASSET_SCOPE_MISSING"
+    assert detail["cause"] == "ASSET_DIRECTOR_PLAN_STALE"
+    assert detail["repair_route"] == f"/series/{series.id}/ai-text-artifacts"
+    assert detail["retryable"] is True
+    assert detail["affected_ids"] == [episode.id]
+
+
 def test_start_flow_auto_generates_missing_storyboard_before_creating_run(db, monkeypatch):
     series, episode = _series_episode(db, storyboard=False)
     client = TestClient(app)

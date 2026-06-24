@@ -101,7 +101,7 @@ def episode_asset_usage_items(
     return result
 
 
-def episode_asset_director_summary(episode: Episode, characters: list[dict], scenes: list[dict]) -> dict:
+def episode_asset_director_summary(db: Session, episode: Episode, characters: list[dict], scenes: list[dict]) -> dict:
     director_assets = [
         item
         for item in [*characters, *scenes]
@@ -128,6 +128,9 @@ def episode_asset_director_summary(episode: Episode, characters: list[dict], sce
         status = "stale"
     else:
         status = "ready"
+    freshness_status = _asset_director_freshness_status(db, episode, director_assets)
+    if freshness_status:
+        status = freshness_status
 
     director_ids = {item.get("id") for item in director_assets if item.get("id")}
     frames = episode.storyboard_json.get("frames", []) if isinstance(episode.storyboard_json, dict) else []
@@ -149,6 +152,30 @@ def episode_asset_director_summary(episode: Episode, characters: list[dict], sce
         "blockers": blockers,
         "repair_route": f"/series/{episode.series_id}/ai-text-artifacts",
     }
+
+
+def _asset_director_freshness_status(db: Session, episode: Episode, director_assets: list[dict]) -> str | None:
+    if not director_assets:
+        return None
+    try:
+        from app.domains.ai_video_series.asset_director_service import (
+            ASSET_DIRECTOR_ARTIFACT_TYPE,
+            compute_asset_director_fingerprint,
+            load_asset_director_inputs,
+        )
+
+        artifact = AITextArtifactService(db).latest_approved(
+            target_type="series",
+            target_id=episode.series_id,
+            artifact_type=ASSET_DIRECTOR_ARTIFACT_TYPE,
+        )
+        if not artifact or not isinstance(artifact.content_json, dict):
+            return "needs_repair"
+        inputs = load_asset_director_inputs(db, episode.series_id)
+        expected = compute_asset_director_fingerprint(inputs)
+    except Exception:
+        return "stale"
+    return None if artifact.content_json.get("input_fingerprint") == expected else "stale"
 
 
 def episode_asset_scope_payload(db: Session, episode: Episode) -> dict:
@@ -197,7 +224,7 @@ def episode_asset_scope_payload(db: Session, episode: Episode) -> dict:
         "scenes": scenes,
         "generated_assets": generated_assets,
         "source": source,
-        "director_summary": episode_asset_director_summary(episode, characters, scenes),
+        "director_summary": episode_asset_director_summary(db, episode, characters, scenes),
     }
 
 

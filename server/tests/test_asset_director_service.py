@@ -293,6 +293,40 @@ def test_apply_plan_creates_episode_assets_and_binds_frames(db):
     assert ep1.script_json["episode_asset_scope"]["scene_ids"] == [exam_room.id]
 
 
+def test_apply_plan_rebuilds_frame_reference_urls_from_director_assets(db):
+    series, ep1, ep2, lin, hallway = _series_with_episodes(db)
+    _approved_sources(db, series, ep1, ep2)
+    plan = _plan(db, series, ep1, ep2, lin, hallway)
+    plan["episode_assets"][0]["characters"][0].update({
+        "avatar_front_url": "https://cdn.test/patient-wu-front.png",
+        "avatar_side_url": "https://cdn.test/patient-wu-side.png",
+        "avatar_threequarter_url": "https://cdn.test/patient-wu-three.png",
+        "avatar_fullbody_url": "https://cdn.test/patient-wu-full.png",
+    })
+    plan["episode_assets"][0]["scenes"][0].update({
+        "reference_wideshot_url": "https://cdn.test/exam-room-wide.png",
+        "reference_midshot_url": "https://cdn.test/exam-room-mid.png",
+        "reference_aerial_url": "https://cdn.test/exam-room-aerial.png",
+    })
+    ep1.storyboard_json = {
+        **ep1.storyboard_json,
+        "frames": [{**ep1.storyboard_json["frames"][0], "reference_urls": ["https://cdn.test/stale-old-ref.png"]}],
+    }
+    db.commit()
+
+    apply_asset_director_plan(db, series.id, plan)
+
+    db.refresh(ep1)
+    frame = ep1.storyboard_json["frames"][0]
+    assert "https://cdn.test/stale-old-ref.png" not in frame["reference_urls"]
+    assert "https://cdn.test/patient-wu-front.png" in frame["reference_urls"]
+    assert "https://cdn.test/exam-room-wide.png" in frame["reference_urls"]
+    assert "https://cdn.test/patient-wu-front.png" in frame["character_reference_urls"]
+    assert "https://cdn.test/exam-room-wide.png" in frame["style_reference_urls"]
+    assert frame["scene_name"] == "Exam Room One"
+    assert frame["reference_instructions"]
+
+
 def test_plan_rerun_is_idempotent_by_stable_key(db):
     series, ep1, ep2, lin, hallway = _series_with_episodes(db)
     _approved_sources(db, series, ep1, ep2)
@@ -863,3 +897,28 @@ def test_episode_asset_scope_payload_prefers_asset_director_scope_over_stale_out
     assert summary["frame_binding_count"] == 1
     assert "avatar_front_url" in summary["blockers"]
     assert "reference_wideshot_url" in summary["blockers"]
+
+def test_episode_asset_scope_payload_marks_ready_director_summary_stale_after_input_change(db):
+    series, ep1, ep2, lin, hallway = _series_with_episodes(db)
+    _approved_sources(db, series, ep1, ep2)
+    plan = _plan(db, series, ep1, ep2, lin, hallway)
+    plan["episode_assets"][0]["characters"][0].update({
+        "avatar_front_url": "https://cdn.test/patient-wu-front.png",
+        "avatar_side_url": "https://cdn.test/patient-wu-side.png",
+        "avatar_threequarter_url": "https://cdn.test/patient-wu-three.png",
+        "avatar_fullbody_url": "https://cdn.test/patient-wu-full.png",
+    })
+    plan["episode_assets"][0]["scenes"][0].update({
+        "reference_wideshot_url": "https://cdn.test/exam-room-wide.png",
+        "reference_midshot_url": "https://cdn.test/exam-room-mid.png",
+        "reference_aerial_url": "https://cdn.test/exam-room-aerial.png",
+    })
+    apply_asset_director_plan(db, series.id, plan)
+    ep1.script_json = {**ep1.script_json, "script": "Lin treats Patient Wu after a late rewrite."}
+    db.commit()
+
+    from app.domains.ai_video_series.read_models import episode_asset_scope_payload
+
+    payload = episode_asset_scope_payload(db, ep1)
+
+    assert payload["director_summary"]["status"] == "stale"

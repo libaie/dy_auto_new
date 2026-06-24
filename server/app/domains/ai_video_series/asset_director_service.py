@@ -1017,6 +1017,34 @@ def _missing_scene_reference_slots(scene: Scene) -> list[str]:
     return [slot for slot in SCENE_REFERENCE_SLOTS if not reference_url_is_usable(getattr(scene, slot))]
 
 
+def _usable_reference_urls(asset: Any, slots: tuple[str, ...]) -> list[str]:
+    return [
+        url
+        for slot in slots
+        if reference_url_is_usable(url := getattr(asset, slot, None))
+    ]
+
+
+def _frame_reference_payload(scene: Scene | None, characters: list[Character]) -> dict[str, Any]:
+    character_urls: list[str] = []
+    for character in characters:
+        character_urls.extend(_usable_reference_urls(character, CHARACTER_REFERENCE_SLOTS))
+    style_urls = _usable_reference_urls(scene, SCENE_REFERENCE_SLOTS) if scene else []
+    reference_urls = dedupe_asset_ids(character_urls + style_urls)
+    payload: dict[str, Any] = {
+        "reference_urls": reference_urls,
+        "character_reference_urls": dedupe_asset_ids(character_urls),
+        "style_reference_urls": dedupe_asset_ids(style_urls),
+        "reference_instructions": (
+            "Use the supplied character and scene reference images to keep identity, outfit, lighting, and environment consistent."
+            if reference_urls else ""
+        ),
+    }
+    if scene:
+        payload["scene_name"] = scene.name
+    return payload
+
+
 def _resolved_item(asset: Any) -> dict[str, Any]:
     meta = asset.meta_json if isinstance(asset.meta_json, dict) else {}
     return {
@@ -1051,6 +1079,7 @@ def _apply_episode_bindings(
         frame_id = str(binding.get("frame_id") or binding.get("shot_id") or binding.get("id") or "").strip()
         frame = frames_by_id[frame_id]
         scene_key = str(binding.get("scene_stable_key") or "").strip()
+        scene = None
         if scene_key:
             scene = key_to_scene[scene_key]
             frame["scene_id"] = scene.id
@@ -1060,6 +1089,9 @@ def _apply_episode_bindings(
             for stable_key in _director_string_list(binding.get("character_stable_keys"), "character_stable_keys")
             if stable_key in key_to_character
         ]
+        frame.update(_frame_reference_payload(scene, characters))
+        if scene is None:
+            frame.pop("scene_name", None)
         if characters:
             frame["character_ids"] = dedupe_asset_ids([character.id for character in characters])
             used_characters.extend(characters)

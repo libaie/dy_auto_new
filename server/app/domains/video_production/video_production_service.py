@@ -22,6 +22,11 @@ from app.db.models import Episode
 from app.domains.agency_operations.agency_backtrack_policy import trigger_backtrack_if_needed
 from app.domains.agency_operations.agency_creative_patch_service import unresolved_patch_gate
 from app.domains.agency_operations.agency_orchestrator import AgencyOrchestrator
+from app.domains.ai_video_series.asset_director_service import (
+    AssetDirectorError,
+    asset_director_required_enabled,
+    ensure_asset_director_plan_for_episode,
+)
 from app.domains.model_configuration.runtime_model_config import (
     RuntimeModelConfigError,
     redact_runtime_model_config,
@@ -68,6 +73,80 @@ logger = logging.getLogger(__name__)
 COMPOSE_SCENE_KEY = "video_composition"
 PROVIDER_MODEL_CONFIG_MISSING = "PROVIDER_MODEL_CONFIG_MISSING"
 REAL_PROVIDER_PATH_RUN_TYPES = (REAL_SHORT_E2E, LEGACY_EPISODE_RUN)
+
+
+def _asset_director_repair(error: AssetDirectorError, series_id: str) -> tuple[str, str]:
+    route = f"/series/{series_id}/ai-text-artifacts"
+    actions = {
+        "ASSET_DIRECTOR_INPUTS_MISSING": "Open AI text artifacts, generate the missing scripts/storyboards or asset director plan, then retry production.",
+        "ASSET_DIRECTOR_PLAN_STALE": "Regenerate the asset director plan from the latest scripts, storyboards, and style lock, then retry production.",
+        "ASSET_DIRECTOR_REFERENCES_MISSING": "Generate missing character and scene reference images, then retry production.",
+        "ASSET_DIRECTOR_REFERENCES_FAILED": "Fix failed reference image generation in the AI text artifact or asset workflow, then retry production.",
+    }
+    return actions.get(error.code, "Open AI text artifacts, repair the asset director blocker, then retry production."), route
+
+
+def _asset_director_result_status(result: object) -> str | None:
+    if isinstance(result, dict):
+        readiness = result.get("readiness")
+        if isinstance(readiness, dict) and readiness.get("status"):
+            return str(readiness["status"])
+        status = result.get("status")
+        return str(status) if status else None
+    content = getattr(result, "content_json", None)
+    readiness = content.get("readiness") if isinstance(content, dict) else None
+    if isinstance(readiness, dict) and readiness.get("status"):
+        return str(readiness["status"])
+    return None
+
+
+def _asset_director_error_for_status(series_id: str, episode_id: str, status: str | None) -> AssetDirectorError:
+    if status == "reference_failed":
+        return AssetDirectorError(
+            code="ASSET_DIRECTOR_REFERENCES_FAILED",
+            message="Asset director reference generation failed.",
+            details={"series_id": series_id, "episode_id": episode_id, "status": status},
+        )
+    if status in {"stale", "plan_stale"}:
+        return AssetDirectorError(
+            code="ASSET_DIRECTOR_PLAN_STALE",
+            message="Asset director plan input fingerprint is stale.",
+            details={"series_id": series_id, "episode_id": episode_id, "status": status},
+        )
+    return AssetDirectorError(
+        code="ASSET_DIRECTOR_REFERENCES_MISSING",
+        message="Asset director references are not ready.",
+        details={"series_id": series_id, "episode_id": episode_id, "status": status},
+    )
+
+
+def _raise_asset_director_repairable(series_id: str, episode_id: str, error: AssetDirectorError) -> None:
+    repair_action, repair_route = _asset_director_repair(error, series_id)
+    raise ProductionRepairableError(
+        code=ProductionErrorCode.EPISODE_ASSET_SCOPE_MISSING,
+        message=error.message,
+        cause=error.code,
+        repair_action=repair_action,
+        repair_route=repair_route,
+        retryable=True,
+        affected_ids=[episode_id],
+    )
+
+
+async def _enforce_asset_director_for_series_episode_run(db: Session, run: VideoProductionRun) -> None:
+    if _is_linked_run(run) or not run.series_id or not run.episode_id or not asset_director_required_enabled():
+        return
+    try:
+        result = await ensure_asset_director_plan_for_episode(db, run.series_id, run.episode_id)
+        status = _asset_director_result_status(result)
+        if status != "ready":
+            raise _asset_director_error_for_status(run.series_id, run.episode_id, status)
+    except AssetDirectorError as error:
+        _raise_asset_director_repairable(run.series_id, run.episode_id, error)
+    episode = db.query(Episode).filter(Episode.id == run.episode_id, Episode.series_id == run.series_id).first()
+    if episode and isinstance(episode.storyboard_json, dict):
+        run.storyboard_json = episode.storyboard_json
+        db.flush()
 
 
 class VideoProductionError(ValueError):
@@ -1197,6 +1276,7 @@ async def start_image_stage(db: Session, run_id: str) -> VideoProductionRun:
         assert_can_start_images(run)
     except ValueError as exc:
         raise VideoProductionError(str(exc)) from exc
+    await _enforce_asset_director_for_series_episode_run(db, run)
     _guard_creative_patches(db, run, "image_stage")
     frames = image_stage_frames(run, db=db)
     if not frames:

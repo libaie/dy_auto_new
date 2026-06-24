@@ -20,6 +20,7 @@ from app.db.models import (
     Scene,
 )
 from app.main import app
+from app.domains.ai_video_series.asset_director_service import AssetDirectorError
 from app.domains.video_production.video_production_run_types import MOCK_SERIES_SCALE, REAL_SHORT_E2E
 
 
@@ -146,6 +147,14 @@ def stub_series_story_plan_for_start_flow(monkeypatch):
 
     monkeypatch.setattr("app.domains.video_production.production_run_service.generate_series_story_plan", fake_generate_series_story_plan)
 
+    async def fake_asset_director(db_arg, series_id, episode_id):
+        return {"status": "ready", "artifact": None, "readiness": {"status": "ready"}}
+
+    monkeypatch.setattr(
+        "app.domains.video_production.production_run_service.ensure_asset_director_plan_for_episode",
+        fake_asset_director,
+    )
+
 
 def _series_episode(db, *, locked=True, storyboard=True):
     series = Series(
@@ -191,6 +200,66 @@ def _series_episode(db, *, locked=True, storyboard=True):
     db.add(episode)
     db.commit()
     return series, episode
+
+
+def test_start_flow_requires_asset_director_before_run_creation(db, monkeypatch):
+    calls = []
+
+    async def fake_director(db_arg, series_id, episode_id):
+        calls.append((series_id, episode_id))
+        return {"status": "ready", "artifact": None, "readiness": {"status": "ready"}}
+
+    monkeypatch.setattr(
+        "app.domains.video_production.production_run_service.ensure_asset_director_plan_for_episode",
+        fake_director,
+    )
+    series, episode = _series_episode(db)
+    client = TestClient(app)
+
+    resp = client.post("/api/video-production/runs/start", json={
+        "series_id": series.id,
+        "episode_id": episode.id,
+        "target_duration_seconds": 10,
+        "autostart_images": False,
+    })
+
+    assert resp.status_code == 200
+    assert calls == [(series.id, episode.id)]
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        "ASSET_DIRECTOR_INPUTS_MISSING",
+        "ASSET_DIRECTOR_PLAN_STALE",
+        "ASSET_DIRECTOR_REFERENCES_MISSING",
+        "ASSET_DIRECTOR_REFERENCES_FAILED",
+    ],
+)
+def test_start_flow_blocks_on_asset_director_error(db, monkeypatch, code):
+    async def fake_director(db_arg, series_id, episode_id):
+        raise AssetDirectorError(code=code, message=f"{code} message", details={"code": code})
+
+    monkeypatch.setattr(
+        "app.domains.video_production.production_run_service.ensure_asset_director_plan_for_episode",
+        fake_director,
+    )
+    series, episode = _series_episode(db)
+    client = TestClient(app)
+
+    resp = client.post("/api/video-production/runs/start", json={
+        "series_id": series.id,
+        "episode_id": episode.id,
+        "target_duration_seconds": 10,
+        "autostart_images": False,
+    })
+
+    assert resp.status_code == 409
+    detail = resp.json()["detail"]
+    assert detail["error_code"] == "EPISODE_ASSET_SCOPE_MISSING"
+    assert detail["cause"] == code
+    assert detail["repair_route"] == f"/series/{series.id}/ai-text-artifacts"
+    assert db.query(VideoProductionRun).count() == 0
 
 
 def test_start_flow_auto_generates_missing_storyboard_before_creating_run(db, monkeypatch):

@@ -22,6 +22,11 @@ from app.db.models import (
     Series,
 )
 from app.domains.ai_text_artifacts.ai_text_artifact_service import AITextArtifactService
+from app.domains.ai_video_series.asset_director_service import (
+    AssetDirectorError,
+    asset_director_required_enabled,
+    ensure_asset_director_plan_for_episode,
+)
 from app.domains.ai_video_series.series_planning_service import (
     ensure_series_continuity_artifacts,
     generate_series_story_plan,
@@ -876,6 +881,30 @@ def _raise_episode_asset_scope_missing(
     )
 
 
+def _asset_director_repair(error: AssetDirectorError, series_id: str) -> tuple[str, str]:
+    route = f"/series/{series_id}/ai-text-artifacts"
+    actions = {
+        "ASSET_DIRECTOR_INPUTS_MISSING": "Open AI text artifacts, generate the missing scripts/storyboards or asset director plan, then retry production.",
+        "ASSET_DIRECTOR_PLAN_STALE": "Regenerate the asset director plan from the latest scripts, storyboards, and style lock, then retry production.",
+        "ASSET_DIRECTOR_REFERENCES_MISSING": "Generate missing character and scene reference images, then retry production.",
+        "ASSET_DIRECTOR_REFERENCES_FAILED": "Fix failed reference image generation in the AI text artifact or asset workflow, then retry production.",
+    }
+    return actions.get(error.code, "Open AI text artifacts, repair the asset director blocker, then retry production."), route
+
+
+def _raise_asset_director_error(series_id: str, episode_id: str, error: AssetDirectorError) -> None:
+    repair_action, repair_route = _asset_director_repair(error, series_id)
+    raise ProductionRepairableError(
+        code=ProductionErrorCode.EPISODE_ASSET_SCOPE_MISSING,
+        message=error.message,
+        cause=error.code,
+        repair_action=repair_action,
+        repair_route=repair_route,
+        retryable=True,
+        affected_ids=[episode_id],
+    )
+
+
 def _validate_episode_asset_scope_ids(db: Session, series: Series, episode: Episode, scope: dict) -> None:
     """业务函数：处理 _validate_episode_asset_scope_ids 对应的业务流程、校验或数据转换。
 
@@ -1551,6 +1580,14 @@ async def start_episode_production(
                 storyboard["generation_trace"] = generation_error
                 episode.storyboard_json = storyboard
                 db.flush()
+    if prepare_text_artifacts and asset_director_required_enabled():
+        try:
+            await ensure_asset_director_plan_for_episode(db, series_id, episode_id)
+            db.refresh(series)
+            db.refresh(episode)
+            storyboard = episode.storyboard_json if isinstance(episode.storyboard_json, dict) else storyboard
+        except AssetDirectorError as error:
+            _raise_asset_director_error(series_id, episode_id, error)
     effective_duration = target_duration_seconds or series.target_duration or episode.duration_seconds or _target_duration_from_storyboard(storyboard)
     _assert_real_short_duration(run_type, effective_duration)
     if episode_asset_scope_override is not None:

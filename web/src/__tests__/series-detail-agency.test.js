@@ -288,6 +288,20 @@ describe('SeriesDetailPage agency team status', () => {
       },
     })
 
+    mocks.listAITextArtifacts.mockResolvedValueOnce({
+      data: {
+        ok: true,
+        artifacts: [{
+          id: 'outline-1',
+          episode_id: 'ep1',
+          artifact_type: 'episode_outline',
+          status: 'approved',
+          version: 1,
+          content_text: 'Asset order regression outline',
+        }],
+      },
+    })
+
     const wrapper = mount(SeriesDetailPage)
     await flushPromises()
 
@@ -302,6 +316,14 @@ describe('SeriesDetailPage agency team status', () => {
     expect(wrapper.text()).toContain('复用 1')
     expect(wrapper.text()).toContain('绑定 3')
     expect(wrapper.text()).toContain('查看文本产物')
+
+    const html = wrapper.html()
+    const statusIndex = html.indexOf('资产导演')
+    expect(statusIndex).toBeGreaterThan(-1)
+    expect(statusIndex).toBeLessThan(html.indexOf('剧集大纲'))
+    expect(statusIndex).toBeLessThan(html.indexOf('本集角色'))
+    expect(statusIndex).toBeLessThan(html.indexOf('>剧本</h3>'))
+    expect(statusIndex).toBeLessThan(html.indexOf('>分镜剧本</h3>'))
   })
 
   it('shows asset director empty state for episodes without director scope', async () => {

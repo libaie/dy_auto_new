@@ -245,10 +245,6 @@
               </button>
             </div>
             <div v-if="expandedEpisodeId === ep.id" class="border-t border-slate-800/70 bg-slate-950/50 px-5 py-4">
-              <div v-if="episodeOutlineText(ep)" class="mb-4 rounded border border-slate-800 bg-slate-950/70 p-3">
-                <div class="mb-2 text-xs font-medium text-cyan-300">剧集大纲</div>
-                <pre class="max-h-44 overflow-auto whitespace-pre-wrap text-xs leading-5 text-slate-300">{{ episodeOutlineText(ep) }}</pre>
-              </div>
               <div role="status" aria-live="polite" class="mb-3 flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3 text-sm text-slate-300">
                 <div class="flex min-w-0 flex-wrap items-center gap-2">
                   <span class="font-medium text-slate-200">资产导演</span>
@@ -304,6 +300,10 @@
               <div v-if="episodeGeneratedAssets(ep).length" class="mb-4 rounded border border-emerald-900/60 bg-emerald-950/20 p-3 text-xs text-emerald-100">
                 <span class="font-medium">本集新增资产</span>
                 <span class="ml-2">{{ episodeGeneratedAssets(ep).join('、') }}</span>
+              </div>
+              <div v-if="episodeOutlineText(ep)" class="mb-4 rounded border border-slate-800 bg-slate-950/70 p-3">
+                <div class="mb-2 text-xs font-medium text-cyan-300">剧集大纲</div>
+                <pre class="max-h-44 overflow-auto whitespace-pre-wrap text-xs leading-5 text-slate-300">{{ episodeOutlineText(ep) }}</pre>
               </div>
               <div class="grid gap-4 lg:grid-cols-2">
                 <section class="rounded border border-slate-800 bg-slate-950/70 p-3">

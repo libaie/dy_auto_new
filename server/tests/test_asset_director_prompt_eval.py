@@ -1,3 +1,5 @@
+import json
+
 from app.db.models import Character, Episode, Scene, Series
 from app.domains.ai_video_series.asset_director_service import (
     build_asset_director_prompt,
@@ -37,8 +39,12 @@ def test_thirty_episode_prompt_contains_series_wide_context_without_full_cast_in
     db.commit()
 
     prompt = build_asset_director_prompt(load_asset_director_inputs(db=db, series_id=series.id))
+    payload = json.loads(prompt)
+    episodes = payload["episodes"]
 
-    assert "covered_episode_numbers" in prompt
     assert "do not assign the full series cast to every frame" in prompt
+    assert payload["output_schema"]["covered_episode_numbers"] == list(range(1, 31))
+    assert [episode["episode_number"] for episode in episodes] == list(range(1, 31))
     assert "ep30-f1" in prompt
-    assert prompt.count("episode_number") >= 30
+
+

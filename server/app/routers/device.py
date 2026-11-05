@@ -20,7 +20,8 @@ from app.models import (
     StatsIncrementRequest,
 )
 from app.database import get_db
-from app.deps import verify_device_secret, verify_admin_token
+from app.deps import verify_device_secret, verify_admin_token, resource_user_ids
+from app.db_models import Device as EventDevice, Task as EventTask, Channel as EventChannel
 from app.services.task_service import task_service
 from app.config import ANTI_DETECT_CONFIG, ANTI_DETECT_CONFIG_VERSION, DEVICE_CONFIG, bj_now
 from app.services.selector_service import selector_service
@@ -240,7 +241,7 @@ async def create_pair_request(
             "ip": client_ip,
             "created_at": str(pair_req.created_at),
         },
-    })
+    }, user_ids=resource_user_ids(db, EventDevice, pair_req.device_id))
 
     return PairStatusResponse(pairing_token=token, status="pending")
 
@@ -397,7 +398,7 @@ async def ws_device_status(websocket: WebSocket):
             "event": "device_status_changed",
             "device_id": device_id,
             "status": "online",
-        })
+        }, user_ids=resource_user_ids(db, EventDevice, device_id))
 
         # Check for pending tasks and notify device
         await _notify_pending_tasks(db, device_id)
@@ -423,7 +424,7 @@ async def ws_device_status(websocket: WebSocket):
                             "event": "device_status_changed",
                             "device_id": device_id,
                             "status": "offline",
-                        })
+                        }, user_ids=resource_user_ids(db, EventDevice, device_id))
                         break
                     if msg == "ping":
                         await websocket.send_text("pong")
@@ -516,7 +517,7 @@ async def poll_tasks(
             "event": "task_updated",
             "task_id": task.id,
             "status": task.status.value if hasattr(task.status, 'value') else str(task.status),
-        })
+        }, user_ids=resource_user_ids(db, EventTask, task.id))
 
     from app.services.device_service import device_service
     device_info = device_service.get_device_status(db, device_id)
@@ -583,11 +584,10 @@ async def report_progress(
     db_task = db.query(DBTask).filter(DBTask.id == report.task_id).first()
     if not db_task:
         raise HTTPException(status_code=404, detail="Task not found")
-    if report.lease_id and db_task.lease_id:
-        if db_task.lease_id != report.lease_id:
-            return {"ok": True, "stale": True, "message": "Progress ignored (stale lease)"}
-    elif db_task.device_id != authed_device_id:
+    if authed_device_id and db_task.device_id != authed_device_id:
         raise HTTPException(status_code=403, detail="Task does not belong to this device")
+    if report.lease_id and db_task.lease_id != report.lease_id:
+        return {"ok": True, "stale": True, "message": "Progress ignored (stale lease)"}
 
     await pair_ws_manager.broadcast_to_admins({
         "event": "task_progress",
@@ -595,7 +595,7 @@ async def report_progress(
         "step": report.step,
         "detail": report.detail,
         "progress": report.progress,
-    })
+    }, user_ids=[db_task.user_id] if db_task.user_id else [])
     return {"ok": True}
 
 
@@ -605,19 +605,18 @@ async def report_result(
     db: Session = Depends(get_db),
     authed_device_id: Optional[str] = Depends(verify_device_secret),
 ):
-    # Verify lease: accept current lease, log stale reports, fall back to device_id
-    if authed_device_id:
-        from app.db_models import Task as DBTask
-        db_task = db.query(DBTask).filter(DBTask.id == report.task_id).first()
-        if not db_task:
-            raise HTTPException(status_code=404, detail="Task not found")
-        if report.lease_id and db_task.lease_id:
-            if db_task.lease_id != report.lease_id:
-                logger.warning("device=%s task=%s stale result report (lease mismatch: reported=%s current=%s) — result logged for audit, not applied",
-                    authed_device_id, report.task_id, report.lease_id[:8], db_task.lease_id[:8] if db_task.lease_id else "None")
-                return {"ok": True, "stale": True, "message": "Result recorded for audit (stale lease)"}
-        elif db_task.device_id != authed_device_id:
-            raise HTTPException(status_code=403, detail="Task does not belong to this device")
+    # Fence an attempt even for the legacy master secret and after recovery
+    # clears a lease. Per-device identity is independent of knowing a lease ID.
+    from app.db_models import Task as DBTask
+    db_task = db.query(DBTask).filter(DBTask.id == report.task_id).first()
+    if not db_task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if authed_device_id and db_task.device_id != authed_device_id:
+        raise HTTPException(status_code=403, detail="Task does not belong to this device")
+    if report.lease_id and db_task.lease_id != report.lease_id:
+        logger.warning("device=%s task=%s stale result report (lease mismatch) — not applied",
+                       authed_device_id, report.task_id)
+        return {"ok": True, "stale": True, "message": "Result recorded for audit (stale lease)"}
 
     try:
         task, channel_broadcast_info = task_service.report_result(
@@ -637,7 +636,7 @@ async def report_result(
         "task_id": str(report.task_id),
         "status": str(report.status.value),
         "result": report.result or {},
-    })
+    }, user_ids=resource_user_ids(db, EventTask, report.task_id))
 
     # 通知所有在线设备有新任务可领取（通道内可能有下一批待执行 item）
     if report.status.value in ("completed", "failed"):
@@ -648,10 +647,12 @@ async def report_result(
         from fastapi import BackgroundTasks
         bg = BackgroundTasks()
         bg.add_task(pair_ws_manager.broadcast_channel_progress,
-                    channel_broadcast_info["channel_id"], channel_broadcast_info["stats"])
+                    channel_broadcast_info["channel_id"], channel_broadcast_info["stats"],
+                    user_ids=resource_user_ids(db, EventChannel, channel_broadcast_info["channel_id"]))
         if channel_broadcast_info.get("channel_completed"):
             bg.add_task(pair_ws_manager.broadcast_channel_completed,
-                        channel_broadcast_info["channel_id"])
+                        channel_broadcast_info["channel_id"],
+                        user_ids=resource_user_ids(db, EventChannel, channel_broadcast_info["channel_id"]))
         from fastapi.encoders import jsonable_encoder
         return JSONResponse(content=jsonable_encoder(task), background=bg)
 
@@ -664,7 +665,7 @@ def stats_increment(
     db: Session = Depends(get_db),
     authed_device_id: str = Depends(verify_device_secret),
 ):
-    """设备端增量统计上报——idempotent: 同一 (task,device,type,target,op_index) 只计一次。
+    """设备端增量统计上报——idempotent: 同一 (task,lease,device,type,target,op_index) 只计一次。
     校验 task→account 归属和 task→device 归属，防止跨账号伪造统计。
     """
     from app.services.stats_service import stats_service
@@ -679,6 +680,12 @@ def stats_increment(
     if db_task.device_id != authed_device_id:
         raise HTTPException(status_code=403, detail="Task not assigned to this device")
 
+    # Supplied attempt IDs are fenced even when recovery cleared the lease.
+    # Lease-less legacy devices are attributed to the current stored attempt.
+    if body.lease_id is not None and body.lease_id != db_task.lease_id:
+        return {"ok": True, "stale": True}
+    event_lease_id = body.lease_id if body.lease_id is not None else (db_task.lease_id or "")
+
     # 2. Idempotent insert — duplicate key → skip count increment
     from sqlalchemy.exc import IntegrityError
     import logging
@@ -686,6 +693,7 @@ def stats_increment(
     try:
         evt = StatsEvent(
             task_id=body.task_id,
+            lease_id=event_lease_id,
             device_id=authed_device_id,
             account_id=body.account_id,
             event_type=body.task_type,
@@ -735,7 +743,7 @@ async def heartbeat(
             "event": "device_status_changed",
             "device_id": device_id,
             "status": "online",
-        })
+        }, user_ids=resource_user_ids(db, EventDevice, device_id))
         await _notify_pending_tasks(db, device_id)
     return {"status": "ok", "device_id": device_id}
 
@@ -881,7 +889,7 @@ async def report_risk(
         from app.services.channel_service import channel_service
         channel_service.on_risk_control(db, report.account_id)
         db.commit()
-        await pair_ws_manager.broadcast_to_admins({"event": "accounts_changed"})
+        await pair_ws_manager.broadcast_to_admins({"event": "accounts_changed"}, user_ids=[account.user_id] if account.user_id else [])
     return {"status": "acknowledged", "account_status": account.status}
 
 
@@ -1091,7 +1099,7 @@ async def device_calibrate(
         "event": "selectors_updated",
         "version": version,
     })
-    await pair_ws_manager.broadcast_to_admins({"event": "selectors_changed"})
+    await pair_ws_manager.broadcast_invalidation("selectors_changed")
 
     return {"uploaded": uploaded, "resolution": resolution}
 
@@ -1303,9 +1311,9 @@ async def collect_report(
                     db.commit()
 
     # WS 实时推送
-    await pair_ws_manager.broadcast_to_admins({"event": "data_changed", "type": "comment", "id": comment.id})
+    await pair_ws_manager.broadcast_to_admins({"event": "data_changed", "type": "comment", "id": comment.id}, user_ids=resource_user_ids(db, EventTask, request.task_id))
     if user_new:
-        await pair_ws_manager.broadcast_to_admins({"event": "data_changed", "type": "user", "id": request.user.douyin_id})
+        await pair_ws_manager.broadcast_to_admins({"event": "data_changed", "type": "user", "id": request.user.douyin_id}, user_ids=resource_user_ids(db, EventTask, request.task_id))
 
     return {"comment_saved": True, "user_new": user_new}
 
@@ -1391,7 +1399,7 @@ async def dm_send_report(
 
     await pair_ws_manager.broadcast_to_admins({
         "event": "data_changed", "type": "conversation", "id": conv.id,
-    })
+    }, user_ids=resource_user_ids(db, EventDevice, conv.device_id))
     return {"ok": True}
 
 

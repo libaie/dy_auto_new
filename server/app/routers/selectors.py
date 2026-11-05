@@ -146,7 +146,7 @@ async def create_selector(
         "event": "selectors_updated",
         "version": version,
     })
-    await pair_ws_manager.broadcast_to_admins({"event": "selectors_changed"})
+    await pair_ws_manager.broadcast_invalidation("selectors_changed")
     return sel
 
 
@@ -181,7 +181,7 @@ async def update_selector(
         "event": "selectors_updated",
         "version": version,
     })
-    await pair_ws_manager.broadcast_to_admins({"event": "selectors_changed"})
+    await pair_ws_manager.broadcast_invalidation("selectors_changed")
     return sel
 
 
@@ -204,7 +204,7 @@ async def delete_selector(
         "event": "selectors_updated",
         "version": version,
     })
-    await pair_ws_manager.broadcast_to_admins({"event": "selectors_changed"})
+    await pair_ws_manager.broadcast_invalidation("selectors_changed")
     return {"deleted": True, "action_name": action_name}
 
 
@@ -229,5 +229,5 @@ async def toggle_selector(
         "event": "selectors_updated",
         "version": version,
     })
-    await pair_ws_manager.broadcast_to_admins({"event": "selectors_changed"})
+    await pair_ws_manager.broadcast_invalidation("selectors_changed")
     return sel

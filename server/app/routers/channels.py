@@ -3,16 +3,25 @@ from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.deps import verify_admin_token, require_role
+from app.deps import verify_admin_token, require_role, resource_user_ids
 from app.models import (
     ChannelCreate, ChannelUpdate, ChannelAppendItems,
     ChannelItemUpdate, ChannelEditRequest, ChannelItemEditRequest, BatchEditRequest,
 )
 from app.services.channel_service import channel_service
 from app.ws_manager import pair_ws_manager
-from app.db_models import Account, AccountGroup, ChannelItem, Device
+from app.db_models import Account, AccountGroup, ChannelItem, Device, Channel
 
 router = APIRouter(prefix="/api/channels", tags=["channels"])
+
+
+def _item_owner_ids(db: Session, item_ids: list[str], user: tuple) -> list[str]:
+    query = db.query(Channel.user_id).join(ChannelItem, ChannelItem.channel_id == Channel.id).filter(
+        ChannelItem.id.in_(item_ids)
+    )
+    if user[1] != "admin":
+        query = query.filter(Channel.user_id == user[0])
+    return list({owner_id for (owner_id,) in query.all() if owner_id})
 
 
 def _channel_to_response(ch, stats: dict, group_name: str = "") -> dict:
@@ -77,7 +86,7 @@ async def create_channel(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    await pair_ws_manager.broadcast_to_admins({"event": "channels_changed"})
+    await pair_ws_manager.broadcast_to_admins({"event": "channels_changed"}, user_ids=resource_user_ids(db, Channel, ch.id))
     group = db.query(AccountGroup).filter(AccountGroup.id == ch.group_id).first()
     stats = channel_service.get_channel_stats(db, ch.id)
     return _channel_to_response(ch, stats, group.name if group else "")
@@ -156,7 +165,7 @@ async def update_channel(
     if request.status == "active":
         await pair_ws_manager.broadcast_to_devices({"event": "new_task_available"})
 
-    await pair_ws_manager.broadcast_to_admins({"event": "channels_changed"})
+    await pair_ws_manager.broadcast_to_admins({"event": "channels_changed"}, user_ids=resource_user_ids(db, Channel, channel_id))
     return {"status": "updated", "id": channel_id}
 
 
@@ -172,7 +181,7 @@ async def delete_channel(
         channel_service.soft_delete_channel(db, channel_id, user_id=scope_user_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    await pair_ws_manager.broadcast_to_admins({"event": "channels_changed"})
+    await pair_ws_manager.broadcast_to_admins({"event": "channels_changed"}, user_ids=resource_user_ids(db, Channel, channel_id))
     return {"deleted": True, "id": channel_id}
 
 
@@ -189,7 +198,7 @@ async def append_items(
         channel_service.append_items(db, channel_id, request.keywords, user_id=scope_user_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    await pair_ws_manager.broadcast_to_admins({"event": "channels_changed"})
+    await pair_ws_manager.broadcast_to_admins({"event": "channels_changed"}, user_ids=resource_user_ids(db, Channel, channel_id))
     return {"appended": len(request.keywords), "channel_id": channel_id}
 
 
@@ -209,7 +218,7 @@ async def update_item(
         channel_service.update_item_status(db, item_id, request.status, user_id=scope_user_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    await pair_ws_manager.broadcast_to_admins({"event": "channels_changed"})
+    await pair_ws_manager.broadcast_to_admins({"event": "channels_changed"}, user_ids=_item_owner_ids(db, [item_id], user))
     return {"status": "updated", "item_id": item_id}
 
 
@@ -233,7 +242,7 @@ async def batch_edit_items(
         assigned_device_id=request.assigned_device_id,
         user_id=scope_user_id,
     )
-    await pair_ws_manager.broadcast_to_admins({"event": "channels_changed"})
+    await pair_ws_manager.broadcast_to_admins({"event": "channels_changed"}, user_ids=_item_owner_ids(db, request.item_ids, user))
     return result
 
 
@@ -258,7 +267,7 @@ async def edit_channel_item(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    await pair_ws_manager.broadcast_to_admins({"event": "channels_changed"})
+    await pair_ws_manager.broadcast_to_admins({"event": "channels_changed"}, user_ids=_item_owner_ids(db, [item_id], user))
 
     account_nickname = ""
     device_name = ""
@@ -296,7 +305,7 @@ async def edit_channel(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    await pair_ws_manager.broadcast_to_admins({"event": "channels_changed"})
+    await pair_ws_manager.broadcast_to_admins({"event": "channels_changed"}, user_ids=resource_user_ids(db, Channel, channel_id))
     await pair_ws_manager.broadcast_to_devices({"event": "new_task_available"})
     group = db.query(AccountGroup).filter(AccountGroup.id == ch.group_id).first()
     stats = channel_service.get_channel_stats(db, ch.id)

@@ -11,6 +11,8 @@ class PairWSManager:
         self._device_connections: dict[str, WebSocket] = {}
         # Admin connections: user_id → set of WebSockets
         self._admin_connections: dict[str, set[WebSocket]] = {}
+        # Roles belong to connections, so simultaneous sessions remain isolated.
+        self._admin_roles: dict[WebSocket, str] = {}
         # Device status connections: device_id → WebSocket
         self._device_status_connections: dict[str, WebSocket] = {}
         # Heartbeat memory cache: device_id → datetime
@@ -37,49 +39,66 @@ class PairWSManager:
 
     # --- Admin side (subscribing to events) ---
 
-    async def register_admin(self, ws: WebSocket, user_id: str = ""):
+    async def register_admin(self, ws: WebSocket, user_id: str = "", role: str = "admin"):
         await ws.accept()
         self._admin_connections.setdefault(user_id, set()).add(ws)
+        self._admin_roles[ws] = role
 
     def unregister_admin(self, ws: WebSocket):
+        self._admin_roles.pop(ws, None)
         for user_id, wss in list(self._admin_connections.items()):
             wss.discard(ws)
             if not wss:
                 del self._admin_connections[user_id]
 
     async def broadcast_to_admins(self, data: dict, user_ids: list[str] = None):
-        """Broadcast event to admin clients. If user_ids given, only to those users."""
+        """Deliver to administrators and explicitly scoped resource owners only."""
         dead = []
-        items = self._admin_connections.items()
+        items = list(self._admin_connections.items())
         for user_id, wss in items:
-            if user_ids is not None and user_id not in user_ids:
-                continue
             for ws in list(wss):
+                if self._admin_roles.get(ws) != "admin" and (not user_id or user_ids is None or user_id not in user_ids):
+                    continue
                 try:
                     await ws.send_json(data)
                 except Exception:
                     dead.append((user_id, ws))
         for user_id, ws in dead:
+            self._admin_roles.pop(ws, None)
             wss = self._admin_connections.get(user_id)
             if wss:
                 wss.discard(ws)
                 if not wss:
                     del self._admin_connections[user_id]
 
-    async def broadcast_channel_progress(self, channel_id: str, stats: dict):
+    async def broadcast_invalidation(self, event: str):
+        """Publish an intentional, payload-free refresh signal to all users.
+
+        Keep this allowlist separate from confidential resource notifications.
+        Callers cannot attach IDs, task results, or other per-user data.
+        """
+        allowed = {
+            "accounts_changed", "account_groups_changed", "chains_changed",
+            "content_changed", "selectors_changed", "prompt_templates_changed",
+        }
+        if not isinstance(event, str) or event not in allowed:
+            raise ValueError("Unsupported global invalidation event")
+        await self.broadcast_to_admins({"event": event}, user_ids=list(self._admin_connections))
+
+    async def broadcast_channel_progress(self, channel_id: str, stats: dict, user_ids: list[str] = None):
         """Push channel progress event to admin WS connections."""
         await self.broadcast_to_admins({
             "event": "channel_progress",
             "channel_id": channel_id,
             **stats,
-        })
+        }, user_ids=user_ids)
 
-    async def broadcast_channel_completed(self, channel_id: str):
+    async def broadcast_channel_completed(self, channel_id: str, user_ids: list[str] = None):
         """Push channel completed event to admin WS connections."""
         await self.broadcast_to_admins({
             "event": "channel_completed",
             "channel_id": channel_id,
-        })
+        }, user_ids=user_ids)
 
     # --- Heartbeat memory cache (avoids DB write on every ping) ---
 

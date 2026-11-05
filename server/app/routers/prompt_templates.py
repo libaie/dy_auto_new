@@ -383,10 +383,7 @@ async def create_template(
         "event": "prompt_templates_updated",
         "version": version,
     })
-    await pair_ws_manager.broadcast_to_admins({
-        "event": "prompt_templates_changed",
-        "version": version,
-    })
+    await pair_ws_manager.broadcast_invalidation("prompt_templates_changed")
     return tmpl
 
 
@@ -413,10 +410,7 @@ async def update_template(
         "event": "prompt_templates_updated",
         "version": version,
     })
-    await pair_ws_manager.broadcast_to_admins({
-        "event": "prompt_templates_changed",
-        "version": version,
-    })
+    await pair_ws_manager.broadcast_invalidation("prompt_templates_changed")
     return tmpl
 
 
@@ -436,10 +430,7 @@ async def delete_template(
         "event": "prompt_templates_updated",
         "version": version,
     })
-    await pair_ws_manager.broadcast_to_admins({
-        "event": "prompt_templates_changed",
-        "version": version,
-    })
+    await pair_ws_manager.broadcast_invalidation("prompt_templates_changed")
     return {"deleted": True, "name": name}
 
 
@@ -461,8 +452,5 @@ async def toggle_template(
         "event": "prompt_templates_updated",
         "version": version,
     })
-    await pair_ws_manager.broadcast_to_admins({
-        "event": "prompt_templates_changed",
-        "version": version,
-    })
+    await pair_ws_manager.broadcast_invalidation("prompt_templates_changed")
     return tmpl

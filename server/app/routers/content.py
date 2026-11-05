@@ -30,7 +30,7 @@ async def create_template(
         db, name=request.name, category=request.category,
         body=request.body, variables=request.variables,
     )
-    await pair_ws_manager.broadcast_to_admins({"event": "content_changed"})
+    await pair_ws_manager.broadcast_invalidation("content_changed")
     return result
 
 
@@ -70,7 +70,7 @@ async def update_template(
     tpl = content_service.update_template(db, template_id, **updates)
     if not tpl:
         raise HTTPException(status_code=404, detail="Template not found")
-    await pair_ws_manager.broadcast_to_admins({"event": "content_changed"})
+    await pair_ws_manager.broadcast_invalidation("content_changed")
     return tpl
 
 
@@ -82,7 +82,7 @@ async def delete_template(
 ):
     if not content_service.delete_template(db, template_id):
         raise HTTPException(status_code=404, detail="Template not found")
-    await pair_ws_manager.broadcast_to_admins({"event": "content_changed"})
+    await pair_ws_manager.broadcast_invalidation("content_changed")
     return {"ok": True}
 
 
@@ -96,7 +96,7 @@ async def add_sensitive_word(
 ):
     try:
         result = content_service.add_sensitive_word(db, request.word)
-        await pair_ws_manager.broadcast_to_admins({"event": "content_changed"})
+        await pair_ws_manager.broadcast_invalidation("content_changed")
         return result
     except ValueError:
         raise HTTPException(status_code=409, detail="Word already exists")
@@ -121,7 +121,7 @@ async def delete_sensitive_word(
 ):
     if not content_service.delete_sensitive_word(db, word_id):
         raise HTTPException(status_code=404, detail="Word not found")
-    await pair_ws_manager.broadcast_to_admins({"event": "content_changed"})
+    await pair_ws_manager.broadcast_invalidation("content_changed")
     return {"ok": True}
 
 

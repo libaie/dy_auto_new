@@ -151,7 +151,7 @@ AI_THINKING_LEVELS = {
 }
 
 
-def _resolve_ai_config(db=None):
+def _resolve_ai_config(db=None, *, settings_snapshot=None):
     """从 DB 读取 AI 配置，fallback 到环境变量。内部使用，含 API Key。
     Key 命名：llm_* 优先（新），ai_* 作为 fallback（旧，兼容期保留）。
     """
@@ -160,10 +160,12 @@ def _resolve_ai_config(db=None):
     model = os.getenv("AI_MODEL", "deepseek-chat")
     thinking = os.getenv("AI_THINKING", "max")
 
-    if db:
+    if db or settings_snapshot is not None:
         try:
-            from app.db_models import SystemSetting
-            settings = {s.key: s.value for s in db.query(SystemSetting).all()}
+            settings = settings_snapshot
+            if settings is None:
+                from app.db_models import SystemSetting
+                settings = {s.key: s.value for s in db.query(SystemSetting).all()}
             # llm_* keys take priority (new naming), ai_* fallback (legacy)
             api_key = settings.get("llm_api_key") or settings.get("ai_api_key") or api_key
             base_url = settings.get("llm_base_url") or settings.get("ai_base_url") or base_url
@@ -179,6 +181,7 @@ def _resolve_ai_config(db=None):
 
     return {
         "api_key": api_key,
+        "base_url": base_url,
         "api_url": f"{base_url}/v1/chat/completions",
         "model": model,
         "thinking_enabled": level != "disabled",
@@ -227,17 +230,19 @@ PIXELLE_CONFIG_PATH = os.getenv("PIXELLE_CONFIG_PATH", str(SERVER_DIR.parent.par
 SEEDANCE_API_KEY = os.getenv("SEEDANCE_API_KEY", "")
 
 
-def _resolve_pixelle_config(db=None):
+def _resolve_pixelle_config(db=None, *, settings_snapshot=None):
     """从 DB 读取 Pixelle-Video 配置，fallback 到环境变量/默认值。"""
     url = PIXELLE_VIDEO_URL
     timeout = PIXELLE_VIDEO_TIMEOUT
 
-    if db:
+    if db or settings_snapshot is not None:
         import logging
         _log = logging.getLogger(__name__)
         try:
-            from app.db_models import SystemSetting
-            settings = {s.key: s.value for s in db.query(SystemSetting).all()}
+            settings = settings_snapshot
+            if settings is None:
+                from app.db_models import SystemSetting
+                settings = {s.key: s.value for s in db.query(SystemSetting).all()}
             url = settings.get("pixelle_video_url") or url
             try:
                 timeout = int(settings.get("pixelle_video_timeout", timeout))

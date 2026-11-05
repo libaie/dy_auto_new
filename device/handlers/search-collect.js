@@ -5,6 +5,7 @@ var aiAnalyzer = require("../core/ai-analyzer");
 var apiClient = require("../core/api-client");
 var logger = require("../utils/logger");
 var commentUtils = require("./comment-utils");
+var taskCancellation = require("../core/task-cancellation");
 
 var TAG = "采集";
 
@@ -77,6 +78,7 @@ SearchCollectHandler._processComments = function (params, stats, videoIndex) {
   var t0 = Date.now();
 
   while (true) {
+    if (taskCancellation.isCancelled()) break;
     if (consecutiveEmpty >= 5) {
       logger.info(TAG, "[耗时] 连续 " + consecutiveEmpty + " 轮无有效评论, 停止");
       break;
@@ -99,6 +101,7 @@ SearchCollectHandler._processComments = function (params, stats, videoIndex) {
     var tScrollStart = Date.now();
 
     for (var i = 0; i < items.length; i++) {
+      if (taskCancellation.isCancelled()) break;
       if (collected >= maxComments) break;
       var tItem = Date.now();
       var comment = commentUtils.parseCommentItem(items[i], this);
@@ -130,6 +133,7 @@ SearchCollectHandler._processComments = function (params, stats, videoIndex) {
       comment._keyword = keyword;
       var tAI = Date.now();
       if (!this._aiQualify(comment)) { aiSkipped++; logger.info(TAG, "  [" + i + "] AI淘汰: " + comment.nickname); continue; }
+      if (taskCancellation.isCancelled()) break;
       validThisScroll++;
 
       logger.info(TAG, "  [" + i + "] ★符合: " + comment.nickname);
@@ -158,6 +162,7 @@ SearchCollectHandler._processComments = function (params, stats, videoIndex) {
       }
     }
 
+    if (taskCancellation.isCancelled()) break;
     if (reopenFailed) {
       logger.info(TAG, "[耗时] 评论区重开失败，停止 (已采集 " + collected + " 条)");
       break;
@@ -206,9 +211,12 @@ SearchCollectHandler._aiQualify = function (comment) {
       searchKeyword: (comment._keyword || ""),
       nickname: comment.nickname,
       commentText: comment.text,
+      generateReply: false,
     });
+    var quality = result && result.dimensions && result.dimensions.lead_quality;
+    if (quality && (quality.is_bot === true || quality.is_competitor === true)) return false;
     if (result && typeof result.score === "number") return result.score >= 40;
-    return result && result.qualified === true;
+    return !!(result && result.qualified === true);
   } catch (e) { logger.warn(TAG, "AI分析失败: " + e.message); return false; }
 };
 
@@ -240,6 +248,7 @@ SearchCollectHandler._collectCommentData = function (item, comment) {
 };
 
 SearchCollectHandler._collectUserData = function (item) {
+  if (taskCancellation.isCancelled()) return null;
   var avatarEl = this._findChildBySelector(item, "comment_author_avatar");
   if (!avatarEl) { logger.warn(TAG, "头像未找到"); return null; }
   if (avatarEl.isImage || avatarEl.isCoordinate) { logger.warn(TAG, "头像为虚拟元素"); return null; }
@@ -247,12 +256,7 @@ SearchCollectHandler._collectUserData = function (item) {
   var avatarBase64 = commentUtils._cropCircularAvatar(avatarEl);
 
   try {
-    var b = avatarEl.bounds();
-    if (avatarEl.clickable()) {
-      avatarEl.click();
-    } else if (b) {
-      press(b.centerX(), b.centerY(), 80);
-    }
+    if (taskCancellation.isCancelled() || !uiOperator.clickElement(avatarEl)) return null;
   } catch (e) { logger.warn(TAG, "头像点击失败"); return null; }
   sleep(1700);
 
@@ -282,12 +286,14 @@ SearchCollectHandler.execute = function (params) {
 };
 
 SearchCollectHandler._executeShareLinks = function (params) {
+  aiAnalyzer.useTemplate(params.prompt_template_id);
   var links = params.share_links;
   var taskId = params.task_id || "";
   logger.info(TAG, "分享链接采集: " + links.length + " 个链接, 关键词='" + (params.keyword || "") + "'");
   var linkStats = { success_count: 0, fail_count: 0, details: [], _taskId: taskId, _keyword: params.keyword || "" };
 
   for (var li = 0; li < links.length; li++) {
+    if (taskCancellation.isCancelled()) break;
     var link = (links[li] || "").trim();
     if (!link) continue;
     logger.info(TAG, "第 " + (li + 1) + "/" + links.length + " 个链接: " + link.substring(0, 40) + "...");

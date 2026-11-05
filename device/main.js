@@ -81,7 +81,7 @@ function startPairingFlow() {
       var sec = pairing.getSavedSecret();
       floatingWindow.showMainUI();
       global.__paired = true;
-      startMainLoop(url, sec);
+      startMainLoop(url, sec, result.config);
       return;
     }
 
@@ -107,7 +107,7 @@ function startPairingWait() {
       var sec = pairing.getSavedSecret();
       floatingWindow.showMainUI();
       global.__paired = true;
-      startMainLoop(url, sec);
+      startMainLoop(url, sec, result.config);
     } else if (result && result.status === "rejected") {
       logger.warn(TAG, "配对被拒绝，2 秒后重新显示配对界面");
       floatingWindow.updatePairStatus("配对已被拒绝");
@@ -147,7 +147,7 @@ function startPairingPoll() {
           } else if (res && res.status === "approved") {
             floatingWindow.showMainUI();
             global.__paired = true;
-            startMainLoop(pairing.getSavedServerUrl(), pairing.getSavedSecret());
+            startMainLoop(pairing.getSavedServerUrl(), pairing.getSavedSecret(), res.config);
           }
         });
       }, 2000);
@@ -162,7 +162,7 @@ function startPairingPoll() {
       logger.info(TAG, "配对已批准，启动主循环");
       floatingWindow.showMainUI();
       global.__paired = true;
-      startMainLoop(pairing.getSavedServerUrl(), pairing.getSavedSecret());
+      startMainLoop(pairing.getSavedServerUrl(), pairing.getSavedSecret(), status.config);
     } else if (status.status === "rejected") {
       clearInterval(pollTimer);
       logger.warn(TAG, "配对被拒绝，2 秒后重新显示配对界面");
@@ -179,8 +179,9 @@ function startPairingPoll() {
  * 主循环 — 事件驱动，通过 WS 推送接收任务
  * @param {string} [serverUrl] - 服务端地址（配对成功时显式传入）
  * @param {string} [secret] - 设备密钥（配对成功时显式传入）
+ * @param {Object} [initialConfig] - 配对批准时返回的完整配置
  */
-function startMainLoop(serverUrl, secret) {
+function startMainLoop(serverUrl, secret, initialConfig) {
   // 使用显式参数或从 storage 读取
   config.serverUrl = serverUrl || pairing.getSavedServerUrl();
   config.deviceSecret = secret || pairing.getSavedSecret();
@@ -190,11 +191,27 @@ function startMainLoop(serverUrl, secret) {
     return;
   }
 
+  // A replacement pairing retires the old session, but its worker keeps the
+  // shared execution slot until it actually exits.
+  if (_mainLoopRuntime.retire) _mainLoopRuntime.retire();
+  var session = {};
+  var apiSession = null;
+
   logger.info(TAG, "Device ID: " + config.deviceId);
   logger.info(TAG, "Server: " + config.serverUrl);
   logger.info(TAG, "Secret: " + config.deviceSecret.substring(0, 8) + "...");
 
   var heartbeatTimer = null;
+  var authFailed = false;
+  var _configReady = false;
+  var _initialized = false;
+  // 每次配对/启动都重新确认服务端配置，不能沿用上一次服务端的决策开关。
+  config.decision = {
+    enabled: false,
+    model: "typesafe-ai/jev",
+    min_confidence: 0.5,
+    min_probability: 0.75
+  };
 
   // 任务队列 — WS 推送的任务排队执行
   var _taskBusy = false;
@@ -202,9 +219,42 @@ function startMainLoop(serverUrl, secret) {
   var _needsRestart = false;  // watchdog 触发后拒绝新任务，防止双任务并发操作 UI
   var _knownTaskIds = {};       // taskId→true: 当前运行中+已入队的 task id，防重复派发
   var _recentlyFinished = [];   // 最近完成的 task id + lease (最多 20 个)，防同一轮执行重放
+  var _activePolls = [];        // 只保留未结束的请求及其期间收到的取消 ID
+  var _hasCancellation = false;
   var MAX_RECENT = 20;
-  _mainLoopRuntime.isIdle = function () { return !_taskBusy && _taskQueue.length === 0 && !_needsRestart; };
+  _mainLoopRuntime.isIdle = function () {
+    return !authFailed && _initialized && _configReady && !_taskBusy && !_mainLoopRuntime.activeRun && _taskQueue.length === 0 && !_needsRestart;
+  };
+  _mainLoopRuntime.needsConfig = function () { return !authFailed && _initialized && !_configReady && !_needsRestart; };
   _mainLoopRuntime.catchUpPoll = function () { catchUpPoll(); };
+  _mainLoopRuntime.retire = retireSession;
+  _mainLoopRuntime.resumeTasks = function () {
+    if (authFailed || _needsRestart) return;
+    processTaskQueue();
+    if (!_taskBusy && _taskQueue.length === 0) catchUpPoll();
+  };
+
+  function retireSession() {
+    authFailed = true;
+    _taskQueue = [];
+    _knownTaskIds = {};
+    var run = _mainLoopRuntime.activeRun;
+    if (run && run.session === session) {
+      run.cancelled = true;
+      taskExecutor.cancel(run.task.id, run.task.lease_id);
+    }
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
+    deviceWs.stop();
+  }
+
+  function applyRuntimeConfig(serverConfig, fullConfig) {
+    if (authFailed || !serverConfig || typeof serverConfig !== "object" || Array.isArray(serverConfig)) return;
+    applyServerConfig(serverConfig);
+    // 完整握手缺少 decision_config 表示旧服务端；局部 WS 更新不能作此推断。
+    var decision = serverConfig.decision_config;
+    if ((decision && typeof decision.enabled === "boolean") ||
+        (fullConfig && decision === undefined)) _configReady = true;
+  }
 
   function _attemptKey(task) {
     return JSON.stringify([task.id, task.lease_id || ""]);
@@ -220,8 +270,14 @@ function startMainLoop(serverUrl, secret) {
     return false;
   }
 
-  function handleTask(task) {
-    if (!task || !task.id) return;
+  function handleTask(task, pollFrame) {
+    if (authFailed || !task || !task.id) return;
+    if (!pollFrame && _hasCancellation) {
+      // 取消后的直接推送可能是无租约的旧链任务；以新 poll 的服务端状态为准。
+      catchUpPoll();
+      return;
+    }
+    if (pollFrame && pollFrame.cancelled[task.id]) return;
     if (_isDuplicateTask(task)) {
       logger.info(TAG, "忽略重复任务: " + task.id + " (已在队列/执行中/近期完成)");
       return;
@@ -232,10 +288,12 @@ function startMainLoop(serverUrl, secret) {
   }
 
   function processTaskQueue() {
-    if (_needsRestart || _taskBusy || _taskQueue.length === 0) return;
+    if (authFailed || !_initialized || !_configReady || _needsRestart || _taskBusy || _mainLoopRuntime.activeRun || _taskQueue.length === 0) return;
     _taskBusy = true;
     _idleTicks = 0;
     var task = _taskQueue.shift();
+    var run = { task: task, session: session, apiSession: apiSession, cancelled: false };
+    _mainLoopRuntime.activeRun = run;
 
     // Watchdog: 10min 超时 → 取消任务，进入维护状态
     // 不释放 busy 锁 → 旧线程最终退出后 finally 块释放 → 防止双任务并发操作 UI
@@ -244,20 +302,25 @@ function startMainLoop(serverUrl, secret) {
     var _watchdog = setTimeout(function () {
       if (!_completed) {
         logger.error(TAG, "任务超时 (" + (TASK_TIMEOUT_MS / 60000) + "min): " + task.id + "，取消任务，设备进入维护状态");
-        taskExecutor.cancel(task.id);
+        run.cancelled = true;
+        taskExecutor.cancel(task.id, task.lease_id);
         _needsRestart = true;
       }
     }, TASK_TIMEOUT_MS);
 
     threads.start(function () {
       try {
+        if (authFailed) return;
         logger.info(TAG, "执行任务: " + task.id + " (" + task.type + ")");
         floatingWindow.setStatus("running");
 
         var flowContext = require("./core/flow-context");
         flowContext.reset();
 
-        var result = taskExecutor.execute(task);
+        var result = run.cancelled
+          ? { status: "cancelled", result: { error: "Task cancelled before execution" } }
+          : taskExecutor.execute(task, run);
+        if (authFailed) return;
 
         // 上报结果
         var uiSnapshot = null;
@@ -270,13 +333,14 @@ function startMainLoop(serverUrl, secret) {
           }
         }
 
-        var reportResult = apiClient.report(task.id, result.status, result.result, uiSnapshot, task.lease_id);
+        if (authFailed) return;
+        var reportResult = apiClient.report(task.id, result.status, result.result, uiSnapshot, task.lease_id, apiSession);
         if (reportResult) {
           logger.info(TAG, "任务结果已上报: " + result.status);
         } else {
-          logger.warn(TAG, "任务结果上报失败，已加入离线队列重试: " + result.status);
+          logger.warn(TAG, "任务结果上报失败: " + result.status);
         }
-        floatingWindow.setStatus(result.status === "completed" ? "success" : "error");
+        if (!authFailed) floatingWindow.setStatus(result.status === "completed" ? "success" : "error");
       } catch (e) {
         logger.error(TAG, "任务执行异常: " + e.message);
       } finally {
@@ -288,13 +352,11 @@ function startMainLoop(serverUrl, secret) {
         if (!_completed) {
           _completed = true;
           _taskBusy = false;
-          if (!_needsRestart) {
-            processTaskQueue();
-            if (_taskQueue.length === 0 && !_taskBusy) {
-              catchUpPoll();
-            }
-          } else {
+          if (_mainLoopRuntime.activeRun === run) _mainLoopRuntime.activeRun = null;
+          if (_needsRestart && !authFailed) {
             logger.error(TAG, "任务 " + task.id + " 被 watchdog 强杀后线程退出，设备状态不可靠，拒绝新任务，建议重启设备");
+          } else if (_mainLoopRuntime.resumeTasks) {
+            _mainLoopRuntime.resumeTasks();
           }
         }
       }
@@ -308,7 +370,7 @@ function startMainLoop(serverUrl, secret) {
   function applyPollSideData(response) {
     if (!response) return;
     if (response.proxy) apiClient.setProxy(response.proxy);
-    if (response.device_config) applyServerConfig(response.device_config);
+    if (response.device_config) applyRuntimeConfig(response.device_config, true);
     if (response.anti_detect_config) antiDetect.updateFromServer(response.anti_detect_config);
     if (response.selectors_version) selectorLoader.checkAndUpdate(response.selectors_version);
     if (response.prompt_templates_version) promptTemplateLoader.checkAndUpdate(response.prompt_templates_version);
@@ -321,17 +383,14 @@ function startMainLoop(serverUrl, secret) {
   }
 
   // 认证失败处理
-  var authFailed = false;
   function handleAuthFailure() {
     if (authFailed) return;
-    authFailed = true;
+    retireSession();
     logger.error(TAG, "设备认证失败，清除配对信息，重新配对");
 
     config.deviceSecret = "";
     config.serverUrl = "";
 
-    deviceWs.stop();
-    if (heartbeatTimer) clearInterval(heartbeatTimer);
     pairing.clear();
 
     global.__paired = false;
@@ -345,7 +404,7 @@ function startMainLoop(serverUrl, secret) {
       if (result.status === "approved") {
         floatingWindow.showMainUI();
         global.__paired = true;
-        startMainLoop(pairing.getSavedServerUrl(), pairing.getSavedSecret());
+        startMainLoop(pairing.getSavedServerUrl(), pairing.getSavedSecret(), result.config);
         return;
       }
       floatingWindow.showWaitingUI();
@@ -353,6 +412,7 @@ function startMainLoop(serverUrl, secret) {
     });
   }
   apiClient.setAuthFailureHandler(handleAuthFailure);
+  apiSession = apiClient.captureSession();
   deviceWs.setAuthFailureHandler(handleAuthFailure);
 
   // WS 重连后重新 poll 捕获离线期间的任务
@@ -365,6 +425,7 @@ function startMainLoop(serverUrl, secret) {
   // 注册 WS 推送回调
   deviceWs.setCallbacks({
     onTask: function (task) {
+      if (authFailed) return;
       syncDMSequences();
       handleTask(task);
     },
@@ -372,24 +433,28 @@ function startMainLoop(serverUrl, secret) {
       _handleCancelledTask(taskId);
     },
     onSelectorsUpdated: function (version) {
+      if (authFailed) return;
       logger.info(TAG, "选择器更新: v" + version);
       selectorLoader.checkAndUpdate(version);
     },
     onPromptTemplatesUpdated: function (version) {
+      if (authFailed) return;
       logger.info(TAG, "提示词模板更新: v" + version);
       promptTemplateLoader.checkAndUpdate(version);
     },
     onConfigUpdated: function (serverConfig, proxy) {
-      if (serverConfig) applyServerConfig(serverConfig);
+      if (authFailed) return;
+      applyRuntimeConfig(serverConfig, false);
       if (proxy) apiClient.setProxy(proxy);
+      processTaskQueue();
     },
     onNewTaskAvailable: function () {
       catchUpPoll();
     },
     onDeviceRemoved: function () {
+      if (authFailed) return;
+      retireSession();
       logger.error(TAG, "设备已被服务端移除，返回配对界面");
-      deviceWs.stop();
-      if (heartbeatTimer) clearInterval(heartbeatTimer);
       pairing.clear();
       config.deviceSecret = "";
       config.serverUrl = "";
@@ -404,7 +469,7 @@ function startMainLoop(serverUrl, secret) {
         if (result.status === "approved") {
           floatingWindow.showMainUI();
           global.__paired = true;
-          startMainLoop(pairing.getSavedServerUrl(), pairing.getSavedSecret());
+          startMainLoop(pairing.getSavedServerUrl(), pairing.getSavedSecret(), result.config);
           return;
         }
         floatingWindow.showWaitingUI();
@@ -415,8 +480,12 @@ function startMainLoop(serverUrl, secret) {
 
   // 启动 WS
   // 初始化选择器（必须在 WS 连接前完成，否则 catch-up 任务找不到选择器）
+  applyRuntimeConfig(initialConfig, true);
   selectorLoader.init();
   promptTemplateLoader.init();
+  if (authFailed) return;
+  _initialized = true;
+  processTaskQueue();
 
   try {
     deviceWs.start();
@@ -451,7 +520,8 @@ function startMainLoop(serverUrl, secret) {
     var regResult = apiClient.register(deviceInfo);
     if (regResult) {
       logger.info(TAG, "设备已注册: " + regResult.device_id);
-      applyServerConfig(regResult.config);
+      applyRuntimeConfig(regResult.config, true);
+      processTaskQueue();
     } else {
       logger.warn(TAG, "设备注册失败，继续运行");
     }
@@ -461,6 +531,7 @@ function startMainLoop(serverUrl, secret) {
 
   // 一次性 poll 捕获离线期间的任务
   catchUpPoll();
+  if (authFailed) return;
 
   // 心跳定时器
   heartbeatTimer = setInterval(function () {
@@ -478,16 +549,32 @@ function startMainLoop(serverUrl, secret) {
    * check_cancelled_running 会持续投递，设备卡在取消循环拿不到新任务。
    */
   function _handleCancelledTask(taskId) {
+    if (authFailed) return;
+    _hasCancellation = true;
+    for (var p = 0; p < _activePolls.length; p++) {
+      _activePolls[p].cancelled[taskId] = true;
+    }
     logger.info(TAG, "收到服务端取消任务: " + taskId);
-    var currentTaskId = taskExecutor.getCurrentTaskId();
-    if (currentTaskId === taskId) {
-      // Task is running — flag it; handler will exit via isCancelled() and report
-      taskExecutor.cancel(taskId);
+    var run = _mainLoopRuntime.activeRun;
+    if (run && run.session === session && run.task.id === taskId) {
+      // The reservation includes workers not yet inside taskExecutor.execute.
+      // Its token stays with this lease, including across executor initialization.
+      run.cancelled = true;
+      taskExecutor.cancel(taskId, run.task.lease_id);
     } else {
+      // 配置未就绪时任务也可能已排队；取消后不能在配置恢复时执行它。
+      var cancelledLease;
+      for (var i = _taskQueue.length - 1; i >= 0; i--) {
+        if (_taskQueue[i].id === taskId) {
+          cancelledLease = _taskQueue[i].lease_id;
+          _taskQueue.splice(i, 1);
+          delete _knownTaskIds[taskId];
+        }
+      }
       // Task not running — ack immediately so server clears device_id
       logger.info(TAG, "任务未在运行，直接确认取消: " + taskId);
       try {
-        apiClient.report(taskId, "cancelled", { error: "Ack server cancel (task not running)" });
+        apiClient.report(taskId, "cancelled", { error: "Ack server cancel (task not running)" }, null, cancelledLease, apiSession);
       } catch (e) {
         logger.warn(TAG, "确认取消上报失败: " + e.message);
       }
@@ -498,9 +585,12 @@ function startMainLoop(serverUrl, secret) {
    * catch-up poll — 捕获离线期间积累的任务
    */
   function catchUpPoll() {
+    if (authFailed) return;
+    var pollFrame = { cancelled: {} };
+    _activePolls.push(pollFrame);
     try {
       var response = apiClient.poll();
-      if (!response) return;
+      if (authFailed || !response) return;
 
       applyPollSideData(response);
 
@@ -513,10 +603,19 @@ function startMainLoop(serverUrl, secret) {
         if (response.task.params && response.task.params.dm_sequence_id) {
           syncDMSequences();
         }
-        handleTask(response.task);
+        handleTask(response.task, pollFrame);
       }
+      // 配置恢复时可能没有新任务；已有队列也需要在取消/侧数据处理后释放。
+      processTaskQueue();
     } catch (e) {
       logger.warn(TAG, "catch-up poll 失败: " + e.message);
+    } finally {
+      for (var i = _activePolls.length - 1; i >= 0; i--) {
+        if (_activePolls[i] === pollFrame) {
+          _activePolls.splice(i, 1);
+          break;
+        }
+      }
     }
   }
 
@@ -536,7 +635,7 @@ function _startIdlePoll() {
   if (_idlePollTimer) clearInterval(_idlePollTimer);
   _idlePollTimer = setInterval(function () {
     if (!_mainLoopRuntime.isIdle || !_mainLoopRuntime.catchUpPoll) return;
-    if (_mainLoopRuntime.isIdle()) {
+    if (_mainLoopRuntime.isIdle() || (_mainLoopRuntime.needsConfig && _mainLoopRuntime.needsConfig())) {
       _mainLoopRuntime.catchUpPoll();
       if (_mainLoopRuntime.isIdle()) {
         _idleTicks++;
@@ -573,6 +672,30 @@ function applyServerConfig(serverConfig) {
   }
   if (serverConfig.anti_detect_config_version !== undefined) {
     config.antiDetectVersion = serverConfig.anti_detect_config_version;
+  }
+
+  if (serverConfig.decision_config && typeof serverConfig.decision_config === "object") {
+    var incomingDecision = serverConfig.decision_config;
+    var currentDecision = config.decision || {};
+    // 显式 false/0 也必须生效，只接收公开字段。
+    var decisionEnabled = typeof incomingDecision.enabled === "boolean" ?
+      incomingDecision.enabled : currentDecision.enabled === true;
+    var decisionModel = typeof incomingDecision.model === "string" && incomingDecision.model.trim() ?
+      incomingDecision.model.trim() : (currentDecision.model || "typesafe-ai/jev");
+    var minConfidence = currentDecision.min_confidence;
+    var minProbability = currentDecision.min_probability;
+    if (typeof minConfidence !== "number" || !isFinite(minConfidence) || minConfidence < 0 || minConfidence > 1) minConfidence = 0.5;
+    if (typeof minProbability !== "number" || !isFinite(minProbability) || minProbability < 0 || minProbability > 1) minProbability = 0.75;
+    if (typeof incomingDecision.min_confidence === "number" && isFinite(incomingDecision.min_confidence) &&
+      incomingDecision.min_confidence >= 0 && incomingDecision.min_confidence <= 1) minConfidence = incomingDecision.min_confidence;
+    if (typeof incomingDecision.min_probability === "number" && isFinite(incomingDecision.min_probability) &&
+      incomingDecision.min_probability >= 0 && incomingDecision.min_probability <= 1) minProbability = incomingDecision.min_probability;
+    config.decision = {
+      enabled: decisionEnabled,
+      model: decisionModel,
+      min_confidence: minConfidence,
+      min_probability: minProbability
+    };
   }
 
   if (serverConfig.ai_config) {

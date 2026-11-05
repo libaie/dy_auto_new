@@ -7,6 +7,9 @@ var aiAnalyzer = require("../core/ai-analyzer");
 var flowContext = require("../core/flow-context");
 var taskCancellation = require("../core/task-cancellation");
 var taskTimeout = require("../core/task-timeout");
+var screenContext = require("../core/screen-context");
+var commentUtils = require("./comment-utils");
+var ocrLocator = require("../core/ocr-locator");
 
 var TAG = "搜索";
 
@@ -141,11 +144,19 @@ SearchBaseHandler.execute = function (params) {
       }
     }
 
+    if (taskCancellation.isCancelled()) break;
+    this._lastSendOutcome = "not_attempted";
     var interactResult = this._interactWithVideo(content, stats);
     if (interactResult) {
       stats.success_count++;
     } else {
       stats.fail_count++;
+    }
+
+    if (this._lastSendOutcome === "unknown") {
+      logger.warn(TAG, "发送结果无法确认，停止当前搜索以避免继续或重复发送");
+      stats.details.push("send_unconfirmed at video " + (i + 1));
+      break;
     }
 
     antiDetect.maybePause();
@@ -220,13 +231,16 @@ SearchBaseHandler._inputKeyword = function (keyword) {
     return false;
   }
   // 在屏幕顶部区域限定查找可聚焦的搜索输入框
+  var ctx = screenContext.read();
+  var header = commentUtils.usableBounds(ctx.contentBounds, ctx);
+  if (!header) return false;
+  header.bottom = Math.min(header.bottom, header.top + Math.max(screenContext.dp(96, ctx), (header.bottom - header.top) * 0.3));
   var allEdits = className("EditText").find();
   var editBox = null;
   for (var ei = 0; ei < allEdits.length; ei++) {
     try {
       if (!allEdits[ei].focusable()) continue;
-      var b = allEdits[ei].bounds();
-      if (b && b.top < device.height * 0.3) { editBox = allEdits[ei]; break; }
+      if (commentUtils.visibleNode(allEdits[ei], ctx, header)) { editBox = allEdits[ei]; break; }
     } catch (e) {}
   }
   if (!editBox) {
@@ -243,27 +257,17 @@ SearchBaseHandler._inputKeyword = function (keyword) {
  * 点击联想词 — RecyclerView 内遍历匹配关键词
  */
 SearchBaseHandler._clickSuggestion = function (keyword) {
-  // RecyclerView 遍历匹配联想词
-  var rv = id("recycler_view").findOne(2000);
-  if (!rv) {
-    var allRVs = className("androidx.recyclerview.widget.RecyclerView").find();
-    if (allRVs.length === 0) allRVs = className("android.support.v7.widget.RecyclerView").find();
-    for (var ri = 0; ri < allRVs.length; ri++) {
-      var rvb = allRVs[ri].bounds();
-      if (rvb && rvb.height() < device.height * 0.5 && rvb.top < device.height * 0.4) {
-        rv = allRVs[ri]; break;
-      }
-    }
-  }
-  if (rv) {
+  var ctx = screenContext.read();
+  var rv = commentUtils.findListContainer(null);
+  var scope = rv ? commentUtils.usableBounds(rv.bounds(), ctx) : null;
+  if (scope) {
     var children = rv.children();
     for (var c = 0; c < children.length; c++) {
       var ct = children[c].findOne(text(keyword));
-      if (ct) {
-        logger.info(TAG, "点击联想词: '" + ct.text() + "'");
-        var gpp = ct.parent().parent();
-        var bb = gpp.bounds();
-        if (bb) { press(bb.centerX(), bb.centerY(), 150); sleep(500); return true; }
+      if (ct && commentUtils.clickWithin(ct, scope)) {
+        logger.info(TAG, "点击联想词: '" + keyword + "'");
+        sleep(500);
+        return true;
       }
     }
   }
@@ -277,7 +281,12 @@ SearchBaseHandler._clickSuggestion = function (keyword) {
  * 优先使用选择器系统，回退到硬编码
  */
 SearchBaseHandler._clickVideoTab = function () {
-  var clicked = this.safeClick("search_video_tab", 2);
+  var ctx = screenContext.read();
+  var tabs = uiOperator.findElements("search_video_tab", 2000);
+  var clicked = false;
+  for (var ti = 0; ti < tabs.length; ti++) {
+    if (commentUtils.clickWithin(tabs[ti], ctx.contentBounds)) { clicked = true; break; }
+  }
   if (clicked) {
     logger.info(TAG, "点击视频标签");
     return true;
@@ -327,6 +336,9 @@ SearchBaseHandler._sortResults = function (sortBy) {
     var ocrScreen = images.captureScreen();
     if (ocrScreen) {
       try {
+        // Coordinates belong to this capture, not the later recognition time.
+        // Preserve its signature/age so the live executor can reject staleness.
+        var ocrContext = screenContext.read(ocrScreen);
         var ocrResult = null;
         if (typeof images.paddleOcr === "function") {
           try { ocrResult = images.paddleOcr(ocrScreen); } catch (e) {}
@@ -343,41 +355,7 @@ SearchBaseHandler._sortResults = function (sortBy) {
         }
 
         if (ocrResult) {
-          if (Array.isArray(ocrResult)) {
-            // paddleOcr / mlKitOcr / ocr.recognizeText: 结构化数组
-            for (var oi = 0; oi < ocrResult.length; oi++) {
-              var item = ocrResult[oi];
-              var itemText = (item.text || "").replace(/\s/g, "");
-              for (var kj = 0; kj < ocrKeywords.length; kj++) {
-                if (itemText.indexOf(ocrKeywords[kj]) !== -1) {
-                  var ocrX, ocrY;
-                  if (item.bounds) {
-                    ocrX = (item.bounds.left + item.bounds.right) / 2;
-                    ocrY = (item.bounds.top + item.bounds.bottom) / 2;
-                  } else if (item.x != null && item.y != null) {
-                    ocrX = item.x; ocrY = item.y;
-                  }
-                  if (ocrX && ocrY) {
-                    logger.info(TAG, "OCR 命中: '" + itemText + "' 坐标(" + ocrX + "," + ocrY + ")");
-                    optionEl = { isCoordinate: true, x: ocrX, y: ocrY };
-                    break;
-                  }
-                }
-              }
-              if (optionEl) break;
-            }
-          } else if (typeof ocrResult === "string") {
-            // ocr() 返回拼接文本字符串，无坐标信息
-            var cleanAll = ocrResult.replace(/\s/g, "");
-            for (var kk = 0; kk < ocrKeywords.length; kk++) {
-              if (cleanAll.indexOf(ocrKeywords[kk]) !== -1) {
-                // OCR 确认弹窗存在，用排序弹窗典型布局近似定位（右上方区域）
-                logger.info(TAG, "OCR 字符串命中: '" + ocrKeywords[kk] + "'，使用排序弹窗近似坐标");
-                optionEl = { isCoordinate: true, x: Math.round(device.width * 0.72), y: Math.round(device.height * 0.28) };
-                break;
-              }
-            }
-          }
+          optionEl = ocrLocator.locateUnique(ocrResult, ocrKeywords, ocrContext, ocrContext.contentBounds);
         }
         if (!optionEl) {
           logger.warn(TAG, "OCR 也未找到排序选项: " + sortBy);
@@ -394,7 +372,7 @@ SearchBaseHandler._sortResults = function (sortBy) {
   }
 
   // 点击排序选项
-  uiOperator.clickElement(optionEl);
+  if (!uiOperator.clickElement(optionEl)) return false;
   logger.info(TAG, "排序方式: " + sortBy);
   sleep(500);
 
@@ -459,78 +437,36 @@ SearchBaseHandler._submitSearch = function () {
  * 通过选择器系统查找视频列表容器，再点击子项
  */
 SearchBaseHandler._clickSearchResult = function (index) {
-  var screenW = device.width;
-  var screenH = device.height;
-
-  function isVisible(el) {
-    try {
-      var b = el.bounds();
-      if (!b) return false;
-      var cx = b.centerX();
-      var cy = b.centerY();
-      return cx >= 0 && cy >= 0 && cx < screenW && cy < screenH;
-    } catch (e) { return false; }
-  }
-
-  function tryClick(el) {
-    if (el.clickable()) return el.click();
-    var b = el.bounds();
-    if (b) return press(b.centerX(), b.centerY(), 80);
-    return false;
-  }
-
-  function findRecyclerView() {
-    var rv = id("recycler_view").findOne(500);
-    if (rv) return rv;
-    var all = className("androidx.recyclerview.widget.RecyclerView").find();
-    if (all.length === 0) all = className("android.support.v7.widget.RecyclerView").find();
-    for (var i = 0; i < all.length; i++) {
-      var b = all[i].bounds();
-      if (b && b.height() > 200 && b.width() > 200) return all[i];
-    }
-    return null;
-  }
-
   var maxScroll = 10;
   for (var scroll = 0; scroll < maxScroll; scroll++) {
-    // 路径1: 选择器
+    var ctx = screenContext.read();
+    var rv = commentUtils.findListContainer("search_video_list");
+    var scope = rv ? commentUtils.usableBounds(rv.bounds(), ctx) : ctx.contentBounds;
+    if (!scope) return false;
     var items = uiOperator.findElements("search_video_list", 3000);
-    var seenCount = 0;
+    var candidates = [];
     for (var i = 0; i < items.length; i++) {
-      if (isVisible(items[i])) {
-        if (seenCount === index) {
-          if (tryClick(items[i])) {
-            logger.info(TAG, "点击视频: 第" + (index+1) + "个(策略)"); sleep(2000);
-            this.safeClick("off_video", 1);
-            return true;
-          }
-          return false;
-        }
-        seenCount++;
-      }
+      // Separate accessibility queries can wrap the same list node in distinct
+      // objects. Container semantics, not JS identity, decide whether to expand
+      // its visible result children below.
+      if (!commentUtils.isListContainer(items[i]) && commentUtils.visibleNode(items[i], ctx, scope)) candidates.push(items[i]);
     }
-
-    // 路径2: RecyclerView 兜底
-    var rv = findRecyclerView();
-    if (rv) {
+    if (!candidates.length && rv) {
       var children = rv.children();
-      var cnt = 0;
       for (var c = 0; c < children.length; c++) {
-        if (isVisible(children[c])) {
-          if (cnt === index) {
-            if (tryClick(children[c])) {
-              logger.info(TAG, "点击视频: 第" + (index+1) + "个(兜底)"); sleep(2000);
-              this.safeClick("off_video", 1);
-              return true;
-            }
-            return false;
-          }
-          cnt++;
-        }
+        if (commentUtils.visibleNode(children[c], ctx, scope)) candidates.push(children[c]);
       }
     }
-
-    if (scroll < maxScroll - 1) { uiOperator.swipeUp(); sleep(2000); }
+    if (candidates.length > index && index >= 0) {
+      if (!commentUtils.clickWithin(candidates[index], scope)) return false;
+      sleep(2000);
+      this.safeClick("off_video", 1);
+      return true;
+    }
+    if (scroll < maxScroll - 1) {
+      if (!rv || !commentUtils.swipeList("search_video_list", false)) break;
+      sleep(2000);
+    }
   }
 
   logger.warn(TAG, "目标视频 " + (index + 1) + " 未找到");
@@ -724,6 +660,7 @@ SearchBaseHandler._getDMCachedSequence = function (seqId) {
  * 支持变体轮替: cached.variants 存在时轮替选取，设备重启后从 KV 恢复索引
  */
 SearchBaseHandler.resolveMessages = function (params) {
+  if (taskCancellation.isCancelled()) return [];
   // 1. dm_sequence_id — 查 poll 缓存 (含 variants, 优先于内联 dm_messages)
   if (params.dm_sequence_id) {
     var cached = this._getDMCachedSequence(params.dm_sequence_id);
@@ -792,38 +729,29 @@ SearchBaseHandler.applyVariables = function (template, vars) {
  */
 SearchBaseHandler._sendMessageSequence = function (messages, stats, keyword) {
   var sentCount = 0;
-  var antiDetect = require("../core/anti-detect");
+  this._lastSendOutcome = "not_attempted";
+  var previousSkip = antiDetect._skipDisabled;
   antiDetect._skipDisabled = true;
   try {
     for (var i = 0; i < messages.length; i++) {
-    var msg = messages[i];
-    var content = this.applyVariables(msg.content, {keyword: keyword || ""});
-    var inputOk = this.safeInput("dm_input", content);
-    if (!inputOk) {
-      logger.warn(TAG, "DM序列[" + (i + 1) + "/" + messages.length + "]输入失败，跳过本条");
-      continue;
-    }
-    sleep(500);
-    var sendBtn = uiOperator.findElement("dm_send", 3000);
-    if (!sendBtn) {
-      logger.warn(TAG, "DM序列[" + (i + 1) + "/" + messages.length + "]发送按钮未找到，本条未发送");
-      continue;
-    }
-    uiOperator.clickElement(sendBtn);
-    sleep(1000);
-    var sendFailed = !!uiOperator.findElement("dm_send_failed", 2000, true);
-    if (sendFailed) {
-      logger.warn(TAG, "DM序列[" + (i + 1) + "/" + messages.length + "]发送失败，停止向该用户发送后续私信");
-      break;
-    }
-    sentCount++;
-    var extraDelay = msg.delay_ms != null ? msg.delay_ms : (Math.floor(Math.random() * 3000) + 2000);
-    sleep(extraDelay);
-    stats.details.push("dm_sent[" + (i + 1) + "/" + messages.length + "]: "
-      + content.substring(0, 30));
+      if (taskCancellation.isCancelled()) break;
+      var msg = messages[i];
+      var content = this.applyVariables(msg.content, { keyword: keyword || "" });
+      if (!this.safeInput("dm_input", content)) break;
+      sleep(500);
+      if (taskCancellation.isCancelled()) break;
+      this._lastSendOutcome = commentUtils.submitAndObserve("dm_send", "dm_input", content, "dm_send_failed");
+      if (this._lastSendOutcome !== "confirmed") {
+        logger.warn(TAG, "DM发送未确认: " + this._lastSendOutcome + "，停止序列");
+        break;
+      }
+      sentCount++;
+      stats.details.push("dm_sent[" + (i + 1) + "/" + messages.length + "]: " + content.substring(0, 30));
+      if (taskCancellation.isCancelled()) break;
+      sleep(msg.delay_ms != null ? msg.delay_ms : (Math.floor(Math.random() * 3000) + 2000));
     }
   } finally {
-    antiDetect._skipDisabled = false;
+    antiDetect._skipDisabled = previousSkip;
   }
   return sentCount;
 };

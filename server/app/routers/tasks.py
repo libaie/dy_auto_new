@@ -147,11 +147,19 @@ def _validate_and_normalize_params(task_type: str, params: dict) -> dict:
 
     if callable(validator) and not isinstance(validator, type):
         # Function-style validator (e.g. _validate_nurture_params)
-        return validator(params)
+        params = validator(params)
     elif isinstance(validator, type) and issubclass(validator, PydanticBase):
         # Pydantic model validator
         validated = validator(**params)
-        return validated.model_dump(exclude_none=True)
+        params = validated.model_dump(exclude_none=True)
+
+    # Devices consume seconds; their legacy fallback interprets max_age_days
+    # literally as days. Normalize every creation path before persistence.
+    age = params.get("max_age_days")
+    if age is not None:
+        unit = params.get("max_age_unit") or "days"
+        multiplier = {"seconds": 1, "minutes": 60, "hours": 3600, "days": 86400}[unit]
+        params["max_age_seconds"] = -1 if age == -1 else age * multiplier
     return params
 
 
@@ -289,7 +297,35 @@ async def batch_create_tasks(
         raise HTTPException(status_code=400, detail="所选分组/账号没有活跃账号，请先添加活跃账号")
 
     created_tasks = []
-    if keywords:
+    if keywords and request.device_id:
+        # Channels route by account binding and cannot retain a target device.
+        # Use the existing directed-task queue, keeping one task per keyword.
+        from app.services.channel_service import channel_service as _ch_svc, _inject_nurture_keyword_matrix
+        assigned_ids = _ch_svc._round_robin_assign(db, keywords, all_accounts)
+        template_params = {k: v for k, v in params.items() if k not in ("keyword", "keywords")}
+        template_body = None
+        template_id = template_params.get("content_template_id")
+        if template_id:
+            try:
+                template_body = content_service.get_template_body(db, template_id)
+            except Exception:
+                logger.warning("Failed to load content template for directed batch", exc_info=True)
+        for keyword, account_id in zip(keywords, assigned_ids):
+            task_params = {**template_params, "keyword": keyword}
+            if ttype == "nurture":
+                task_params = _inject_nurture_keyword_matrix(task_params, keyword)
+            if template_body:
+                task_params["content"] = content_service.substitute_variables(template_body, {"keyword": keyword})
+            task = task_service.create_task(
+                db=db,
+                task_type=TT(ttype),
+                account_id=account_id,
+                params=task_params,
+                device_id=request.device_id,
+                user_id=user_id,
+            )
+            created_tasks.append({"id": task.id, "account_id": account_id})
+    elif keywords:
         # 确定通道归属的分组：优先用 group_ids[0]，否则查账号所属分组
         channel_group_id = request.group_ids[0] if request.group_ids else None
         if not channel_group_id:
@@ -374,14 +410,14 @@ async def batch_create_tasks(
                 t["account_id"] for t in created_tasks if t.get("id")
                 if not db.query(Device).filter(Device.bound_account_id == t["account_id"]).first()
             ]
-            if unbound_accounts:
+            if request.device_id or unbound_accounts:
                 await pair_ws_manager.broadcast_to_devices({"event": "new_task_available"})
         else:
             await pair_ws_manager.broadcast_to_devices({"event": "new_task_available"})
         # 通知前端更新任务列表
         await pair_ws_manager.broadcast_to_admins({"event": "tasks_changed"}, user_ids=[user_id] if user_id else [])
 
-    return {"created": len(created_tasks), "mode": "channel" if keywords else "direct"}
+    return {"created": len(created_tasks), "mode": "channel" if keywords and not request.device_id else "direct"}
 
 
 @router.get("")

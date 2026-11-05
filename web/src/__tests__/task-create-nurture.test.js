@@ -54,7 +54,7 @@ async function mountDialog() {
   })
 }
 
-describe('task create nurture payload', () => {
+describe('task creation payload contract', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.createTask.mockResolvedValue({ data: { ok: true } })
@@ -103,5 +103,22 @@ describe('task create nurture payload', () => {
     const payload = mocks.createTask.mock.calls[0][0]
     expect(payload.params.keywords).toEqual(['seed-a'])
     expect(payload.params.keyword_matrix).toBeUndefined()
+  })
+
+  it.each(['keyword', 'share-link'])('submits the selected decision template for %s collection', async (mode) => {
+    const wrapper = await mountDialog()
+    wrapper.vm.selectionMode = 'single'
+    wrapper.vm.form.type = 'collect'
+    wrapper.vm.form.account_id = 'acct-1'
+    wrapper.vm.form.keyword = mode === 'keyword' ? 'synthetic keyword' : ''
+    wrapper.vm.shareLinksText = mode === 'share-link' ? 'https://v.douyin.com/synthetic123/' : ''
+    wrapper.vm.selectedPromptTemplateId = 'prompt-1'
+
+    await wrapper.vm.handleCreate()
+    await flushPromises()
+
+    expect(mocks.createTask).toHaveBeenCalledTimes(1)
+    expect(mocks.createTask.mock.calls[0][0].params.prompt_template_id).toBe('prompt-1')
+    wrapper.unmount()
   })
 })

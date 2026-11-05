@@ -46,6 +46,14 @@ var config = {
   // 代理配置（从服务端 poll 响应获取后动态设置）
   proxy: null,
 
+  // 结构化决策配置（仅公开参数；上游密钥和地址保留在服务端）
+  decision: {
+    enabled: false,
+    model: "typesafe-ai/jev",
+    min_confidence: 0.5,
+    min_probability: 0.75,
+  },
+
   // AI 分析配置（通过服务端 poll 下发）
   ai: {
     apiUrl: "https://api.deepseek.com/v1/chat/completions",

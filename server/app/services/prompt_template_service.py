@@ -73,8 +73,6 @@ class PromptTemplateService:
     def get_all_templates(self, db: Session) -> tuple[int, list[dict]]:
         """Returns (version, templates_list)."""
         templates = db.query(PromptTemplate).filter(PromptTemplate.enabled == True).all()
-        if not templates:
-            return 0, []
         version = _get_tmpl_revision(db)
         return version, [_to_device_dict(t) for t in templates]
 

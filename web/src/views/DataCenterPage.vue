@@ -476,6 +476,7 @@ onMounted(async () => {
               {{ stageLabel(conv.current_stage) }}
             </span>
           </div>
+          <p v-if="conv.status === 'pending_confirmation'" class="mb-2 text-xs text-amber-400">发送待确认，已暂停自动重发</p>
           <p class="text-xs text-slate-400 line-clamp-2 mb-3 min-h-[2rem]">{{ conv.last_dm_content || '暂无消息' }}</p>
           <div class="flex items-center justify-between text-[11px] text-slate-500 pt-3 border-t" style="border-color: var(--border-subtle);">
             <span>共 {{ conv.total_dm_count || 0 }} 条</span>

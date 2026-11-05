@@ -154,6 +154,7 @@ class ReplyCommentParams(BaseModel):
     content_template_id: Optional[str] = Field(None, description="内容模板ID")
     dm_sequence_id: Optional[str] = Field(None, description="DM序列模板ID")
     prompt_template_id: Optional[str] = Field(None, description="提示词模板ID")
+    skip_reply: bool = Field(default=False, description="仅关注和私信，不发布评论回复")
     count: int = Field(default=5, ge=-1, description="每个视频处理评论数, -1=全量")
     video_count: int = Field(default=3, ge=-1, description="处理视频数, -1=全量")
     sort_by: Optional[str] = Field(None, pattern="^(latest|most_liked)$")
@@ -633,6 +634,7 @@ class DMClaimRecipientRequest(BaseModel):
     account_id: str
     recipient_douyin_id: str
     recipient_nickname: str
+    preserve_on_unknown: bool = False
 
 
 class DMClaimRecipientResponse(BaseModel):

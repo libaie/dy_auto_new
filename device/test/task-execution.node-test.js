@@ -12,7 +12,7 @@ function runtime(t) {
   ].map(file => path.join(root, file)));
   const noOp = () => {};
   const ui = { findElement: () => null, waitForElement: () => true, swipeUp: noOp };
-  const adapter = new Proxy({ ensureAppActive: () => true, safeClick: () => true }, {
+  const adapter = new Proxy({ ensureAppActive: () => true, safeClick: () => true, isCurrentSession: () => true }, {
     get: (object, key) => key in object ? object[key] : noOp,
   });
   const originalLoad = Module._load;

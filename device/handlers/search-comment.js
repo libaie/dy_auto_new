@@ -5,6 +5,7 @@ var uiOperator = require("../core/ui-operator");
 var commentUtils = require("./comment-utils");
 var apiClient = require("../core/api-client");
 var logger = require("../utils/logger");
+var taskCancellation = require("../core/task-cancellation");
 
 var TAG = "搜索评论";
 
@@ -22,6 +23,8 @@ var SearchCommentHandler = Object.create(SearchBaseHandler);
  * 优先使用 params.content，留空则 AI 根据视频内容自动生成
  */
 SearchCommentHandler._interactWithVideo = function (content, stats) {
+  this._lastSendOutcome = "not_attempted";
+  if (taskCancellation.isCancelled()) return false;
   // 如果没有提供评论内容，提取视频文本并 AI 生成
   if (!content) {
     var videoText = this._extractVideoText();
@@ -33,8 +36,11 @@ SearchCommentHandler._interactWithVideo = function (content, stats) {
     logger.info(TAG, "AI 生成评论: '" + content.substring(0, 30) + "'");
   }
 
+  if (taskCancellation.isCancelled()) return false;
+
   // 0. 确认进入视频详情页
   if (!uiOperator.isOnPage("is_video_view")) {
+    if (taskCancellation.isCancelled()) return false;
     logger.info(TAG, "未检测到视频详情页，尝试点击屏幕中心进入");
     press(Math.round(device.width * 0.5), Math.round(device.height * 0.5), 80);
     sleep(2000);
@@ -84,9 +90,15 @@ SearchCommentHandler._interactWithVideo = function (content, stats) {
   }
   sleep(500);
 
-  // 4. 通过键盘回车发送
+  // 4. Submit once and require visible delivery evidence before counting it.
   sleep(500);
-  this.submitViaKeyboard("comment_submit");
+  if (taskCancellation.isCancelled()) return false;
+  this._lastSendOutcome = commentUtils.submitAndObserve("comment_submit", "video_comment_input", content, "comment_send_failed");
+  if (this._lastSendOutcome !== "confirmed") {
+    logger.warn(TAG, "评论发送未确认: " + this._lastSendOutcome);
+    this.safeClick("back_btn", 2);
+    return false;
+  }
   sleep(1000);
 
   // 5. 关闭评论面板

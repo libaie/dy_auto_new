@@ -179,7 +179,7 @@ async def approve_pair_request(
 ):
     """Approve a pairing request — generates per-device secret and creates Device record."""
     import uuid
-    from app.config import DEVICE_CONFIG, ANTI_DETECT_CONFIG, ANTI_DETECT_CONFIG_VERSION, get_ai_config
+    from app.routers.device import _build_approved_payload
     user_id, _ = user
 
     pair_req = db.query(DevicePairRequest).filter(DevicePairRequest.id == request_id).first()
@@ -235,19 +235,7 @@ async def approve_pair_request(
     db.commit()
 
     # Push result to device via WebSocket (if connected)
-    config = {
-        **DEVICE_CONFIG,
-        "anti_detect_config": ANTI_DETECT_CONFIG,
-        "anti_detect_config_version": ANTI_DETECT_CONFIG_VERSION,
-    }
-    ai_cfg = get_ai_config(db)
-    if ai_cfg:
-        config["ai_config"] = ai_cfg
-    await pair_ws_manager.notify(pair_req.pairing_token, {
-        "status": "approved",
-        "secret": device_secret,
-        "config": config,
-    })
+    await pair_ws_manager.notify(pair_req.pairing_token, _build_approved_payload(pair_req, db))
 
     # Broadcast to admin clients
     await pair_ws_manager.broadcast_to_admins({
@@ -396,7 +384,12 @@ async def delete_device(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
-    from app.db_models import Task, DevicePairRequest
+    from sqlalchemy.exc import IntegrityError
+    from app.db_models import (
+        ChainInstance, ChannelItem, CollectedComment, CollectedUser,
+        Conversation, DevicePairRequest, RepliedComment, StatsEvent, Task,
+    )
+    from app.services.task_service import TASK_TARGET_DEVICE_PARAM, _task_params_with_target
 
     user_id, role = user
     query = db.query(Device).filter(Device.id == device_id)
@@ -406,28 +399,58 @@ async def delete_device(
     if not dev:
         raise HTTPException(status_code=404, detail="Device not found")
 
-    # 1. 通知设备：你已被移除
-    await pair_ws_manager.send_to_device(device_id, {
-        "event": "device_removed",
-    })
-    # 2. 关闭设备 WS 连接
-    await pair_ws_manager.disconnect_device(device_id)
+    # Retained history needs a separate archive/soft-delete migration. Reject
+    # before changing either the database or the active device session.
+    history_conflict = "设备仍有关联的历史统计、链式任务或通道记录，暂不能删除；请先完成历史归档或软删除迁移"
+    for model, column in (
+        (StatsEvent, StatsEvent.device_id),
+        (ChainInstance, ChainInstance.device_id),
+        (ChannelItem, ChannelItem.assigned_device_id),
+    ):
+        if db.query(model.id).filter(column == device_id).first():
+            raise HTTPException(status_code=409, detail=history_conflict)
 
-    # 3. 解绑该设备上的待执行任务（放回队列等待其他设备领取）
+    # 解绑该设备上的待执行任务（放回队列等待其他设备领取）
     db.query(Task).filter(
         Task.device_id == device_id,
         Task.status.in_(["pending", "running"]),
-    ).update({"device_id": None, "status": "pending", "started_at": None}, synchronize_session=False)
+    ).update({"device_id": None, "status": "pending", "started_at": None, "lease_id": None}, synchronize_session=False)
 
-    # 4. 删除配对请求记录
+    # Removing a device releases its persistent routing reservations as well.
+    # Clear even detached/terminal records so reusing an ID cannot revive a pin.
+    for task in db.query(Task).filter(Task.params[TASK_TARGET_DEVICE_PARAM].as_string() == device_id).all():
+        task.params = _task_params_with_target(task.params)
+
+    # A later pairing may legitimately reuse this hardware ID for another user.
+    # Preserve results and unresolved send/reply holds, but never let the new
+    # device instance inherit authority over those historical records.
+    for model in (CollectedComment, CollectedUser, Conversation):
+        db.query(model).filter(model.device_id == device_id).update(
+            {"device_id": None}, synchronize_session=False
+        )
+    db.query(RepliedComment).filter(RepliedComment.replied_by_device == device_id).update(
+        {"replied_by_device": None}, synchronize_session=False
+    )
+
+    # 删除配对请求记录
     db.query(DevicePairRequest).filter(DevicePairRequest.device_id == device_id).delete()
 
-    # 5. 删除设备
+    # 删除设备；并发写入历史引用时同样完整回滚，不能先断开设备。
     owner_ids = [dev.user_id] if dev.user_id else []
-    db.delete(dev)
-    db.commit()
+    try:
+        db.delete(dev)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=history_conflict) from None
 
-    # 6. 通知前端
+    # 数据库删除成功后才通知设备并关闭连接。
+    await pair_ws_manager.send_to_device(device_id, {
+        "event": "device_removed",
+    })
+    await pair_ws_manager.disconnect_device(device_id)
+
+    # 通知前端
     await pair_ws_manager.broadcast_to_admins({
         "event": "device_status_changed",
         "device_id": device_id,

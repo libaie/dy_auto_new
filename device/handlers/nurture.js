@@ -315,6 +315,12 @@ NurtureHandler._isKeywordRelevant = function (videoText) {
 
   // 本地未命中，用 AI 做语义分析
   var keywords = this._keywordMatrix.join("、");
+  if (aiAnalyzer.isDecisionEnabled()) {
+    return aiAnalyzer.checkRelevance(videoText, keywords, {
+      skipLocalFilter: true,
+      keywords: this._keywordMatrix
+    });
+  }
   var prompt = "判断以下抖音视频内容是否与下列关键词相关。\n\n" +
     "关键词：" + keywords + "\n\n" +
     "内容：" + videoText.substring(0, 300) + "\n\n" +
@@ -466,6 +472,7 @@ NurtureHandler._commentOnVideo = function (templateId, templateContent) {
   }
   // 1. AI 生成评论
   var content = templateContent || aiAnalyzer.generateVideoComment(videoText);
+  if (taskCancellation.isCancelled()) return false;
   if (!content) {
     logger.warn(TAG, "AI 生成评论失败，跳过评论");
     return false;

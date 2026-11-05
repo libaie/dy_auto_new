@@ -36,7 +36,13 @@ const isMultiCondition = computed(() =>
   !!(props.strategy.conditions && props.strategy.conditions.length > 0)
 )
 
-const isLocate = computed(() => props.purpose !== 'extract')
+const isLocate = computed(() => props.purpose === 'locate')
+const normalizedSpaces = [
+  { value: 'content_normalized', label: '应用可见区域比例 (0–1)' },
+  { value: 'screen_normalized', label: '屏幕比例 (0–1)' },
+  { value: 'anchor_normalized', label: '锚点区域比例 (0–1)' },
+]
+const needsAnchor = computed(() => props.strategy.position?.space === 'anchor_normalized' || props.strategy.region?.space === 'anchor_normalized')
 
 const typeConfig = computed(() =>
   STRATEGY_TYPES.find(t => t.value === props.strategy.type) || STRATEGY_TYPES[0]
@@ -51,19 +57,55 @@ function updateField(key, value) {
 }
 
 function onTypeChange(newType) {
-  const base = { type: newType }
+  const base = { ...props.strategy, type: newType }
+  // Only remove fields owned by the previous strategy type. Generic extension
+  // fields, priority and explicit geometry retain their authored values.
+  for (const field of ['value', 'match_mode', 'x_percent', 'y_percent', 'position', 'template', 'threshold', 'source_resolution', 'source_density', 'scales', 'conditions', 'logic', 'steps']) {
+    delete base[field]
+  }
   if (newType === 'coordinate') {
-    base.x_percent = props.strategy.x_percent || 0.5
-    base.y_percent = props.strategy.y_percent || 0.5
+    base.position = { space: 'content_normalized', x: 0.5, y: 0.5 }
   } else if (newType === 'chain') {
     base.steps = props.strategy.steps || [{ type: 'text', value: '' }]
   } else if (newType === 'image') {
     base.template = props.strategy.template || ''
-    base.threshold = props.strategy.threshold || 0.8
+    base.threshold = props.strategy.type === 'image' ? (props.strategy.threshold ?? 0.8) : 0.8
   } else {
-    base.value = props.strategy.value || ''
+    base.value = ['text', 'id', 'desc', 'className', 'package'].includes(props.strategy.type) ? (props.strategy.value ?? '') : ''
   }
   emit('update', base)
+}
+
+// Core geometry fields are explicit; legacy values keep their original units.
+function numberInput(value) { return value === '' ? '' : Number(value) }
+function updateOptional(key, value) {
+  const next = { ...props.strategy }
+  if (value === undefined || value === '') delete next[key]
+  else next[key] = value
+  emit('update', next)
+}
+function updateNested(key, field, value) {
+  emit('update', { ...props.strategy, [key]: { ...props.strategy[key], [field]: value } })
+}
+function setPositionSpace(space) {
+  if (space === 'legacy') return
+  const { x_percent, y_percent, ...next } = props.strategy
+  next.position = { space, x: props.strategy.position?.x ?? x_percent ?? 0.5, y: props.strategy.position?.y ?? y_percent ?? 0.5 }
+  emit('update', next)
+}
+function setOffsetUnit(unit) {
+  if (!unit) { updateOptional('offset', undefined); return }
+  updateField('offset', { unit, x: props.strategy.offset?.x ?? 0, y: props.strategy.offset?.y ?? 0 })
+}
+function setRegionSpace(space) {
+  if (!space) { updateOptional('region', undefined); return }
+  updateField('region', { left: 0, top: 0, right: 1, bottom: 1, ...props.strategy.region, space })
+}
+function updateAnchor(field, value) {
+  updateField('anchor', { type: 'text', value: '', ...props.strategy.anchor, [field]: value })
+}
+function setScales(value) {
+  updateOptional('scales', value.trim() ? value.split(',').map(v => Number(v.trim())) : undefined)
 }
 
 // --- Multi-condition helpers ---
@@ -430,34 +472,22 @@ async function onImageFileSelect(e) {
         </div>
       </div>
 
-      <!-- coordinate: x + y inputs (0-1 比例) -->
-      <div v-else-if="typeConfig.fields === 'xy'" class="flex gap-3">
-        <div class="flex-1">
-          <label class="text-xs text-slate-400 mb-1 block">X 比例 (0-1)</label>
-          <input
-            type="number"
-            min="0"
-            max="1"
-            step="0.01"
-            :value="strategy.x_percent"
-            @input="updateField('x_percent', Number($event.target.value))"
-            placeholder="0.5"
-            class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:border-purple-500/50 focus:outline-none"
-          />
+      <!-- Loaded legacy coordinates remain screen ratios until the space is changed. -->
+      <div v-else-if="typeConfig.fields === 'xy'" class="space-y-2">
+        <label class="text-xs text-slate-400 block">坐标空间
+          <select data-testid="position-space" :value="strategy.position?.space || 'legacy'" @change="setPositionSpace($event.target.value)" class="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200">
+            <option v-if="!strategy.position" value="legacy">旧版屏幕比例 (0–1)，保留原有含义</option>
+            <option v-for="space in normalizedSpaces" :key="space.value" :value="space.value">{{ space.label }}</option>
+            <option value="screen_px">屏幕像素 (px)</option>
+            <option value="capture_px">截图像素 (px)，需要已知截图映射</option>
+          </select>
+        </label>
+        <div class="flex gap-3">
+          <label v-for="axis in ['x', 'y']" :key="axis" class="flex-1 text-xs text-slate-400">{{ axis.toUpperCase() }} {{ !strategy.position || strategy.position.space.endsWith('normalized') ? '比例 (0–1)' : '像素 (px)' }}
+            <input :data-testid="strategy.position ? `position-${axis}` : `legacy-${axis}`" type="number" min="0" :max="!strategy.position || strategy.position.space.endsWith('normalized') ? 1 : undefined" step="any" :value="strategy.position ? strategy.position[axis] : strategy[axis + '_percent']" @input="strategy.position ? updateNested('position', axis, numberInput($event.target.value)) : updateField(axis + '_percent', numberInput($event.target.value))" class="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200" />
+          </label>
         </div>
-        <div class="flex-1">
-          <label class="text-xs text-slate-400 mb-1 block">Y 比例 (0-1)</label>
-          <input
-            type="number"
-            min="0"
-            max="1"
-            step="0.01"
-            :value="strategy.y_percent"
-            @input="updateField('y_percent', Number($event.target.value))"
-            placeholder="0.5"
-            class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:border-purple-500/50 focus:outline-none"
-          />
-        </div>
+        <p class="text-xs text-slate-500">比例 0 和 1 均有效；1 对应区域内最后一个像素。新坐标默认相对应用可见区域。</p>
       </div>
 
       <!-- image: template + threshold -->
@@ -484,22 +514,32 @@ async function onImageFileSelect(e) {
         </div>
         <div>
           <label class="text-xs text-slate-400 mb-1 block">
-            匹配阈值: {{ (strategy.threshold || 0.8).toFixed(2) }}
+            匹配阈值: {{ (strategy.threshold ?? 0.8).toFixed(2) }}
           </label>
           <input
             type="range"
-            min="0.5"
+            min="0"
             max="1"
             step="0.05"
-            :value="strategy.threshold || 0.8"
+            :value="strategy.threshold ?? 0.8"
             @input="updateField('threshold', Number($event.target.value))"
             class="w-full accent-purple-500"
           />
           <div class="flex justify-between text-xs text-slate-600">
-            <span>0.5（宽松）</span>
+            <span>0.0（宽松）</span>
             <span>1.0（精确）</span>
           </div>
         </div>
+        <label class="block text-xs text-slate-400">模板来源分辨率
+          <input data-testid="source-resolution" :value="strategy.source_resolution" @input="updateOptional('source_resolution', $event.target.value)" placeholder="1080x2400" pattern="[1-9][0-9]*x[1-9][0-9]*" class="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200" />
+        </label>
+        <label class="block text-xs text-slate-400">模板来源像素密度（density）
+          <input data-testid="source-density" type="number" min="0.01" step="any" :value="strategy.source_density" @input="updateOptional('source_density', $event.target.value === '' ? undefined : Number($event.target.value))" placeholder="3" class="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200" />
+        </label>
+        <label class="block text-xs text-slate-400">模板等比倍率（最多 5 个，0.25–4）
+          <input data-testid="template-scales" :value="strategy.scales?.join(', ')" @change="setScales($event.target.value)" placeholder="0.9, 1, 1.1" class="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200" />
+        </label>
+        <p class="text-xs text-slate-500">倍率直接作用于模板；留空时根据来源密度或分辨率推导最多三个候选。匹配阈值保持设置值。</p>
       </div>
     </div>
 
@@ -508,6 +548,7 @@ async function onImageFileSelect(e) {
       <button
         type="button"
         class="text-xs text-slate-500 hover:text-slate-300 flex items-center gap-1"
+        data-testid="legacy-offset-toggle"
         @click="showAdvanced = !showAdvanced"
       >
         <svg
@@ -515,18 +556,19 @@ async function onImageFileSelect(e) {
           :class="{ 'rotate-90': showAdvanced }"
           fill="none" stroke="currentColor" viewBox="0 0 24 24"
         ><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
-        点击位置偏移
+        旧版点击位置偏移{{ strategy.offset ? '（显式偏移已优先）' : '' }}
       </button>
       <div v-if="showAdvanced" class="mt-2 space-y-2">
         <p class="text-xs text-slate-500 leading-relaxed">
-          相对控件<strong class="text-slate-400">中心点</strong>的偏移量，按<strong class="text-slate-400">控件自身宽高百分比</strong>计算，不受分辨率影响。<br/>
-          不填=点中心 &middot; 正数=右/下 &middot; 负数=左/上 &middot; 例如填 <code class="text-purple-400">150</code> 向右偏移 1.5 倍控件宽
+          {{ strategy.type === 'image' ? '旧版图片偏移为像素 (px)，不是百分比。' : '旧版节点偏移按控件宽高百分比计算，例如 150 表示 1.5 倍宽度。' }}
+          正数向右/下，负数向左/上；显式 offset 优先于旧版字段。
         </p>
         <div class="flex gap-3">
           <div class="flex-1">
-            <label class="text-xs text-slate-400 mb-1 block">水平偏移 %</label>
+            <label class="text-xs text-slate-400 mb-1 block">{{ strategy.type === 'image' ? '水平偏移像素 (px)' : '水平偏移 %' }}</label>
             <input
               type="number"
+              data-testid="legacy-offset-x"
               :value="strategy.x_percent"
               @input="updateField('x_percent', $event.target.value !== '' ? Number($event.target.value) : undefined)"
               placeholder="0"
@@ -534,7 +576,7 @@ async function onImageFileSelect(e) {
             />
           </div>
           <div class="flex-1">
-            <label class="text-xs text-slate-400 mb-1 block">垂直偏移 %</label>
+            <label class="text-xs text-slate-400 mb-1 block">{{ strategy.type === 'image' ? '垂直偏移像素 (px)' : '垂直偏移 %' }}</label>
             <input
               type="number"
               :value="strategy.y_percent"
@@ -544,6 +586,52 @@ async function onImageFileSelect(e) {
             />
           </div>
         </div>
+      </div>
+    </div>
+    <div class="mt-3 space-y-3 border-t border-white/10 pt-3">
+      <div v-if="isLocate" class="space-y-2">
+        <label class="block text-xs text-slate-400">显式点击偏移单位
+          <select data-testid="offset-unit" :value="strategy.offset?.unit || ''" @change="setOffsetUnit($event.target.value)" class="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200">
+            <option value="">未设置（保留旧版偏移）</option>
+            <option value="px">屏幕像素 (px)</option><option value="dp">密度无关像素 (dp)</option><option value="target_fraction">目标宽高比例（1 = 一倍宽/高）</option>
+          </select>
+        </label>
+        <div v-if="strategy.offset" class="flex gap-3">
+          <label v-for="axis in ['x', 'y']" :key="axis" class="flex-1 text-xs text-slate-400">{{ axis.toUpperCase() }} 偏移
+            <input :data-testid="`offset-${axis}`" type="number" step="any" :value="strategy.offset[axis]" @input="updateNested('offset', axis, numberInput($event.target.value))" class="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200" />
+          </label>
+        </div>
+        <p class="text-xs text-slate-500">显式偏移优先；坐标策略的旧版比例只表示位置，不会再次作为偏移。</p>
+      </div>
+      <label class="block text-xs text-slate-400">定位区域
+        <select data-testid="region-space" :value="strategy.region?.space || ''" @change="setRegionSpace($event.target.value)" class="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200">
+          <option value="">默认可见区域（设置锚点时使用锚点区域）</option>
+          <option v-for="space in normalizedSpaces" :key="space.value" :value="space.value">{{ space.label }}</option>
+        </select>
+      </label>
+      <div v-if="strategy.region" class="grid grid-cols-2 gap-2">
+        <label v-for="edge in ['left', 'top', 'right', 'bottom']" :key="edge" class="text-xs text-slate-400">{{ { left: '左', top: '上', right: '右', bottom: '下' }[edge] }}边界 (0–1)
+          <input :data-testid="`region-${edge}`" type="number" min="0" max="1" step="any" :value="strategy.region[edge]" @input="updateNested('region', edge, numberInput($event.target.value))" class="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200" />
+        </label>
+      </div>
+      <div class="space-y-2">
+        <label class="block text-xs text-slate-400">语义锚点{{ needsAnchor ? '（必填）' : '（可选）' }}
+          <select data-testid="anchor-type" :value="strategy.anchor?.type || (needsAnchor ? 'text' : '')" @change="$event.target.value ? updateAnchor('type', $event.target.value) : updateOptional('anchor', undefined)" class="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200">
+            <option v-if="!needsAnchor" value="">未设置</option>
+            <option v-for="type in CONDITION_TYPES" :key="type.value" :value="type.value">{{ type.label }}</option>
+          </select>
+        </label>
+        <template v-if="strategy.anchor || needsAnchor">
+          <label class="block text-xs text-slate-400">锚点查找值
+            <input data-testid="anchor-value" :value="strategy.anchor?.value || ''" :required="needsAnchor" @input="updateAnchor('value', $event.target.value)" class="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200" />
+          </label>
+          <label class="block text-xs text-slate-400">锚点匹配模式
+            <select :value="strategy.anchor?.match_mode || 'exact'" @change="updateAnchor('match_mode', $event.target.value)" class="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200">
+              <option value="exact">精确匹配</option><option value="contains">包含</option>
+            </select>
+          </label>
+          <p class="text-xs text-slate-500">当前应用窗口内必须找到唯一可用锚点；锚点只支持单条语义选择器。</p>
+        </template>
       </div>
     </div>
   </div>

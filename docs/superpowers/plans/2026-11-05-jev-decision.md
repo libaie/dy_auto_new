@@ -16,7 +16,7 @@ Spec: `docs/superpowers/specs/2026-11-05-jev-decision-design.md`
 - [x] 2. Device: typed decision client and business mapping, live config application, decision-only collection and skip-reply paths, current share-link templates and relevance routing; Node tests and independent review approved.
 - [x] 3. Settings: encrypted/masked key, effective configuration API, admin form and env example; backend and UI tests; recovery-path review finding fixed and re-reviewed.
 - [x] 4. Integration: synthetic provider check HTTP 200, complete regression/build, independent review and fixes including initial configuration readiness and in-flight cancellation fencing.
-- [ ] 5. Delivery: usage/validation guide, secret scan, commit and publish to existing draft PR with exact tree verification.
+- [x] 5. Delivery: usage/validation guide, secret scan, commit and publish to existing draft PR with exact tree verification.
 
 ## Ownership
 
@@ -28,3 +28,9 @@ Server implementer owns new `server/app/services/decision_config.py`, `decision_
 - ES5: 15 full device production files and the main startup/pairing/configuration prefix passed.
 - Provider: one synthetic native System One request returned HTTP 200 with all three expected types; the captured response passed the final adapter validator.
 - Final independent spec and quality review approved with no open Critical/Important issues. Physical Android/AutoJS6 and production deployment remain separate acceptance steps.
+
+## Published delivery
+
+- Feature commit: [`91bc4619b936041d1d1a3b90f6f38aeb9b61023c`](https://github.com/libaie/dy_auto_new/commit/91bc4619b936041d1d1a3b90f6f38aeb9b61023c).
+- The published feature tree, `d6afb1ab32cc18f28c228bd6d029bd0163a7ee1a`, exactly matches the locally verified code and documentation.
+- [PR #2](https://github.com/libaie/dy_auto_new/pull/2) includes the implementation, configuration guide and validation results. It remains open, in draft and unmerged; no production deployment was performed.

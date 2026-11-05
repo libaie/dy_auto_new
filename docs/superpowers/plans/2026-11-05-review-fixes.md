@@ -34,11 +34,11 @@
 
 **Interfaces:** Preserve service signatures from Task 2. Route ownership checks can query DB Task/Device/Account. `register_admin` may accept role with a backwards-compatible admin default for existing internal callers, but the real route must pass the actual role. Default unscoped broadcasts must reach administrators only; user-scoped task progress/results must reach the owner plus administrators. Preserve ordinary-user updates for their resources.
 
-- [ ] Add behavior regressions for two ordinary users and admin: task detail/cancel/delete/bulk, pair request approval of another user's device, and owner/admin WS delivery with no cross-user delivery.
-- [ ] Observe expected failures with `/tmp/dy-review-venv/bin/python -m pytest tests/test_review_authorization.py -q`.
-- [ ] Centralize owner checks, enforce appropriate role/ownership for pairing, and scope task/result notifications without leaking unrelated events.
-- [ ] Run new and existing relevant auth/device/WS tests, write the report with exact commands/results and any outstanding concerns.
-- [ ] Coordinator reviews and commits this file set.
+- [x] Add behavior regressions for two ordinary users and admin: task detail/cancel/delete/bulk, pair request approval of another user's device, and owner/admin WS delivery with no cross-user delivery.
+- [x] Observe expected failures with `/tmp/dy-review-venv/bin/python -m pytest tests/test_review_authorization.py -q`.
+- [x] Centralize owner checks, enforce appropriate role/ownership for pairing, and scope task/result notifications without leaking unrelated events.
+- [x] Run new and existing relevant auth/device/WS tests, write the report with exact commands/results and any outstanding concerns.
+- [x] Coordinator reviews and commits this file set.
 
 ### Task 2: Task lifecycle and dispatch
 
@@ -46,11 +46,11 @@
 
 **Interfaces:** Existing public service signatures remain compatible. Keep the device timeout contract: `max(10 minutes, requested nurture duration + 2 minutes)`; server configured `TASK_STALE_MINUTES` remains a minimum, not a cap for legitimate long tasks. The coordinator applies the same rule on device. If a new helper is needed expose a synchronous checker or service function for behavior tests rather than reproducing the checker logic in tests.
 
-- [ ] Reproduce pause/resume/reclaim, healthy 30-minute nurture at minute 11, expired direct task retry, eligible eleventh task, risk-controlled account, StatsEvent FK deletion, and five stale channel recoveries with a bounded retry counter.
-- [ ] Run the failing regressions before editing production code.
-- [ ] Preserve pending items on pause, restore interrupted work safely, use task-aware deadlines, fairly scan direct candidates, check active accounts, clean dependent stats events for hard deletion, and persist channel retry budgets across replacement Task rows.
-- [ ] Cover late cancellation acknowledgements and retry exhaustion using the actual service/checker functions and FK-enabled test DBs.
-- [ ] Run targeted task/channel suites; report exact results. Coordinator reviews and commits this file set.
+- [x] Reproduce pause/resume/reclaim, healthy 30-minute nurture at minute 11, expired direct task retry, eligible eleventh task, risk-controlled account, StatsEvent FK deletion, and five stale channel recoveries with a bounded retry counter.
+- [x] Run the failing regressions before editing production code.
+- [x] Preserve pending items on pause, restore interrupted work safely, use task-aware deadlines, fairly scan direct candidates, check active accounts, clean dependent stats events for hard deletion, and persist channel retry budgets across replacement Task rows.
+- [x] Cover late cancellation acknowledgements and retry exhaustion using the actual service/checker functions and FK-enabled test DBs.
+- [x] Run targeted task/channel suites; report exact results. Coordinator reviews and commits this file set.
 
 ### Task 3: Production worker recovery and image claim idempotency
 
@@ -58,35 +58,35 @@
 
 **Interfaces:** Preserve API contracts. Use existing lease/status fields where possible. A submitting image must have a durable claim before any awaited upstream call; no temporary local transaction may hold a write lock through a network call. A stable external_task_id is retained on ambiguous network outcomes. Old worker results cannot clobber a new lease.
 
-- [ ] Reproduce expired `leased` job through `run_real_worker_step`, and two concurrent image dispatches with independent sessions and a controlled async provider.
-- [ ] Observe failure, then wire expiry recovery into actual worker consumption and add lease fencing to terminal writes where needed.
-- [ ] Atomically acquire image submission rights before await; make concurrent loser return a controlled conflict; preserve submission identity and handle failure/late response consistently.
-- [ ] Test active lease is not stolen, expired lease recovers, already-submitted provider IDs are reused, stale result writes fail, and exactly one network submission occurs for concurrent requests.
-- [ ] Run targeted production/image tests; report commands/results. Coordinator reviews and commits.
+- [x] Reproduce expired `leased` job through `run_real_worker_step`, and two concurrent image dispatches with independent sessions and a controlled async provider.
+- [x] Observe failure, then wire expiry recovery into actual worker consumption and add lease fencing to terminal writes where needed.
+- [x] Atomically acquire image submission rights before await; make concurrent loser return a controlled conflict; preserve submission identity and handle failure/late response consistently.
+- [x] Test active lease is not stolen, expired lease recovers, already-submitted provider IDs are reused, stale result writes fail, and exactly one network submission occurs for concurrent requests.
+- [x] Run targeted production/image tests; report commands/results. Coordinator reviews and commits.
 
 ### Task 4: Database initialization, migration graph and test dependencies
 
 **Files:** `server/app/database.py`, `server/alembic/versions/<new_merge>.py`, `server/requirements.txt`, database/migration tests and confirmed stale backend contract tests. Coordinator owns this task and shared test fixture decisions.
 
-- [ ] Add regressions: one migration head, upgrade empty SQLite and each former head, migration exceptions propagated, SQLite-only connection initialization.
-- [ ] Observe failures; create a merge revision without rewriting published ancestors, make startup migration failure explicit, and condition SQLite PRAGMAs by dialect.
-- [ ] Add the missing jsonschema test dependency in the existing dependency pattern; review and update the three stale backend assertions only when justified by current intended behavior.
-- [ ] Run migrations including a pre-existing fallback-created schema, then relevant backend tests.
-- [ ] Review and commit database/dependency work.
+- [x] Add regressions: one migration head, upgrade empty SQLite and each former head, migration exceptions propagated, SQLite-only connection initialization.
+- [x] Observe failures; create a merge revision without rewriting published ancestors, make startup migration failure explicit, and condition SQLite PRAGMAs by dialect.
+- [x] Add the missing jsonschema test dependency in the existing dependency pattern; review and update the three stale backend assertions only when justified by current intended behavior.
+- [x] Run migrations including a pre-existing fallback-created schema, then relevant backend tests.
+- [x] Review and commit database/dependency work.
 
 ### Task 5: Device execution, offline results and frontend evidence
 
 **Files:** `device/core/task-executor.js`, `device/core/task-timeout.js`, `device/core/api-client.js`, optional `device/core/task-state.js`, cancellation consumers under `device/handlers`, device Node regressions; `web/src/components/agency/agencyExpertLabels.js`, related Vitest tests and the seven stale agency API mocks. Coordinator owns this task.
 
-- [ ] Capture failing actual-module regressions for cyclic imports, a successful 60-minute nurture returning after 31 minutes, full search count -1, and offline queue containing deleted then valid task reports.
-- [ ] Decouple cancellation state, reuse task-timeout.js in executor, define full-search iteration until cancellation/exhaustion/deadline, and drain offline queues without recursion or permanent-item blockage.
-- [ ] Preserve evidence strings including `shot-001` and unknown English; repair API mocks using the real exported API contract.
-- [ ] Run all device Node tests, full Vitest and production build; document Android validation limits.
-- [ ] Review and commit this file set.
+- [x] Capture failing actual-module regressions for cyclic imports, a successful 60-minute nurture returning after 31 minutes, full search count -1, and offline queue containing deleted then valid task reports.
+- [x] Decouple cancellation state, reuse task-timeout.js in executor, define full-search iteration until cancellation/exhaustion/deadline, and drain offline queues without recursion or permanent-item blockage.
+- [x] Preserve evidence strings including `shot-001` and unknown English; repair API mocks using the real exported API contract.
+- [x] Run all device Node tests, full Vitest and production build; document Android validation limits.
+- [x] Review and commit this file set.
 
 ### Task 6: Integration, independent review and delivery
 
-- [ ] Read all task reports and scope-specific diffs; review spec compliance and code quality for each task.
-- [ ] Run full backend pytest, frontend Vitest/build, all device Node regressions, and migration checks with external paid APIs disabled.
-- [ ] Hand a full-branch diff file and exact validation evidence to an independent reviewer; resolve material findings and rerun only affected validation plus required gates.
-- [ ] Commit and publish the repair branch with a draft pull request if repository write access permits; do not merge main. Provide exact verification results and environment limitations to the user.
+- [x] Read all task reports and scope-specific diffs; review spec compliance and code quality for each task.
+- [x] Run full backend pytest, frontend Vitest/build, all device Node regressions, and migration checks with external paid APIs disabled.
+- [x] Hand a full-branch diff file and exact validation evidence to an independent reviewer; resolve material findings and rerun only affected validation plus required gates.
+- [x] Commit and publish the repair branch with a draft pull request if repository write access permits; do not merge main. Provide exact verification results and environment limitations to the user.

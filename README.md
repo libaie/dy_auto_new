@@ -326,7 +326,8 @@ GET /api/system/health
 - 默认 SQLite 数据库：`server/app/data/dy_auto.db`
 - Alembic 配置：`server/alembic.ini`
 - 迁移目录：`server/alembic/versions/`
-- 启动时 `init_db()` 会先尝试 `alembic upgrade head`，再用 `create_all` 和 SQLite 缺列补齐作为兜底。
+- 启动时 `init_db()` 必须先成功执行 `alembic upgrade head`，再补齐仍由 ORM 管理的历史表和 SQLite 缺列。迁移失败会中止启动并保留错误，不再绕过失败继续运行。
+- 本次审查修复的迁移顺序、旧库处理和验证边界见 [2026-11-05 修复与升级说明](docs/operations/2026-11-05-audit-repairs.md)。
 
 手动迁移：
 

@@ -103,8 +103,12 @@ def test_put_creates_new_key(client, db):
 
 
 def test_get_empty_settings(client, db):
-    """When no settings exist, return empty dict."""
+    """An empty settings table still exposes nonsecret decision defaults."""
     _clean_settings(db)
     resp = client.get("/api/settings")
     assert resp.status_code == 200
-    assert resp.json() == {}
+    data = resp.json()
+    assert data["decision_enabled"] == "false"
+    assert data["decision_model"] == "typesafe-ai/jev"
+    assert data["decision_api_key"] == ""
+    assert not any(key in data for key in ("ai_api_key", "llm_api_key", "pixelle_api_key"))

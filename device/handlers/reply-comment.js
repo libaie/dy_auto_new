@@ -354,6 +354,7 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
         searchKeyword: keyword,
         nickname: comment.nickname,
         commentText: comment.text,
+        generateReply: !skipReply,
       });
 
       if (!analysis) {

@@ -26,6 +26,8 @@ from app.services.task_service import task_service
 from app.config import ANTI_DETECT_CONFIG, ANTI_DETECT_CONFIG_VERSION, DEVICE_CONFIG, bj_now
 from app.services.selector_service import selector_service
 from app.services.prompt_template_service import prompt_template_service
+from app.services.decision_config import get_public_decision_config
+from app.services.decision_service import DecisionRequestError, DecisionServiceError, request_decision
 from app.ws_manager import pair_ws_manager
 
 router = APIRouter(prefix="/api/device", tags=["device"])
@@ -254,6 +256,7 @@ def _build_approved_payload(pair_req, db=None) -> dict:
         **DEVICE_CONFIG,
         "anti_detect_config": ANTI_DETECT_CONFIG,
         "anti_detect_config_version": ANTI_DETECT_CONFIG_VERSION,
+        "decision_config": get_public_decision_config(db),
     }
     ai_cfg = get_ai_config(db)
     if ai_cfg:
@@ -293,7 +296,7 @@ def check_pair_status(
         # Device was deleted or secret changed — need re-approval
         return PairStatusResponse(status="pending")
 
-    payload = _build_approved_payload(pair_req)
+    payload = _build_approved_payload(pair_req, db)
     return PairStatusResponse(**payload)
 
 
@@ -318,7 +321,7 @@ async def ws_pair_status(websocket: WebSocket, token: str):
             device = db.query(Device).filter(Device.id == pair_req.device_id).first()
             if device and device.device_secret == pair_req.device_secret:
                 await websocket.accept()
-                await websocket.send_json(_build_approved_payload(pair_req))
+                await websocket.send_json(_build_approved_payload(pair_req, db))
                 await websocket.close()
                 return
             # Device deleted or secret changed — treat as pending (wait for re-approval)
@@ -487,7 +490,7 @@ async def poll_tasks(
             cancelled_task_id=cancelled_task.id,
             anti_detect_config=ANTI_DETECT_CONFIG,
             anti_detect_config_version=ANTI_DETECT_CONFIG_VERSION,
-            device_config=DEVICE_CONFIG,
+            device_config={**DEVICE_CONFIG, "decision_config": get_public_decision_config(db)},
             server_date=bj_now().strftime("%Y-%m-%d"),
         )
 
@@ -567,7 +570,7 @@ async def poll_tasks(
         anti_detect_config=ANTI_DETECT_CONFIG,
         anti_detect_config_version=ANTI_DETECT_CONFIG_VERSION,
         ai_config=get_ai_config(db),
-        device_config=DEVICE_CONFIG,
+        device_config={**DEVICE_CONFIG, "decision_config": get_public_decision_config(db)},
         dm_sequences=dm_sequences_list,
         server_date=bj_now().strftime("%Y-%m-%d"),
     )
@@ -785,6 +788,7 @@ def register_device(
         **DEVICE_CONFIG,
         "anti_detect_config": ANTI_DETECT_CONFIG,
         "anti_detect_config_version": ANTI_DETECT_CONFIG_VERSION,
+        "decision_config": get_public_decision_config(db),
     }
     ai_cfg = get_ai_config(db)
     if ai_cfg:
@@ -1068,6 +1072,21 @@ async def device_calibrate(
     await pair_ws_manager.broadcast_invalidation("selectors_changed")
 
     return {"uploaded": uploaded, "resolution": resolution}
+
+
+@router.post("/decision-proxy")
+async def decision_proxy(
+    payload: dict,
+    db: Session = Depends(get_db),
+    _: Optional[str] = Depends(verify_device_secret),
+):
+    """Authenticated native decisions; gateway credentials remain on the server."""
+    try:
+        return await request_decision(payload, db)
+    except DecisionRequestError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
+    except DecisionServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from None
 
 
 @router.post("/ai-proxy", response_model=DeviceAIProxyResponse)

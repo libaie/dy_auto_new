@@ -8,12 +8,20 @@ import LoadingSpinner from '../components/LoadingSpinner.vue'
 const toast = useToastStore()
 const loading = ref(false)
 const saving = ref(false)
+const decisionKeyConfigured = ref(false)
+const decisionConfigError = ref('')
 
 const form = reactive({
   ai_api_key: '',
   ai_base_url: 'https://api.deepseek.com',
   ai_model: 'deepseek-chat',
   ai_thinking: 'max',
+  decision_enabled: false,
+  decision_api_key: '',
+  decision_api_url: 'https://ai-gateway.vercel.sh/typesafe/v1/systemone',
+  decision_model: 'typesafe-ai/jev',
+  decision_min_confidence: 0.5,
+  decision_min_probability: 0.75,
   pixelle_video_url: 'http://localhost:8500',
   pixelle_video_timeout: 600,
 })
@@ -31,6 +39,15 @@ async function fetchSettings() {
     form.ai_base_url = data.ai_base_url || 'https://api.deepseek.com'
     form.ai_model = data.ai_model || 'deepseek-chat'
     form.ai_thinking = data.ai_thinking || 'max'
+    decisionConfigError.value = data.decision_config_error || ''
+    const enabled = data.decision_enabled
+    // Recovery must stay fail closed unless the server explicitly reports disabled.
+    form.decision_enabled = enabled === 'true' || enabled === true
+      || (Boolean(decisionConfigError.value) && enabled !== 'false' && enabled !== false)
+    form.decision_api_key = ''
+    decisionKeyConfigured.value = Boolean(data.decision_api_key)
+    form.decision_min_confidence = thresholdOrDefault(data.decision_min_confidence, 0.5)
+    form.decision_min_probability = thresholdOrDefault(data.decision_min_probability, 0.75)
     form.pixelle_video_url = data.pixelle_video_url || 'http://localhost:8500'
     form.pixelle_video_timeout = parseInt(data.pixelle_video_timeout) || 600
   } catch {
@@ -40,7 +57,17 @@ async function fetchSettings() {
   }
 }
 
+function thresholdOrDefault(value, fallback) {
+  return value !== undefined && value !== null && value !== '' && Number.isFinite(Number(value))
+    ? Number(value) : fallback
+}
+
 async function handleSave() {
+  const thresholds = [form.decision_min_confidence, form.decision_min_probability]
+  if (thresholds.some(value => typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1)) {
+    toast.error('决策门槛必须是 0 到 1 之间的数字')
+    return
+  }
   saving.value = true
   try {
     const payload = {}
@@ -49,12 +76,23 @@ async function handleSave() {
     if (form.ai_base_url) payload.ai_base_url = form.ai_base_url
     if (form.ai_model) payload.ai_model = form.ai_model
     if (form.ai_thinking) payload.ai_thinking = form.ai_thinking
+    payload.decision_enabled = String(form.decision_enabled)
+    payload.decision_api_url = form.decision_api_url
+    payload.decision_model = form.decision_model
+    payload.decision_min_confidence = String(form.decision_min_confidence)
+    payload.decision_min_probability = String(form.decision_min_probability)
+    const decisionKey = form.decision_api_key.trim()
+    if (decisionKey && decisionKey !== '****') payload.decision_api_key = decisionKey
     if (form.pixelle_video_url) payload.pixelle_video_url = form.pixelle_video_url
     if (form.pixelle_video_timeout) payload.pixelle_video_timeout = String(form.pixelle_video_timeout)
     await updateSettings(payload)
+    if (payload.decision_api_key) decisionKeyConfigured.value = true
+    form.decision_api_key = ''
+    decisionConfigError.value = ''
     toast.success('设置已保存')
-  } catch {
-    toast.error('保存失败')
+  } catch (error) {
+    const detail = error?.response?.data?.detail
+    toast.error(typeof detail === 'string' ? detail : '保存失败')
   } finally {
     saving.value = false
   }
@@ -92,8 +130,8 @@ onMounted(fetchSettings)
             </svg>
           </div>
           <div>
-            <h2 class="text-lg font-semibold text-white">AI 配置</h2>
-            <p class="text-sm text-slate-400">配置 AI 内容分析和生成功能（DeepSeek / OpenAI 兼容格式）</p>
+            <h2 class="text-lg font-semibold text-white">文案生成模型</h2>
+            <p class="text-sm text-slate-400">配置回复、私信与文案生成（DeepSeek / OpenAI 兼容格式）</p>
           </div>
         </div>
 
@@ -149,6 +187,56 @@ onMounted(fetchSettings)
           </div>
         </div>
       </div>
+
+      <section class="glass-card p-6 mb-6" aria-labelledby="decision-heading">
+        <div class="mb-6">
+          <h2 id="decision-heading" class="text-lg font-semibold text-white">Jev 决策模型</h2>
+          <p class="mt-1 text-sm text-slate-400">用于评论评分、意图识别和内容相关性判断。回复文案继续使用上方生成模型。</p>
+        </div>
+        <div class="space-y-5">
+          <label for="decision-enabled" class="flex items-center gap-3 text-sm text-slate-300">
+            <input id="decision-enabled" v-model="form.decision_enabled" type="checkbox" class="h-4 w-4 accent-cyan-500" />
+            启用 Jev 决策
+          </label>
+          <p class="text-xs text-slate-500">启用后，决策异常或未达到门槛时跳过该次操作；关闭后使用原有判断方式。</p>
+          <p v-if="decisionConfigError" role="alert" class="text-sm text-amber-300">{{ decisionConfigError }}</p>
+
+          <div>
+            <label for="decision-api-key" class="block text-sm font-medium text-slate-300 mb-2">AI Gateway API Key</label>
+            <input id="decision-api-key" v-model="form.decision_api_key" type="password" autocomplete="new-password"
+              :placeholder="decisionKeyConfigured ? '已配置，留空保留现有密钥' : '输入 AI Gateway API Key'"
+              class="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50" />
+            <p class="mt-1 text-xs text-slate-500">密钥只保存在服务端；留空保留已存值或使用 DECISION_API_KEY。通过此页面保存前，服务端需配置 ENCRYPTION_KEY。</p>
+          </div>
+
+          <div>
+            <label for="decision-model" class="block text-sm font-medium text-slate-300 mb-2">决策模型</label>
+            <input id="decision-model" v-model="form.decision_model" type="text" readonly
+              class="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-slate-300" />
+          </div>
+          <div>
+            <label for="decision-api-url" class="block text-sm font-medium text-slate-300 mb-2">完整 POST 地址</label>
+            <input id="decision-api-url" v-model="form.decision_api_url" type="url" readonly
+              class="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-slate-300" />
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label for="decision-min-confidence" class="block text-sm font-medium text-slate-300 mb-2">评分置信度门槛</label>
+              <input id="decision-min-confidence" v-model.number="form.decision_min_confidence" type="number" min="0" max="1" step="0.05"
+                class="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-cyan-500/50" />
+              <p class="mt-1 text-xs text-slate-500">采用模型的评分 confidence，默认 0.5。</p>
+            </div>
+            <div>
+              <label for="decision-min-probability" class="block text-sm font-medium text-slate-300 mb-2">分类概率门槛</label>
+              <input id="decision-min-probability" v-model.number="form.decision_min_probability" type="number" min="0" max="1" step="0.05"
+                class="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-cyan-500/50" />
+              <p class="mt-1 text-xs text-slate-500">用于意图、相关性和排除项判断，默认 0.75。</p>
+            </div>
+          </div>
+          <p class="text-xs text-slate-500">提高门槛会跳过更多不确定结果；初始门槛需要结合实际业务样本调整。</p>
+        </div>
+      </section>
 
       <!-- Pixelle-Video Configuration -->
       <div class="glass-card p-6 mb-6">
@@ -234,7 +322,7 @@ onMounted(fetchSettings)
           <div class="text-sm text-slate-400 leading-relaxed">
             <p class="mb-2">AI 配置用于以下功能：</p>
             <ul class="list-disc list-inside space-y-1 text-slate-500">
-              <li>养号过程中的内容语义分析（判断是否与大健康相关）</li>
+              <li>Jev 决策：评论评分、意图识别和所属行业的内容相关性</li>
               <li>评论 / 私信内容 AI 生成</li>
               <li>Pixelle-Video 视频生成（LLM 脚本 → ComfyUI 配图 → TTS 配音 → 合成）</li>
             </ul>

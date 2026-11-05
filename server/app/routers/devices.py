@@ -179,7 +179,7 @@ async def approve_pair_request(
 ):
     """Approve a pairing request — generates per-device secret and creates Device record."""
     import uuid
-    from app.config import DEVICE_CONFIG, ANTI_DETECT_CONFIG, ANTI_DETECT_CONFIG_VERSION, get_ai_config
+    from app.routers.device import _build_approved_payload
     user_id, _ = user
 
     pair_req = db.query(DevicePairRequest).filter(DevicePairRequest.id == request_id).first()
@@ -235,19 +235,7 @@ async def approve_pair_request(
     db.commit()
 
     # Push result to device via WebSocket (if connected)
-    config = {
-        **DEVICE_CONFIG,
-        "anti_detect_config": ANTI_DETECT_CONFIG,
-        "anti_detect_config_version": ANTI_DETECT_CONFIG_VERSION,
-    }
-    ai_cfg = get_ai_config(db)
-    if ai_cfg:
-        config["ai_config"] = ai_cfg
-    await pair_ws_manager.notify(pair_req.pairing_token, {
-        "status": "approved",
-        "secret": device_secret,
-        "config": config,
-    })
+    await pair_ws_manager.notify(pair_req.pairing_token, _build_approved_payload(pair_req, db))
 
     # Broadcast to admin clients
     await pair_ws_manager.broadcast_to_admins({

@@ -206,9 +206,12 @@ SearchCollectHandler._aiQualify = function (comment) {
       searchKeyword: (comment._keyword || ""),
       nickname: comment.nickname,
       commentText: comment.text,
+      generateReply: false,
     });
+    var quality = result && result.dimensions && result.dimensions.lead_quality;
+    if (quality && (quality.is_bot === true || quality.is_competitor === true)) return false;
     if (result && typeof result.score === "number") return result.score >= 40;
-    return result && result.qualified === true;
+    return !!(result && result.qualified === true);
   } catch (e) { logger.warn(TAG, "AI分析失败: " + e.message); return false; }
 };
 
@@ -282,6 +285,7 @@ SearchCollectHandler.execute = function (params) {
 };
 
 SearchCollectHandler._executeShareLinks = function (params) {
+  aiAnalyzer.useTemplate(params.prompt_template_id);
   var links = params.share_links;
   var taskId = params.task_id || "";
   logger.info(TAG, "分享链接采集: " + links.length + " 个链接, 关键词='" + (params.keyword || "") + "'");

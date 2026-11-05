@@ -6,6 +6,8 @@ from sqlalchemy.orm import Session
 import time
 
 from app.database import get_db
+from app.db_models import UISelector
+from app.services.selector_validation import validate_selector_strategies
 from app.deps import verify_admin_token, require_role
 from app.services.selector_service import selector_service
 from app.services.template_service import template_service
@@ -123,6 +125,7 @@ async def create_selector(
     user = Depends(require_role("admin")),
 ):
     try:
+        validate_selector_strategies(request.strategies, request.purpose)
         sel = selector_service.create_selector(
             db, action_name=request.action_name,
             strategies=request.strategies,
@@ -158,6 +161,19 @@ async def update_selector(
     user = Depends(require_role("admin")),
 ):
     try:
+        # Resolve the same composite key as update_selector, including disabled records.
+        query = db.query(UISelector).filter(UISelector.action_name == action_name)
+        if request.platform_version:
+            query = query.filter(UISelector.platform_version == request.platform_version)
+        if request.resolution_profile:
+            query = query.filter(UISelector.resolution_profile == request.resolution_profile)
+        existing = query.first()
+        if existing is None:
+            raise HTTPException(status_code=404, detail=f"Selector '{action_name}' not found")
+        validate_selector_strategies(
+            request.strategies if request.strategies is not None else existing.strategies,
+            request.purpose if request.purpose is not None else (existing.purpose or 'locate'),
+        )
         sel = selector_service.update_selector(
             db, action_name=action_name,
             strategies=request.strategies,
@@ -173,7 +189,7 @@ async def update_selector(
             clean_prompt=request.clean_prompt,
         )
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e))
 
     version = selector_service.get_version(db)
     from app.ws_manager import pair_ws_manager

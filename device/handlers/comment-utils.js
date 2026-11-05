@@ -6,10 +6,143 @@ var uiOperator = require("../core/ui-operator");
 var selectorLoader = require("../core/selector-loader");
 var selectorResolver = require("../core/selector-resolver");
 var logger = require("../utils/logger");
+var screenContext = require("../core/screen-context");
 
 var TAG = "评论工具";
 
 var commentUtils = {
+
+  // Largest unobstructed part of a known container; never invent full-screen
+  // list coordinates when the list cannot be identified.
+  usableBounds: function (bounds, ctx) {
+    if (!ctx || ctx.canInteract === false) return null;
+    var area = screenContext.intersect(screenContext.rect(bounds), ctx.contentBounds);
+    if (!area) return null;
+    var blocked = ctx.blockedBounds || [];
+    for (var i = 0; i < blocked.length; i++) {
+      var overlap = screenContext.intersect(area, blocked[i]);
+      if (!overlap) continue;
+      var parts = [
+        { left: area.left, top: area.top, right: area.right, bottom: overlap.top },
+        { left: area.left, top: overlap.bottom, right: area.right, bottom: area.bottom },
+        { left: area.left, top: area.top, right: overlap.left, bottom: area.bottom },
+        { left: overlap.right, top: area.top, right: area.right, bottom: area.bottom }
+      ];
+      area = null;
+      var largest = 0;
+      for (var j = 0; j < parts.length; j++) {
+        var size = (parts[j].right - parts[j].left) * (parts[j].bottom - parts[j].top);
+        if (size > largest) { largest = size; area = parts[j]; }
+      }
+      if (!area) return null;
+    }
+    return area;
+  },
+
+  visibleNode: function (node, ctx, region) {
+    if (!node) return false;
+    try {
+      if (node.isImage || node.isCoordinate) return screenContext.isUsablePoint(node, ctx, region);
+      var b = screenContext.rect(node.bounds());
+      return !!b && screenContext.isUsablePoint({ x: (b.left + b.right) / 2, y: (b.top + b.bottom) / 2 }, ctx, region);
+    } catch (e) { return false; }
+  },
+
+  clickWithin: function (node, region) {
+    var ctx = screenContext.read();
+    if (!commentUtils.visibleNode(node, ctx, region)) return false;
+    return uiOperator.clickElement(node);
+  },
+
+  isListContainer: function (node) {
+    if (!node || node.isImage || node.isCoordinate || node.isPress) return false;
+    try {
+      var name = String(node.className());
+      return name.indexOf("RecyclerView") !== -1 || name.indexOf("ListView") !== -1 || !!(node.scrollable && node.scrollable());
+    } catch (e) { return false; }
+  },
+
+  findListContainer: function (action) {
+    var candidates = action ? (uiOperator.findElements(action, 500) || []) : [];
+    var all = [];
+    var i;
+    for (i = 0; i < candidates.length; i++) all.push(candidates[i]);
+    try {
+      var byId = id("recycler_view").find();
+      for (i = 0; i < byId.length; i++) all.push(byId[i]);
+    } catch (e) {}
+    var names = ["androidx.recyclerview.widget.RecyclerView", "android.support.v7.widget.RecyclerView", "android.widget.ListView"];
+    for (var n = 0; n < names.length; n++) {
+      try {
+        var found = className(names[n]).find();
+        for (i = 0; i < found.length; i++) all.push(found[i]);
+      } catch (e2) {}
+    }
+    var ctx = screenContext.read();
+    for (i = 0; i < all.length; i++) {
+      var node = all[i];
+      for (var depth = 0; node && depth < 8; depth++) {
+        try {
+          if (commentUtils.isListContainer(node)) {
+            var b = commentUtils.usableBounds(node.bounds(), ctx);
+            if (b && b.right - b.left >= screenContext.dp(48, ctx) && b.bottom - b.top >= screenContext.dp(96, ctx)) return node;
+          }
+          node = node.parent();
+        } catch (e3) { break; }
+      }
+    }
+    return null;
+  },
+
+  swipeList: function (action, downward) {
+    // Reacquire the list and window for each gesture, including every retry.
+    var container = commentUtils.findListContainer(action);
+    if (!container) return false;
+    var ctx = screenContext.read();
+    var b;
+    try { b = commentUtils.usableBounds(container.bounds(), ctx); } catch (e) { return false; }
+    if (!b || b.bottom - b.top < screenContext.dp(48, ctx)) return false;
+    var x = Math.floor((b.left + b.right) / 2);
+    var low = Math.floor(b.top + (b.bottom - b.top) * 0.8);
+    var high = Math.floor(b.top + (b.bottom - b.top) * 0.25);
+    if (!screenContext.isUsablePoint({ x: x, y: low }, ctx, b) || !screenContext.isUsablePoint({ x: x, y: high }, ctx, b)) return false;
+    return gestures([0, Math.floor(Math.random() * 150 + 400), [x, downward ? high : low], [x, downward ? low : high]]) !== false;
+  },
+
+  _visibleTextCount: function (content) {
+    try {
+      var nodes = text(content).find();
+      var ctx = screenContext.read();
+      var count = 0;
+      for (var i = 0; i < nodes.length; i++) {
+        // The input's text must never serve as outgoing-message evidence.
+        if (String(nodes[i].className()).indexOf("EditText") === -1 && commentUtils.visibleNode(nodes[i], ctx, ctx.contentBounds)) count++;
+      }
+      return count;
+    } catch (e) { return null; }
+  },
+
+  // One submission maximum. A click return value is actuation, not delivery.
+  // Only a new exact text node plus cleared input confirms an observed send.
+  submitAndObserve: function (sendAction, inputAction, content, failureAction) {
+    var before = commentUtils._visibleTextCount(content);
+    var alreadyFailed = failureAction ? !!uiOperator.findElement(failureAction, 300, true) : false;
+    var target = uiOperator.findElement(sendAction, 3000);
+    if (!target) return "not_attempted";
+    try {
+      if (!uiOperator.clickAction(sendAction, 1000)) return "unknown";
+      for (var attempt = 0; attempt < 3; attempt++) {
+        sleep(500);
+        if (failureAction && !alreadyFailed && uiOperator.findElement(failureAction, 300, true)) return "failed";
+        var edit = uiOperator.findElement(inputAction, 500, true);
+        var after = commentUtils._visibleTextCount(content);
+        if (edit && !edit.isImage && !edit.isCoordinate && before !== null && after !== null && after > before && String(edit.text() || "").replace(/\s/g, "") === "") return "confirmed";
+      }
+    } catch (e) {
+      logger.warn(TAG, "发送状态无法确认: " + (e.message || e));
+    }
+    return "unknown";
+  },
 
   /**
    * 打开评论区 — 统一实现，合并 search-collect 和 reply-comment 的最佳行为
@@ -367,19 +500,25 @@ localPreFilter: function (text) {
       var avatarBounds = avatarEl.bounds();
       if (!avatarBounds) return null;
 
-      var w = avatarBounds.right - avatarBounds.left;
-      var h = avatarBounds.bottom - avatarBounds.top;
-      var size = Math.min(w, h);
-      var cx = avatarBounds.left + w / 2;
-      var cy = avatarBounds.top + h / 2;
-      var radius = size / 2;
-      var left = Math.round(cx - radius);
-      var top = Math.round(cy - radius);
-      var sz = Math.round(size);
-
-      var screen = null, squareImg = null, srcBitmap = null, outBitmap = null;
+      var screen = null, squareImg = null, srcBitmap = null, outBitmap = null, outputImage = null;
       try {
         screen = images.captureScreen();
+        if (!screen) return null;
+        var ctx = screenContext.read(screen);
+        var physical = screenContext.intersect(avatarBounds, ctx.captureBounds || { left: 0, top: 0, right: ctx.width, bottom: ctx.height });
+        if (!physical) return null;
+        var first = screenContext.screenToCapture({ x: physical.left, y: physical.top }, ctx);
+        var last = screenContext.screenToCapture({ x: physical.right - 1, y: physical.bottom - 1 }, ctx);
+        if (!first || !last) return null;
+        var mapped = screenContext.intersect({ left: Math.floor(Math.min(first.x, last.x)), top: Math.floor(Math.min(first.y, last.y)),
+          right: Math.ceil(Math.max(first.x, last.x) + 1), bottom: Math.ceil(Math.max(first.y, last.y) + 1) },
+          { left: 0, top: 0, right: screen.getWidth(), bottom: screen.getHeight() });
+        if (!mapped) return null;
+        var sz = Math.floor(Math.min(mapped.right - mapped.left, mapped.bottom - mapped.top));
+        if (sz < 1) return null;
+        var left = Math.floor(mapped.left + (mapped.right - mapped.left - sz) / 2);
+        var top = Math.floor(mapped.top + (mapped.bottom - mapped.top - sz) / 2);
+        var radius = sz / 2;
         squareImg = images.clip(screen, left, top, sz, sz);
         if (squareImg) {
           srcBitmap = squareImg.getBitmap();
@@ -395,11 +534,13 @@ localPreFilter: function (text) {
             android.graphics.PorterDuff.Mode.SRC_IN
           ));
           canvas.drawBitmap(srcBitmap, 0, 0, paint);
-          return images.toBase64(images.fromBitmap(outBitmap), "png");
+          outputImage = images.fromBitmap(outBitmap);
+          return images.toBase64(outputImage, "png");
         }
       } finally {
-        if (outBitmap) outBitmap.recycle();
-        if (srcBitmap) srcBitmap.recycle();
+        // The ImageWrapper owns outBitmap, squareImg owns srcBitmap.
+        if (outputImage) outputImage.recycle();
+        else if (outBitmap) outBitmap.recycle();
         if (squareImg) squareImg.recycle();
         if (screen) screen.recycle();
       }

@@ -1,5 +1,6 @@
 var apiClient = require("./api-client");
 var logger = require("../utils/logger");
+var screenContext = require("./screen-context");
 
 var TAG = "选择器";
 
@@ -19,22 +20,49 @@ function ensureDirPath(dir) {
 var selectorLoader = global.__selectorLoader || {
 
   _cache: {},       // action_name -> selector config
+  _allSelectors: [], // last authoritative candidates, before profile selection
   _retriedActions: {},  // action_name -> bool, 每个 action 独立重试
   _version: 0,      // 本地缓存版本号
   _initialized: false,
-  _resolution: "",  // 当前设备分辨率，init 时捕获
+  _resolution: "",  // live physical display size; refreshed before each lookup
+  _pendingGeometryRefresh: false,
+  _geometryRequestAt: 0,
+
+  _calibrationActions: function () {
+    var missing = [];
+    for (var action in this._cache) {
+      if (!Object.prototype.hasOwnProperty.call(this._cache, action)) continue;
+      var selector = this._cache[action];
+      if (!selector || !selector.strategies || selector.purpose === "page_detect" || selector.purpose === "extract") continue;
+      var hasImage = false, hasSemantic = false, covered = false;
+      for (var i = 0; i < selector.strategies.length; i++) {
+        var strategy = selector.strategies[i];
+        if (strategy.type === "image") {
+          hasImage = true;
+          if (selector.resolution_profile === this._resolution && (!this._douyinVersion || selector.platform_version === this._douyinVersion)) {
+            try { if (files.exists("/sdcard/dy_auto/templates/" + this._resolution + "/" + strategy.template)) covered = true; } catch (e) {}
+          }
+        } else if (strategy.type !== "coordinate" && strategy.type !== "package" && (strategy.conditions || ["text", "id", "desc", "className", "chain"].indexOf(strategy.type) !== -1)) {
+          hasSemantic = true;
+        }
+      }
+      if (hasImage && hasSemantic && !covered) missing.push(action);
+    }
+    return missing;
+  },
 
   /**
    * 初始化 — 从后端拉取全量选择器（带重试）
    */
   init: function () {
     // 第一时间捕获设备分辨率，后续 syncTemplates 等依赖
-    this._resolution = device.width + "x" + device.height;
+    var geometry = screenContext.read();
+    this._resolution = geometry ? geometry.width + "x" + geometry.height : device.width + "x" + device.height;
     var maxRetries = 3;
     for (var attempt = 1; attempt <= maxRetries; attempt++) {
       logger.info(TAG, "从服务端加载选择器 (尝试 " + attempt + "/" + maxRetries + ")...");
       try {
-        var response = apiClient.fetchSelectors(0);
+        var response = apiClient.fetchSelectors(0, this._resolution);
         // 如果返回的是字符串，先解析成对象
         if (typeof response === 'string') {
             try {
@@ -49,42 +77,23 @@ var selectorLoader = global.__selectorLoader || {
           this._initialized = true;
           logger.info(TAG, "已加载 " + Object.keys(this._cache).length + " 个选择器, 版本=" + this._version);
           this.syncTemplates();
-          // 检查是否需要为新分辨率设备标定 image 模板
-          var needCalibration = false;
-          var hasImageSelector = false;
-          var hasExactMatch = false;
-          for (var actionName in this._cache) {
-            var sel = this._cache[actionName];
-            if (!sel || !sel.strategies) continue;
-            for (var si = 0; si < sel.strategies.length; si++) {
-              if (sel.strategies[si].type === "image") {
-                hasImageSelector = true;
-                break;
-              }
-            }
-            var rp = sel.resolution_profile || "default";
-            if (rp === this._resolution) { hasExactMatch = true; }
-          }
-          // 已有本地模板文件则跳过（避免重复标定）
-          var localTplDir = "/sdcard/dy_auto/templates/" + this._resolution + "/";
-          var hasLocalTemplates = false;
-          try {
-            hasLocalTemplates = files.isDir(localTplDir) && files.listDir(localTplDir).length > 0;
-          } catch (e) {}
-          needCalibration = hasImageSelector && !hasExactMatch && !hasLocalTemplates;
+          // 逐动作、逐应用版本检查，其他动作已有模板不能代替本动作。
+          var calibrationActions = this._calibrationActions();
+          var needCalibration = calibrationActions.length > 0;
           // 检查关键选择器是否缺失
           var criticalActions = ["search_tab", "video_comment_btn", "comment_list", "follow_button"];
           var missing = [];
           for (var ci = 0; ci < criticalActions.length; ci++) {
             if (!this._cache[criticalActions[ci]]) missing.push(criticalActions[ci]);
           }
-          if (needCalibration || missing.length > 0) {
-            var reason = needCalibration ? "新分辨率 " + this._resolution + " 缺少 image 模板" : "";
+          if (missing.length > 0) logger.warn(TAG, "缺少选择器配置: " + missing.join(","));
+          if (needCalibration) {
+            var reason = "分辨率 " + this._resolution + " 缺少当前应用模板: " + calibrationActions.join(",");
             if (missing.length > 0) reason += (reason ? "; " : "") + "缺少选择器: " + missing.join(",");
             logger.warn(TAG, "触发自动标定: " + reason);
             try {
               var calibrator = require("./calibrator");
-              calibrator.run({ unattended: true });
+              calibrator.run({ unattended: true, actions: calibrationActions });
             } catch (e) {
               logger.warn(TAG, "自动标定失败: " + e.message);
             }
@@ -110,9 +119,10 @@ var selectorLoader = global.__selectorLoader || {
    * @param {number} serverVersion - 服务端版本号
    */
   checkAndUpdate: function (serverVersion) {
+    this._refreshGeometry();
     if (serverVersion > this._version) {
       logger.info(TAG, "选择器已过期 (本地=" + this._version + ", 服务端=" + serverVersion + "), 更新中...");
-      var response = apiClient.fetchSelectors(this._version);
+      var response = apiClient.fetchSelectors(this._version, this._resolution);
       if (response && response.changed && response.selectors) {
         this._applySelectors(response.selectors);
         this._version = response.version;
@@ -128,15 +138,16 @@ var selectorLoader = global.__selectorLoader || {
    * @returns {Object|null} { strategies: [...] }
    */
   get: function (actionName) {
+    this._refreshGeometry();
     var selector = this._cache[actionName];
     if (selector) return selector;
 
     // 未找到 — 每个 action 独立重试一次（可能是初始化时网络异常）
-    if (this._initialized && !this._retriedActions[actionName]) {
+    if (this._initialized && !this._pendingGeometryRefresh && !this._retriedActions[actionName]) {
       this._retriedActions[actionName] = true;
       logger.warn(TAG, "选择器 '" + actionName + "' 未找到，尝试重新加载...");
       try {
-        var response = apiClient.fetchSelectors(0);
+        var response = apiClient.fetchSelectors(0, this._resolution);
         if (typeof response === 'string') {
           response = JSON.parse(response);
         }
@@ -155,6 +166,44 @@ var selectorLoader = global.__selectorLoader || {
     return null;
   },
 
+  /** Re-select immediately after rotation/display change, even if config revision
+   * is unchanged. A failed network refresh keeps only compatible cached profiles
+   * and retries at most once per 10 seconds, rather than once per selector. */
+  _refreshGeometry: function () {
+    if (this._refreshingGeometry) return;
+    var geometry = screenContext.read();
+    if (!geometry) return;
+    var resolution = geometry.width + "x" + geometry.height;
+    var changed = resolution !== this._resolution;
+    if (!changed && !this._pendingGeometryRefresh) return;
+    if (changed) {
+      this._resolution = resolution;
+      this._retriedActions = {};
+      if (this._allSelectors.length) this._applySelectors(this._allSelectors);
+      this._pendingGeometryRefresh = this._initialized;
+    }
+    if (!this._initialized || (!changed && Date.now() - this._geometryRequestAt < 10000)) return;
+    this._geometryRequestAt = Date.now();
+    this._refreshingGeometry = true;
+    try {
+      var response = apiClient.fetchSelectors(0, resolution);
+      if (typeof response === "string") response = JSON.parse(response);
+      if (response && Array.isArray(response.selectors)) {
+        this._applySelectors(response.selectors);
+        this._version = response.version;
+        this._pendingGeometryRefresh = this._resolution !== resolution;
+        this.syncTemplates();
+      } else {
+        this._pendingGeometryRefresh = true;
+      }
+    } catch (e) {
+      this._pendingGeometryRefresh = true;
+      logger.warn(TAG, "分辨率配置刷新失败: " + resolution + " - " + e.message);
+    } finally {
+      this._refreshingGeometry = false;
+    }
+  },
+
   /**
    * 应用选择器配置到缓存
    * 同名 action 择优保留：精确匹配当前抖音版本 > default > 其他版本
@@ -162,6 +211,7 @@ var selectorLoader = global.__selectorLoader || {
    * @param {Array} selectors
    */
   _applySelectors: function (selectors) {
+    this._allSelectors = selectors.slice();
     var douyinVersion = this._douyinVersion;
     if (douyinVersion === undefined) {
       try {
@@ -172,11 +222,12 @@ var selectorLoader = global.__selectorLoader || {
     }
 
     // Capture device resolution
-    var devRes = this._resolution;
+    var geometry = screenContext.read();
+    var devRes = geometry ? geometry.width + "x" + geometry.height : this._resolution;
     if (!devRes) {
       devRes = device.width + "x" + device.height;
-      this._resolution = devRes;
     }
+    this._resolution = devRes;
     var devAR = _aspectTag(devRes);
 
     function _priority(platformVer) {
@@ -267,6 +318,7 @@ var selectorLoader = global.__selectorLoader || {
     var newCache = {};
     for (var i = 0; i < selectors.length; i++) {
       var s = selectors[i];
+      if (_resProfileScore(s) === 0) continue;
       var fromNew = newCache[s.action_name];
       var fromOld = oldCache[s.action_name];
       if (fromNew) {

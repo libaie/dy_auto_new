@@ -317,12 +317,17 @@ var apiClient = {
   uploadCalibration: function (templates, resolution) {
     var body = {
       templates: templates.map(function (t) {
-        return {
+        var item = {
           action_name: t.action_name,
           filename: t.filename,
           data: android.util.Base64.encodeToString(t.data, 0),  // base64 for JSON
           resolution: resolution,
         };
+        var fields = ["source_selector_id", "source_selector_version", "source_platform_version", "source_resolution_profile", "platform_version", "source_resolution", "source_density"];
+        for (var i = 0; i < fields.length; i++) {
+          if (t[fields[i]] !== undefined) item[fields[i]] = t[fields[i]];
+        }
+        return item;
       }),
       resolution: resolution,
     };
@@ -397,8 +402,10 @@ var apiClient = {
     return this.post("/api/device/progress", body);
   },
 
-  fetchSelectors: function (currentVersion) {
-    return this.get("/api/device/selectors", { version: currentVersion || 0 });
+  fetchSelectors: function (currentVersion, resolution) {
+    var params = { version: currentVersion || 0 };
+    if (resolution) params.resolution = resolution;
+    return this.get("/api/device/selectors", params);
   },
 
   fetchPromptTemplates: function (currentVersion) {
@@ -496,7 +503,12 @@ var apiClient = {
   // --- DM conversation ---
 
   claimDMRecipient: function (data) {
-    return this.post("/api/device/dm-claim-recipient", data);
+    var body = {};
+    for (var key in data) {
+      if (Object.prototype.hasOwnProperty.call(data, key)) body[key] = data[key];
+    }
+    body.preserve_on_unknown = true;
+    return this.post("/api/device/dm-claim-recipient", body);
   },
 
   reportDMSend: function (data) {

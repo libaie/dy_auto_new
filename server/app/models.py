@@ -633,6 +633,7 @@ class DMClaimRecipientRequest(BaseModel):
     account_id: str
     recipient_douyin_id: str
     recipient_nickname: str
+    preserve_on_unknown: bool = False
 
 
 class DMClaimRecipientResponse(BaseModel):

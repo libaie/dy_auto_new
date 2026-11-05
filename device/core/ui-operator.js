@@ -1,8 +1,31 @@
 var selectorLoader = require("./selector-loader");
 var apiClient = require("./api-client");
 var logger = require("../utils/logger");
+var geometry = require("./screen-context");
+var imageLocator = require("./image-locator");
 
 var TAG = "界面操作";
+
+// Keep metadata outside Java UiObjects: callers still receive the native node.
+// Values never retain their weak key. Rhino uses Java's synchronized weak map;
+// runtimes with WeakMap may use it, without requiring ES6 syntax or APIs.
+var nodeScopeMap = null, nodeScopeFallback = [], nodeScopeStoreFailed = false;
+try {
+  if (typeof java !== "undefined" && java.util && java.util.WeakHashMap && java.util.Collections) {
+    nodeScopeMap = {javaMap:java.util.Collections.synchronizedMap(new java.util.WeakHashMap())};
+  }
+} catch (scopeStoreError) { nodeScopeStoreFailed = true; }
+if (!nodeScopeMap && !nodeScopeStoreFailed && typeof WeakMap === "function") {
+  try { nodeScopeMap = {jsMap:new WeakMap()}; } catch (weakMapError) { nodeScopeStoreFailed = true; }
+}
+
+function scopeStrategy(strategy) {
+  var copy = {};
+  if (strategy.anchor) copy.anchor = JSON.parse(JSON.stringify(strategy.anchor));
+  if (strategy.region) copy.region = JSON.parse(JSON.stringify(strategy.region));
+  return copy;
+}
+
 
 var uiOperator = {
   /**
@@ -97,94 +120,182 @@ var uiOperator = {
   /**
    * 判断元素是否在当前屏幕内
    */
-  _isOnScreen: function (el) {
-    if (!el) return false;
-    // 坐标类型（图片匹配、坐标策略）视为在屏幕内
-    if (el.isImage || el.isCoordinate || el.isPackage) return true;
-    try {
-      var b = el.bounds();
-      if (!b) return false;
-      var cx = b.centerX();
-      var cy = b.centerY();
-      return cx >= 0 && cy >= 0 && cx < device.width && cy < device.height;
-    } catch (e) { return false; }
+  _sameNode: function (first, second) {
+    if (first === second) return true;
+    try { return !!first && typeof first.equals === "function" && first.equals(second) === true; } catch (e) { return false; }
   },
 
-  /**
-   * 使用选择器查找控件（仅返回屏幕内的元素，避免 RecyclerView 复用导致的离屏匹配）
-   * @param {string} actionName - 操作名称
-   * @param {number} timeout - 超时时间（毫秒），默认 5000
-   * @returns {UiObject|null} 找到的控件，或 null
-   */
-  findElement: function (actionName, timeout, quiet) {
-    timeout = timeout || 2000;
-    var selector = selectorLoader.get(actionName);
-    if (!selector) {
-      logger.error(TAG, "未找到选择器配置: " + actionName);
-      return null;
-    }
+  _appendDistinctNode: function (list, node) {
+    for (var i = 0; i < list.length; i++) if (this._sameNode(list[i],node)) return;
+    list.push(node);
+  },
 
-    var strategies = selector.strategies.slice().sort(function (a, b) {
-      return a.priority - b.priority;
-    });
-
-    var startTime = Date.now();
-    while (Date.now() - startTime < timeout) {
-      for (var i = 0; i < strategies.length; i++) {
-        var s = strategies[i];
-        var element = this._findByStrategy(s);
-        if (element && this._isOnScreen(element)) {
-          // press 模式：找到元素后用真实触摸按压代替点击
-          if (s.click_mode === "press") {
-            if (element.isImage || element.isCoordinate) {
-              if (s.x_percent != null) element.x += s.x_percent;
-              if (s.y_percent != null) element.y += s.y_percent;
-              return { isPress: true, x: element.x, y: element.y, duration: s.press_duration || 150 };
-            }
-            if (!element.isPackage) {
-              var pb = element.bounds();
-              if (pb) {
-                var pcx = pb.centerX();
-                var pcy = pb.centerY();
-                if (s.x_percent != null) pcx += Math.round((pb.right - pb.left) * s.x_percent / 100);
-                if (s.y_percent != null) pcy += Math.round((pb.bottom - pb.top) * s.y_percent / 100);
-                logger.debug(TAG, "通过 " + s.type + " +press 找到: '" + actionName + "'");
-                return { isPress: true, x: pcx, y: pcy, duration: s.press_duration || 150 };
-              }
-            }
-          }
-
-          // 偏移处理：image 用像素偏移，coordinate 已在 _findByStrategy 处理跳过，控件按比例
-          if (s.x_percent != null || s.y_percent != null) {
-            if (element.isImage) {
-              if (s.x_percent != null) element.x += s.x_percent;
-              if (s.y_percent != null) element.y += s.y_percent;
-              logger.debug(TAG, "通过 " + s.type + " +偏移 找到: '" + actionName + "'");
-              return element;
-            }
-            if (!element.isCoordinate && !element.isPackage) {
-              var b = element.bounds();
-              if (b) {
-                var cx = b.centerX();
-                var cy = b.centerY();
-                var elW = b.right - b.left;
-                var elH = b.bottom - b.top;
-                if (s.x_percent != null) cx += Math.round(elW * s.x_percent / 100);
-                if (s.y_percent != null) cy += Math.round(elH * s.y_percent / 100);
-                logger.debug(TAG, "通过 " + s.type + " +偏移 找到: '" + actionName + "'");
-                return { isCoordinate: true, x: cx, y: cy };
-              }
-            }
-          }
-          logger.debug(TAG, "通过 " + s.type + " 找到元素: '" + actionName + "'");
-          return element;
-        }
-      }
-      sleep(700);
-    }
-
-    if (!quiet) { logger.warn(TAG, "未找到元素: " + actionName); }
+  _nodeScopeRecord: function (node) {
+    if (nodeScopeMap) return nodeScopeMap.javaMap ? nodeScopeMap.javaMap.get(node) : nodeScopeMap.jsMap.get(node);
+    for (var i = 0; i < nodeScopeFallback.length; i++) if (this._sameNode(nodeScopeFallback[i].node,node)) return nodeScopeFallback[i].record;
     return null;
+  },
+
+  _rememberNodeScope: function (node, strategy) {
+    if (nodeScopeStoreFailed) return false;
+    try {
+      var value = scopeStrategy(strategy);
+      var anchor = value.anchor || {}, region = value.region || {};
+      var key = JSON.stringify([anchor.type || null,anchor.value || null,anchor.match_mode || "exact",region.space || null,region.left,region.top,region.right,region.bottom]);
+      var previous = this._nodeScopeRecord(node);
+      // Raw aliases cannot encode which lookup a caller retained. Remember the
+      // conflict rather than replacing or clearing either caller's restriction.
+      var record = previous || {strategy:value,key:key,ambiguous:false};
+      if (record.key !== key) record.ambiguous = true;
+      if (nodeScopeMap) {
+        if (nodeScopeMap.javaMap) nodeScopeMap.javaMap.put(node,record);
+        else nodeScopeMap.jsMap.set(node,record);
+        return true;
+      }
+      for (var i = 0; i < nodeScopeFallback.length; i++) {
+        if (this._sameNode(nodeScopeFallback[i].node,node)) { nodeScopeFallback[i].record = record; return true; }
+      }
+      if (nodeScopeFallback.length >= 256) return false;
+      nodeScopeFallback.push({node:node,record:record});
+      return true;
+    } catch (e) { nodeScopeStoreFailed = true; return false; }
+  },
+
+  _sameBounds: function (first, second) {
+    if (!first || !second) return !first && !second;
+    return first.left === second.left && first.top === second.top && first.right === second.right && first.bottom === second.bottom;
+  },
+
+  _liveScopeForElement: function (element, ctx, resolution) {
+    if (!element || !ctx) return null;
+    var isPoint = element.isCoordinate || element.isImage || element.isPress;
+    if (isPoint && element.sourceNode && (!this._isOnScreen(element.sourceNode,ctx) || !this._sameBounds(element.observedNodeBounds,this._nodeBounds(element.sourceNode)))) return null;
+    var strategy = isPoint ? element.scopeStrategy : (resolution ? resolution.strategy : null);
+    try {
+      if (!strategy && !isPoint) {
+        var record = this._nodeScopeRecord(element);
+        if (record && record.ambiguous) return null;
+        strategy = record ? record.strategy : null;
+      }
+    } catch (e) { return null; }
+    if (strategy) {
+      var scope = this._strategyScope(strategy,ctx);
+      if (!scope) return null;
+      if (isPoint && strategy.anchor && !this._sameBounds(element.observedAnchorBounds,scope.anchorBounds)) return null;
+      scope.strategy = strategy;
+      return scope;
+    }
+    return {region:element.region || ctx.contentBounds,strategy:null};
+  },
+
+  _pointIsFresh: function (element, ctx) {
+    return !!ctx && !!element.signature && element.signature === ctx.signature && typeof element.observedAt === "number" && Date.now()-element.observedAt <= 5000 && Date.now() >= element.observedAt;
+  },
+
+  _nodeBounds: function (element) {
+    try { return geometry.rect(element.bounds()); } catch (e) { return null; }
+  },
+
+  _nodePoint: function (element) {
+    var bounds = this._nodeBounds(element);
+    if (!bounds) return null;
+    return {x: Math.floor((bounds.left + bounds.right) / 2), y: Math.floor((bounds.top + bounds.bottom) / 2)};
+  },
+
+  _isOnScreen: function (element, ctx, region) {
+    if (!element) return false;
+    ctx = ctx || geometry.read();
+    if (!ctx) return false;
+    if (element.isPackage) return element.packageName === ctx.foregroundPackage;
+    if (element.isImage || element.isCoordinate || element.isPress) {
+      return (!element.signature || element.signature === ctx.signature) && geometry.isUsablePoint(element, ctx, region || element.region);
+    }
+    // AutoJS UiObject caches bounds; refresh() invalidates that cache. Reading
+    // bounds twice without refreshing would miss movement of a retained node.
+    try { if (typeof element.refresh === "function" && element.refresh() !== true) return false; } catch (refreshError) { return false; }
+    try { if (typeof element.visibleToUser === "function" && !element.visibleToUser()) return false; } catch (e) { return false; }
+    return geometry.isUsablePoint(this._nodePoint(element), ctx, region);
+  },
+
+  _anchorBounds: function (strategy, ctx) {
+    if (!strategy.anchor) return null;
+    var anchor = strategy.anchor;
+    if (["text", "id", "desc", "className"].indexOf(anchor.type) < 0 || typeof anchor.value !== "string" || !anchor.value) return null;
+    var all = this._findByCondition(anchor), selected = null;
+    if (!all) return null;
+    for (var i = 0; i < all.length; i++) {
+      if (!this._isOnScreen(all[i], ctx)) continue;
+      if (selected && !this._sameNode(selected,all[i])) return null;
+      selected = all[i];
+    }
+    return selected ? this._nodeBounds(selected) : null;
+  },
+
+  _strategyScope: function (strategy, ctx) {
+    if (!ctx || !ctx.canInteract) return null;
+    var anchorBounds = this._anchorBounds(strategy, ctx);
+    if (strategy.anchor && !anchorBounds) return null;
+    var region = geometry.regionForStrategy(strategy, ctx, anchorBounds);
+    return region ? {anchorBounds:anchorBounds,region:region} : null;
+  },
+
+  _targetForStrategy: function (element, strategy, ctx, region, anchorBounds) {
+    if (!element || element.isPackage) return element;
+    var pointType = element.isImage || element.isCoordinate || element.isPress;
+    var hasOffset = !!strategy.offset || (strategy.type !== "coordinate" && (strategy.x_percent != null || strategy.y_percent != null));
+    if (!pointType && !hasOffset && strategy.click_mode !== "press") return this._rememberNodeScope(element,strategy) ? element : null;
+    var bounds = pointType ? (element.targetBounds || element.bounds || region) : this._nodeBounds(element);
+    var point = pointType ? {x:element.x,y:element.y} : this._nodePoint(element);
+    point = geometry.offsetPoint(point,strategy,bounds,ctx,element.isImage ? "image" : (pointType ? "coordinate" : "node"));
+    if (!geometry.isUsablePoint(point,ctx,region)) return null;
+    var result = {x:point.x,y:point.y,signature:ctx.signature,observedAt:ctx.observedAt,region:region,scopeStrategy:scopeStrategy(strategy),observedAnchorBounds:geometry.rect(anchorBounds)};
+    if (!pointType) { result.sourceNode = element; result.observedNodeBounds = geometry.rect(bounds); }
+    if (element.isImage) { result.isImage = true; result.bounds = element.bounds || element.targetBounds; result.targetBounds = result.bounds; }
+    else result.isCoordinate = true;
+    if (strategy.click_mode === "press") { result.isPress = true; result.duration = strategy.press_duration || 150; }
+    return result;
+  },
+
+  _findElementResolution: function (actionName, timeout, quiet) {
+    timeout = timeout == null ? 2000 : timeout;
+    var selector = selectorLoader.get(actionName);
+    if (!selector || !selector.strategies) { logger.error(TAG,"未找到选择器配置: " + actionName); return null; }
+    var strategies = selector.strategies.slice().sort(function (a,b) { return a.priority - b.priority; });
+    var startTime = Date.now();
+    do {
+      for (var i = 0; i < strategies.length; i++) {
+        var resolution = {profile:selector.resolution_profile};
+        var element = this._findByStrategy(strategies[i],selector.resolution_profile,resolution);
+        if (element) { resolution.element = element; return resolution; }
+      }
+      if (Date.now() - startTime >= timeout) break;
+      sleep(Math.min(300,Math.max(1,timeout-(Date.now()-startTime))));
+    } while (Date.now() - startTime < timeout);
+    if (!quiet) logger.warn(TAG,"未找到元素: " + actionName);
+    return null;
+  },
+
+  findElement: function (actionName, timeout, quiet) {
+    var resolution = this._findElementResolution(actionName,timeout,quiet);
+    return resolution ? resolution.element : null;
+  },
+
+  clickAction: function (actionName, timeout, options) {
+    var resolution = this._findElementResolution(actionName,timeout);
+    if (!resolution) return false;
+    var element = resolution.element;
+    options = options || {};
+    if (options.click_mode === "press" && !element.isPackage) {
+      var ctx = geometry.read();
+      var liveScope = this._liveScopeForElement(element,ctx,resolution);
+      if (!liveScope || !this._isOnScreen(element,ctx,liveScope.region)) return false;
+      var isPoint = element.isImage || element.isCoordinate || element.isPress;
+      if (isPoint && !this._pointIsFresh(element,ctx)) return false;
+      var point = isPoint ? element : this._nodePoint(element);
+      if (!point) return false;
+      element = {isPress:true,x:point.x,y:point.y,duration:options.press_duration || 150,signature:isPoint ? point.signature : ctx.signature,observedAt:isPoint ? point.observedAt : ctx.observedAt,region:liveScope.region,scopeStrategy:liveScope.strategy,observedAnchorBounds:isPoint ? point.observedAnchorBounds : geometry.rect(liveScope.anchorBounds),sourceNode:isPoint ? point.sourceNode : element,observedNodeBounds:isPoint ? point.observedNodeBounds : this._nodeBounds(element)};
+    }
+    return this._clickElementResolved(element,resolution);
   },
 
   /**
@@ -324,90 +435,51 @@ var uiOperator = {
    * @param {Object} strategy - { type, value, match_mode, conditions, logic, ... }
    * @returns {UiObject|null}
    */
-  _findByStrategy: function (strategy) {
-    // Multi-condition mode
-    if (strategy.conditions && strategy.conditions.length > 0) {
-      return this._findByConditions(strategy);
-    }
-
-    var all, j;
-    // Non-text types: match_mode is meaningless, handle directly
-    switch (strategy.type) {
-      case "package":
-        if (currentPackage() === strategy.value) {
-          return { isPackage: true, packageName: strategy.value };
+  _findByStrategy: function (strategy, profile, resolution) {
+    var ctx = geometry.read();
+    var scope = this._strategyScope(strategy,ctx);
+    if (!scope) return null;
+    if (resolution) { resolution.strategy = scopeStrategy(strategy); resolution.anchorBounds = geometry.rect(scope.anchorBounds); }
+    if (strategy.type === "package") return currentPackage() === strategy.value ? {isPackage:true,packageName:strategy.value} : null;
+    if (strategy.type === "coordinate") {
+      var screen = null;
+      try {
+        if (strategy.position && strategy.position.space === "capture_px") {
+          screen = images.captureScreen();
+          if (!screen) return null;
+          var captureContext = geometry.read(screen);
+          if (!captureContext || captureContext.signature !== ctx.signature) return null;
+          ctx = captureContext;
         }
-        return null;
-      case "coordinate":
-        var x = Math.round(strategy.x_percent * device.width);
-        var y = Math.round(strategy.y_percent * device.height);
-        return { isCoordinate: true, x: x, y: y };
-      case "image":
-        return this._findByImage(strategy.template, strategy.threshold || 0.8);
-      case "chain":
-        return this._findByChain(strategy.steps || []);
+        var point = geometry.pointForStrategy(strategy,ctx,scope.anchorBounds);
+        if (!geometry.isUsablePoint(point,ctx,scope.region)) return null;
+        return this._targetForStrategy({isCoordinate:true,x:point.x,y:point.y},strategy,ctx,scope.region,scope.anchorBounds);
+      } finally { if (screen) { try { screen.recycle(); } catch (e) {} } }
     }
-    // Text-based types: use match_mode
-    var matchMode = strategy.match_mode || "exact";
-    if (matchMode === "contains") {
-      switch (strategy.type) {
-        case "text": all = textContains(strategy.value).find(); break;
-        case "id": all = idContains(strategy.value).find(); break;
-        case "desc": all = descContains(strategy.value).find(); break;
-        case "className": all = classNameContains(strategy.value).find(); break;
-        default: return null;
-      }
-    } else {
-      switch (strategy.type) {
-        case "text": all = text(strategy.value).find(); break;
-        case "id": all = id(strategy.value).find(); break;
-        case "desc": all = desc(strategy.value).find(); break;
-        case "className": all = className(strategy.value).find(); break;
-        default: return null;
-      }
+    if (strategy.type === "image") {
+      var image = this._findByImage(strategy.template,strategy.threshold === undefined ? 0.8 : strategy.threshold,strategy,ctx,scope.anchorBounds,profile);
+      if (!image) return null;
+      return this._targetForStrategy(image,strategy,ctx,scope.region,scope.anchorBounds);
     }
-    if (all && all.length > 0) {
-      for (j = 0; j < all.length; j++) {
-        if (this._isOnScreen(all[j])) return all[j];
-      }
+    var all = this._findManyByStrategy(strategy,ctx,scope);
+    for (var i = 0; i < all.length; i++) {
+      var target = this._targetForStrategy(all[i],strategy,ctx,scope.region,scope.anchorBounds);
+      if (target) return target;
     }
     return null;
   },
 
-  /**
-   * 按策略类型查找多个控件（返回数组）
-   * @param {Object} strategy - { type, value }
-   * @returns {Array} UiObject 数组
-   */
-  _findManyByStrategy: function (strategy) {
-    // Multi-condition mode
-    if (strategy.conditions && strategy.conditions.length > 0) {
-      return this._findManyByConditions(strategy);
-    }
-
-    // Non-text types: match_mode is meaningless, handle directly
-    if (strategy.type === "chain") {
-      return this._findByChainAll(strategy.steps || []);
-    }
-
-    // Text-based types: use match_mode
-    var matchMode = strategy.match_mode || "exact";
-    if (matchMode === "contains") {
-      switch (strategy.type) {
-        case "text": return textContains(strategy.value).find();
-        case "id": return idContains(strategy.value).find();
-        case "desc": return descContains(strategy.value).find();
-        case "className": return classNameContains(strategy.value).find();
-        default: return [];
-      }
-    }
-    switch (strategy.type) {
-      case "text": return text(strategy.value).find();
-      case "id": return id(strategy.value).find();
-      case "desc": return desc(strategy.value).find();
-      case "className": return className(strategy.value).find();
-      default: return [];
-    }
+  _findManyByStrategy: function (strategy, ctx, scope) {
+    ctx = ctx || geometry.read();
+    scope = scope || this._strategyScope(strategy,ctx);
+    if (!scope) return [];
+    var all;
+    if (strategy.conditions && strategy.conditions.length) all = this._findManyByConditions(strategy);
+    else if (strategy.type === "chain") all = this._findByChainAll(strategy.steps || []);
+    else all = this._findByCondition(strategy);
+    var visible = [];
+    if (all) for (var i = 0; i < all.length; i++) if (this._isOnScreen(all[i],ctx,scope.region) && this._rememberNodeScope(all[i],strategy)) this._appendDistinctNode(visible,all[i]);
+    return visible;
   },
 
   /**
@@ -419,17 +491,12 @@ var uiOperator = {
 
     if (logic === "or") {
       var results = [];
-      var seen = {};
       for (var j = 0; j < conditions.length; j++) {
         var candidates = this._findByCondition(conditions[j]);
         if (!candidates) continue;
         for (var k = 0; k < candidates.length; k++) {
           var el = candidates[k];
-          var key = this._elKey(el);
-          if (!seen[key]) {
-            seen[key] = true;
-            results.push(el);
-          }
+          this._appendDistinctNode(results,el);
         }
       }
       return results;
@@ -454,26 +521,45 @@ var uiOperator = {
     return results;
   },
 
-  /** 生成元素去重 key（bounds 中心 + className） */
-  _elKey: function (el) {
-    try {
-      var b = el.bounds();
-      return (el.className() || "") + "@" + (b ? (b.centerX() + "," + b.centerY()) : "?");
-    } catch (e) { return String(Math.random()); }
-  },
-
   _findByChainAll: function (steps) {
-    if (!steps || steps.length === 0) return [];
-    // Build selector chain from filter steps (same as _findByChain)
-    var sel = null;
-    for (var i = 0; i < steps.length; i++) {
-      var nav = steps[i].nav || "filter";
-      if (nav !== "filter") break;  // only filter steps can build selectors
-      if (!sel) { sel = this._makeSelector(steps[i]); }
-      else { sel = this._chainSelector(sel, steps[i]); }
-      if (!sel) return [];
+    if (!steps || !steps.length) return [];
+    var selector = null, navStart = steps.length, i;
+    for (i = 0; i < steps.length; i++) {
+      if ((steps[i].nav || "filter") !== "filter") { navStart = i; break; }
+      selector = selector ? this._chainSelector(selector,steps[i]) : this._makeSelector(steps[i]);
+      if (!selector) return [];
     }
-    return sel ? sel.find() : [];
+    var current = [], initial;
+    try { initial = selector ? selector.find() : className("android.widget.FrameLayout").find(); } catch (e) { return []; }
+    for (i = 0; initial && i < initial.length; i++) if (this._isOnScreen(initial[i])) current.push(initial[i]);
+    for (var n = navStart; n < steps.length; n++) {
+      var step = steps[n], nav = step.nav || "filter", next = [];
+      for (var c = 0; c < current.length; c++) {
+        var element = current[c], choices = [];
+        try {
+          if (nav === "filter") { if (this._elementMatchesStep(element,step)) choices = [element]; }
+          else if (nav === "parent") { var parent = element.parent(); if (parent) choices = [parent]; }
+          else if (nav === "child" || nav === "sibling") {
+            var source = nav === "sibling" ? element.parent() : element;
+            var childSelector = this._makeSelector(step);
+            if (!source || !childSelector) continue;
+            var children = source.find(childSelector), visible = [];
+            for (var ch = 0; children && ch < children.length; ch++) {
+              if (nav === "sibling" && children[ch] === element) continue;
+              if (this._isOnScreen(children[ch])) visible.push(children[ch]);
+            }
+            choices = step.index == null ? visible : (visible[step.index] ? [visible[step.index]] : []);
+          }
+          for (var j = 0; j < choices.length; j++) {
+            if (!this._isOnScreen(choices[j])) continue;
+            this._appendDistinctNode(next,choices[j]);
+          }
+        } catch (navigationError) { /* stale nodes do not hide later candidates */ }
+      }
+      current = next;
+      if (!current.length) break;
+    }
+    return current;
   },
 
   /**
@@ -536,13 +622,13 @@ var uiOperator = {
     while (Date.now() - startTime < timeout) {
       if (useOr) {
         for (var i = 0; i < strategies.length; i++) {
-          if (this._findByStrategy(strategies[i])) return true;
+          if (strategies[i].type !== "coordinate" && this._findByStrategy(strategies[i],config.resolution_profile)) return true;
         }
       } else {
         // AND — all strategies must match
         var allMatch = true;
         for (var j = 0; j < strategies.length; j++) {
-          if (!this._findByStrategy(strategies[j])) { allMatch = false; break; }
+          if (strategies[j].type === "coordinate" || !this._findByStrategy(strategies[j],config.resolution_profile)) { allMatch = false; break; }
         }
         if (allMatch) return true;
       }
@@ -578,145 +664,12 @@ var uiOperator = {
    * @param {number} threshold - 匹配阈值
    * @returns {Object|null} { isImage: true, x, y } 或 null
    */
-  _findByImage: function (templateFile, threshold) {
-    var res = device.width + "x" + device.height;
-    threshold = threshold || 0.75;
-
-    function addCandidate(list, seen, dir, name) {
-      if (!dir || !name) return;
-      var path = dir + name;
-      if (!seen[path]) {
-        seen[path] = true;
-        list.push({ path: path, name: name });
-      }
-    }
-
-    function _arTag(r) {
-      try {
-        var parts = r.split("x");
-        var _w = parseInt(parts[0]), _h = parseInt(parts[1]);
-        if (!_w || !_h) return "unknown";
-        var _a = _w, _b = _h, _t;
-        while (_b) { _t = _b; _b = _a % _b; _a = _t; }
-        return (_w / _a) + ":" + (_h / _a);
-      } catch (e) { return "unknown"; }
-    }
-    function _sameARDirs() {
-      var target = _arTag(res);
-      if (target === "unknown") return [];
-      var baseDir = "/sdcard/dy_auto/templates/";
-      var result = [];
-      try {
-        if (!files.isDir(baseDir)) return result;
-        var allDirs = files.listDir(baseDir);
-        for (var di = 0; di < allDirs.length; di++) {
-          var dn = allDirs[di];
-          if (dn === "default" || dn === res) continue;
-          if (_arTag(dn) === target && files.isDir(baseDir + dn)) {
-            result.push(baseDir + dn + "/");
-          }
-        }
-      } catch (e) {}
-      return result;
-    }
-
-    function collectCandidates(templateName) {
-      var dirs = [
-        "/sdcard/dy_auto/templates/" + res + "/",
-      ];
-      var arDirs = _sameARDirs();
-      for (var ad = 0; ad < arDirs.length; ad++) { dirs.push(arDirs[ad]); }
-      dirs.push("/sdcard/dy_auto/templates/default/");
-      var list = [];
-      var seen = {};
-      var dot = templateName.lastIndexOf(".");
-      var base = dot > 0 ? templateName.substring(0, dot) : templateName;
-      var ext = dot > 0 ? templateName.substring(dot) : "";
-      var imageExts = { ".png": true, ".jpg": true, ".jpeg": true };
-
-      for (var di = 0; di < dirs.length; di++) {
-        var dir = dirs[di];
-        addCandidate(list, seen, dir, templateName);
-        if (base.indexOf("@") === -1 && ext) {
-          addCandidate(list, seen, dir, base + "@" + res + ext);
-        }
-
-        try {
-          if (!files.isDir(dir)) continue;
-          var localFiles = files.listDir(dir);
-          for (var fi = 0; fi < localFiles.length; fi++) {
-            var fn = localFiles[fi];
-            var fnDot = fn.lastIndexOf(".");
-            var fnExt = fnDot > 0 ? fn.substring(fnDot).toLowerCase() : "";
-            if (!imageExts[fnExt]) continue;
-            if (fn.indexOf(base + "@") === 0 || fn.indexOf(base + "_") === 0) {
-              addCandidate(list, seen, dir, fn);
-            }
-          }
-        } catch (e) {}
-      }
-      return list;
-    }
-
-    var candidates = collectCandidates(templateFile);
-    if (candidates.length === 0) return null;
-
-    var screen = images.captureScreen();
-    if (!screen) return null;
-
-    try {
-      for (var ci = 0; ci < candidates.length; ci++) {
-        var tpl = images.read(candidates[ci].path);
-        if (!tpl) continue;
-
-        try {
-          // If template is from a different resolution, scale before matching
-          // Template filename format: name@1080x2400.png — extract original res
-          var matchThreshold = threshold;
-          var scaleMatch = candidates[ci].name.match(/@(\d+x\d+)/);
-          if (scaleMatch) {
-            var origRes = scaleMatch[1];
-            if (origRes !== res) {
-              var origParts = origRes.split("x");
-              var origW = parseInt(origParts[0]) || 1;
-              var origH = parseInt(origParts[1]) || 1;
-              var scaleX = device.width / origW;
-              var scaleY = device.height / origH;
-              if (Math.abs(1 - scaleX) > 0.05 || Math.abs(1 - scaleY) > 0.05) {
-                var newW = Math.round(tpl.getWidth() * scaleX);
-                var newH = Math.round(tpl.getHeight() * scaleY);
-                try {
-                  var scaled = images.scale(tpl, newW, newH);
-                  if (scaled) { tpl.recycle(); tpl = scaled; matchThreshold = matchThreshold - 0.05; }
-                } catch (e) {
-                  logger.warn(TAG, "模板缩放失败: " + e.message);
-                }
-              }
-            }
-          }
-
-          var thresholds = [matchThreshold];
-          var relaxed = Math.max(0.70, matchThreshold - 0.10);
-          if (relaxed < matchThreshold) thresholds.push(relaxed);
-
-          for (var ti = 0; ti < thresholds.length; ti++) {
-            var p = images.findImage(screen, tpl, { threshold: thresholds[ti] });
-            if (p) {
-              var cx = Math.round(p.x + tpl.getWidth() / 2);
-              var cy = Math.round(p.y + tpl.getHeight() / 2);
-              logger.debug(TAG, "图片匹配: " + candidates[ci].name + " threshold=" + thresholds[ti] + " (" + p.x + "," + p.y + ") 中心: (" + cx + "," + cy + ")");
-              return { isImage: true, x: cx, y: cy };
-            }
-          }
-        } finally {
-          tpl.recycle();
-        }
-      }
-
-      return null;
-    } finally {
-      screen.recycle();
-    }
+  _findByImage: function (templateFile, threshold, strategy, ctx, anchorBounds, profile) {
+    var config = {}, key;
+    strategy = strategy || {};
+    for (key in strategy) if (Object.prototype.hasOwnProperty.call(strategy,key)) config[key] = strategy[key];
+    config.threshold = threshold === undefined ? 0.75 : threshold;
+    return imageLocator.find(templateFile,config,ctx,anchorBounds,false,profile);
   },
 
   /**
@@ -727,106 +680,8 @@ var uiOperator = {
    * @returns {UiObject|null}
    */
   _findByChain: function (steps) {
-    if (!steps || steps.length === 0) return null;
-
-    // Phase 1: build selector chain for initial filter steps (nav="filter" or default)
-    var sel = null;
-    var navStartIdx = steps.length;  // index of first nav step
-    for (var i = 0; i < steps.length; i++) {
-      var nav = steps[i].nav || "filter";
-      if (nav !== "filter") { navStartIdx = i; break; }
-      var step = steps[i];
-      if (!sel) {
-        sel = this._makeSelector(step);
-        if (!sel) { logger.debug(TAG, "链式 Phase1: _makeSelector 返回 null, step=" + JSON.stringify(step)); return null; }
-      } else {
-        sel = this._chainSelector(sel, step);
-        if (!sel) { logger.debug(TAG, "链式 Phase1: _chainSelector 返回 null"); return null; }
-      }
-    }
-
-    // If all steps are filter, just find from selector
-    if (navStartIdx >= steps.length) {
-      if (!sel) return null;
-      var all = sel.find();
-      if (all && all.length > 0) {
-        for (var j = 0; j < all.length; j++) {
-          if (this._isOnScreen(all[j])) return all[j];
-        }
-      }
-      return null;
-    }
-
-    // Phase 2: find first matching element from filter chain, then navigate
-    var el = null;
-    if (sel) {
-      var candidates = sel.find();
-      logger.debug(TAG, "链式 Phase2: 候选=" + (candidates ? candidates.length : 0) + " 个");
-      if (candidates && candidates.length > 0) {
-        for (var k = 0; k < candidates.length; k++) {
-          if (this._isOnScreen(candidates[k])) { el = candidates[k]; break; }
-        }
-      }
-    } else {
-      // First step is a nav step with no prior filter: start from root
-      try { el = className("android.widget.FrameLayout").findOne(1000); } catch (e) {}
-    }
-    if (!el) { logger.debug(TAG, "链式 Phase2: 未找到可见元素 (sel=" + (sel ? "ok" : "null") + ")"); return null; }
-
-    // Phase 3: walk the tree
-    for (var m = navStartIdx; m < steps.length; m++) {
-      var navStep = steps[m];
-      var navAction = navStep.nav || "filter";
-      if (navAction === "parent") {
-        try { el = el.parent(); } catch (e) { logger.debug(TAG, "链式 Phase3: parent() 异常"); return null; }
-        if (!el) { logger.debug(TAG, "链式 Phase3: parent() 返回 null"); return null; }
-      } else if (navAction === "child") {
-        var childSel = this._makeSelector(navStep);
-        if (!childSel) return null;
-        try {
-          var children = el.find(childSel);
-          if (!children || children.length === 0) return null;
-          var idx = navStep.index || 0;
-          el = null;
-          var found = 0;
-          for (var c = 0; c < children.length; c++) {
-            if (this._isOnScreen(children[c])) {
-              if (found === idx) { el = children[c]; break; }
-              found++;
-            }
-          }
-          if (!el) return null;
-        } catch (e) { return null; }
-      } else if (navAction === "sibling") {
-        // Go to parent, then find a different child matching the step
-        try {
-          var parentEl = el.parent();
-          if (!parentEl) return null;
-          var siblingSel = this._makeSelector(navStep);
-          if (!siblingSel) return null;
-          var siblings = parentEl.find(siblingSel);
-          el = null;
-          if (siblings && siblings.length > 0) {
-            var sibIdx = navStep.index || 0;
-            var sibFound = 0;
-            for (var s = 0; s < siblings.length; s++) {
-              if (this._isOnScreen(siblings[s])) {
-                if (sibFound === sibIdx) { el = siblings[s]; break; }
-                sibFound++;
-              }
-            }
-          }
-          if (!el) return null;
-        } catch (e) { return null; }
-      } else if (navAction === "filter") {
-        // filter at current element level: check if this element matches
-        if (!this._elementMatchesStep(el, navStep)) return null;
-      }
-    }
-
-    var result = this._isOnScreen(el) ? el : null;
-    logger.debug(TAG, "链式 完成: _isOnScreen=" + (result ? "true" : "false"));
-    return result;
+    var all = this._findByChainAll(steps);
+    return all.length ? all[0] : null;
   },
 
   _makeSelector: function (step) {
@@ -871,7 +726,7 @@ var uiOperator = {
       }
     } catch (e) { return false; }
     if (!actual) return false;
-    var matchMode = step.match_mode || "exact";
+    var matchMode = step.match_mode || (/Contains$/.test(step.type) ? "contains" : "exact");
     if (matchMode === "contains") return actual.indexOf(step.value) !== -1;
     return actual === step.value;
   },
@@ -882,100 +737,55 @@ var uiOperator = {
    * @returns {boolean}
    */
   clickElement: function (element) {
-    if (!element) return false;
-
-    // 按压触摸（press 模式）
-    if (element.isPress) {
-      logger.debug(TAG, "按压: (" + element.x + ", " + element.y + "), " + (element.duration || 150) + "ms");
-      return press(element.x, element.y, element.duration || 150);
-    }
-
-    // 坐标点击
-    if (element.isCoordinate) {
-      logger.debug(TAG, "点击坐标: (" + element.x + ", " + element.y + ")");
-      return click(element.x, element.y);
-    }
-
-    // 图片匹配点击
-    if (element.isImage) {
-      logger.debug(TAG, "点击图片匹配: (" + element.x + ", " + element.y + ")");
-      return click(element.x, element.y);
-    }
-
-    // package 类型 — 仅验证包名，无需点击
-    if (element.isPackage) {
-      logger.debug(TAG, "package 验证通过: " + element.packageName);
-      return true;
-    }
-
-    // 控件点击
-    if (element.clickable()) {
-      return element.click();
-    }
-    // 控件不可点击，坐标点击
-    try {
-      var bounds = element.bounds();
-      if (bounds) {
-        var cx = bounds.centerX();
-        var cy = bounds.centerY();
-        if (cx >= 0 && cy >= 0 && cx < device.width && cy < device.height) {
-          return click(cx, cy);
-        }
-      }
-    } catch (e) {}
-    return false;
+    return this._clickElementResolved(element,null);
   },
 
-  /**
-   * 输入文本
-   * @param {UiObject} element - 输入框控件
-   * @param {string} text - 要输入的文本
-   * @returns {boolean}
-   */
-  inputText: function (element, text) {
-    if (!element || !text) return false;
-
-    // 点击输入框获取焦点
-    if (element.isImage || element.isCoordinate) {
-      var x = element.x || Math.round(element.x_percent * device.width);
-      var y = element.y || Math.round(element.y_percent * device.height);
-      click(x, y);
-    } else {
-      try { element.click(); } catch (e) { /* ignore */ }
+  _clickElementResolved: function (element, resolution) {
+    if (!element || element.isPackage) return false;
+    var ctx = geometry.read();
+    var liveScope = this._liveScopeForElement(element,ctx,resolution);
+    if (!liveScope || !this._isOnScreen(element,ctx,liveScope.region)) return false;
+    var isPoint = element.isPress || element.isCoordinate || element.isImage;
+    if (isPoint) {
+      if (!this._pointIsFresh(element,ctx)) return false;
+      try {
+        if (element.isPress) return press(element.x,element.y,element.duration || 150) === true;
+        return click(element.x,element.y) === true;
+      } catch (e) { return false; }
     }
+    try {
+      if (element.clickable()) return element.click() === true;
+      var point = this._nodePoint(element);
+      var fresh = geometry.read(), freshScope = this._liveScopeForElement(element,fresh,resolution);
+      if (!freshScope || !geometry.isUsablePoint(point,fresh,freshScope.region)) return false;
+      return click(point.x,point.y) === true;
+    } catch (e2) { return false; }
+  },
+
+  inputText: function (element, value) {
+    if (!element || typeof value !== "string" || !value || !this.clickElement(element)) return false;
     sleep(500);
-
-    // 优先 setText（最可靠）
+    var pointType = element.isImage || element.isCoordinate || element.isPress;
+    var fresh = geometry.read(), freshScope = this._liveScopeForElement(element,fresh);
+    if (!freshScope || !this._isOnScreen(element,fresh,freshScope.region)) return false;
     try {
-      if (!element.isImage && !element.isCoordinate) {
-        element.setText(text);
-        logger.debug(TAG, "setText: '" + text.substring(0, 20) + "'");
-        return true;
+      if (!pointType && this._isOnScreen(element) && element.setText(value) === true) return true;
+    } catch (e) {}
+    try {
+      var candidates = className("EditText").find();
+      for (var i = 0; candidates && i < candidates.length; i++) {
+        var input = candidates[i];
+        if (!this._isOnScreen(input)) continue;
+        if (typeof input.focused === "function" && !input.focused()) continue;
+        if (input.setText(value) === true) return true;
       }
-    } catch (e1) { /* ignore */ }
-
-    // 找 EditText 控件 setText
+    } catch (e2) {}
     try {
-      var editText = className("EditText").findOne(2000);
-      if (editText) {
-        editText.setText(text);
-        logger.debug(TAG, "EditText.setText: '" + text.substring(0, 20) + "'");
-        return true;
-      }
-    } catch (e2) { /* ignore */ }
-
-    // 最后兜底: 剪贴板粘贴
-    try {
-      setClip(text);
-      sleep(200);
-      try { shell("input keyevent 279", false); } catch (e3) { /* ignore */ }
-      sleep(200);
-      logger.debug(TAG, "剪贴板粘贴: '" + text.substring(0, 20) + "'");
-      return true;
-    } catch (e5) {
-      logger.warn(TAG, "所有输入方式均失败");
-    }
-    return false;
+      if (!geometry.read().canInteract) return false;
+      setClip(value);
+      var result = shell("input keyevent 279",false);
+      return !!result && Number(result.code) === 0;
+    } catch (e3) { return false; }
   },
 
   /**
@@ -985,7 +795,7 @@ var uiOperator = {
    */
   submitViaKeyboard: function (submitActionName) {
     // 尝试键盘回车
-    try { shell("input keyevent 66", false); sleep(300); return true; } catch (e1) { /* ignore */ }
+    try { var dispatched = shell("input keyevent 66", false); if (dispatched && Number(dispatched.code) === 0) { sleep(300); return true; } } catch (e1) { /* ignore */ }
 
     // 回退: 点击提交按钮
     if (submitActionName) {
@@ -994,7 +804,7 @@ var uiOperator = {
         var selector = selectorLoader.get(submitActionName);
         if (selector) {
           var btn = this.findElement(submitActionName, 2000);
-          if (btn) { this.clickElement(btn); sleep(500); return true; }
+          if (btn && this.clickElement(btn)) { sleep(500); return true; }
         }
       } catch (e3) { /* ignore */ }
     }
@@ -1025,43 +835,14 @@ var uiOperator = {
    */
   findImageClick: function (templatePath, options) {
     options = options || {};
-    var threshold = options.threshold || 0.8;
-
-    var tpl = images.read(templatePath);
-    if (!tpl) {
-      logger.error(TAG, "模板图片未找到: " + templatePath);
-      return false;
-    }
-
-    var screen = images.captureScreen();
-    if (!screen) {
-      tpl.recycle();
-      logger.error(TAG, "截屏失败");
-      return false;
-    }
-
-    try {
-      var findOptions = { threshold: threshold };
-      if (options.region) {
-        findOptions.region = options.region;
-      }
-
-      var p = images.findImage(screen, tpl, findOptions);
-
-      if (p) {
-        var cx = p.x + tpl.getWidth() / 2;
-        var cy = p.y + tpl.getHeight() / 2;
-        logger.info(TAG, "图片匹配: (" + p.x + "," + p.y + ") 点击: (" + cx + "," + cy + ")");
-        click(cx, cy);
-        return true;
-      }
-
-      logger.warn(TAG, "图片未匹配: " + templatePath);
-      return false;
-    } finally {
-      tpl.recycle();
-      screen.recycle();
-    }
+    var strategy = {}, key;
+    for (key in options) if (Object.prototype.hasOwnProperty.call(options,key)) strategy[key] = options[key];
+    if (Object.prototype.toString.call(options.region) === "[object Array]") { strategy.captureRegion = options.region; delete strategy.region; }
+    var ctx = geometry.read(), scope = this._strategyScope(strategy,ctx);
+    if (!scope) return false;
+    var element = imageLocator.find(templatePath,strategy,ctx,scope.anchorBounds,true);
+    element = this._targetForStrategy(element,strategy,ctx,scope.region,scope.anchorBounds);
+    return this.clickElement(element);
   },
 
   /**

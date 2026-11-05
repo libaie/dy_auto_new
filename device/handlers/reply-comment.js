@@ -9,6 +9,7 @@ var logger = require("../utils/logger");
 var commentUtils = require("./comment-utils");
 var crashRecovery = require("../core/crash-recovery");
 var humanInput = require("../core/human-input");
+var screenContext = require("../core/screen-context");
 
 var TAG = "评论回复";
 var flowContext = require("../core/flow-context");
@@ -280,7 +281,7 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
           logger.info(TAG, "连续" + emptyStreak + "轮为空且无结束标记，强制停止（疑似无限弹窗）");
           break;
         }
-        uiOperator.swipeUp();
+        if (!commentUtils.swipeList("comment_list")) break;
         sleep(1500);
         continue;
       }
@@ -392,7 +393,7 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
         logger.debug(TAG, "回复: '" + analysis.reply.substring(0, 30) + "...'");
         if (comment.replyBtn) {
           logger.info(TAG, "点击回复按钮...");
-          comment.replyBtn.click();
+          commentUtils.clickWithin(comment.replyBtn, screenContext.read().contentBounds);
         } else {
           logger.info(TAG, "无回复按钮，直接输入");
         }
@@ -407,7 +408,9 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
           // collectReport 统一在用户主页采集后发送（含 ai_reply + user），避免重复记录
         } else {
           stats.fail_count++;
-          try { apiClient.releaseCommentReply(comment.nickname, comment.text); } catch (e) {}
+          if (this._lastSendOutcome !== "unknown") {
+            try { apiClient.releaseCommentReply(comment.nickname, comment.text); } catch (e) {}
+          }
           continue;
         }
       }
@@ -552,6 +555,7 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
                     recipient_nickname: comment.nickname,
                   });
                   if (dmClaimResult && dmClaimResult.claimed) {
+                    this._lastSendOutcome = "not_attempted";
                     var sent, reportedContent;
                     // DM 序列模板 vs 单条私信
                     if (hasDMSequence) {
@@ -562,7 +566,7 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
                       if (dmBtnOk && seqMsgs.length > 0) {
                         var seqSent = this._sendMessageSequence(seqMsgs, stats, keyword);
                         sent = seqSent > 0;
-                        reportedContent = seqMsgs.map(function(m){return m.content;}).join(" | ");
+                        reportedContent = seqMsgs.slice(0, seqSent).map(function(m){return m.content;}).join(" | ");
                         if (sent) { try { apiClient.incrementStats(params.account_id, "search_dm", (userData && userData.uniqueId) || "", 1); } catch (e) {} }
                       } else {
                         sent = false;
@@ -585,7 +589,7 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
                         logger.info(TAG, "当日DM: " + dailyCount + "/" + (params.server_daily_limit_dm != null ? params.server_daily_limit_dm : (params.max_daily_dm || 75)));
                       }
                     } else {
-                      apiClient.releaseDMRecipient({ conversation_id: dmClaimResult.conversation_id });
+                      if (this._lastSendOutcome !== "unknown") apiClient.releaseDMRecipient({ conversation_id: dmClaimResult.conversation_id });
                     }
                   } else {
                     logger.info(TAG, "用户 " + comment.nickname + " 已被其他设备 DM，跳过");
@@ -603,6 +607,7 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
                     recipient_nickname: comment.nickname,
                   });
                   if (dmClaimResult && dmClaimResult.claimed) {
+                    this._lastSendOutcome = "not_attempted";
                     var sent2, reportedContent2;
                     if (hasDMSequence) {
                       var seqMsgs2 = this.resolveMessages(params);
@@ -612,7 +617,7 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
                       if (dmBtnOk2 && seqMsgs2.length > 0) {
                         var seqSent2 = this._sendMessageSequence(seqMsgs2, stats, keyword);
                         sent2 = seqSent2 > 0;
-                        reportedContent2 = seqMsgs2.map(function(m){return m.content;}).join(" | ");
+                        reportedContent2 = seqMsgs2.slice(0, seqSent2).map(function(m){return m.content;}).join(" | ");
                         if (sent2) { try { apiClient.incrementStats(params.account_id, "search_dm", (userData && userData.uniqueId) || "", 1); } catch (e) {} }
                       } else {
                         sent2 = false;
@@ -635,7 +640,7 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
                         logger.info(TAG, "当日DM: " + dailyCount + "/" + (params.server_daily_limit_dm != null ? params.server_daily_limit_dm : (params.max_daily_dm || 75)));
                       }
                     } else {
-                      apiClient.releaseDMRecipient({ conversation_id: dmClaimResult.conversation_id });
+                      if (this._lastSendOutcome !== "unknown") apiClient.releaseDMRecipient({ conversation_id: dmClaimResult.conversation_id });
                     }
                   }
                 }
@@ -727,12 +732,7 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
         break;
       }
       // 统一滑动：for 循环内不滑，此处滑一次推进到下一屏
-      var sx2 = device.width * (0.35 + Math.random() * 0.2);
-      var sy2 = device.height * (0.80 + Math.random() * 0.08);
-      var ex2 = sx2 + Math.floor(Math.random() * 30 + 20);
-      var ey2 = device.height * (0.50 + Math.random() * 0.06);
-      var dur2 = Math.floor(Math.random() * 150 + 400);
-      gestures([0, dur2, [sx2, sy2], [ex2, ey2]]);
+      if (!commentUtils.swipeList("comment_list")) break;
       sleep(600);
       // 控件树刷新由 while 循环顶部动态快照执行
     }
@@ -782,7 +782,7 @@ ReplyCommentHandler._readComments = function (maxCount) {
 
       if (comments.length < maxCount) {
         logger.info(TAG, "已读取 " + comments.length + "/" + maxCount + " 条，滑动加载更多...");
-        uiOperator.swipeUp();
+        if (!commentUtils.swipeList("comment_list")) break;
         sleep(1500);
         items = uiOperator.findElements("comment_list", 3000);
       }
@@ -801,6 +801,8 @@ ReplyCommentHandler._readComments = function (maxCount) {
  * @returns {Object|null} { nickname, text, time, element }
  */
 ReplyCommentHandler._parseCommentItem = function (item) {
+  var ctx = screenContext.read();
+  if (!commentUtils.visibleNode(item, ctx, ctx.contentBounds)) return null;
   var result = commentUtils.parseCommentItem(item, this);
   if (result) result.element = item;  // 保持向后兼容
   return result;
@@ -835,6 +837,7 @@ ReplyCommentHandler._parseTime = function (timeStr) {
  * 流程: 点回复(键盘唤起+输入框聚焦) → input()模拟打字 → 图找图发送
  */
 ReplyCommentHandler._replyToComment = function (replyText, nickname) {
+  this._lastSendOutcome = "not_attempted";
   // 1. 点回复按钮 → 键盘唤起，输入框自动获得焦点
   // if (!this.safeClick("comment_reply_button", 3)) {
   //   logger.warn(TAG, "回复按钮未找到");
@@ -908,26 +911,8 @@ ReplyCommentHandler._replyToComment = function (replyText, nickname) {
   }
   sleep(500);
 
-  // 5. 以图找图点击发送按钮（comment_submit 使用 image 策略）
-  var sent = false;
-  var sendBtn = uiOperator.findElement("comment_submit", 3000);
-  if (sendBtn) {
-    uiOperator.clickElement(sendBtn);
-    sleep(1200);
-    sent = true;
-    logger.debug(TAG, "回复已发送(图找图): " + replyText.substring(0, 20) + "'");
-  }
-
-  // 兜底：回车发送
-  if (!sent) {
-    logger.info(TAG, "comment_submit 未找到，尝试回车发送");
-    try { shell("input keyevent 66", false); } catch (e) { /* ignore */ }
-    back();
-    sleep(1200);
-    sent = true;  // Enter 后假定发送成功（无法验证）
-  }
-
-  return sent;
+  this._lastSendOutcome = commentUtils.submitAndObserve("comment_submit", "comment_input", cleanText, "comment_send_failed");
+  return this._lastSendOutcome === "confirmed";
 };
 
 /**
@@ -952,89 +937,29 @@ ReplyCommentHandler._dismissKeyboard = function () {
  * @returns {boolean}
  */
 ReplyCommentHandler._enterCommenterProfile = function (commentAuthorAvatarEl, nickname) {
-  // 先判断目标评论者昵称是否可见（昵称可见=头像在同一行可见）
-  var nameVisible = false;
-  try { nameVisible = !!text(nickname).findOne(500); } catch (e) {}
-  if (!nameVisible) {
-    logger.info(TAG, "头像不可见，评论列表内滚动查找目标评论");
-    var rv = uiOperator.findElement("comment_list", 1000);
-    // 在列表区域下拉——先小幅滚动查找近处评论，再大幅滚动扫长列表
-    if (rv && !rv.isImage && !rv.isCoordinate) {
-      try {
-        var rvb = rv.bounds();
-        var rvcx = rvb.centerX();
-        // 第一阶段：小幅滚动 4 次（近处评论）
-        var found = false;
-        for (var si = 0; si < 6; si++) {
-          var sd = Math.floor(Math.random() * 200 + 400);
-          gestures([0, sd, [rvcx, rvb.top + rvb.height() * 0.20],
-                           [rvcx + Math.floor(Math.random() * 20 + 10), rvb.top + rvb.height() * 0.75]]);
-          sleep(400);
-          try { if (text(nickname).findOne(300)) { found = true; break; } } catch (e) {}
-          if (!uiOperator.findElement("is_comment_view", 300)) break;
-        }
-        // 第二阶段：大幅翻页滚动 8 次（评论极多时目标在深处）
-        if (!found) {
-          for (var si2 = 0; si2 < 8; si2++) {
-            var sd2 = Math.floor(Math.random() * 300 + 600);
-            gestures([0, sd2, [rvcx, rvb.top + rvb.height() * 0.60],
-                             [rvcx + Math.floor(Math.random() * 20 + 10), rvb.top + rvb.height() * 0.20]]);
-            sleep(400);
-            try { if (text(nickname).findOne(300)) break; } catch (e) {}
-            if (!uiOperator.findElement("is_comment_view", 300)) break;
-          }
-        }
-      } catch (e) {}
-    } else {
-      // 兜底：找不到 comment_list，全屏滚动
-      var sc = device.width / 2;
-      var found2 = false;
-      for (var sj = 0; sj < 4; sj++) {
-        var sd3 = Math.floor(Math.random() * 200 + 400);
-        gestures([0, sd3, [sc, device.height * 0.45],
-                         [sc + Math.floor(Math.random() * 20 + 10), device.height * 0.70]]);
-        sleep(400);
-        try { if (text(nickname).findOne(300)) { found2 = true; break; } } catch (e) {}
-        if (!uiOperator.findElement("is_comment_view", 300)) break;
+  for (var attempt = 0; attempt < 15; attempt++) {
+    var container = commentUtils.findListContainer("comment_list");
+    if (!container) return false;
+    var ctx = screenContext.read();
+    var scope = commentUtils.usableBounds(container.bounds(), ctx);
+    try {
+      var names = container.find(text(nickname));
+      var matches = [];
+      for (var i = 0; i < names.length; i++) {
+        if (commentUtils.visibleNode(names[i], ctx, scope)) matches.push(names[i]);
       }
-      if (!found2) {
-        for (var sj2 = 0; sj2 < 6; sj2++) {
-          var sd4 = Math.floor(Math.random() * 300 + 600);
-          gestures([0, sd4, [sc, device.height * 0.60],
-                           [sc + Math.floor(Math.random() * 20 + 10), device.height * 0.20]]);
-          sleep(400);
-          try { if (text(nickname).findOne(300)) break; } catch (e) {}
-          if (!uiOperator.findElement("is_comment_view", 300)) break;
+      if (matches.length > 1) return false;
+      if (matches.length === 1) {
+        if (!commentUtils.clickWithin(matches[0], scope)) return false;
+        if (uiOperator.waitForPage("is_user_view", 5000)) {
+          flowContext.enter("profile");
+          return true;
         }
+        return false;
       }
-    }
-  }
-
-  // 进入目标用户主页。
-  // 不依赖传入的 commentAuthorAvatarEl —— 评论列表滚动后元素引用会失效。
-  // 前面的滚动逻辑已将目标昵称拉回可见区域，直接按昵称文本点击最可靠。
-  try {
-    var nameEl = text(nickname).findOne(3000);
-    if (nameEl) {
-      try { nameEl.click(); } catch (e) { nameEl.parent().click(); }
-      if (uiOperator.waitForPage("is_user_view", 5000)) {
-        flowContext.enter("profile");
-        return true;
-      }
-      logger.warn(TAG, "点击昵称后未检测到主页，尝试点头像");
-    }
-  } catch (e) {
-    logger.warn(TAG, "点击昵称失败: " + e.message);
-  }
-
-  // 回退：safeClick 按头像 selector 搜索
-  var avatarClicked = this.safeClick("comment_author_avatar", 2);
-  if (avatarClicked) {
-    if (uiOperator.waitForPage("is_user_view", 5000)) {
-      flowContext.enter("profile");
-      return true;
-    }
-    logger.warn(TAG, "点击头像后未检测到主页");
+    } catch (e) { return false; }
+    if (!uiOperator.findElement("is_comment_view", 300) || !commentUtils.swipeList("comment_list", attempt < 6)) break;
+    sleep(400);
   }
   return false;
 };
@@ -1075,43 +1000,38 @@ ReplyCommentHandler._followUser = function () {
     }
     sleep(Math.floor(Math.random() * 400 + 400));
 
-    // 3. 找关注按钮 — 用随机按压时长模拟真人（80~180ms）
     var followed = false;
-    var followBtn = uiOperator.findElement("follow_button", 3000);
-    if (followBtn) {
-      // 图找图/坐标返回的是虚拟元素，控件返回的是 UiObject，统一取坐标
-      var fbx, fby;
-      if (followBtn.isImage || followBtn.isCoordinate) {
-        fbx = followBtn.x; fby = followBtn.y;
+    for (var attempt = 0; attempt < 2; attempt++) {
+      // Read success explicitly; disappearing targets alone cannot prove success.
+      if (uiOperator.findElement("is_follow", 1000)) {
+        if (attempt === 0) return false; // Already followed before this operation.
+        followed = true; break;
+      }
+      sleep(Math.floor(Math.random() * 600 + 400));
+      if (attempt === 0) {
+        var firstTarget = uiOperator.findElement("follow_button", 3000);
+        if (!firstTarget) break;
+        var firstText = "", firstDesc = "";
+        try { firstText = String(firstTarget.text() || "").replace(/\s/g, ""); } catch (firstLabelError) {}
+        try { firstDesc = String(firstTarget.desc() || "").replace(/\s/g, ""); } catch (firstDescError) {}
+        if (/已关注|互相关注|取消关注/.test(firstText + firstDesc)) return false;
+        // Actuate the same freshly inspected target, without resolving the ID
+        // again into a toggle whose meaning may have changed.
+        if (!uiOperator.clickElement(firstTarget)) break;
       } else {
-        try { var fb = followBtn.bounds(); if (fb) { fbx = fb.centerX(); fby = fb.centerY(); } } catch (e) {}
+        // A persistent resource ID can become an unfollow toggle after the
+        // first click. Only an exact fresh unfollowed label permits a retry.
+        var retryTarget = uiOperator.findElement("follow_button", 2000);
+        if (!retryTarget || retryTarget.isCoordinate || retryTarget.isPress || retryTarget.isImage) break;
+        var retryText = "", retryDesc = "";
+        try { retryText = String(retryTarget.text() || "").replace(/\s/g, ""); } catch (labelError) {}
+        try { retryDesc = String(retryTarget.desc() || "").replace(/\s/g, ""); } catch (descError) {}
+        if (/已关注|互相关注|取消关注/.test(retryText + retryDesc)) break;
+        if (!/^[+＋]?关注$/.test(retryText) && !/^[+＋]?关注$/.test(retryDesc)) break;
+        if (!uiOperator.clickElement(retryTarget)) break;
       }
-      if (!fbx) { fbx = device.width / 2; fby = device.height * 0.3; }
-
-      // 随机延迟后点击（真人不会一到主页就秒点关注）
-      sleep(Math.floor(Math.random() * 1500 + 500));
-      press(fbx, fby, Math.floor(Math.random() * 100 + 80));
       sleep(Math.floor(Math.random() * 1000 + 1000));
-
-      // 验证：图找图检测关注成功
-      if (uiOperator.findElement("is_follow", 2000)) {
-        followed = true;
-      }
-
-      // 可能被风控，换随机时长重试
-      // 重试前先检查 follow_button 是否仍可见——第一次 press 可能已生效
-      // 只是 is_follow 选择器匹配慢。按钮变"已关注"后 follow_button 模板不再匹配
-      if (!followed) {
-        sleep(Math.floor(Math.random() * 600 + 400));
-        var retryBtn = uiOperator.findElement("follow_button", 2000);
-        if (!retryBtn) {
-          followed = true;
-        } else {
-          press(fbx, fby, Math.floor(Math.random() * 100 + 80));
-          sleep(Math.floor(Math.random() * 1000 + 1000));
-          if (uiOperator.findElement("is_follow", 2000)) followed = true;
-        }
-      }
+      if (uiOperator.findElement("is_follow", 2000)) { followed = true; break; }
     }
 
     if (followed) {
@@ -1139,6 +1059,7 @@ ReplyCommentHandler._collectProfileData = function () {
  * @param {string} content - 私信内容
  */
 ReplyCommentHandler._sendDM = function (content) {
+  this._lastSendOutcome = "not_attempted";
   // 1. 进入私信页：点 dm_entry_btn
   var messageClicked = this.safeClick("dm_entry_btn", 5);
   if (!messageClicked) {
@@ -1198,17 +1119,8 @@ ReplyCommentHandler._sendDM = function (content) {
 
   // 5. 等几十毫秒让输入生效，然后点击发送
   sleep(Math.floor(Math.random() * 150 + 100));
-  var sent = uiOperator.findElement("dm_send", 3000);
-  if (sent) {
-    uiOperator.clickElement(sent);
-    sleep(800);
-  } else {
-    logger.warn(TAG, "私信发送按钮未找到，取消发送");
-    return false;
-  }
-
-  logger.info(TAG, "私信已发送: '" + content.substring(0, 20) + "'");
-  return true;
+  this._lastSendOutcome = commentUtils.submitAndObserve("dm_send", "dm_input", content, "dm_send_failed");
+  return this._lastSendOutcome === "confirmed";
 };
 
 ReplyCommentHandler._returnToComments = function () {

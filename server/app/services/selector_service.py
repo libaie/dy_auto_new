@@ -91,8 +91,10 @@ def _to_dict(sel: UISelector) -> dict:
 
 
 def _to_device_dict(sel: UISelector) -> dict:
-    """Device-facing dict (no description/version/enabled)."""
+    """Device-facing dict with source identity for revision-safe calibration."""
     return {
+        "id": sel.id,
+        "version": sel.version,
         "action_name": sel.action_name,
         "platform_version": sel.platform_version,
         "resolution_profile": sel.resolution_profile or "default",
@@ -109,7 +111,7 @@ def _to_device_dict(sel: UISelector) -> dict:
 class SelectorService:
     """UI selector management — DB-backed."""
 
-    def get_all_selectors(self, db: Session, device_id: str = None) -> tuple[int, list[dict]]:
+    def get_all_selectors(self, db: Session, device_id: str = None, resolution: str | None = None) -> tuple[int, list[dict]]:
         """Returns (version, selectors_list). Version is max version across all selectors.
         When device_id is given, filters by resolution_profile: exact match > same AR > default.
         """
@@ -117,19 +119,20 @@ class SelectorService:
         if not selectors:
             return 0, []
 
-        # Resolve device resolution for profile filtering
-        if device_id:
+        # Live display geometry can differ from the registration-time dimensions
+        # (rotation/external display); do not mutate the device record on a read.
+        dev_res = resolution
+        if not dev_res and device_id:
             device = db.query(Device).filter(Device.id == device_id).first()
             if device and device.screen_resolution:
                 dev_res = device.screen_resolution
-                dev_ar = _aspect_tag(dev_res)
-                # Keep all resolution-compatible candidates. The device knows the
-                # installed Douyin version, so it must make the final per-action
-                # choice between platform-specific/default selector rows.
-                selectors = [
-                    s for s in selectors
-                    if _profile_priority(s.resolution_profile or "default", dev_res, dev_ar) > 0
-                ]
+        if dev_res:
+            dev_ar = _aspect_tag(dev_res)
+            # Keep compatible candidates; the device selects the installed app version.
+            selectors = [
+                s for s in selectors
+                if _profile_priority(s.resolution_profile or "default", dev_res, dev_ar) > 0
+            ]
 
         version = _get_revision(db)
         return version, [_to_device_dict(s) for s in selectors]

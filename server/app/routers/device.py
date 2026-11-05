@@ -801,12 +801,15 @@ def register_device(
 @router.get("/selectors")
 def get_selectors(
     version: int = Query(0),
+    resolution: str | None = Query(None, pattern=r"^[1-9]\d{0,4}x[1-9]\d{0,4}$"),
     db: Session = Depends(get_db),
     device_id: str = Depends(verify_device_secret),
 ):
 
-    current_version, selectors = selector_service.get_all_selectors(db, device_id=device_id)
-    if version == current_version:
+    current_version, selectors = selector_service.get_all_selectors(db, device_id=device_id, resolution=resolution)
+    # A revision alone does not identify the cached profile after display rotation.
+    # Explicit live geometry requests always receive a complete snapshot.
+    if version == current_version and resolution is None:
         return {"version": current_version, "selectors": None, "changed": False}
 
     return {
@@ -1013,14 +1016,21 @@ def device_download_template(
 
 
 class CalibrationItem(BaseModel):
-    action_name: str
-    filename: str
-    data: str  # base64-encoded PNG
+    action_name: str = Field(min_length=1, max_length=100)
+    filename: str = Field(min_length=1, max_length=255)
+    data: str = Field(max_length=7 * 1024 * 1024)  # base64-encoded PNG
+    source_selector_id: str | None = Field(None, max_length=64)
+    source_selector_version: int | None = Field(None, ge=1)
+    source_platform_version: str | None = Field(None, min_length=1, max_length=50)
+    source_resolution_profile: str | None = Field(None, pattern=r"^(default|[1-9]\d{0,4}x[1-9]\d{0,4})$")
+    platform_version: str | None = Field(None, min_length=1, max_length=50)
+    source_resolution: str | None = Field(None, pattern=r"^[1-9]\d{0,4}x[1-9]\d{0,4}$")
+    source_density: float | None = Field(None, gt=0, le=16, allow_inf_nan=False)
 
 
 class CalibrationRequest(BaseModel):
-    templates: list[CalibrationItem]
-    resolution: str = ""
+    templates: list[CalibrationItem] = Field(max_length=100)
+    resolution: str = Field("", pattern=r"^([1-9]\d{0,4}x[1-9]\d{0,4})?$")
 
 
 @router.post("/calibrate")
@@ -1031,67 +1041,23 @@ async def device_calibrate(
 ):
     """Device uploads auto-calibrated image templates.
     Saves templates and upserts UISelector rows for this resolution profile."""
-    import base64
-    from app.services.template_service import template_service
-    from app.db_models import UISelector, Device
+    import re
+    from app.services.calibration_service import CalibrationError, publish_calibration
+    from app.db_models import Device
 
     resolution = request.resolution
     if not resolution:
         device = db.query(Device).filter(Device.id == device_id).first()
         if device and device.screen_resolution:
             resolution = device.screen_resolution
-    if not resolution:
+    if not resolution or not re.fullmatch(r"[1-9]\d{0,4}x[1-9]\d{0,4}", resolution):
         raise HTTPException(status_code=400, detail="无法确定设备分辨率")
 
-    uploaded = 0
-    for item in request.templates:
-        # Decode and save template
-        try:
-            content = base64.b64decode(item.data)
-        except Exception:
-            continue
-        template_service.save_template(item.filename, content, resolution=resolution)
-
-        # Upsert selector: clone existing "default" profile selector for this resolution
-        existing = db.query(UISelector).filter(
-            UISelector.action_name == item.action_name,
-            UISelector.resolution_profile == resolution,
-        ).first()
-        if not existing:
-            # Clone from default profile if it exists
-            default_sel = db.query(UISelector).filter(
-                UISelector.action_name == item.action_name,
-                UISelector.resolution_profile == "default",
-            ).first()
-            if default_sel:
-                # Clone strategies but update image template references to the
-                # newly uploaded file (original references default templates).
-                import copy
-                new_strategies = copy.deepcopy(default_sel.strategies)
-                for st in new_strategies:
-                    if st.get("type") == "image":
-                        st["template"] = item.filename
-                new_sel = UISelector(
-                    action_name=item.action_name,
-                    description=default_sel.description,
-                    platform_version=default_sel.platform_version,
-                    resolution_profile=resolution,
-                    strategies=new_strategies,
-                    version=1,
-                    category=default_sel.category,
-                    purpose=default_sel.purpose,
-                    strategy_logic=default_sel.strategy_logic,
-                    extract_field=default_sel.extract_field,
-                    clean_mode=default_sel.clean_mode,
-                    clean_pattern=default_sel.clean_pattern,
-                    clean_prompt=default_sel.clean_prompt,
-                )
-                db.add(new_sel)
-        uploaded += 1
-
-    from app.services.selector_service import _bump_revision
-    _bump_revision(db)
-    db.commit()
+    try:
+        uploaded = publish_calibration(db, [item.model_dump(exclude_none=True) for item in request.templates], resolution)
+    except CalibrationError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
 
     # Broadcast version bump
     version = selector_service.get_version(db)
@@ -1359,6 +1325,9 @@ def dm_claim_recipient(
         recipient_nickname=request.recipient_nickname,
         recipient_douyin_id=request.recipient_douyin_id,
         claimed_at=now,
+        # Modern devices verify delivery. Keep unknown/crashed attempts out of
+        # legacy orphan cleanup until confirmed or explicitly released as failed.
+        status="pending_confirmation" if request.preserve_on_unknown else "active",
     )
     db.add(conv)
     try:
@@ -1393,6 +1362,8 @@ async def dm_send_report(
     conv.last_dm_at = now
     conv.total_dm_count = (conv.total_dm_count or 0) + 1
     conv.claimed_at = None  # 清除 claim 标记
+    if conv.status == "pending_confirmation":
+        conv.status = "active"
     if request.keyword and not conv.keyword:
         conv.keyword = request.keyword
     db.commit()

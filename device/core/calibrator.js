@@ -2,9 +2,9 @@
  * 自动标定 — 为新分辨率设备采集 image 模板
  *
  * 工作流程：
- * 1. 遍历所有选择器，找出有 coordinate 策略的 action
- * 2. 对每个 coordinate 策略，截图 → 按 x_percent/y_percent 裁剪区域 → 保存 PNG
- * 3. 批量上传到服务端，自动创建对应 resolution_profile 的选择器行
+ * 1. 查找可通过语义控件/已验证图片确认的 action，排除纯坐标猜测
+ * 2. 确认页面、目标及窗口稳定，将屏幕 bounds 换算为截图范围再裁剪
+ * 3. 上传来源选择器与应用版本，创建对应 resolution_profile 的图片策略
  *
  * 调用时机：selectorLoader.init() 完成后，若 _cache 中缺少 action（无匹配 profile）
  *
@@ -16,6 +16,7 @@ var selectorLoader = require("./selector-loader");
 var apiClient = require("./api-client");
 var uiOperator = require("./ui-operator");
 var logger = require("../utils/logger");
+var screenContext = require("./screen-context");
 
 var TAG = "标定";
 
@@ -42,7 +43,9 @@ var calibrator = {
    */
   run: function (options) {
     options = options || {};
-    var resolution = device.width + "x" + device.height;
+    var geometry = screenContext.read();
+    if (!geometry) return { captured: 0, uploaded: 0, errors: ["无法获取设备几何信息"] };
+    var resolution = geometry.width + "x" + geometry.height;
     var unattended = !!options.unattended;
     logger.info(TAG, "开始标定, 分辨率=" + resolution + (unattended ? " (自动)" : " (手动)"));
 
@@ -59,9 +62,11 @@ var calibrator = {
 
     for (var pi = 0; pi < pages.length; pi++) {
       var page = pages[pi];
-      var targets = this._collectCoordinateActions(page.key);
+      if (options.pageKey && options.pageKey !== page.key) continue;
+      var targets = this._collectObservableActions(page.key);
+      if (options.actions) targets = targets.filter(function (target) { return options.actions.indexOf(target.action_name) !== -1; });
       if (targets.length === 0) {
-        logger.info(TAG, "页面[" + page.key + "] 无 coordinate 策略，跳过");
+        logger.info(TAG, "页面[" + page.key + "] 无可确认的目标策略，跳过");
         continue;
       }
 
@@ -87,7 +92,7 @@ var calibrator = {
       for (var i = 0; i < targets.length; i++) {
         var t = targets[i];
         try {
-          var templateData = this._captureTemplate(t.action_name, t.x_percent, t.y_percent, resolution);
+          var templateData = this._captureTemplate(t, resolution);
           if (templateData) {
             uploads.push(templateData);
             results.captured++;
@@ -135,9 +140,9 @@ var calibrator = {
   },
 
   /**
-   * 收集所有包含 coordinate 策略的 action
+   * 收集具备观测依据的动作；coordinate 不是元素存在的证据。
    */
-  _collectCoordinateActions: function (pageKey) {
+  _collectObservableActions: function (pageKey) {
     var targets = [];
     var cache = selectorLoader._cache;
 
@@ -153,7 +158,7 @@ var calibrator = {
     for (var actionName in cache) {
       if (!cache.hasOwnProperty(actionName)) continue;
       var sel = cache[actionName];
-      if (!sel.strategies) continue;
+      if (!sel.strategies || sel.purpose === "page_detect" || sel.purpose === "extract") continue;
 
       // Filter by page if specified
       if (pageKey) {
@@ -170,64 +175,110 @@ var calibrator = {
 
       for (var i = 0; i < sel.strategies.length; i++) {
         var st = sel.strategies[i];
-        if (st.type === "coordinate" && typeof st.x_percent === "number" && typeof st.y_percent === "number") {
+        if (st.type !== "coordinate" && st.type !== "package" && (st.conditions || ["text", "id", "desc", "className", "chain", "image"].indexOf(st.type) !== -1)) {
           targets.push({
             action_name: actionName,
-            x_percent: st.x_percent,
-            y_percent: st.y_percent,
+            selector: sel,
           });
-          break; // 每个 action 只取第一个 coordinate 策略
+          break;
         }
       }
     }
     return targets;
   },
 
+  _findObservedBounds: function (target) {
+    if (!target || !target.selector || !target.selector.strategies) return null;
+    var strategies = target.selector.strategies.slice().sort(function (a, b) { return (a.priority || 0) - (b.priority || 0); });
+    for (var i = 0; i < strategies.length; i++) {
+      var strategy = strategies[i];
+      if (strategy.type === "coordinate" || strategy.type === "package") continue;
+      if (strategy.type === "image") {
+        var imageTarget = uiOperator._findByStrategy(strategy);
+        // A single best image match need not be unique. Only a matcher that
+        // explicitly verified uniqueness may seed a new automatic template.
+        if (imageTarget && imageTarget.isImage && imageTarget.unique === true) {
+          var imageBounds = screenContext.rect(imageTarget.bounds);
+          if (imageBounds) return imageBounds;
+        }
+        continue;
+      }
+      var candidates = uiOperator._findManyByStrategy(strategy) || [];
+      var observed = [];
+      for (var ci = 0; ci < candidates.length; ci++) {
+        var candidate = candidates[ci];
+        if (!candidate || candidate.isCoordinate || candidate.isPress || candidate.isPackage || !uiOperator._isOnScreen(candidate)) continue;
+        try {
+          var candidateBounds = screenContext.rect(candidate.bounds());
+          if (candidateBounds) observed.push(candidateBounds);
+        } catch (e) {}
+      }
+      if (observed.length === 1) return observed[0];
+    }
+    return null;
+  },
+
   /**
    * 截图并裁剪模板区域
    * @returns {{ action_name, filename, data: bytes } | null}
    */
-  _captureTemplate: function (actionName, xPercent, yPercent, resolution) {
+  _captureTemplate: function (target, resolution) {
+    var before = screenContext.read();
+    var bounds = this._findObservedBounds(target);
+    if (!before || !bounds) return null;
+    var actionName = target.action_name;
     var screen = images.captureScreen();
     if (!screen) {
       logger.warn(TAG, "截图失败: " + actionName);
       return null;
     }
 
-    var cx = Math.round(xPercent * device.width);
-    var cy = Math.round(yPercent * device.height);
-
-    // 裁剪区域：以坐标为中心，取 10% 最小维度的弹性区域（±20% padding）
-    var cropSize = Math.round(Math.min(device.width, device.height) * 0.10);
-    cropSize = Math.max(40, Math.min(cropSize, 120));
-    var left = Math.max(0, cx - cropSize);
-    var top = Math.max(0, cy - cropSize);
-    var w = Math.min(cropSize * 2, screen.getWidth() - left);
-    var h = Math.min(cropSize * 2, screen.getHeight() - top);
-
     var tpl = null;
     try {
-      tpl = images.clip(screen, left, top, w, h);
-      screen.recycle();
+      var ctx = screenContext.read(screen);
+      if (!ctx || !ctx.captureValid || ctx.signature !== before.signature || ctx.width + "x" + ctx.height !== resolution) return null;
+      var afterBounds = this._findObservedBounds(target);
+      if (!afterBounds || JSON.stringify(afterBounds) !== JSON.stringify(bounds)) return null;
+      var visible = screenContext.intersect(bounds, ctx.contentBounds);
+      if (!visible || JSON.stringify(visible) !== JSON.stringify(bounds)) return null;
+      var center = { x: (bounds.left + bounds.right) / 2, y: (bounds.top + bounds.bottom) / 2 };
+      if (!screenContext.isUsablePoint(center, ctx)) return null;
+      if ((bounds.right - bounds.left) * (bounds.bottom - bounds.top) > ctx.width * ctx.height * 0.2) return null;
+      for (var bi = 0; bi < ctx.blockedBounds.length; bi++) {
+        if (screenContext.intersect(bounds, ctx.blockedBounds[bi])) return null;
+      }
+      var topLeft = screenContext.screenToCapture({ x: bounds.left, y: bounds.top }, ctx);
+      var bottomRight = screenContext.screenToCapture({ x: bounds.right - 1, y: bounds.bottom - 1 }, ctx);
+      if (!topLeft || !bottomRight) return null;
+      var left = Math.min(topLeft.x, bottomRight.x), top = Math.min(topLeft.y, bottomRight.y);
+      var width = Math.abs(bottomRight.x - topLeft.x) + 1, height = Math.abs(bottomRight.y - topLeft.y) + 1;
+      if (width < 2 || height < 2) return null;
+      tpl = images.clip(screen, left, top, width, height);
       if (!tpl) return null;
 
-      var filename = actionName + "@" + resolution + ".png";
+      var sourceResolution = ctx.captureWidth + "x" + ctx.captureHeight;
+      var filename = String(actionName).replace(/[^A-Za-z0-9_.-]/g, "_") + "@" + sourceResolution + "_" + Date.now() + ".png";
       var tmpPath = "/sdcard/dy_auto/templates/" + resolution + "/" + filename;
       ensureDirPath("/sdcard/dy_auto/templates/" + resolution + "/");
       images.save(tpl, tmpPath, "png", 80);
       var data = files.readBytes(tmpPath);
-      tpl.recycle();
 
       return {
         action_name: actionName,
         filename: filename,
         data: data,
         resolution: resolution,
+        source_selector_id: target.selector.id,
+        source_selector_version: target.selector.version,
+        source_platform_version: target.selector.platform_version || "default",
+        source_resolution_profile: target.selector.resolution_profile || "default",
+        platform_version: String(selectorLoader._douyinVersion || target.selector.platform_version || "default"),
+        source_resolution: sourceResolution,
+        source_density: ctx.density * (ctx.captureRotation === 90 || ctx.captureRotation === 270 ? ctx.captureHeight / ctx.width : ctx.captureWidth / ctx.width),
       };
-    } catch (e) {
+    } finally {
       if (tpl) tpl.recycle();
-      if (screen) { try { screen.recycle(); } catch (e2) {} }
-      throw e;
+      screen.recycle();
     }
   },
 };

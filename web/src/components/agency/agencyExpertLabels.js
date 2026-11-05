@@ -321,7 +321,8 @@ export function decisionLogText(value, field = 'generic', fallback = '') {
   const localized = localizeEmbeddedEnglish(text)
   if (localized) return compactChineseText(localized)
 
-  if (/[A-Za-z_]/.test(text)) return fallback
+  // Dynamic findings/evidence may include IDs or untranslated provider text.
+  // Preserve it instead of presenting a nonempty record as missing evidence.
   return compactChineseText(text) || fallback
 }
 

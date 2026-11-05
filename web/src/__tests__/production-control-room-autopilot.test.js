@@ -23,6 +23,10 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock('vue-router', () => ({ useRoute: () => mocks.route }))
+vi.mock('../api/agency.js', () => ({
+  listAgencyRepairTasks: vi.fn(() => Promise.resolve({ data: { ok: true, items: [], summary: {} } })),
+}))
+
 vi.mock('../api/videoProduction.js', () => ({
   getVideoProductionRun: mocks.getVideoProductionRun,
   getRunProductionTree: mocks.getRunProductionTree,

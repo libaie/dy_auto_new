@@ -144,7 +144,7 @@ describe('agency control room components', () => {
     expect(wrapper.text()).toContain('必须修改：补全上一段结束状态')
     expect(wrapper.text()).toContain('证据：shot-001: missing end frame')
     expect(wrapper.text()).toContain('下一步：返回自动分镜修订')
-    expect(wrapper.text()).toContain('历史审计记录')
+    expect(wrapper.text()).toContain('历史审查记录')
     expect(wrapper.text()).not.toMatch(/prompt_engineer|storyboard_quality_reviewer|\{/)
   })
 })

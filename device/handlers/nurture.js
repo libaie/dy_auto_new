@@ -6,7 +6,8 @@ var aiAnalyzer = require("../core/ai-analyzer");
 var commentUtils = require("./comment-utils");
 var logger = require("../utils/logger");
 var flowContext = require("../core/flow-context");
-var taskExecutor = require("../core/task-executor");
+var taskCancellation = require("../core/task-cancellation");
+var taskTimeout = require("../core/task-timeout");
 var apiClient = require("../core/api-client");
 
 var TAG = "养号";
@@ -36,7 +37,7 @@ NurtureHandler.execute = function (params) {
 NurtureHandler._executeV2 = function (params) {
   var subTasks = params.sub_tasks;
   var completionMode = params.completion_mode || "all";
-  var maxDuration = (params.duration || 60) * 60 * 1000;
+  var maxDuration = taskTimeout.getNurtureDurationMinutes(params) * 60 * 1000;
   var startTime = Date.now();
 
   // Store keyword matrix for content filtering
@@ -65,7 +66,7 @@ NurtureHandler._executeV2 = function (params) {
   });
 
   while (Date.now() - startTime < maxDuration) {
-    if (taskExecutor.isCancelled()) {
+    if (taskCancellation.isCancelled()) {
       logger.info(TAG, "任务已取消，停止养号");
       break;
     }
@@ -145,6 +146,8 @@ NurtureHandler._quotaValue = function (value) {
 };
 
 NurtureHandler._hasNurtureQuota = function (type) {
+  // Browsing/watching do not consume like, comment or follow quotas.
+  if (type === "browse" || type === "watch") return true;
   if (!this._nurtureQuota) return true;
   var remaining = this._nurtureQuota[type];
   return remaining === null || remaining > 0;
@@ -547,7 +550,7 @@ NurtureHandler._followCurrentUser = function () {
 
 // --- Legacy support ---
 NurtureHandler._legacyExecute = function (params) {
-  var duration = params.duration || 30;
+  var duration = taskTimeout.getNurtureDurationMinutes(params);
   var actions = params.actions || [
     { type: "browse_feed", weight: 70 },
     { type: "like", weight: 20 },
@@ -566,7 +569,7 @@ NurtureHandler._legacyExecute = function (params) {
   var stats = { videos_watched: 0, likes: 0, follows: 0, errors: 0 };
 
   while (Date.now() < endTime) {
-    if (taskExecutor.isCancelled()) {
+    if (taskCancellation.isCancelled()) {
       logger.info(TAG, "任务已取消，停止养号");
       break;
     }

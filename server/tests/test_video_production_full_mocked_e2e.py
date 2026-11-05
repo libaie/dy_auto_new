@@ -208,11 +208,13 @@ def test_linked_start_to_final_video_mocked_e2e(db, monkeypatch):
         "series_id": series.id,
         "episode_id": episode.id,
         "target_duration_seconds": 12,
-        "autostart_images": True,
+        # This scenario validates explicit human approval at each gate.
+        "autostart_images": False,
     })
     assert created.status_code == 200
     run_id = created.json()["run"]["id"]
 
+    assert client.post(f"/api/video-production/runs/{run_id}/start-images").status_code == 200
     assert client.post(f"/api/video-production/runs/{run_id}/sync-image-results").status_code == 200
     image_ids = [asset.id for asset in db.query(VideoProductionAsset).filter_by(run_id=run_id, asset_type="image").all()]
     for image_id in image_ids:

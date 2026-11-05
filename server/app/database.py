@@ -23,13 +23,22 @@ engine = create_engine(DATABASE_URL, echo=False, connect_args=connect_args)
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 
 
-@event.listens_for(engine, "connect")
 def _set_sqlite_pragma(dbapi_conn, connection_record):
     cursor = dbapi_conn.cursor()
     cursor.execute("PRAGMA journal_mode=WAL")
     cursor.execute("PRAGMA busy_timeout=5000")
     cursor.execute("PRAGMA foreign_keys = ON")
     cursor.close()
+
+
+def configure_engine(target_engine):
+    """Install SQLite-only connection settings, also reusable by test engines."""
+    if target_engine.dialect.name == "sqlite":
+        if not event.contains(target_engine, "connect", _set_sqlite_pragma):
+            event.listen(target_engine, "connect", _set_sqlite_pragma)
+
+
+configure_engine(engine)
 
 
 def _migrate_add_columns():
@@ -135,26 +144,24 @@ def _seed_selector_descriptions():
 
 
 def init_db():
-    """Create all tables. Called once at startup.
+    """Apply required migrations and initialize the remaining legacy tables.
 
-    Runs alembic migrations first, then create_all as safety net for any tables
-    not yet captured by migrations. Both are idempotent.
+    Migration errors deliberately stop startup. The legacy table/column safety
+    net may run only after a successful, versioned upgrade.
     """
     # Ensure data directory exists for SQLite
     if DATABASE_URL.startswith("sqlite"):
         Path(DATABASE_URL.replace("sqlite:///", "")).parent.mkdir(parents=True, exist_ok=True)
 
-    # Try alembic migrations first
-    try:
-        from alembic.config import Config
-        from alembic import command
-        alembic_ini = SERVER_DIR / "alembic.ini"
-        if alembic_ini.exists():
-            alembic_cfg = Config(str(alembic_ini))
-            command.upgrade(alembic_cfg, "head")
-            logger.info("Alembic migrations applied")
-    except Exception as e:
-        logger.warning("Alembic migration skipped: %s", e)
+    from alembic.config import Config
+    from alembic import command
+
+    alembic_ini = SERVER_DIR / "alembic.ini"
+    if not alembic_ini.is_file():
+        raise RuntimeError(f"Required Alembic configuration is missing: {alembic_ini}")
+    alembic_cfg = Config(str(alembic_ini))
+    command.upgrade(alembic_cfg, "head")
+    logger.info("Alembic migrations applied")
 
     # Safety net: create_all for any tables not in migrations
     Base.metadata.create_all(bind=engine)

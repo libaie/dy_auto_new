@@ -90,3 +90,30 @@ def verify_ws_admin_token(token: str) -> tuple:
         return (payload.get("user_id", ""), payload.get("role", "admin"))
     except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
         return (None, None)
+
+
+def require_resource_owner(resource, user: tuple, detail: str = "Resource not found"):
+    """Return a resource only for its owner or an administrator.
+
+    Unowned legacy records remain administrator-only. A missing user identity
+    must never grant an ordinary caller access to unowned records.
+    """
+    user_id, role = user
+    if resource is None or (role != "admin" and (not user_id or resource.user_id != user_id)):
+        raise HTTPException(status_code=404, detail=detail)
+    return resource
+
+
+def get_owned_resource(db: Session, model, resource_id: str, user: tuple):
+    """Load an owned resource without changing service interfaces."""
+    return require_resource_owner(
+        db.query(model).filter(model.id == resource_id).first(),
+        user,
+        detail=f"{model.__name__} not found",
+    )
+
+
+def resource_user_ids(db: Session, model, resource_id: str) -> list[str]:
+    """Resolve event recipients; missing/unowned resources reach admins only."""
+    row = db.query(model.user_id).filter(model.id == resource_id).first()
+    return [row[0]] if row and row[0] else []

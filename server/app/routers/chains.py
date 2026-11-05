@@ -61,7 +61,7 @@ async def create_template(
     db.add(tpl)
     db.commit()
     db.refresh(tpl)
-    await pair_ws_manager.broadcast_to_admins({"event": "chains_changed"})
+    await pair_ws_manager.broadcast_invalidation("chains_changed")
     return _template_to_dict(tpl)
 
 
@@ -133,7 +133,7 @@ async def update_template(
         tpl.steps = [s.model_dump() for s in request.steps]
     db.commit()
     db.refresh(tpl)
-    await pair_ws_manager.broadcast_to_admins({"event": "chains_changed"})
+    await pair_ws_manager.broadcast_invalidation("chains_changed")
     return _template_to_dict(tpl)
 
 
@@ -158,7 +158,7 @@ async def delete_template(
         raise HTTPException(status_code=400, detail=f"该模板有 {active} 个活跃实例，无法删除")
     db.delete(tpl)
     db.commit()
-    await pair_ws_manager.broadcast_to_admins({"event": "chains_changed"})
+    await pair_ws_manager.broadcast_invalidation("chains_changed")
     return {"deleted": True, "id": template_id}
 
 
@@ -186,7 +186,7 @@ async def create_instances(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
-    await pair_ws_manager.broadcast_to_admins({"event": "chains_changed"})
+    await pair_ws_manager.broadcast_invalidation("chains_changed")
     return {
         "created_count": len(results["created"]),
         "skipped_busy_count": len(results["skipped_busy"]),
@@ -317,7 +317,7 @@ async def cancel_instance(
     inst.completed_at = bj_now()
     db.commit()
 
-    await pair_ws_manager.broadcast_to_admins({"event": "chains_changed"})
+    await pair_ws_manager.broadcast_invalidation("chains_changed")
     return {"status": "cancelled", "id": instance_id}
 
 
@@ -364,5 +364,5 @@ async def retry_instance(
 
     chain_service._safe_push_step_task(db, inst)
 
-    await pair_ws_manager.broadcast_to_admins({"event": "chains_changed"})
+    await pair_ws_manager.broadcast_invalidation("chains_changed")
     return {"status": "retrying", "id": instance_id, "step": failed_task.step_order}

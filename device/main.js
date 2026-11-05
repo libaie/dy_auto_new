@@ -201,22 +201,28 @@ function startMainLoop(serverUrl, secret) {
   var _taskQueue = [];
   var _needsRestart = false;  // watchdog 触发后拒绝新任务，防止双任务并发操作 UI
   var _knownTaskIds = {};       // taskId→true: 当前运行中+已入队的 task id，防重复派发
-  var _recentlyFinished = [];   // 最近完成的 task id (最多 20 个)，防网络重放
+  var _recentlyFinished = [];   // 最近完成的 task id + lease (最多 20 个)，防同一轮执行重放
   var MAX_RECENT = 20;
   _mainLoopRuntime.isIdle = function () { return !_taskBusy && _taskQueue.length === 0 && !_needsRestart; };
   _mainLoopRuntime.catchUpPoll = function () { catchUpPoll(); };
 
-  function _isDuplicateTask(taskId) {
-    if (_knownTaskIds[taskId]) return true;
+  function _attemptKey(task) {
+    return JSON.stringify([task.id, task.lease_id || ""]);
+  }
+
+  function _isDuplicateTask(task) {
+    // 活跃任务仍按 ID 去重，避免旧线程退出前并行执行同一任务的新租约。
+    if (_knownTaskIds[task.id]) return true;
+    var attemptKey = _attemptKey(task);
     for (var i = 0; i < _recentlyFinished.length; i++) {
-      if (_recentlyFinished[i] === taskId) return true;
+      if (_recentlyFinished[i] === attemptKey) return true;
     }
     return false;
   }
 
   function handleTask(task) {
     if (!task || !task.id) return;
-    if (_isDuplicateTask(task.id)) {
+    if (_isDuplicateTask(task)) {
       logger.info(TAG, "忽略重复任务: " + task.id + " (已在队列/执行中/近期完成)");
       return;
     }
@@ -277,7 +283,7 @@ function startMainLoop(serverUrl, secret) {
         if (_watchdog) clearTimeout(_watchdog);
         // 去重维护: 无论何种退出路径，从活跃集移除并加入最近完成集
         delete _knownTaskIds[task.id];
-        _recentlyFinished.push(task.id);
+        _recentlyFinished.push(_attemptKey(task));
         if (_recentlyFinished.length > MAX_RECENT) _recentlyFinished.shift();
         if (!_completed) {
           _completed = true;

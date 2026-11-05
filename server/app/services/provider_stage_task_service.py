@@ -111,6 +111,7 @@ def claim_stage_task_for_submit(db: Session, task_id: str) -> bool:
         .update(
             {
                 "status": PROVIDER_TASK_SUBMITTED,
+                "external_task_id": task_id,
                 "submitted_at": now,
                 "updated_at": now,
             },

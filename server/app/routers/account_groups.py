@@ -37,7 +37,7 @@ async def create_group(
     db.add(group)
     db.commit()
     db.refresh(group)
-    await pair_ws_manager.broadcast_to_admins({"event": "account_groups_changed"})
+    await pair_ws_manager.broadcast_invalidation("account_groups_changed")
     return _group_to_dict(group, 0)
 
 
@@ -117,7 +117,7 @@ async def update_group(
     db.commit()
     db.refresh(group)
     member_count = db.query(AccountGroupMember).filter(AccountGroupMember.group_id == group_id).count()
-    await pair_ws_manager.broadcast_to_admins({"event": "account_groups_changed"})
+    await pair_ws_manager.broadcast_invalidation("account_groups_changed")
     return _group_to_dict(group, member_count)
 
 
@@ -136,7 +136,7 @@ async def delete_group(
         raise HTTPException(status_code=404, detail="分组不存在")
     db.delete(group)
     db.commit()
-    await pair_ws_manager.broadcast_to_admins({"event": "account_groups_changed"})
+    await pair_ws_manager.broadcast_invalidation("account_groups_changed")
     return {"deleted": True, "id": group_id}
 
 
@@ -210,7 +210,7 @@ async def add_members(
             db.add(AccountGroupMember(group_id=group_id, account_id=account_id))
             added.append(account_id)
     db.commit()
-    await pair_ws_manager.broadcast_to_admins({"event": "account_groups_changed"})
+    await pair_ws_manager.broadcast_invalidation("account_groups_changed")
     return {"added": added, "count": len(added)}
 
 
@@ -237,5 +237,5 @@ async def remove_members(
         .delete(synchronize_session=False)
     )
     db.commit()
-    await pair_ws_manager.broadcast_to_admins({"event": "account_groups_changed"})
+    await pair_ws_manager.broadcast_invalidation("account_groups_changed")
     return {"removed": count}

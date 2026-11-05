@@ -26,6 +26,10 @@ vi.mock('vue-router', () => ({
   useRoute: () => mocks.route,
 }))
 
+vi.mock('../api/agency.js', () => ({
+  listAgencyRepairTasks: vi.fn(() => Promise.resolve({ data: { ok: true, items: [], summary: {} } })),
+}))
+
 vi.mock('../api/videoProduction.js', () => ({
   getVideoProductionRun: mocks.getVideoProductionRun,
   getRunReadiness: mocks.getRunReadiness,

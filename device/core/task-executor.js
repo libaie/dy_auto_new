@@ -2,6 +2,8 @@
 var apiClient = require("./api-client");
 var selectorLoader = require("./selector-loader");
 var logger = require("../utils/logger");
+var taskCancellation = require("./task-cancellation");
+var taskTimeout = require("./task-timeout");
 
 var TAG = "任务执行";
 
@@ -20,7 +22,6 @@ var taskExecutor = {
   _currentLeaseId: null,
   _currentAccountId: null,
   _nextOpIndex: 0,
-  _cancelled: false,
 
   /**
    * 标记当前任务为已取消
@@ -28,7 +29,7 @@ var taskExecutor = {
    */
   cancel: function (taskId) {
     if (this._currentTaskId === taskId) {
-      this._cancelled = true;
+      taskCancellation.cancel();
       logger.info(TAG, "任务取消标记已设置: " + taskId);
     }
   },
@@ -37,7 +38,7 @@ var taskExecutor = {
    * 当前任务是否已被取消
    */
   isCancelled: function () {
-    return this._cancelled;
+    return taskCancellation.isCancelled();
   },
 
   /**
@@ -81,24 +82,25 @@ var taskExecutor = {
     this._currentLeaseId = task.lease_id || null;
     this._currentAccountId = task.account_id || null;
     this._nextOpIndex = 0;
-    this._cancelled = false;
+    taskCancellation.reset();
     task.params.task_id = task.id;  // 注入任务 ID 供 handler 上报进度
     task.params.account_id = task.account_id;  // 注入账号 ID 供 handler 使用
 
-    // 看门狗：任务最大执行时间 30 分钟，同时检查取消标记
-    var TASK_TIMEOUT = 30 * 60 * 1000;
+    // 与 main.js 使用相同的任务期限，长养号任务包含配置时长和缓冲。
+    var TASK_TIMEOUT = taskTimeout.getTaskTimeoutMs(task);
     var startTime = Date.now();
     var timedOut = false;
     var self = this;
 
     var watchdog = setInterval(function () {
-      if (self._cancelled) {
+      if (self.isCancelled()) {
         logger.info(TAG, "任务 " + task.id + " 已被取消");
         return;
       }
       if (Date.now() - startTime > TASK_TIMEOUT) {
-        logger.error(TAG, "任务 " + task.id + " 执行超时（30分钟）");
+        logger.error(TAG, "任务 " + task.id + " 执行超时（" + (TASK_TIMEOUT / 60000) + "分钟）");
         timedOut = true;
+        taskCancellation.cancel();
       }
     }, 10000);
 
@@ -116,12 +118,12 @@ var taskExecutor = {
       this._currentAccountId = null;
       this._nextOpIndex = 0;
 
-      if (this._cancelled) {
-        return { status: "cancelled", result: { error: "Task cancelled by server" } };
+      if (timedOut || Date.now() - startTime > TASK_TIMEOUT) {
+        return { status: "failed", result: { error: "Task execution timed out (" + (TASK_TIMEOUT / 60000) + " min)" } };
       }
 
-      if (timedOut) {
-        return { status: "failed", result: { error: "Task execution timed out (30 min)" } };
+      if (this.isCancelled()) {
+        return { status: "cancelled", result: { error: "Task cancelled by server" } };
       }
 
       if (result.success) {

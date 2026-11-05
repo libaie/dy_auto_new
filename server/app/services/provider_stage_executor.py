@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.config import bj_now
 from app.db_models import ProviderCostReservation, ProviderStageTask
 from app.services.production_action_result import ProductionActionResult
+from app.services.production_lease_service import worker_write_scope as _worker_write_scope
 from app.services.production_errors import ProductionErrorCode, ProductionRepairableError
 from app.services.production_observability import record_production_event
 from app.services.production_queue_service import retry_job_without_attempt
@@ -127,6 +128,7 @@ class ProviderStageExecutor:
         estimated_cost: float,
         payload: dict,
         capability: dict | None = None,
+        worker_lease: tuple | None = None,
     ) -> ProductionActionResult:
         resolved_capability = {**DEFAULT_REAL_PROVIDER_CAPABILITY, **(capability or {})}
         assert_real_paid_allowed(resolved_capability)
@@ -134,73 +136,74 @@ class ProviderStageExecutor:
         assert_paid_submit_deployment_safe(resolved_capability)
 
         with _provider_stage_lock(provider, model_name, stage):
-            existing = _find_existing_task(
-                db,
-                run_id=run_id,
-                stage=stage,
-                target_type=target_type,
-                target_id=target_id,
-                provider=provider,
-                model_name=model_name,
-                payload=payload,
-            )
-            if _needs_submit_claim_repair(existing):
-                _raise_submit_claim_repair_error(db, existing)
-            if existing is None or not existing.provider_task_id:
-                _assert_provider_capacity(
-                    db,
-                    job_id=job_id,
+            with _worker_write_scope(db, job_id, worker_lease) as write_db:
+                existing = _find_existing_task(
+                    write_db,
+                    run_id=run_id,
+                    stage=stage,
+                    target_type=target_type,
+                    target_id=target_id,
                     provider=provider,
                     model_name=model_name,
-                    stage=stage,
-                    max_concurrent_tasks=resolved_capability.get("max_concurrent_tasks"),
+                    payload=payload,
                 )
+                if _needs_submit_claim_repair(existing):
+                    _raise_submit_claim_repair_error(write_db, existing)
+                if existing is None or not existing.provider_task_id:
+                    _assert_provider_capacity(
+                        write_db,
+                        job_id=job_id,
+                        provider=provider,
+                        model_name=model_name,
+                        stage=stage,
+                        max_concurrent_tasks=resolved_capability.get("max_concurrent_tasks"),
+                    )
 
-            task, created = get_or_create_stage_task(
-                db,
-                run_id=run_id,
-                plan_id=plan_id,
-                job_id=job_id,
-                target_type=target_type,
-                target_id=target_id,
-                stage=stage,
-                provider=provider,
-                model_name=model_name,
-                payload=payload,
-            )
-            reservation = _reservation_for_task(db, task.id)
-            if created:
-                reservation = create_cost_reservation(
-                    db,
+                task, created = get_or_create_stage_task(
+                    write_db,
+                    run_id=run_id,
                     plan_id=plan_id,
-                    provider_stage_task_id=task.id,
-                    estimated_cost=estimated_cost,
+                    job_id=job_id,
+                    target_type=target_type,
+                    target_id=target_id,
+                    stage=stage,
+                    provider=provider,
+                    model_name=model_name,
+                    payload=payload,
                 )
-            elif not task.provider_task_id and reservation is None:
-                reservation = create_cost_reservation(
-                    db,
-                    plan_id=plan_id,
-                    provider_stage_task_id=task.id,
-                    estimated_cost=estimated_cost,
-                )
-            elif task.provider_task_id and reservation is None:
-                _raise_missing_reservation_repair_error(task)
-            task_id = task.id
-            reservation_id = reservation.id if reservation else None
-            provider_task_id = task.provider_task_id
-            if provider_task_id:
-                action = "sync"
-            elif claim_stage_task_for_submit(db, task_id):
-                action = "submit"
-            else:
-                task = _reload_task(db, task_id)
+                reservation = _reservation_for_task(write_db, task.id)
+                if created:
+                    reservation = create_cost_reservation(
+                        write_db,
+                        plan_id=plan_id,
+                        provider_stage_task_id=task.id,
+                        estimated_cost=estimated_cost,
+                    )
+                elif not task.provider_task_id and reservation is None:
+                    reservation = create_cost_reservation(
+                        write_db,
+                        plan_id=plan_id,
+                        provider_stage_task_id=task.id,
+                        estimated_cost=estimated_cost,
+                    )
+                elif task.provider_task_id and reservation is None:
+                    _raise_missing_reservation_repair_error(task)
+                task_id = task.id
+                reservation_id = reservation.id if reservation else None
                 provider_task_id = task.provider_task_id
                 if provider_task_id:
                     action = "sync"
+                elif claim_stage_task_for_submit(write_db, task_id):
+                    action = "submit"
                 else:
-                    _close_transaction(db)
-                    _raise_submit_claim_repair_error(db, task)
-            _close_transaction(db)
+                    task = _reload_task(write_db, task_id)
+                    provider_task_id = task.provider_task_id
+                    if provider_task_id:
+                        action = "sync"
+                    else:
+                        _close_transaction(write_db)
+                        _raise_submit_claim_repair_error(write_db, task)
+                _close_transaction(write_db)
 
         if action == "sync":
             sync_result = await self.client.sync(provider_task_id)
@@ -210,7 +213,8 @@ class ProviderStageExecutor:
                 submit_result = await self.client.submit(submit_payload)
                 provider_task_id = _provider_task_id(submit_result)
             except ProductionRepairableError as exc:
-                _record_provider_submit_failure(db, task_id, reservation_id, exc)
+                with _worker_write_scope(db, job_id, worker_lease) as write_db:
+                    _record_provider_submit_failure(write_db, task_id, reservation_id, exc)
                 raise
             except Exception as exc:
                 repairable = ProductionRepairableError(
@@ -222,42 +226,47 @@ class ProviderStageExecutor:
                     retryable=True,
                     affected_ids=[task_id],
                 )
-                _record_provider_submit_failure(db, task_id, reservation_id, repairable, raw_error=exc)
+                with _worker_write_scope(db, job_id, worker_lease) as write_db:
+                    _record_provider_submit_failure(write_db, task_id, reservation_id, repairable, raw_error=exc)
                 raise repairable from exc
-            task = _reload_task(db, task_id)
-            task = set_task_status(
-                db,
-                task,
-                PROVIDER_TASK_SUBMITTED,
-                provider_task_id=provider_task_id,
-                external_task_id=submit_result.get("external_task_id") or task_id,
-                response_summary_json=submit_result,
-                submitted_at=bj_now(),
-            )
-            reservation = _reservation_for_task(db, task_id)
-            if reservation and reservation.status != COST_SUBMITTED:
-                reservation = mark_reservation_submitted(db, reservation.id)
-            _close_transaction(db)
+            with _worker_write_scope(db, job_id, worker_lease) as write_db:
+                task = _reload_task(write_db, task_id)
+                task = set_task_status(
+                    write_db,
+                    task,
+                    PROVIDER_TASK_SUBMITTED,
+                    provider_task_id=provider_task_id,
+                    external_task_id=submit_result.get("external_task_id") or task_id,
+                    response_summary_json=submit_result,
+                    submitted_at=bj_now(),
+                )
+                reservation = _reservation_for_task(write_db, task_id)
+                if reservation and reservation.status != COST_SUBMITTED:
+                    reservation = mark_reservation_submitted(write_db, reservation.id)
+                _close_transaction(write_db)
             sync_result = await self.client.sync(provider_task_id)
 
-        task = _reload_task(db, task_id)
-        reservation = _reload_reservation(db, reservation_id)
-        if resolved_capability.get("settle_missing_usage_with_estimated_cost") is True:
-            sync_result = _sync_result_with_estimated_usage(sync_result, estimated_cost)
-        return _handle_sync_result(
-            db,
-            task=task,
-            reservation=reservation,
-            run_id=run_id,
-            plan_id=plan_id,
-            target_type=target_type,
-            target_id=target_id,
-            stage=stage,
-            provider=provider,
-            model_name=model_name,
-            estimated_cost=estimated_cost,
-            sync_result=sync_result,
-        )
+        with _worker_write_scope(db, job_id, worker_lease) as write_db:
+            task = _reload_task(write_db, task_id)
+            reservation = _reload_reservation(write_db, reservation_id)
+            if resolved_capability.get("settle_missing_usage_with_estimated_cost") is True:
+                sync_result = _sync_result_with_estimated_usage(sync_result, estimated_cost)
+            return _handle_sync_result(
+                write_db,
+                task=task,
+                reservation=reservation,
+                run_id=run_id,
+                plan_id=plan_id,
+                target_type=target_type,
+                target_id=target_id,
+                stage=stage,
+                provider=provider,
+                model_name=model_name,
+                estimated_cost=estimated_cost,
+                sync_result=sync_result,
+            )
+
+
 
 
 def _assert_positive_estimated_cost(estimated_cost: float) -> None:

@@ -61,7 +61,7 @@ async def create_account(
     db.add(acc)
     db.commit()
     db.refresh(acc)
-    await pair_ws_manager.broadcast_to_admins({"event": "accounts_changed"})
+    await pair_ws_manager.broadcast_invalidation("accounts_changed")
     return _account_to_dict(acc)
 
 
@@ -134,7 +134,7 @@ async def update_account(
 
     db.commit()
     db.refresh(acc)
-    await pair_ws_manager.broadcast_to_admins({"event": "accounts_changed"})
+    await pair_ws_manager.broadcast_invalidation("accounts_changed")
     return _account_to_dict(acc)
 
 
@@ -168,5 +168,5 @@ async def delete_account(
     acc.status = "deleted"
 
     db.commit()
-    await pair_ws_manager.broadcast_to_admins({"event": "accounts_changed"})
+    await pair_ws_manager.broadcast_invalidation("accounts_changed")
     return {"deleted": True, "id": account_id}

@@ -253,7 +253,7 @@ async def test_linked_video_regeneration_uses_segment_frame_and_preserves_target
     assert calls[0][0]["frame_id"] == segment.id
     assert calls[0][0]["production_segment_id"] == segment.id
     assert calls[0][0]["video_prompt"] == "linked video prompt"
-    assert calls[0][0]["approved_image_url"] == "output/approved-image.png"
+    assert calls[0][0]["approved_image_url"] == "https://cdn.test/approved-image.png"
 
     new_asset = await sync_regenerated_asset(db, asset.id)
     db.refresh(asset)

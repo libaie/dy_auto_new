@@ -72,6 +72,7 @@ def _isolate_test(test_db):
             session.execute(table.delete())
         else:
             session.query(table).delete()
+    _restore_seeded_accounts(session)
     session.commit()
     session.close()
     # Reset login rate limiter state (test_admin_auth.py fills it up)
@@ -135,6 +136,12 @@ def _seed_test_identity(db):
             nickname="test-admin",
         ))
 
+    _restore_seeded_accounts(db)
+    db.commit()
+
+
+def _restore_seeded_accounts(db):
+    """Restore the two shared test identities, including mutable routing inputs."""
     default_limits = {
         "likes": 50,
         "comments": 20,
@@ -147,12 +154,14 @@ def _seed_test_identity(db):
         ("acc-001", "test-account-1", "test_user_001"),
         ("acc-002", "test-account-2", "test_user_002"),
     ):
-        if not db.query(Account).filter(Account.id == account_id).first():
-            db.add(Account(
-                id=account_id,
-                nickname=nickname,
-                douyin_id=douyin_id,
-                status="active",
-                daily_limits=default_limits,
-            ))
-    db.commit()
+        account = db.query(Account).filter(Account.id == account_id).first()
+        if account is None:
+            account = Account(id=account_id, nickname=nickname)
+            db.add(account)
+        account.nickname = nickname
+        account.douyin_id = douyin_id
+        account.group = "default"
+        account.status = "active"
+        account.cookie = None
+        account.user_id = None
+        account.daily_limits = dict(default_limits)

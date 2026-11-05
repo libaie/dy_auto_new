@@ -212,7 +212,7 @@ def test_finalize_invocation_is_idempotent_for_terminal_invocation(db):
     assert first.id == second.id == stored.id
     assert stored.execution_status == "completed"
     assert stored.result_status == "passed"
-    assert stored.output_summary_json == {"decision": "first"}
+    assert stored.output_summary_json == {"decision": "first", "repair_tasks": []}
     assert stored.evidence_json == [{"message": "first evidence"}]
     assert stored.token_usage_json == {"total_tokens": 10}
     assert stored.error_code is None

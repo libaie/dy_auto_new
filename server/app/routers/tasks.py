@@ -7,7 +7,8 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.deps import verify_admin_token
+from app.deps import verify_admin_token, get_owned_resource, require_resource_owner, resource_user_ids
+from app.db_models import Task as DBTask, Account, Device, AccountGroup, AccountGroupMember
 from app.config import bj_now
 from app.models import TaskType, TaskStatus
 from app.services.task_service import task_service
@@ -162,6 +163,9 @@ async def create_task(
 ):
     if not request.account_id:
         raise HTTPException(status_code=400, detail="account_id is required for single create")
+    get_owned_resource(db, Account, request.account_id, user)
+    if request.device_id:
+        get_owned_resource(db, Device, request.device_id, user)
     try:
         params = _validate_and_normalize_params(request.type.value, request.params)
     except Exception as e:
@@ -190,7 +194,7 @@ async def create_task(
         "event": "task_updated",
         "task_id": task.id,
         "status": "pending",
-    })
+    }, user_ids=resource_user_ids(db, DBTask, task.id))
     return task
 
 
@@ -202,7 +206,19 @@ async def batch_create_tasks(
 ):
     if not request.group_ids and not request.account_ids:
         raise HTTPException(status_code=400, detail="需要提供 group_ids 或 account_ids")
-    user_id, _ = user
+    user_id, role = user
+    # Validate the entire selection before any generation or mutation.
+    for account_id in request.account_ids:
+        get_owned_resource(db, Account, account_id, user)
+    for group_id in request.group_ids:
+        get_owned_resource(db, AccountGroup, group_id, user)
+        group_accounts = db.query(Account).join(AccountGroupMember, AccountGroupMember.account_id == Account.id).filter(
+            AccountGroupMember.group_id == group_id
+        ).all()
+        for account in group_accounts:
+            require_resource_owner(account, user)
+    if request.device_id:
+        get_owned_resource(db, Device, request.device_id, user)
     ttype = request.type.value
 
     try:
@@ -210,7 +226,7 @@ async def batch_create_tasks(
     except Exception as e:
         raise HTTPException(status_code=422, detail=f"Invalid params for {ttype}: {str(e)}")
 
-    from app.db_models import Account, AccountGroupMember, Channel, ChannelItem as DBChannelItem
+    from app.db_models import Channel, ChannelItem as DBChannelItem
     from app.models import TaskType as TT
 
     params = await _maybe_resolve_content_template(params, ttype, db=db)
@@ -234,7 +250,6 @@ async def batch_create_tasks(
 
     # 校验 group_ids 存在性（避免 FK 约束异常）
     if request.group_ids:
-        from app.db_models import AccountGroup
         existing_groups = db.query(AccountGroup.id).filter(
             AccountGroup.id.in_(request.group_ids)
         ).all()
@@ -279,24 +294,26 @@ async def batch_create_tasks(
         channel_group_id = request.group_ids[0] if request.group_ids else None
         if not channel_group_id:
             # 从 account_ids 中查所属分组
-            member_group = db.query(AccountGroupMember.group_id).filter(
-                AccountGroupMember.account_id.in_(request.account_ids)
-            ).first()
+            member_group_query = db.query(AccountGroupMember.group_id).join(
+                AccountGroup, AccountGroup.id == AccountGroupMember.group_id
+            ).filter(AccountGroupMember.account_id.in_(request.account_ids))
+            if role != "admin":
+                member_group_query = member_group_query.filter(AccountGroup.user_id == user_id)
+            member_group = member_group_query.first()
             if member_group:
                 channel_group_id = member_group[0]
             else:
                 # 账号不在任何分组中，自动创建分组
-                from app.db_models import AccountGroup
-                from datetime import datetime as dt
                 display = all_accounts[0].nickname or all_accounts[0].douyin_id or all_accounts[0].id[:8]
                 # name 字段 String(100)，截断 display 确保不超长
-                ts = dt.now().strftime('%m%d%H%M%S')
+                ts = bj_now().strftime('%m%d%H%M%S')
                 max_display = 100 - len(f"自动分组--{ts}") - 1  # 预留截断空间
                 if len(display) > max_display:
                     display = display[:max_display]
                 ag = AccountGroup(
                     name=f"自动分组-{display}-{ts}",
                     description="系统自动创建（单账号批量任务）",
+                    user_id=user_id,
                 )
                 db.add(ag)
                 db.flush()
@@ -351,7 +368,6 @@ async def batch_create_tasks(
     db.commit()
 
     if created_tasks:
-        from app.db_models import Device
         from app.ws_manager import pair_ws_manager
         if any(t.get("id") for t in created_tasks):
             unbound_accounts = [
@@ -363,7 +379,7 @@ async def batch_create_tasks(
         else:
             await pair_ws_manager.broadcast_to_devices({"event": "new_task_available"})
         # 通知前端更新任务列表
-        await pair_ws_manager.broadcast_to_admins({"event": "tasks_changed"})
+        await pair_ws_manager.broadcast_to_admins({"event": "tasks_changed"}, user_ids=[user_id] if user_id else [])
 
     return {"created": len(created_tasks), "mode": "channel" if keywords else "direct"}
 
@@ -400,9 +416,15 @@ async def batch_delete_tasks(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
+    # Authorize every existing row first so mixed batches cannot partially mutate.
+    owners = set()
+    for task in db.query(DBTask).filter(DBTask.id.in_(body.task_ids)).all():
+        require_resource_owner(task, user, "Task not found")
+        if task.user_id:
+            owners.add(task.user_id)
     count = task_service.delete_tasks_batch(db, body.task_ids)
     from app.ws_manager import pair_ws_manager
-    await pair_ws_manager.broadcast_to_admins({"event": "tasks_changed"})
+    await pair_ws_manager.broadcast_to_admins({"event": "tasks_changed"}, user_ids=list(owners))
     return {"deleted": count}
 
 
@@ -412,6 +434,7 @@ def get_task(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
+    get_owned_resource(db, DBTask, task_id, user)
     task = task_service.get_task(db=db, task_id=task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -424,6 +447,8 @@ async def cancel_task(
     db: Session = Depends(get_db),
     user = Depends(verify_admin_token),
 ):
+    owned_task = get_owned_resource(db, DBTask, task_id, user)
+    owner_ids = [owned_task.user_id] if owned_task.user_id else []
     try:
         task = task_service.cancel_task(db=db, task_id=task_id)
     except ValueError as e:
@@ -446,13 +471,15 @@ async def cancel_task(
         "event": "task_updated",
         "task_id": task.id,
         "status": "cancelled",
-    })
+    }, user_ids=owner_ids)
 
     return task
 
 
 @router.delete("/{task_id}")
-async def delete_task(task_id: str, db=Depends(get_db), _=Depends(verify_admin_token)):
+async def delete_task(task_id: str, db=Depends(get_db), user=Depends(verify_admin_token)):
+    task = get_owned_resource(db, DBTask, task_id, user)
+    owner_ids = [task.user_id] if task.user_id else []
     try:
         task_service.delete_task(db=db, task_id=task_id)
     except ValueError as e:
@@ -460,5 +487,5 @@ async def delete_task(task_id: str, db=Depends(get_db), _=Depends(verify_admin_t
         raise HTTPException(status_code=400, detail=str(e))
     # 通知前端
     from app.ws_manager import pair_ws_manager
-    await pair_ws_manager.broadcast_to_admins({"event": "tasks_changed"})
+    await pair_ws_manager.broadcast_to_admins({"event": "tasks_changed"}, user_ids=owner_ids)
     return {"deleted": True, "task_id": task_id}

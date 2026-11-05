@@ -1,12 +1,12 @@
 """Task scheduling service — backed by SQLAlchemy database."""
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from app.config import bj_now
 from typing import Optional
 
 from sqlalchemy.orm import Session
 from sqlalchemy import update, or_, and_, null, String, select
 
-from app.db_models import Task as DBTask, Device as DBDevice
+from app.db_models import Task as DBTask, Device as DBDevice, Account
 from app.models import TaskType, TaskStatus, Task as PydanticTask
 from app.services.stats_service import stats_service
 
@@ -36,6 +36,81 @@ def _db_task_to_pydantic(task: DBTask, params_override: Optional[dict] = None) -
 
 class TaskService:
     """Task scheduling service — DB-backed."""
+
+    def _retry_attempt(self, db: Session, task: DBTask, result=None, now=None,
+                       keep_cancel_delivery=False):
+        """Spend one persisted retry budget, preserving a single dispatch path."""
+        from app.db_models import ChannelItem
+        from app.services.channel_service import channel_service
+        now = now or bj_now()
+        item = db.query(ChannelItem).filter(
+            ChannelItem.task_id == task.id, ChannelItem.status == "assigned"
+        ).first()
+        task.retry_count = max(task.retry_count or 0, item.retry_count if item else 0) + 1
+        task.result = result
+        task.completed_at = now
+        if item:
+            item.retry_count = task.retry_count
+            task.status = "failed" if task.retry_count >= MAX_RETRIES else "cancelled"
+            if not keep_cancel_delivery:
+                task.device_id = None
+                task.lease_id = None
+            item.assigned_device_id = None
+            item.assigned_at = None
+            item.task_id = None
+            if task.retry_count >= MAX_RETRIES:
+                channel_service.complete_item(db, item.id, "failed")
+            else:
+                item.status = "pending"
+                item.completed_at = None
+                channel_service._reactivate_channel(db, item.channel_id)
+        elif task.retry_count >= MAX_RETRIES:
+            task.status = "failed"
+            task.device_id = None
+            task.lease_id = None
+        else:
+            task.status = "pending"
+            task.device_id = None
+            task.started_at = None
+            task.completed_at = None
+            task.lease_id = None
+        db.flush()
+
+    def recover_stale_tasks(self, db: Session, now=None):
+        """Recover expired attempts for checker and both dispatch paths.
+
+        Device heartbeats measure liveness, not task progress. A legitimate long
+        task keeps its duration allowance even when its device loses contact.
+        """
+        from datetime import timedelta
+        from app.services.task_deadline import task_expired
+        now = now or bj_now()
+        tasks = db.query(DBTask).filter(
+            DBTask.status == "running", DBTask.started_at.isnot(None)
+        ).all()
+        recovered = []
+        for task in tasks:
+            if not task_expired(task, now):
+                continue
+            device = db.get(DBDevice, task.device_id) if task.device_id else None
+            online = bool(device and device.last_seen_at and
+                          device.last_seen_at >= now - timedelta(minutes=2))
+            # Conditional UPDATE owns recovery; concurrent poll/checker workers
+            # must not spend the same attempt twice.
+            claimed = db.execute(update(DBTask).where(
+                DBTask.id == task.id, DBTask.status == "running",
+                DBTask.lease_id == task.lease_id,
+            ).values(status="queued"))
+            if not claimed.rowcount:
+                continue
+            self._retry_attempt(db, task, now=now, keep_cancel_delivery=online)
+            if task.chain_instance_id and task.status == TaskStatus.FAILED.value:
+                from app.services.chain_service import chain_service
+                chain_service.advance_chain(db, task.id, task.status, task.result)
+            recovered.append(task.id)
+        if recovered:
+            db.commit()
+        return recovered
 
     def create_task(
         self,
@@ -75,6 +150,8 @@ class TaskService:
         - Bound device (device.bound_account_id set) -> only tasks for that account
         - Unbound device -> only tasks with no device_id AND whose account is not bound to any device
         """
+        self.recover_stale_tasks(db)
+
         # --- Channel claim (priority path) ---
         from app.services.channel_service import channel_service
         channel_result = channel_service.claim_channel_item(db, device_id)
@@ -106,84 +183,10 @@ class TaskService:
                 and_(DBTask.device_id.is_(None), ~DBTask.account_id.in_(bound_account_ids)),
             )
 
-        # 3. Recover stuck RUNNING tasks (device crashed while executing)
-        # Only reclaim tasks from devices that haven't sent a heartbeat recently.
-        from datetime import timedelta
-        import os
-        stale_minutes = int(os.getenv("TASK_STALE_MINUTES", "10"))
-        stale_threshold = bj_now() - timedelta(minutes=stale_minutes)
-
-        # Find devices that were recently seen (still online)
-        online_device_ids = select(DBDevice.id).where(
-            DBDevice.last_seen_at.isnot(None),
-            DBDevice.last_seen_at >= stale_threshold,
-        )
-
-        stale_running = db.query(DBTask).filter(
-            DBTask.status == TaskStatus.RUNNING.value,
-            DBTask.started_at.isnot(None),
-            DBTask.started_at < stale_threshold,
-            ~DBTask.device_id.in_(online_device_ids),  # skip tasks on online devices
-        ).all()
-        # Query ChannelItems FIRST to distinguish channel-backed tasks from direct tasks.
-        # Channel-backed tasks MUST be cancelled (not reset to PENDING) — otherwise
-        # the old task enters the direct queue AND the ChannelItem generates a new
-        # task, creating two execution paths for the same keyword/account.
-        from app.db_models import ChannelItem
-        from app.services.channel_service import channel_service as ch_svc
-        stale_ids = [t.id for t in stale_running]
-        stale_ch_items = db.query(ChannelItem).filter(ChannelItem.task_id.in_(stale_ids)).all()
-        channel_backed_ids = {sci.task_id for sci in stale_ch_items}
-
-        for stale in stale_running:
-            stale.retry_count += 1
-            if stale.retry_count >= MAX_RETRIES:
-                stale.status = TaskStatus.FAILED.value
-                stale.completed_at = bj_now()
-                stale.device_id = None
-                stale.lease_id = None
-            elif stale.id in channel_backed_ids:
-                # Channel-backed: cancel old task, let ChannelItem re-generate a fresh one.
-                # Consistent with channel_service.claim_channel_item() stale recovery.
-                stale.status = TaskStatus.CANCELLED.value
-                stale.completed_at = bj_now()
-                stale.device_id = None
-                stale.lease_id = None
-            else:
-                # Direct task (no ChannelItem): reset to PENDING for re-dispatch.
-                stale.status = TaskStatus.PENDING.value
-                stale.device_id = None
-                stale.started_at = None
-                stale.lease_id = None
-
-        if stale_running:
-            db.flush()
-            # Reset channel items based on the task's new status:
-            # - FAILED (max retries) → channel item → "failed" (terminal)
-            # - CANCELLED (retry)    → channel item → "pending" (re-dispatch)
-            _task_status = {t.id: t.status for t in stale_running}
-            stale_ch_ids = set()
-            for sci in stale_ch_items:
-                new_status = _task_status.get(sci.task_id)
-                if new_status == TaskStatus.FAILED.value:
-                    sci.status = "failed"
-                    sci.assigned_device_id = None
-                    sci.assigned_at = None
-                    sci.task_id = None
-                elif new_status == TaskStatus.CANCELLED.value:
-                    sci.status = "pending"
-                    sci.assigned_device_id = None
-                    sci.assigned_at = None
-                    sci.task_id = None
-                    stale_ch_ids.add(sci.channel_id)
-            if stale_ch_items:
-                db.flush()
-                for cid in stale_ch_ids:
-                    ch_svc._reactivate_channel(db, cid)
-
         # 4. Find candidate tasks with routing, user scope, and scheduled_at applied
         now = bj_now()
-        candidate_query = db.query(DBTask).filter(
+        candidate_query = db.query(DBTask).join(Account, Account.id == DBTask.account_id).filter(
+            Account.status == "active",
             DBTask.status == TaskStatus.PENDING.value,
             route_filter,
             or_(DBTask.scheduled_at.is_(None), DBTask.scheduled_at <= now),
@@ -192,7 +195,7 @@ class TaskService:
             candidate_query = candidate_query.filter(
                 or_(DBTask.user_id == device_user_id, DBTask.user_id.is_(None))
             )
-        candidates = candidate_query.order_by(DBTask.created_at.asc()).limit(10).all()
+        candidates = candidate_query.order_by(DBTask.created_at.asc(), DBTask.id.asc()).all()
 
         if not candidates:
             return None
@@ -200,7 +203,9 @@ class TaskService:
         # 5. Filter by daily quota and claim via atomic optimistic locking
         # Subquery: accounts that already have a RUNNING task
         busy_account_ids = db.query(DBTask.account_id).filter(
-            DBTask.status == TaskStatus.RUNNING.value,
+            or_(DBTask.status == TaskStatus.RUNNING.value,
+                and_(DBTask.status == TaskStatus.CANCELLED.value, DBTask.device_id.isnot(None),
+                     DBTask.completed_at >= bj_now() - timedelta(minutes=5))),
         ).distinct().scalar_subquery()
 
         for db_task in candidates:
@@ -215,6 +220,7 @@ class TaskService:
                 .where(
                     DBTask.id == db_task.id,
                     DBTask.status == TaskStatus.PENDING.value,
+                    DBTask.account_id.in_(select(Account.id).where(Account.status == "active")),
                     ~DBTask.account_id.in_(busy_account_ids),
                 )
                 .values(status=TaskStatus.RUNNING.value, device_id=device_id, started_at=bj_now(), lease_id=_lease_id)
@@ -264,6 +270,9 @@ class TaskService:
             _logger = logging.getLogger("task_service")
             _logger.info("Device ack'ed cancellation for task %s — device_id cleared, channel item reset",
                          task_id)
+            db_task.lease_id = None
+            db.commit()
+            db.refresh(db_task)
             return _db_task_to_pydantic(db_task), None
 
         # Task already in terminal state — ignore late reports
@@ -294,38 +303,7 @@ class TaskService:
                 channel_item.task_id = None
                 channel_service._reactivate_channel(db, channel_item.channel_id)
         elif status == TaskStatus.FAILED:
-            db_task.retry_count += 1
-            if db_task.retry_count >= MAX_RETRIES:
-                db_task.status = TaskStatus.FAILED.value
-                db_task.result = result
-                db_task.completed_at = bj_now()
-            else:
-                if channel_item:
-                    # Channel-driven retry: increment item-level retry counter,
-                    # reset to pending so claim_channel_item re-dispatches with
-                    # proper routing/cooldown/quota. Old task cancelled to avoid
-                    # orphan direct-queue pickup (single recovery path, no fork).
-                    channel_item.retry_count += 1
-                    if channel_item.retry_count >= MAX_RETRIES:
-                        channel_item.status = "failed"
-                        channel_item.completed_at = bj_now()
-                        db_task.status = TaskStatus.FAILED.value
-                        db_task.completed_at = bj_now()
-                    else:
-                        channel_item.status = "pending"
-                        channel_item.assigned_device_id = None
-                        channel_item.assigned_at = None
-                        channel_item.task_id = None
-                        db.flush()
-                        channel_service._reactivate_channel(db, channel_item.channel_id)
-                        db_task.status = TaskStatus.CANCELLED.value
-                        db_task.completed_at = bj_now()
-                else:
-                    # Non-channel task: standard direct retry
-                    db_task.status = TaskStatus.PENDING.value
-                    db_task.device_id = None
-                    db_task.started_at = None
-                    db_task.lease_id = None
+            self._retry_attempt(db, db_task, result=result)
 
         # Advance chain if this task is part of one
         if db_task.chain_instance_id and db_task.status in ("completed", "failed"):
@@ -423,7 +401,7 @@ class TaskService:
             raise ValueError("Cannot delete a running task. Cancel it first.")
 
         # Reset associated ChannelItem so the keyword can be re-dispatched
-        from app.db_models import ChannelItem, CollectedComment, CollectedUser, Conversation, GeneratedVideo
+        from app.db_models import ChannelItem, CollectedComment, CollectedUser, Conversation, GeneratedVideo, StatsEvent
         from app.services.channel_service import channel_service as ch_svc
         channel_item = db.query(ChannelItem).filter(ChannelItem.task_id == task_id).first()
         if channel_item:
@@ -440,6 +418,7 @@ class TaskService:
                 {"task_id": None}, synchronize_session=False
             )
 
+        db.query(StatsEvent).filter(StatsEvent.task_id == task_id).delete(synchronize_session=False)
         db.delete(task)
         db.commit()
         return True
@@ -477,6 +456,8 @@ class TaskService:
             db.query(model).filter(model.task_id.in_(deletable_ids)).update(
                 {"task_id": None}, synchronize_session=False
             )
+        from app.db_models import StatsEvent
+        db.query(StatsEvent).filter(StatsEvent.task_id.in_(deletable_ids)).delete(synchronize_session=False)
         result = db.query(DBTask).filter(
             DBTask.id.in_(deletable_ids),
         ).delete(synchronize_session=False)

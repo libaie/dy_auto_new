@@ -1128,40 +1128,10 @@ async def create_image_task(db: Session, payload: dict[str, Any]) -> ImageCreati
     if task.queue_job_id and not task.capacity_lease_id:
         return task
 
-    try:
-        result = await submit_image_create(db=db, model_config=model_config, **pixelle_payload)
-    except Exception as exc:
-        safe_message = _redact_provider_error(exc)
-        task.status = "failed"
-        task.capacity_lease_id = None
-        task.error_code = "PIXELLE_IMAGE_SUBMIT_FAILED"
-        task.error_message = safe_message
-        task.repair_action = "Open the task and retry with the suggested fallback model."
-        task.fallback_trace_json = _fallback_trace(
-            db,
-            strategy=strategy,
-            scene_key=scene_key,
-            capability_key=capability_key,
-            error_code="PIXELLE_IMAGE_SUBMIT_FAILED",
-            message=safe_message,
-        )
-        db.commit()
-        raise image_error(
-            502,
-            "PIXELLE_IMAGE_SUBMIT_FAILED",
-            "Pixelle image submission failed after the task snapshot was saved.",
-            "Open the task and retry with the suggested fallback model.",
-            retryable=True,
-            affected_ids=[task.id],
-        ) from exc
-
-    task.provider_response_json = result
-    task.pixelle_task_id = result.get("stage_task_id") or result.get("task_id") or result.get("id")
-    task.provider_task_id = task.pixelle_task_id
-    task.status = "running"
-    db.commit()
-    db.refresh(task)
-    return task
+    return await _submit_claimed_image_task(
+        db, task, task.capacity_lease_id, model_config, pixelle_payload, strategy, scene_key, capability_key,
+        error_code="PIXELLE_IMAGE_SUBMIT_FAILED",
+    )
 
 
 async def dispatch_queued_image_task(db: Session, task_id: str) -> ImageCreationTask:
@@ -1175,7 +1145,7 @@ async def dispatch_queued_image_task(db: Session, task_id: str) -> ImageCreation
             retryable=False,
             affected_ids=[task_id],
         )
-    if task.status != "queued" or task.pixelle_task_id:
+    if task.status != "queued" or task.pixelle_task_id or task.provider_task_id or task.capacity_lease_id:
         raise image_error(
             409,
             "IMAGE_TASK_NOT_DISPATCHABLE",
@@ -1231,52 +1201,96 @@ async def dispatch_queued_image_task(db: Session, task_id: str) -> ImageCreation
         db.refresh(task)
         return task
 
-    task.capacity_lease_id = str(uuid.uuid4())
-    task.queue_job_id = None
-    task.request_json = _request_json_with_trust_fields(
-        task.request_json or {},
-        capacity=capacity,
-        review_gate=review_gate,
-        estimated_cost=estimated_cost,
-    )
-    task.review_policy = review_gate.get("status")
+    claim_id = str(uuid.uuid4())
+    external_task_id = task.external_task_id or saved_payload.get("external_task_id") or task.id
+    saved_payload["external_task_id"] = external_task_id
+    updated = db.query(ImageCreationTask).filter(
+        ImageCreationTask.id == task.id,
+        ImageCreationTask.status == "queued",
+        ImageCreationTask.capacity_lease_id.is_(None),
+        ImageCreationTask.pixelle_task_id.is_(None),
+        ImageCreationTask.provider_task_id.is_(None),
+    ).update({
+        "capacity_lease_id": claim_id,
+        "queue_job_id": None,
+        "external_task_id": external_task_id,
+        "pixelle_payload_json": {**saved_payload, "model_config": redact_runtime_model_config(model_config)},
+        "request_json": _request_json_with_trust_fields(
+            task.request_json or {}, capacity=capacity, review_gate=review_gate, estimated_cost=estimated_cost,
+        ),
+        "review_policy": review_gate.get("status"),
+    }, synchronize_session=False)
+    if updated != 1:
+        db.rollback()
+        raise _image_submission_conflict(task_id)
+    # Commit the compare-and-set before awaiting the external provider.
     db.commit()
     db.refresh(task)
+    return await _submit_claimed_image_task(
+        db, task, claim_id, model_config, saved_payload, strategy, scene_key, capability_key,
+        error_code="PIXELLE_IMAGE_DISPATCH_FAILED",
+    )
 
-    try:
-        result = await submit_image_create(db=db, model_config=model_config, **saved_payload)
-    except Exception as exc:
-        safe_message = _redact_provider_error(exc)
-        task.status = "failed"
-        task.capacity_lease_id = None
-        task.error_code = "PIXELLE_IMAGE_DISPATCH_FAILED"
-        task.error_message = safe_message
-        task.repair_action = "Open the task and retry with the suggested fallback model."
-        task.fallback_trace_json = _fallback_trace(
-            db,
-            strategy=strategy,
-            scene_key=scene_key,
-            capability_key=capability_key,
-            error_code="PIXELLE_IMAGE_DISPATCH_FAILED",
-            message=safe_message,
-        )
-        db.commit()
-        raise image_error(
-            502,
-            "PIXELLE_IMAGE_DISPATCH_FAILED",
-            "Pixelle image dispatch failed after the capacity lease was acquired.",
-            "Open the task and retry with the suggested fallback model.",
-            retryable=True,
-            affected_ids=[task.id],
-        ) from exc
 
-    task.provider_response_json = result
-    task.pixelle_task_id = result.get("stage_task_id") or result.get("task_id") or result.get("id")
-    task.provider_task_id = task.pixelle_task_id
-    task.status = "running"
+def _image_submission_conflict(task_id: str):
+    return image_error(
+        409, "IMAGE_TASK_NOT_DISPATCHABLE",
+        "Image task submission is already claimed or its state has changed.",
+        "Reload the task and reconcile its existing submission before retrying.",
+        retryable=False, affected_ids=[task_id],
+    )
+
+
+def _write_image_submission_result(db, task_id, claim_id, values):
+    updated = db.query(ImageCreationTask).filter(
+        ImageCreationTask.id == task_id,
+        ImageCreationTask.status == "queued",
+        ImageCreationTask.capacity_lease_id == claim_id,
+        ImageCreationTask.pixelle_task_id.is_(None),
+        ImageCreationTask.provider_task_id.is_(None),
+    ).update(values, synchronize_session=False)
+    if updated != 1:
+        db.rollback()
+        raise _image_submission_conflict(task_id)
     db.commit()
+    task = db.query(ImageCreationTask).filter_by(id=task_id).one()
     db.refresh(task)
     return task
+
+
+async def _submit_claimed_image_task(
+    db, task, claim_id, model_config, payload, strategy, scene_key, capability_key, *, error_code,
+):
+    task_id = task.id
+    db.commit()
+    try:
+        result = await submit_image_create(db=db, model_config=model_config, **payload)
+        provider_id = result.get("stage_task_id") or result.get("task_id") or result.get("id")
+        if not provider_id:
+            raise ValueError("Provider submission returned no task id")
+    except Exception as exc:
+        db.rollback()
+        safe_message = _redact_provider_error(exc)
+        # A timeout may mean the provider accepted the request. Preserve its external
+        # identity and require reconciliation; failed tasks are not dispatchable.
+        repair_action = "Reconcile the provider submission using external_task_id before retrying."
+        fallback = _fallback_trace(
+            db, strategy=strategy, scene_key=scene_key, capability_key=capability_key,
+            error_code=error_code, message=safe_message,
+        )
+        _write_image_submission_result(db, task_id, claim_id, {
+            "status": "failed", "capacity_lease_id": None, "error_code": error_code,
+            "error_message": safe_message, "repair_action": repair_action,
+            "fallback_trace_json": fallback,
+        })
+        raise image_error(
+            502, error_code, "Pixelle image submission outcome requires reconciliation.",
+            repair_action, retryable=True, affected_ids=[task_id],
+        ) from exc
+    return _write_image_submission_result(db, task_id, claim_id, {
+        "provider_response_json": result, "pixelle_task_id": provider_id,
+        "provider_task_id": provider_id, "status": "running",
+    })
 
 
 def _task_context(task: ImageCreationTask) -> dict[str, Any]:

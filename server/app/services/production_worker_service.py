@@ -8,9 +8,18 @@ from sqlalchemy.orm import Session
 from app.config import PIXELLE_CONFIG_PATH, bj_now
 from app.db_models import ProductionJob, ProductionSegment, VideoProductionRun
 from app.services.production_action_result import ProductionActionResult
+from app.services.production_lease_service import (
+    ProductionLeaseLostError, guarded_worker_session, worker_write_scope,
+)
 from app.services.agency_repair_executor import execute_repair_job, is_agency_repair_stage
 from app.services.production_errors import ProductionErrorCode, ProductionRepairableError, to_http_detail
-from app.services.production_queue_service import claim_next_job, fail_job, mark_job_completed, retry_job_without_attempt
+from app.services.production_queue_service import (
+    claim_next_job,
+    fail_job,
+    mark_job_completed,
+    release_expired_leases,
+    retry_job_without_attempt,
+)
 from app.services.production_status import (
     JOB_BLOCKED,
     JOB_FAILED,
@@ -39,13 +48,26 @@ def _pixelle_output_root() -> Path:
     return Path(PIXELLE_CONFIG_PATH).resolve().parent / "output"
 
 
-async def execute_real_job(db: Session, run: VideoProductionRun, job: ProductionJob) -> ProductionActionResult:
+async def execute_real_job(
+    db: Session, run: VideoProductionRun, job: ProductionJob, *, worker_lease: tuple | None = None,
+) -> ProductionActionResult:
+    lease = worker_lease if worker_lease is not None else (job.lease_id, job.leased_until)
     if is_agency_repair_stage(job.stage):
-        return await execute_repair_job(db, job)
+        # Current repair handlers perform local DB work only; commit that phase
+        # under the original claim before terminal processing opens its own scope.
+        job_id = job.id
+        with worker_write_scope(db, job_id, lease) as write_db:
+            return await execute_repair_job(write_db, write_db.get(ProductionJob, job_id))
     job_spec = _job_spec(db, run, job)
-    gate_result = await _run_deferred_stage_gates(db, run, job, job_spec)
+    run_id, job_id = run.id, job.id
+    with guarded_worker_session(db, job_id, lease) as guarded:
+        gate_result = await _run_deferred_stage_gates(
+            guarded, guarded.get(VideoProductionRun, run_id), guarded.get(ProductionJob, job_id), job_spec,
+        )
     if gate_result is not None:
         return gate_result
+    if not _owns_lease(db, job.id, lease):
+        raise ValueError("Production job lease no longer belongs to this worker")
     model_config = resolve_runtime_model_config(db, job_spec["scene_key"])
     provider = str(model_config.get("provider") or "configured")
     model_name = str(model_config.get("model_name") or model_config.get("model") or job_spec["scene_key"])
@@ -69,10 +91,13 @@ async def execute_real_job(db: Session, run: VideoProductionRun, job: Production
         estimated_cost=_model_estimated_cost(model_config),
         payload=payload,
         capability=_worker_capability_from_model_config(model_config),
+        worker_lease=lease,
     )
     if result.status != "success":
         return result
-    if not _persist_completed_provider_result(db, run, job, result):
+    if not _owns_lease(db, job.id, lease):
+        raise ValueError("Production job lease no longer belongs to this worker")
+    if not _persist_completed_provider_result(db, run, job, result, lease=lease):
         return ProductionActionResult.blocked(
             ProductionErrorCode.PROVIDER_TASK_FAILED,
             "Provider completed with no assets.",
@@ -150,6 +175,8 @@ async def _run_deferred_stage_gates(
             db.commit()
             db.refresh(run)
             continue
+        # Complete each gate's trace writes before the next external review.
+        db.commit()
         if trace is None:
             return ProductionActionResult.blocked(
                 ProductionErrorCode.REVIEW_GATE_BLOCKED,
@@ -190,13 +217,14 @@ def run_real_worker_step(db: Session, run_id: str, *, lease_id: str, batch_size:
     if not run.production_plan_id:
         raise ValueError("Run has no linked production plan")
 
+    release_expired_leases(db, plan_id=run.production_plan_id)
     limit = max(1, min(int(batch_size or 1), MAX_WORKER_STEP_BATCH_SIZE))
     items: list[dict[str, Any]] = []
     for _ in range(limit):
         job = claim_next_job(db, lease_id=lease_id, plan_id=run.production_plan_id)
         if not job:
             break
-        items.append(_process_claimed_job(db, run, job))
+        items.append(_process_claimed_job(db, run, job, worker_lease=job._production_claim_lease))
 
     return {
         "ok": True,
@@ -241,31 +269,42 @@ def _model_estimated_cost(model_config: dict | None) -> float:
     return 0.0
 
 
-def _process_claimed_job(db: Session, run: VideoProductionRun, job: ProductionJob) -> dict:
+def _process_claimed_job(db: Session, run: VideoProductionRun, job: ProductionJob, *, worker_lease: tuple) -> dict:
+    # Authority comes from the successful claim UPDATE, never from refreshed ORM fields.
+    lease = worker_lease
     try:
-        _mark_segment_running_for_job(db, job)
-        result = _run_async(execute_real_job(db, run, job))
-        if _result_is_blocked(result):
-            item = _record_blocked_result(db, job, result)
-            _update_run_status_after_stage_job(db, run, job.stage)
+        with worker_write_scope(db, job.id, lease) as write_db:
+            _mark_segment_running_for_job(write_db, write_db.get(ProductionJob, job.id))
+        result = _run_async(execute_real_job(db, run, job, worker_lease=lease))
+        job_id, run_id = job.id, run.id
+        if not _result_is_blocked(result) and db.query(ProductionJob.status).filter_by(id=job_id).scalar() == "completed":
+            # Already-finished results remain readable, but grant no write authority.
+            db.refresh(job)
+            item = _success_item(result, job)
+            item["status"] = job.status
+            item["provider_task_id"] = job.provider_task_id
             return item
-        item = _success_item(result, job)
-        refreshed = db.query(ProductionJob).filter(ProductionJob.id == job.id).first()
-        if refreshed and refreshed.status in {"leased", "running"}:
-            refreshed = mark_job_completed(
-                db,
-                refreshed.id,
-                provider_task_id=_result_provider_task_id(result),
-                expected_lease_id=job.lease_id,
+        with worker_write_scope(db, job_id, lease) as write_db:
+            owned_job = write_db.get(ProductionJob, job_id)
+            if _result_is_blocked(result):
+                item, _ = _record_blocked_result(write_db, owned_job, result, lease)
+            else:
+                completed = mark_job_completed(
+                    write_db, job_id, provider_task_id=_result_provider_task_id(result),
+                    expected_lease_id=lease[0], expected_leased_until=lease[1],
+                )
+                item = _success_item(result, completed)
+                item["status"] = completed.status
+                item["provider_task_id"] = completed.provider_task_id
+            _update_run_status_after_stage_job(
+                write_db, _locked_run(write_db, run_id), owned_job.stage,
             )
-        if refreshed:
-            item["status"] = refreshed.status
-            item["provider_task_id"] = refreshed.provider_task_id
-            _update_run_status_after_stage_job(db, run, refreshed.stage)
+        # Refresh only after both transition and run aggregation are committed;
+        # refreshed replacement state never grants authority for further writes.
+        db.refresh(job)
         return item
     except ProductionRepairableError as exc:
-        failed = _fail_or_reload_job(db, job, exc.code.value, exc.message, exc.retryable)
-        _update_run_status_after_stage_job(db, run, job.stage)
+        failed, changed = _fail_or_reload_job(db, run, job, exc.code.value, exc.message, exc.retryable, lease=lease)
         detail = to_http_detail(exc)
         return {
             "ok": False,
@@ -279,24 +318,26 @@ def _process_claimed_job(db: Session, run: VideoProductionRun, job: ProductionJo
             "repair": detail,
         }
     except ValueError as exc:
-        failed = _fail_or_reload_job(
+        failed, changed = _fail_or_reload_job(
             db,
+            run,
             job,
             ProductionErrorCode.PROVIDER_SUBMIT_FAILED.value,
             str(exc),
             retryable=False,
+            lease=lease,
         )
-        _update_run_status_after_stage_job(db, run, job.stage)
         return _failed_job_item(failed, ProductionErrorCode.PROVIDER_SUBMIT_FAILED.value, str(exc), {"message": str(exc)})
     except Exception as exc:
-        failed = _fail_or_reload_job(
+        failed, changed = _fail_or_reload_job(
             db,
+            run,
             job,
             ProductionErrorCode.PROVIDER_SUBMIT_FAILED.value,
             "Unexpected worker job error.",
             retryable=True,
+            lease=lease,
         )
-        _update_run_status_after_stage_job(db, run, job.stage)
         return _failed_job_item(
             failed,
             ProductionErrorCode.PROVIDER_SUBMIT_FAILED.value,
@@ -340,7 +381,7 @@ def _result_is_blocked(result: Any) -> bool:
     return False
 
 
-def _record_blocked_result(db: Session, job: ProductionJob, result: Any) -> dict:
+def _record_blocked_result(db: Session, job: ProductionJob, result: Any, lease) -> tuple[dict, bool]:
     if isinstance(result, ProductionActionResult):
         detail = result.to_http_detail()
         code = detail.get("code") or ProductionErrorCode.PROVIDER_TASK_FAILED.value
@@ -358,9 +399,10 @@ def _record_blocked_result(db: Session, job: ProductionJob, result: Any) -> dict
             code,
             message,
             retry_after_seconds=60,
-            expected_lease_id=job.lease_id,
+            expected_lease_id=lease[0],
+            expected_leased_until=lease[1],
         )
-        return _failed_job_item(retried, code, message, detail)
+        return _failed_job_item(retried, code, message, detail), True
     if code == ProductionErrorCode.PROVIDER_THROTTLED.value:
         retried = retry_job_without_attempt(
             db,
@@ -368,25 +410,37 @@ def _record_blocked_result(db: Session, job: ProductionJob, result: Any) -> dict
             code,
             message,
             retry_after_seconds=60,
-            expected_lease_id=job.lease_id,
+            expected_lease_id=lease[0],
+            expected_leased_until=lease[1],
         )
-        return _failed_job_item(retried, code, message, detail)
+        return _failed_job_item(retried, code, message, detail), True
     if code == ProductionErrorCode.REVIEW_GATE_BLOCKED.value:
-        current = db.query(ProductionJob).filter(ProductionJob.id == job.id).first() or job
-        current.status = JOB_BLOCKED
-        current.blocked_reason = code
-        current.error_code = code
-        current.error_message = message
-        current.retryable = False
-        current.lease_id = None
-        current.leased_until = None
-        current.updated_at = bj_now()
-        _mark_segment_blocked_for_job(db, current)
+        now = bj_now()
+        updated = db.query(ProductionJob).filter(
+            ProductionJob.id == job.id,
+            ProductionJob.status.in_((JOB_LEASED, JOB_RUNNING)),
+            ProductionJob.lease_id == lease[0],
+            ProductionJob.leased_until == lease[1],
+            ProductionJob.leased_until > now,
+        ).update({
+            "status": JOB_BLOCKED, "blocked_reason": code, "error_code": code,
+            "error_message": message, "retryable": False, "lease_id": None,
+            "leased_until": None, "updated_at": now,
+        }, synchronize_session=False)
+        if updated != 1:
+            db.rollback()
+            raise ValueError("Production job lease no longer belongs to this worker")
+        _mark_segment_blocked_for_job(db, job)
         db.commit()
-        db.refresh(current)
-        return _failed_job_item(current, code, message, detail)
-    failed = _fail_or_reload_job(db, job, code, message, retryable)
-    return _failed_job_item(failed, code, message, detail)
+        db.refresh(job)
+        return _failed_job_item(job, code, message, detail), True
+    failed = fail_job(
+        db, job.id, code, message, retryable=retryable,
+        expected_lease_id=lease[0], expected_leased_until=lease[1],
+    )
+    if failed.status == JOB_FAILED:
+        _mark_segment_failed_for_job(db, failed)
+    return _failed_job_item(failed, code, message, detail), True
 
 
 def _failed_job_item(
@@ -408,23 +462,39 @@ def _failed_job_item(
     }
 
 
-def _fail_or_reload_job(db: Session, job: ProductionJob, code: str, message: str, retryable: bool) -> ProductionJob:
-    current = db.query(ProductionJob).filter(ProductionJob.id == job.id).first()
-    if current and current.status not in {"leased", "running"}:
-        return current
-    if code == ProductionErrorCode.PROVIDER_THROTTLED.value:
-        return retry_job_without_attempt(
-            db,
-            job.id,
-            code,
-            message,
-            retry_after_seconds=60,
-            expected_lease_id=job.lease_id,
-        )
-    failed = fail_job(db, job.id, code, message, retryable=retryable)
-    if failed.status == JOB_FAILED:
-        _mark_segment_failed_for_job(db, failed)
-    return failed
+def _owns_lease(db: Session, job_id: str, lease) -> bool:
+    return db.query(ProductionJob.id).filter(
+        ProductionJob.id == job_id,
+        ProductionJob.status.in_((JOB_LEASED, JOB_RUNNING)),
+        ProductionJob.lease_id == lease[0],
+        ProductionJob.leased_until == lease[1],
+        ProductionJob.leased_until > bj_now(),
+    ).first() is not None
+
+
+def _fail_or_reload_job(db: Session, run: VideoProductionRun, job: ProductionJob, code: str, message: str, retryable: bool, *, lease) -> tuple[ProductionJob, bool]:
+    job_id, run_id, stage = job.id, run.id, job.stage
+    changed = False
+    try:
+        with worker_write_scope(db, job_id, lease) as write_db:
+            if code == ProductionErrorCode.PROVIDER_THROTTLED.value:
+                retry_job_without_attempt(
+                    write_db, job_id, code, message, retry_after_seconds=60,
+                    expected_lease_id=lease[0], expected_leased_until=lease[1],
+                )
+            else:
+                failed = fail_job(
+                    write_db, job_id, code, message, retryable=retryable,
+                    expected_lease_id=lease[0], expected_leased_until=lease[1],
+                )
+                if failed.status == JOB_FAILED:
+                    _mark_segment_failed_for_job(write_db, failed)
+            _update_run_status_after_stage_job(write_db, _locked_run(write_db, run_id), stage)
+        changed = True
+    except ValueError:
+        db.rollback()
+    db.refresh(job)
+    return job, changed
 
 
 def _segment_for_job(db: Session, job: ProductionJob) -> ProductionSegment | None:
@@ -610,7 +680,15 @@ def _persist_completed_provider_result(
     run: VideoProductionRun,
     job: ProductionJob,
     result: ProductionActionResult,
+    *,
+    lease=None,
 ) -> bool:
+    if lease is not None:
+        run_id, job_id = run.id, job.id
+        with guarded_worker_session(db, job_id, lease) as guarded:
+            return _persist_completed_provider_result(
+                guarded, guarded.get(VideoProductionRun, run_id), guarded.get(ProductionJob, job_id), result,
+            )
     from app.services import video_production_service as video_service
     from app.services.asset_storage_guard import persist_provider_asset
 
@@ -628,11 +706,11 @@ def _persist_completed_provider_result(
     if job.stage == "image_generation":
         saved = video_service.mark_image_stage_assets(db, run, assets, pixelle_task_id=provider_task_id)
         persisted = _persist_registered_assets(db, saved, persist_provider_asset)
-        run_ai_audit_for_assets(db, run, persisted)
+        _audit_worker_assets(db, run, persisted)
     elif job.stage == "video_generation":
         saved = video_service.mark_video_stage_assets(db, run, assets, pixelle_task_id=provider_task_id)
         persisted = _persist_registered_assets(db, saved, persist_provider_asset)
-        run_ai_audit_for_assets(db, run, persisted)
+        _audit_worker_assets(db, run, persisted)
     elif job.stage in COMPOSE_STAGES:
         run.pixelle_stage_task_id = provider_task_id
         db.commit()
@@ -641,6 +719,18 @@ def _persist_completed_provider_result(
         if persisted:
             video_service.run_final_audit_for_asset(db, run, persisted[0])
     return True
+
+
+
+def _audit_worker_assets(db: Session, run: VideoProductionRun, assets: list) -> None:
+    if db.info.get("production_worker_claim"):
+        # Each asset's audit may call an external service. Finish its write phase
+        # before entering the next audit so no write fence spans network I/O.
+        for asset in assets:
+            run_ai_audit_for_assets(db, run, [asset])
+            db.commit()
+    else:
+        run_ai_audit_for_assets(db, run, assets)
 
 
 def _asset_ready_for_review(asset) -> bool:
@@ -701,7 +791,20 @@ def _blocked_stage_jobs(db: Session, plan_id: str, stage: str) -> int:
     ).count()
 
 
+def _locked_run(db: Session, run_id: str) -> VideoProductionRun:
+    return db.query(VideoProductionRun).filter_by(id=run_id).populate_existing().with_for_update().one()
+
+
 def _update_run_status_after_stage_job(db: Session, run: VideoProductionRun, stage: str) -> None:
+    if run.status == "completed":
+        return
+    stage_order = {
+        "image_generation": 1, "image_stage": 1, "image_review": 1,
+        "video_generation": 2, "video_rendering": 2, "video_stage": 2, "video_review": 2,
+        "composition": 3, "episode_compose": 3, "final_review": 3,
+    }
+    if stage_order.get(run.current_stage, 0) > stage_order.get(stage, 0):
+        return
     if not run.production_plan_id:
         return
     if stage == "image_generation" and run.status == "image_approved":

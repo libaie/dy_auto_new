@@ -7,7 +7,8 @@ import asyncio
 
 from app.database import get_db
 from app.db_models import Device, DevicePairRequest
-from app.deps import verify_admin_token, verify_ws_admin_token, require_role
+from app.deps import verify_admin_token, verify_ws_admin_token, require_role, get_owned_resource, require_resource_owner
+from sqlalchemy import or_
 from app.ws_manager import pair_ws_manager
 
 router = APIRouter(prefix="/api/devices", tags=["devices"])
@@ -20,8 +21,8 @@ async def ws_pair_events(websocket: WebSocket, token: str = Query(...)):
     if not result or not result[0]:
         await websocket.close(code=4001, reason="Unauthorized")
         return
-    user_id, _ = result
-    await pair_ws_manager.register_admin(websocket, user_id)
+    user_id, role = result
+    await pair_ws_manager.register_admin(websocket, user_id, role=role)
     try:
         while True:
             await websocket.receive_text()
@@ -93,7 +94,7 @@ async def create_device(
     db.add(dev)
     db.commit()
     db.refresh(dev)
-    await pair_ws_manager.broadcast_to_admins({"event": "devices_changed"})
+    await pair_ws_manager.broadcast_to_admins({"event": "devices_changed"}, user_ids=[dev.user_id] if dev.user_id else [])
     return _device_to_dict(dev)
 
 
@@ -129,6 +130,12 @@ def list_pair_requests(
 ):
     """List device pairing requests, filtered by status."""
     query = db.query(DevicePairRequest)
+    user_id, role = user
+    if role != "admin":
+        # New/unowned devices may be claimed; owned requests are private.
+        query = query.outerjoin(Device, Device.id == DevicePairRequest.device_id).filter(
+            or_(Device.id.is_(None), Device.user_id.is_(None), Device.user_id == "", Device.user_id == user_id)
+        )
     if status != "all":
         query = query.filter(DevicePairRequest.status == status)
     requests = query.order_by(DevicePairRequest.created_at.desc()).all()
@@ -157,6 +164,13 @@ def list_pair_requests(
     }
 
 
+def _pair_request_device(db: Session, pair_req: DevicePairRequest, user: tuple):
+    device = db.query(Device).filter(Device.id == pair_req.device_id).first()
+    if device and device.user_id:
+        require_resource_owner(device, user, "Pair request not found")
+    return device
+
+
 @router.post("/pair-requests/{request_id}/approve")
 async def approve_pair_request(
     request_id: str,
@@ -171,6 +185,7 @@ async def approve_pair_request(
     pair_req = db.query(DevicePairRequest).filter(DevicePairRequest.id == request_id).first()
     if not pair_req:
         raise HTTPException(status_code=404, detail="Pair request not found")
+    device = _pair_request_device(db, pair_req, user)
     if pair_req.status != "pending":
         raise HTTPException(status_code=400, detail=f"Request already {pair_req.status}")
 
@@ -178,7 +193,6 @@ async def approve_pair_request(
     device_secret = uuid.uuid4().hex
 
     # Create or update Device record
-    device = db.query(Device).filter(Device.id == pair_req.device_id).first()
     if device:
         if not device.user_id:
             device.user_id = user_id
@@ -240,7 +254,7 @@ async def approve_pair_request(
         "event": "pair_approved",
         "request_id": request_id,
         "device_id": pair_req.device_id,
-    })
+    }, user_ids=[device.user_id] if device and device.user_id else [])
 
     return {"status": "approved", "device_id": pair_req.device_id}
 
@@ -255,6 +269,7 @@ async def reject_pair_request(
     pair_req = db.query(DevicePairRequest).filter(DevicePairRequest.id == request_id).first()
     if not pair_req:
         raise HTTPException(status_code=404, detail="Pair request not found")
+    device = _pair_request_device(db, pair_req, user)
     if pair_req.status != "pending":
         raise HTTPException(status_code=400, detail=f"Request already {pair_req.status}")
 
@@ -271,7 +286,7 @@ async def reject_pair_request(
         "event": "pair_rejected",
         "request_id": request_id,
         "device_id": pair_req.device_id,
-    })
+    }, user_ids=[device.user_id] if device and device.user_id else [])
 
     return {"status": "rejected"}
 
@@ -319,8 +334,7 @@ async def update_device(
     if request.bound_account_id is not None:
         if request.bound_account_id:
             from app.db_models import Account
-            if not db.query(Account).filter(Account.id == request.bound_account_id).first():
-                raise HTTPException(status_code=404, detail="Account not found")
+            get_owned_resource(db, Account, request.bound_account_id, user)
         dev.bound_account_id = request.bound_account_id
     if request.proxy_config is not None:
         dev.proxy_config = request.proxy_config
@@ -336,7 +350,7 @@ async def update_device(
             "proxy": dev.proxy_config,
         })
 
-    await pair_ws_manager.broadcast_to_admins({"event": "devices_changed"})
+    await pair_ws_manager.broadcast_to_admins({"event": "devices_changed"}, user_ids=[dev.user_id] if dev.user_id else [])
     return _device_to_dict(dev)
 
 
@@ -371,7 +385,7 @@ async def disconnect_device(
         "event": "device_status_changed",
         "device_id": device_id,
         "status": "offline",
-    })
+    }, user_ids=[dev.user_id] if dev.user_id else [])
 
     return {"status": "disconnected", "device_id": device_id}
 
@@ -409,6 +423,7 @@ async def delete_device(
     db.query(DevicePairRequest).filter(DevicePairRequest.device_id == device_id).delete()
 
     # 5. 删除设备
+    owner_ids = [dev.user_id] if dev.user_id else []
     db.delete(dev)
     db.commit()
 
@@ -417,6 +432,6 @@ async def delete_device(
         "event": "device_status_changed",
         "device_id": device_id,
         "status": "deleted",
-    })
+    }, user_ids=owner_ids)
 
     return {"deleted": True, "id": device_id}

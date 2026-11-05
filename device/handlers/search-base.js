@@ -5,7 +5,8 @@ var antiDetect = require("../core/anti-detect");
 var logger = require("../utils/logger");
 var aiAnalyzer = require("../core/ai-analyzer");
 var flowContext = require("../core/flow-context");
-var taskExecutor = require("../core/task-executor");
+var taskCancellation = require("../core/task-cancellation");
+var taskTimeout = require("../core/task-timeout");
 
 var TAG = "搜索";
 
@@ -30,6 +31,7 @@ SearchBaseHandler.execute = function (params) {
   var videoCount = params.video_count || params.count || 5;
   var content = params.content || "";
   var sortBy = params.sort_by || "";
+  var deadlineAt = Date.now() + taskTimeout.getTaskTimeoutMs({ type: "search", params: params });
 
 
   aiAnalyzer.useTemplate(params.prompt_template_id);
@@ -87,11 +89,14 @@ SearchBaseHandler.execute = function (params) {
   // 6. 逐个视频处理（第一个点击，后续滑动切换）
   var stats = { success_count: 0, fail_count: 0, details: [] };
 
-  for (var i = 0; i < videoCount; i++) {
-    if (taskExecutor.isCancelled()) {
+  for (var i = 0; videoCount === -1 || i < videoCount; i++) {
+    if (taskCancellation.isCancelled()) {
       logger.info(TAG, "任务已取消，停止处理视频");
       stats.details.push("cancelled at video " + (i + 1) + "/" + videoCount);
       break;
+    }
+    if (Date.now() >= deadlineAt) {
+      return { success: false, error: "搜索已达到任务执行时限", result: stats };
     }
     logger.info(TAG, "处理第 " + (i + 1) + "/" + videoCount + " 个结果");
 
@@ -130,6 +135,10 @@ SearchBaseHandler.execute = function (params) {
       }
       uiOperator.swipeUp();
       sleep(2500);
+      if (!uiOperator.waitForElement("video_comment_btn", 5000)) {
+        logger.info(TAG, "没有可继续处理的视频，结束搜索");
+        break;
+      }
     }
 
     var interactResult = this._interactWithVideo(content, stats);

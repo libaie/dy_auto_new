@@ -1,6 +1,6 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import case, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -114,11 +114,13 @@ def claim_next_job(
             update_query = update_query.filter(ProductionJob.plan_id == plan_id)
         if stage:
             update_query = update_query.filter(ProductionJob.stage == stage)
+        # Persist the exact claim token at MySQL DATETIME's supported precision.
+        claim_lease = (lease_id, (now + timedelta(seconds=lease_seconds)).replace(microsecond=0))
         updated = update_query.update(
             {
                 "status": JOB_LEASED,
                 "lease_id": lease_id,
-                "leased_until": now + timedelta(seconds=lease_seconds),
+                "leased_until": claim_lease[1],
                 "updated_at": now,
             },
             synchronize_session=False,
@@ -129,15 +131,21 @@ def claim_next_job(
             continue
 
         db.refresh(job)
+        # ORM refresh may already see a replacement; it must not redefine ownership.
+        job._production_claim_lease = claim_lease
         return job
 
 
-def release_expired_leases(db: Session) -> int:
+def release_expired_leases(db: Session, *, plan_id: str | None = None) -> int:
     now = bj_now()
-    count = (
-        db.query(ProductionJob)
-        .filter(ProductionJob.status == JOB_LEASED, ProductionJob.leased_until < now)
-        .update({"status": JOB_QUEUED, "lease_id": None, "leased_until": None, "updated_at": now}, synchronize_session=False)
+    query = db.query(ProductionJob).filter(
+        ProductionJob.status.in_((JOB_LEASED, JOB_RUNNING)), ProductionJob.leased_until <= now,
+    )
+    if plan_id is not None:
+        query = query.filter(ProductionJob.plan_id == plan_id)
+    count = query.update(
+        {"status": JOB_QUEUED, "lease_id": None, "leased_until": None, "updated_at": now},
+        synchronize_session=False,
     )
     db.commit()
     return count
@@ -151,6 +159,7 @@ def mark_job_completed(
     payload: dict | None = None,
     allowed_statuses: tuple[str, ...] | list[str] | None = None,
     expected_lease_id: str | None = None,
+    expected_leased_until: datetime | None = None,
 ) -> ProductionJob:
     del payload
     default_allowed = (JOB_LEASED, JOB_RUNNING)
@@ -182,8 +191,7 @@ def mark_job_completed(
         .filter(ProductionJob.id == job_id)
         .filter(ProductionJob.status.in_(allowed))
     )
-    if expected_lease_id is not None:
-        update_query = update_query.filter(ProductionJob.lease_id == expected_lease_id)
+    update_query = _fence_lease(update_query, expected_lease_id, expected_leased_until, now)
     updated = update_query.update(values, synchronize_session=False)
     if updated == 1:
         db.commit()
@@ -197,11 +205,39 @@ def mark_job_completed(
     job = db.query(ProductionJob).filter(ProductionJob.id == job_id).first()
     if not job:
         raise ValueError("Production job not found")
-    if job.status == JOB_COMPLETED:
+    if job.status == JOB_COMPLETED and expected_lease_id is None:
         return job
     if job.status in (JOB_BLOCKED, JOB_FAILED, JOB_CANCELLED):
         raise ValueError("Production job cannot be completed from terminal or blocked status")
     raise ValueError("Production job cannot be completed from current status")
+
+
+def _fence_lease(query, expected_lease_id, expected_leased_until, now):
+    if expected_lease_id is not None:
+        query = query.filter(
+            ProductionJob.lease_id == expected_lease_id,
+            ProductionJob.status.in_((JOB_LEASED, JOB_RUNNING)),
+            ProductionJob.leased_until > now,
+        )
+    if expected_leased_until is not None:
+        query = query.filter(ProductionJob.leased_until == expected_leased_until)
+    return query
+
+
+def _write_job_transition(db, job_id, values, expected_lease_id, expected_leased_until):
+    query = db.query(ProductionJob).filter(
+        ProductionJob.id == job_id,
+        ProductionJob.status.in_((JOB_QUEUED, JOB_LEASED, JOB_RUNNING, JOB_RETRY_WAIT)),
+    )
+    query = _fence_lease(query, expected_lease_id, expected_leased_until, bj_now())
+    updated = query.update(values, synchronize_session=False)
+    if updated != 1:
+        db.rollback()
+        raise ValueError("Production job lease or status does not match")
+    db.commit()
+    job = db.query(ProductionJob).filter(ProductionJob.id == job_id).one()
+    db.refresh(job)
+    return job
 
 
 def fail_job(
@@ -211,28 +247,23 @@ def fail_job(
     error_message: str,
     retryable: bool,
     retry_after_seconds: int = 60,
+    *,
+    expected_lease_id: str | None = None,
+    expected_leased_until: datetime | None = None,
 ) -> ProductionJob:
-    job = db.query(ProductionJob).filter(ProductionJob.id == job_id).first()
-    if not job:
-        raise ValueError("Production job not found")
-
     now = bj_now()
-    job.attempt_count += 1
-    job.error_code = error_code
-    job.error_message = error_message
-    job.retryable = retryable
-    if retryable and job.attempt_count < job.max_attempts:
-        job.status = JOB_RETRY_WAIT
-        job.retry_after = now + timedelta(seconds=retry_after_seconds)
-    else:
-        job.status = JOB_FAILED
-        job.retry_after = None
-    job.lease_id = None
-    job.leased_until = None
-    job.updated_at = now
-    db.commit()
-    db.refresh(job)
-    return job
+    can_retry = (ProductionJob.attempt_count + 1 < ProductionJob.max_attempts) if retryable else False
+    return _write_job_transition(db, job_id, {
+        "attempt_count": ProductionJob.attempt_count + 1,
+        "error_code": error_code,
+        "error_message": error_message,
+        "retryable": retryable,
+        "status": case((can_retry, JOB_RETRY_WAIT), else_=JOB_FAILED),
+        "retry_after": case((can_retry, now + timedelta(seconds=retry_after_seconds)), else_=None),
+        "lease_id": None,
+        "leased_until": None,
+        "updated_at": now,
+    }, expected_lease_id, expected_leased_until)
 
 
 def retry_job_without_attempt(
@@ -243,25 +274,19 @@ def retry_job_without_attempt(
     *,
     retry_after_seconds: int = 60,
     expected_lease_id: str | None = None,
+    expected_leased_until: datetime | None = None,
 ) -> ProductionJob:
-    job = db.query(ProductionJob).filter(ProductionJob.id == job_id).first()
-    if not job:
-        raise ValueError("Production job not found")
-    if expected_lease_id is not None and job.lease_id != expected_lease_id:
-        raise ValueError("Production job lease does not match")
-
     now = bj_now()
-    job.status = JOB_RETRY_WAIT
-    job.error_code = error_code
-    job.error_message = error_message
-    job.retryable = True
-    job.retry_after = now + timedelta(seconds=retry_after_seconds)
-    job.lease_id = None
-    job.leased_until = None
-    job.updated_at = now
-    db.commit()
-    db.refresh(job)
-    return job
+    return _write_job_transition(db, job_id, {
+        "status": JOB_RETRY_WAIT,
+        "error_code": error_code,
+        "error_message": error_message,
+        "retryable": True,
+        "retry_after": now + timedelta(seconds=retry_after_seconds),
+        "lease_id": None,
+        "leased_until": None,
+        "updated_at": now,
+    }, expected_lease_id, expected_leased_until)
 
 
 def pause_plan_jobs(db: Session, plan_id: str, reason: str) -> int:

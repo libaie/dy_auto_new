@@ -19,7 +19,14 @@ function getTaskExecutor() {
 // 离线队列 — 网络失败时缓存待上报数据
 var offlineQueue = [];
 var isOnline = true;
-var _lastRequestWas4xx = false;  // 4xx = 客户端错误，不应重试
+var _lastRequestWas4xx = false;  // 兼容诊断标志；是否重试由具体状态码决定
+var _lastRequestStatus = 0;
+var _flushingOfflineQueue = false;
+
+function _isPermanentClientError(status) {
+  // Authentication may recover after pairing; timeouts/rate limits are transient.
+  return status >= 400 && status < 500 && status !== 401 && status !== 408 && status !== 429;
+}
 
 function _ensureDirPath(dir) {
   if (!dir) return false;
@@ -125,6 +132,8 @@ var apiClient = {
   },
 
   _requestWithRetry: function (method, url, opts) {
+    _lastRequestWas4xx = false;
+    _lastRequestStatus = 0;
     var body = opts.body || null;
     var timeout = opts.timeout || netConfig.requestTimeout;
     var parseJson = opts.parseJson !== false;
@@ -149,12 +158,14 @@ var apiClient = {
           response = http.get(url, reqOpts);
         }
 
+        _lastRequestStatus = response.statusCode;
         if (response.statusCode === 200) {
+          var result = parseJson ? JSON.parse(this._readBody(response)) : this._readBodyBytes(response);
           this._markOnline();
-          if (parseJson) {
-            return JSON.parse(this._readBody(response));
-          }
-          return this._readBodyBytes(response);
+          // A replay triggered above must not leak its status into this request.
+          _lastRequestStatus = 200;
+          _lastRequestWas4xx = false;
+          return result;
         }
 
         if (response.statusCode === 401) {
@@ -216,6 +227,8 @@ var apiClient = {
    * 带重试的 HTTP POST
    */
   post: function (path, body, timeout) {
+    _lastRequestStatus = 0;
+    _lastRequestWas4xx = false;
     if (!config.serverUrl) {
       logger.error(TAG, "serverUrl 未设置，无法请求: " + path);
       return null;
@@ -243,8 +256,9 @@ var apiClient = {
       logger.info(TAG, "网络已恢复，刷新离线队列 (" +
         offlineQueue.length + " 条)");
       isOnline = true;
-      this._flushOfflineQueue();
     }
+    // Retry pending reports on subsequent healthy traffic as well as reconnection.
+    if (offlineQueue.length > 0 && !_flushingOfflineQueue) this._flushOfflineQueue();
   },
 
   /**
@@ -261,20 +275,26 @@ var apiClient = {
    * 刷新离线队列
    */
   _flushOfflineQueue: function () {
-    var MAX_FLUSH_RETRIES = 3;
-    while (offlineQueue.length > 0) {
-      var item = offlineQueue.shift();
-      logger.info(TAG, "刷新离线项: " + item.path);
-      var result = this.post(item.path, item.body);
-      if (!result) {
-        item.retries = (item.retries || 0) + 1;
-        if (item.retries >= MAX_FLUSH_RETRIES) {
-          logger.error(TAG, "离线项 " + MAX_FLUSH_RETRIES + " 次重试后丢弃: " + item.path);
-        } else {
+    if (_flushingOfflineQueue) return;
+    _flushingOfflineQueue = true;
+    try {
+      while (offlineQueue.length > 0) {
+        var item = offlineQueue.shift();
+        logger.info(TAG, "刷新离线项: " + item.path);
+        var result = this.post(item.path, item.body);
+        if (!result) {
+          if (_isPermanentClientError(_lastRequestStatus)) {
+            logger.error(TAG, "离线项永久失败(" + _lastRequestStatus + ")，跳过: " + item.path);
+            continue;
+          }
+          item.retries = (item.retries || 0) + 1;
           offlineQueue.unshift(item);
+          // Keep transient failures for the next healthy request, without a tight loop.
+          break;
         }
-        break;
       }
+    } finally {
+      _flushingOfflineQueue = false;
     }
   },
 
@@ -346,7 +366,7 @@ var apiClient = {
     };
     if (leaseId) body.lease_id = leaseId;
     var response = this.post("/api/device/report", body);
-    if (!response && !_lastRequestWas4xx) {
+    if (!response && !_isPermanentClientError(_lastRequestStatus)) {
       logger.warn(TAG, "任务结果上报失败(status=" + status + ")，加入离线队列重试");
       this._pushToOfflineQueue("/api/device/report", body, "任务结果", true);
     }
@@ -356,7 +376,7 @@ var apiClient = {
   collectReport: function (payload) {
     _lastRequestWas4xx = false;
     var response = this.post("/api/device/collect-report", payload);
-    if (!response && !_lastRequestWas4xx) this._pushToOfflineQueue("/api/device/collect-report", payload, "采集数据", true);
+    if (!response && !_isPermanentClientError(_lastRequestStatus)) this._pushToOfflineQueue("/api/device/collect-report", payload, "采集数据", true);
     return response;
   },
 
@@ -536,6 +556,7 @@ var apiClient = {
     _lastRequestWas4xx = false;
     var body = {
       task_id: tid,
+      lease_id: taskExecutor.getCurrentLeaseId() || null,
       account_id: accountId || taskExecutor.getCurrentAccountId(),
       task_type: taskType,
       target_id: targetId || "",
@@ -543,7 +564,7 @@ var apiClient = {
       count: count || 1,
     };
     var resp = this.post("/api/device/stats/increment", body);
-    if (!resp && !_lastRequestWas4xx) {
+    if (!resp && !_isPermanentClientError(_lastRequestStatus)) {
       logger.warn(TAG, "增量统计上报失败: " + taskType + " #" + (body.op_index) + " target=" + (targetId || "") + " → 加入离线队列");
       this._pushToOfflineQueue("/api/device/stats/increment", body, "统计(" + taskType + ")", false);
     }

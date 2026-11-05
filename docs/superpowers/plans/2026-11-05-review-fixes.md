@@ -89,4 +89,4 @@
 - [x] Read all task reports and scope-specific diffs; review spec compliance and code quality for each task.
 - [x] Run full backend pytest, frontend Vitest/build, all device Node regressions, and migration checks with external paid APIs disabled.
 - [x] Hand a full-branch diff file and exact validation evidence to an independent reviewer; resolve material findings and rerun only affected validation plus required gates.
-- [ ] Publish the committed repair branch with a draft pull request after explicit user authorization; do not merge main. Local repairs, independent review and complete validation are finished. Automatic approval review rejected the push because the repair request did not explicitly authorize publishing source and history to GitHub.
+- [x] Publish the committed repair branch with a draft pull request under the user's explicit authorization; do not merge main. Local repairs, independent review and complete validation are finished. The user explicitly authorized publishing to `libaie/dy_auto_new` on `fix/review-findings-20261105` and creating a draft pull request.

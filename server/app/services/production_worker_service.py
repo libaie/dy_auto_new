@@ -10,7 +10,13 @@ from app.db_models import ProductionJob, ProductionSegment, VideoProductionRun
 from app.services.production_action_result import ProductionActionResult
 from app.services.agency_repair_executor import execute_repair_job, is_agency_repair_stage
 from app.services.production_errors import ProductionErrorCode, ProductionRepairableError, to_http_detail
-from app.services.production_queue_service import claim_next_job, fail_job, mark_job_completed, retry_job_without_attempt
+from app.services.production_queue_service import (
+    claim_next_job,
+    fail_job,
+    mark_job_completed,
+    release_expired_leases,
+    retry_job_without_attempt,
+)
 from app.services.production_status import (
     JOB_BLOCKED,
     JOB_FAILED,
@@ -42,10 +48,13 @@ def _pixelle_output_root() -> Path:
 async def execute_real_job(db: Session, run: VideoProductionRun, job: ProductionJob) -> ProductionActionResult:
     if is_agency_repair_stage(job.stage):
         return await execute_repair_job(db, job)
+    lease = (job.lease_id, job.leased_until)
     job_spec = _job_spec(db, run, job)
     gate_result = await _run_deferred_stage_gates(db, run, job, job_spec)
     if gate_result is not None:
         return gate_result
+    if not _owns_lease(db, job.id, lease):
+        raise ValueError("Production job lease no longer belongs to this worker")
     model_config = resolve_runtime_model_config(db, job_spec["scene_key"])
     provider = str(model_config.get("provider") or "configured")
     model_name = str(model_config.get("model_name") or model_config.get("model") or job_spec["scene_key"])
@@ -72,6 +81,8 @@ async def execute_real_job(db: Session, run: VideoProductionRun, job: Production
     )
     if result.status != "success":
         return result
+    if not _owns_lease(db, job.id, lease):
+        raise ValueError("Production job lease no longer belongs to this worker")
     if not _persist_completed_provider_result(db, run, job, result):
         return ProductionActionResult.blocked(
             ProductionErrorCode.PROVIDER_TASK_FAILED,
@@ -190,6 +201,7 @@ def run_real_worker_step(db: Session, run_id: str, *, lease_id: str, batch_size:
     if not run.production_plan_id:
         raise ValueError("Run has no linked production plan")
 
+    release_expired_leases(db, plan_id=run.production_plan_id)
     limit = max(1, min(int(batch_size or 1), MAX_WORKER_STEP_BATCH_SIZE))
     items: list[dict[str, Any]] = []
     for _ in range(limit):
@@ -242,11 +254,13 @@ def _model_estimated_cost(model_config: dict | None) -> float:
 
 
 def _process_claimed_job(db: Session, run: VideoProductionRun, job: ProductionJob) -> dict:
+    # Snapshot the claim before any await or ORM refresh can replace its identity.
+    lease = (job.lease_id, job.leased_until)
     try:
         _mark_segment_running_for_job(db, job)
         result = _run_async(execute_real_job(db, run, job))
         if _result_is_blocked(result):
-            item = _record_blocked_result(db, job, result)
+            item = _record_blocked_result(db, job, result, lease)
             _update_run_status_after_stage_job(db, run, job.stage)
             return item
         item = _success_item(result, job)
@@ -256,7 +270,8 @@ def _process_claimed_job(db: Session, run: VideoProductionRun, job: ProductionJo
                 db,
                 refreshed.id,
                 provider_task_id=_result_provider_task_id(result),
-                expected_lease_id=job.lease_id,
+                expected_lease_id=lease[0],
+                expected_leased_until=lease[1],
             )
         if refreshed:
             item["status"] = refreshed.status
@@ -264,7 +279,7 @@ def _process_claimed_job(db: Session, run: VideoProductionRun, job: ProductionJo
             _update_run_status_after_stage_job(db, run, refreshed.stage)
         return item
     except ProductionRepairableError as exc:
-        failed = _fail_or_reload_job(db, job, exc.code.value, exc.message, exc.retryable)
+        failed = _fail_or_reload_job(db, job, exc.code.value, exc.message, exc.retryable, lease=lease)
         _update_run_status_after_stage_job(db, run, job.stage)
         detail = to_http_detail(exc)
         return {
@@ -285,6 +300,7 @@ def _process_claimed_job(db: Session, run: VideoProductionRun, job: ProductionJo
             ProductionErrorCode.PROVIDER_SUBMIT_FAILED.value,
             str(exc),
             retryable=False,
+            lease=lease,
         )
         _update_run_status_after_stage_job(db, run, job.stage)
         return _failed_job_item(failed, ProductionErrorCode.PROVIDER_SUBMIT_FAILED.value, str(exc), {"message": str(exc)})
@@ -295,6 +311,7 @@ def _process_claimed_job(db: Session, run: VideoProductionRun, job: ProductionJo
             ProductionErrorCode.PROVIDER_SUBMIT_FAILED.value,
             "Unexpected worker job error.",
             retryable=True,
+            lease=lease,
         )
         _update_run_status_after_stage_job(db, run, job.stage)
         return _failed_job_item(
@@ -340,7 +357,7 @@ def _result_is_blocked(result: Any) -> bool:
     return False
 
 
-def _record_blocked_result(db: Session, job: ProductionJob, result: Any) -> dict:
+def _record_blocked_result(db: Session, job: ProductionJob, result: Any, lease) -> dict:
     if isinstance(result, ProductionActionResult):
         detail = result.to_http_detail()
         code = detail.get("code") or ProductionErrorCode.PROVIDER_TASK_FAILED.value
@@ -358,7 +375,8 @@ def _record_blocked_result(db: Session, job: ProductionJob, result: Any) -> dict
             code,
             message,
             retry_after_seconds=60,
-            expected_lease_id=job.lease_id,
+            expected_lease_id=lease[0],
+            expected_leased_until=lease[1],
         )
         return _failed_job_item(retried, code, message, detail)
     if code == ProductionErrorCode.PROVIDER_THROTTLED.value:
@@ -368,24 +386,31 @@ def _record_blocked_result(db: Session, job: ProductionJob, result: Any) -> dict
             code,
             message,
             retry_after_seconds=60,
-            expected_lease_id=job.lease_id,
+            expected_lease_id=lease[0],
+            expected_leased_until=lease[1],
         )
         return _failed_job_item(retried, code, message, detail)
     if code == ProductionErrorCode.REVIEW_GATE_BLOCKED.value:
-        current = db.query(ProductionJob).filter(ProductionJob.id == job.id).first() or job
-        current.status = JOB_BLOCKED
-        current.blocked_reason = code
-        current.error_code = code
-        current.error_message = message
-        current.retryable = False
-        current.lease_id = None
-        current.leased_until = None
-        current.updated_at = bj_now()
-        _mark_segment_blocked_for_job(db, current)
+        now = bj_now()
+        updated = db.query(ProductionJob).filter(
+            ProductionJob.id == job.id,
+            ProductionJob.status.in_((JOB_LEASED, JOB_RUNNING)),
+            ProductionJob.lease_id == lease[0],
+            ProductionJob.leased_until == lease[1],
+            ProductionJob.leased_until > now,
+        ).update({
+            "status": JOB_BLOCKED, "blocked_reason": code, "error_code": code,
+            "error_message": message, "retryable": False, "lease_id": None,
+            "leased_until": None, "updated_at": now,
+        }, synchronize_session=False)
+        if updated != 1:
+            db.rollback()
+            raise ValueError("Production job lease no longer belongs to this worker")
+        _mark_segment_blocked_for_job(db, job)
         db.commit()
-        db.refresh(current)
-        return _failed_job_item(current, code, message, detail)
-    failed = _fail_or_reload_job(db, job, code, message, retryable)
+        db.refresh(job)
+        return _failed_job_item(job, code, message, detail)
+    failed = _fail_or_reload_job(db, job, code, message, retryable, lease=lease)
     return _failed_job_item(failed, code, message, detail)
 
 
@@ -408,20 +433,31 @@ def _failed_job_item(
     }
 
 
-def _fail_or_reload_job(db: Session, job: ProductionJob, code: str, message: str, retryable: bool) -> ProductionJob:
-    current = db.query(ProductionJob).filter(ProductionJob.id == job.id).first()
-    if current and current.status not in {"leased", "running"}:
-        return current
-    if code == ProductionErrorCode.PROVIDER_THROTTLED.value:
-        return retry_job_without_attempt(
-            db,
-            job.id,
-            code,
-            message,
-            retry_after_seconds=60,
-            expected_lease_id=job.lease_id,
+def _owns_lease(db: Session, job_id: str, lease) -> bool:
+    return db.query(ProductionJob.id).filter(
+        ProductionJob.id == job_id,
+        ProductionJob.status.in_((JOB_LEASED, JOB_RUNNING)),
+        ProductionJob.lease_id == lease[0],
+        ProductionJob.leased_until == lease[1],
+        ProductionJob.leased_until > bj_now(),
+    ).first() is not None
+
+
+def _fail_or_reload_job(db: Session, job: ProductionJob, code: str, message: str, retryable: bool, *, lease) -> ProductionJob:
+    try:
+        if code == ProductionErrorCode.PROVIDER_THROTTLED.value:
+            return retry_job_without_attempt(
+                db, job.id, code, message, retry_after_seconds=60,
+                expected_lease_id=lease[0], expected_leased_until=lease[1],
+            )
+        failed = fail_job(
+            db, job.id, code, message, retryable=retryable,
+            expected_lease_id=lease[0], expected_leased_until=lease[1],
         )
-    failed = fail_job(db, job.id, code, message, retryable=retryable)
+    except ValueError:
+        db.rollback()
+        db.refresh(job)
+        return job
     if failed.status == JOB_FAILED:
         _mark_segment_failed_for_job(db, failed)
     return failed

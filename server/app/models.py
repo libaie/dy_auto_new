@@ -617,13 +617,14 @@ class CollectReportRequest(BaseModel):
 
 
 class StatsIncrementRequest(BaseModel):
-    """设备端增量统计上报——每个子操作完成后调用，idempotent per (task,device,type,target,index)"""
+    """设备端增量统计上报——每个子操作完成后调用，idempotent per (task,device,type,target,index,lease)"""
     task_id: str
     account_id: str
     task_type: str                          # search_like / search_comment / reply_comment / follow / search_dm / nurture / collect
     target_id: str = ""                     # 操作目标标识（评论昵称/用户ID），幂等 key 的一部分
     op_index: int = 0                       # 任务内操作序号，幂等 key 的一部分
     count: int = 1
+    lease_id: Optional[str] = None
 
 
 # --- DM / Conversation models ---

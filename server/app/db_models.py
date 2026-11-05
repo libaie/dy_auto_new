@@ -314,7 +314,7 @@ class StatsEvent(Base):
     """Idempotent stats event — each operation recorded once by composite key."""
     __tablename__ = "stats_events"
     __table_args__ = (
-        UniqueConstraint("task_id", "device_id", "event_type", "target_id", "op_index",
+        UniqueConstraint("task_id", "device_id", "event_type", "target_id", "op_index", "lease_id",
                          name="uq_stats_event_idempotent"),
     )
 
@@ -325,6 +325,7 @@ class StatsEvent(Base):
     event_type = Column(String(30), nullable=False)
     target_id = Column(String(200), nullable=False)
     op_index = Column(Integer, nullable=False, default=0)
+    lease_id = Column(String(36), nullable=False, default="", server_default="")
     count = Column(Integer, nullable=False, default=1)
     created_at = Column(DateTime, nullable=False, default=lambda: bj_now())
 

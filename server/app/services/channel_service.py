@@ -1,5 +1,5 @@
 """Channel service -- create, claim, complete, stale recovery, risk control."""
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from app.config import bj_now
 from typing import Optional
 
@@ -21,7 +21,9 @@ def _busy_account_ids(db: Session) -> set[str]:
     ).distinct().all():
         busy.add(aid)
     for (aid,) in db.query(DBTask.account_id).filter(
-        DBTask.status == TaskStatus.RUNNING.value
+        or_(DBTask.status == TaskStatus.RUNNING.value,
+            and_(DBTask.status == TaskStatus.CANCELLED.value, DBTask.device_id.isnot(None),
+                 DBTask.completed_at >= bj_now() - timedelta(minutes=5)))
     ).distinct().all():
         busy.add(aid)
     return busy
@@ -195,82 +197,42 @@ class ChannelService:
 
         now = bj_now()
 
-        # Stale recovery: reset items assigned > 5 min ago
-        # Skip items whose device is still online (slow but alive).
-        # Also reset the associated RUNNING task to PENDING to prevent
-        # duplicate execution when the item is re-claimed.
-        from datetime import timedelta
-        stale_threshold = now - timedelta(seconds=300)
-        online_threshold = now - timedelta(seconds=120)
-        online_device_ids = {
-            d[0] for d in db.query(DBDevice.id).filter(
-                DBDevice.last_seen_at.isnot(None),
-                DBDevice.last_seen_at >= online_threshold,
-            ).all()
-        }
-        stale_items = db.query(ChannelItem).filter(
-            ChannelItem.status == "assigned",
-            ChannelItem.assigned_at.isnot(None),
-            ChannelItem.assigned_at < stale_threshold,
-            ~ChannelItem.assigned_device_id.in_(online_device_ids),
-        ).all()
-        stale_channel_ids = set()
-        stale_task_ids = []
-        for si in stale_items:
-            if si.task_id:
-                stale_task_ids.append(si.task_id)
-            si.status = "pending"
-            si.assigned_device_id = None
-            si.assigned_at = None
-            si.task_id = None
-            stale_channel_ids.add(si.channel_id)
-        if stale_items:
-            db.flush()
-            # Cancel orphaned tasks — channel will create fresh ones on re-claim.
-            # Must NOT reset to PENDING (would create duplicate direct-queue retry).
-            if stale_task_ids:
-                import logging
-                _stale_log = logging.getLogger("channel_service")
-                _stale_log.info("Stale recovery: cancelling %d orphaned tasks for %d channel items",
-                               len(stale_task_ids), len(stale_items))
-                from app.models import TaskStatus as TS
-                db.query(DBTask).filter(
-                    DBTask.id.in_(stale_task_ids),
-                    DBTask.status == TaskStatus.RUNNING.value,  # only cancel running tasks
-                ).update(
-                    {"status": TS.CANCELLED.value, "completed_at": bj_now()},
-                    synchronize_session=False,
-                )
-            for cid in stale_channel_ids:
-                self._reactivate_channel(db, cid)
-        db.expire_all()
+        from app.services.task_service import task_service, MAX_RETRIES
+        task_service.recover_stale_tasks(db, now=now)
 
-        # Orphan cleanup: reset assigned items whose linked task is already terminal
-        # (cancelled/failed).  The regular stale-recovery above requires the device
-        # to be offline, but these items are stuck even when the device IS online
-        # because the task will never execute.  Without this the channel is deadlocked.
-        orphan_items = db.query(ChannelItem).join(
-            DBTask, ChannelItem.task_id == DBTask.id
-        ).filter(
-            ChannelItem.status == "assigned",
-            ChannelItem.task_id.isnot(None),
-            DBTask.status.in_([TaskStatus.CANCELLED.value, TaskStatus.FAILED.value]),
-        ).all()
-        if orphan_items:
-            import logging
-            _orphan_log = logging.getLogger("channel_service")
-            _orphan_log.info("Orphan cleanup: resetting %d assigned items with terminal tasks",
-                            len(orphan_items))
-            orphan_channel_ids = set()
-            for oi in orphan_items:
-                oi.status = "pending"
-                oi.assigned_device_id = None
-                oi.assigned_at = None
-                oi.task_id = None
-                orphan_channel_ids.add(oi.channel_id)
-            db.flush()
-            for cid in orphan_channel_ids:
-                self._reactivate_channel(db, cid)
+        # Cancellation keeps an assigned item locked until device acknowledgement
+        # or a bounded delivery grace. Running tasks use their own task deadline.
+        orphan_channel_ids = set()
+        assigned_items = db.query(ChannelItem).filter(ChannelItem.status == "assigned").all()
+        for item in assigned_items:
+            task = db.get(DBTask, item.task_id) if item.task_id else None
+            if task and task.status == "running":
+                continue
+            if task and task.status == "cancelled" and task.device_id and (
+                    not task.completed_at or now - task.completed_at < timedelta(minutes=5)):
+                continue
+            if not task:
+                device = db.get(DBDevice, item.assigned_device_id) if item.assigned_device_id else None
+                if device and device.last_seen_at and now - device.last_seen_at < timedelta(minutes=2):
+                    continue
+                if not item.assigned_at or now - item.assigned_at < timedelta(minutes=5):
+                    continue
+                item.retry_count += 1
+            if task and task.status not in ("cancelled", "failed", "completed"):
+                continue
+            terminal = bool(task and task.status in ("failed", "completed"))
+            item.status = ("completed" if task and task.status == "completed" else "failed") if terminal else (
+                "failed" if item.retry_count >= MAX_RETRIES else "pending")
+            item.assigned_device_id = None
+            item.assigned_at = None
+            item.task_id = None
+            item.completed_at = now if item.status in ("failed", "completed") else None
+            orphan_channel_ids.add(item.channel_id)
+            if item.status in ("failed", "completed"):
+                self.complete_item(db, item.id, item.status)
+        db.flush()
+        for cid in orphan_channel_ids:
+            self._reactivate_channel(db, cid)
 
         # Build routing filter based on device's bound_account_id
         device = db.query(DBDevice).filter(DBDevice.id == device_id).first()
@@ -485,6 +447,7 @@ class ChannelService:
                 params=params,
                 status=TaskStatus.RUNNING.value,
                 started_at=now,
+                retry_count=item.retry_count,
                 lease_id=str(uuid.uuid4()),
             )
             db.add(task)
@@ -580,24 +543,14 @@ class ChannelService:
                     ChannelItem.task_id.isnot(None),
                 ).all()
             ]
-            # Skip all pending items
-            db.execute(
-                update(ChannelItem)
-                .where(
-                    ChannelItem.channel_id == channel_id,
-                    ChannelItem.status == "pending",
+            # Final cancellation skips work; pause preserves the queue.
+            if new_status == "cancelled":
+                db.execute(
+                    update(ChannelItem).where(
+                        ChannelItem.channel_id == channel_id,
+                        ChannelItem.status.in_(["pending", "assigned"]),
+                    ).values(status="skipped", completed_at=bj_now())
                 )
-                .values(status="skipped", completed_at=bj_now())
-            )
-            # Skip assigned items — cancelled channel must leave no active items
-            db.execute(
-                update(ChannelItem)
-                .where(
-                    ChannelItem.channel_id == channel_id,
-                    ChannelItem.status == "assigned",
-                )
-                .values(status="skipped", completed_at=bj_now())
-            )
             # Cancel running tasks for assigned items — devices pick this up
             # via check_cancelled_running in their next poll.
             # Keep device_id so the cancellation can be delivered; device acks
@@ -693,7 +646,10 @@ class ChannelService:
         """If channel is completed and has pending items, revert to active.
         cancelled/deleted are terminal — never auto-resurrect."""
         ch = db.query(Channel).filter(Channel.id == channel_id).first()
-        if ch and ch.status == "completed":
+        if ch and ch.status == "completed" and db.query(ChannelItem.id).filter(
+                ChannelItem.channel_id == channel_id,
+                ChannelItem.status.in_(["pending", "assigned"]),
+        ).first():
             ch.status = "active"
             ch.completed_at = None
             db.flush()

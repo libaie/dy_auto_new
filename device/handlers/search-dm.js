@@ -6,6 +6,7 @@ var logger = require("../utils/logger");
 var uiOperator = require("../core/ui-operator");
 var flowContext = require("../core/flow-context");
 var crashRecovery = require("../core/crash-recovery");
+var taskCancellation = require("../core/task-cancellation");
 
 var TAG = "搜索私信";
 
@@ -26,6 +27,7 @@ var SearchDMHandler = Object.create(SearchBaseHandler);
  * 确保退出时页面状态与进入前完全一致，避免外层循环在错误的页面继续执行
  */
 SearchDMHandler._interactWithVideo = function (content, stats) {
+  if (taskCancellation.isCancelled()) return false;
   var params = this._params || {};
 
   // ==== 消息解析：传入 content 参数优先于 params 静态模板 ====
@@ -55,6 +57,7 @@ SearchDMHandler._interactWithVideo = function (content, stats) {
     messages = this.resolveMessages(params);
   }
 
+  if (taskCancellation.isCancelled()) return false;
   if (!messages || messages.length === 0) {
     logger.warn(TAG, "无法获取私信内容，跳过");
     return false;

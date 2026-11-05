@@ -13,6 +13,7 @@ var screenContext = require("../core/screen-context");
 
 var TAG = "评论回复";
 var flowContext = require("../core/flow-context");
+var taskCancellation = require("../core/task-cancellation");
 
 var ReplyCommentHandler = Object.create(CommentBaseHandler);
 
@@ -223,6 +224,7 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
   }
 
   while ((readAllMode ? uniqueRead : processed) < count && !stopCurrentVideo) {
+    if (taskCancellation.isCancelled()) break;
     if (Date.now() - videoStartTime > VIDEO_TIMEOUT) {
       logger.warn(TAG, "视频 " + (videoIndex + 1) + " 处理超时 (" +
         Math.round((Date.now() - videoStartTime) / 1000) + "s)，强制跳过");
@@ -295,6 +297,7 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
     // 遍历当前屏所有可见评论，处理完再滑动
     var roundHadNew = false;
     for (var i = 0; i < items.length && (readAllMode ? uniqueRead : processed) < count; i++) {
+      if (taskCancellation.isCancelled()) break;
       try {
         var comment = this._parseCommentItem(items[i]);
         if (!comment) {
@@ -350,14 +353,32 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
         continue;
       }
 
-      var analysis = aiAnalyzer.analyzeComment({
-        searchKeyword: keyword,
-        nickname: comment.nickname,
-        commentText: comment.text,
-        generateReply: !skipReply,
-      });
+      if (taskCancellation.isCancelled()) {
+        try { apiClient.releaseCommentReply(comment.nickname, comment.text); } catch (e) {}
+        break;
+      }
+
+      var analysis = null;
+      try {
+        analysis = aiAnalyzer.analyzeComment({
+          searchKeyword: keyword,
+          nickname: comment.nickname,
+          commentText: comment.text,
+          generateReply: !skipReply,
+        });
+      } catch (analysisError) {
+        logger.warn(TAG, "AI 分析失败，释放未发送的评论占位");
+      }
+
+      if (taskCancellation.isCancelled()) {
+        // No submission occurred; unlike an unknown send, this claim is safe
+        // to release when a late analysis returns after cancellation.
+        try { apiClient.releaseCommentReply(comment.nickname, comment.text); } catch (e) {}
+        break;
+      }
 
       if (!analysis) {
+        try { apiClient.releaseCommentReply(comment.nickname, comment.text); } catch (e) {}
         stats.skipped++;
         _advanceAfterSkip("AI分析为空");
         continue;
@@ -426,6 +447,7 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
 
       // 关注+私信
       sleep(Math.floor(Math.random() * 500 + 800));
+      if (taskCancellation.isCancelled()) break;
       var shouldFollow = analysis.tier === "high" || analysis.tier === "medium";
       var shouldDM = analysis.tier === "high" || analysis.tier === "medium";
       var canFollow = shouldFollow && stats.follow_count < maxFollows;
@@ -518,6 +540,7 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
               var chunkMs = 30000;
               var waited = 0;
               while (waited < cooldownRemaining) {
+                if (taskCancellation.isCancelled()) break;
                 var step = Math.min(chunkMs, cooldownRemaining - waited);
                 sleep(step);
                 waited += step;
@@ -527,6 +550,8 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
               }
               }
             }
+
+            if (taskCancellation.isCancelled()) break;
 
             logger.info(TAG, "DM check: canDM=" + canDM + " shouldDM=" + shouldDM +
               " perTask=" + stats.dm_count + "/" + maxDMs +
@@ -546,6 +571,7 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
                   if (aiDM) dmContent = aiDM;
                 }
               } catch (e) {}
+              if (taskCancellation.isCancelled()) break;
               if (!hasDMSequence && !dmContent && content) dmContent = content;
               if (hasDMSequence || dmContent) {
                 var recipientId = (userData && userData.douyin_id) || "";
@@ -557,6 +583,10 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
                   });
                   if (dmClaimResult && dmClaimResult.claimed) {
                     this._lastSendOutcome = "not_attempted";
+                    if (taskCancellation.isCancelled()) {
+                      apiClient.releaseDMRecipient({ conversation_id: dmClaimResult.conversation_id });
+                      break;
+                    }
                     var sent, reportedContent;
                     // DM 序列模板 vs 单条私信
                     if (hasDMSequence) {
@@ -609,6 +639,10 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
                   });
                   if (dmClaimResult && dmClaimResult.claimed) {
                     this._lastSendOutcome = "not_attempted";
+                    if (taskCancellation.isCancelled()) {
+                      apiClient.releaseDMRecipient({ conversation_id: dmClaimResult.conversation_id });
+                      break;
+                    }
                     var sent2, reportedContent2;
                     if (hasDMSequence) {
                       var seqMsgs2 = this.resolveMessages(params);
@@ -709,6 +743,8 @@ ReplyCommentHandler._processComments = function (params, stats, videoIndex) {
         try { this._returnToComments(); } catch (e2) {}
       }
     }  // for 循环结束：当前屏所有可见评论已遍历
+
+    if (taskCancellation.isCancelled()) break;
 
     // 退出条件：有效回复达标 OR 指定数量读完 OR 到底
     if (readAllMode) {
@@ -839,6 +875,7 @@ ReplyCommentHandler._parseTime = function (timeStr) {
  */
 ReplyCommentHandler._replyToComment = function (replyText, nickname) {
   this._lastSendOutcome = "not_attempted";
+  if (taskCancellation.isCancelled()) return false;
   // 1. 点回复按钮 → 键盘唤起，输入框自动获得焦点
   // if (!this.safeClick("comment_reply_button", 3)) {
   //   logger.warn(TAG, "回复按钮未找到");
@@ -864,6 +901,7 @@ ReplyCommentHandler._replyToComment = function (replyText, nickname) {
   var pasted = false;
   try {
     var focusedNode = className("EditText").focused(true).findOne(3000);
+    if (taskCancellation.isCancelled()) return false;
     if (focusedNode) {
         focusedNode.setText(" ");
         sleep(200);
@@ -873,6 +911,7 @@ ReplyCommentHandler._replyToComment = function (replyText, nickname) {
     // 分块模拟真人打字：2-3 个词一起敲、单字单独敲，块间随机延迟
     var pos = 0;
     while (pos < cleanText.length) {
+      if (taskCancellation.isCancelled()) return false;
       var chunkSize = Math.random() < 0.4 ? 1 : (Math.floor(Math.random() * 2) + 2);  // 40% 单字, 60% 2-3字
       chunkSize = Math.min(chunkSize, cleanText.length - pos);
       var chunk = cleanText.substring(pos, pos + chunkSize);
@@ -888,6 +927,7 @@ ReplyCommentHandler._replyToComment = function (replyText, nickname) {
 
   // 3. 兜底：剪贴板 + keyevent 279 粘贴
   if (!pasted) {
+    if (taskCancellation.isCancelled()) return false;
     try {
       setClip(cleanText);
       sleep(200);
@@ -970,6 +1010,7 @@ ReplyCommentHandler._enterCommenterProfile = function (commentAuthorAvatarEl, ni
  * 进入主页后：浏览一下 → 随机延迟 → 点关注 → 验证
  */
 ReplyCommentHandler._followUser = function () {
+  if (taskCancellation.isCancelled()) return false;
   try {
     // 1. 随机停留，给主页加载时间
     sleep(Math.floor(Math.random() * 1000 + 1000));
@@ -986,6 +1027,7 @@ ReplyCommentHandler._followUser = function () {
     // 2. 确保回到主页顶部（关注/私信按钮在顶部）
     var backToTop = false;
     for (var si = 0; si < 4; si++) {
+      if (taskCancellation.isCancelled()) return false;
       if (uiOperator.findElement("user_nickname", 1000)) {
         backToTop = true;
         break;
@@ -1003,6 +1045,7 @@ ReplyCommentHandler._followUser = function () {
 
     var followed = false;
     for (var attempt = 0; attempt < 2; attempt++) {
+      if (taskCancellation.isCancelled()) return false;
       // Read success explicitly; disappearing targets alone cannot prove success.
       if (uiOperator.findElement("is_follow", 1000)) {
         if (attempt === 0) return false; // Already followed before this operation.
@@ -1018,7 +1061,7 @@ ReplyCommentHandler._followUser = function () {
         if (/已关注|互相关注|取消关注/.test(firstText + firstDesc)) return false;
         // Actuate the same freshly inspected target, without resolving the ID
         // again into a toggle whose meaning may have changed.
-        if (!uiOperator.clickElement(firstTarget)) break;
+        if (taskCancellation.isCancelled() || !uiOperator.clickElement(firstTarget)) break;
       } else {
         // A persistent resource ID can become an unfollow toggle after the
         // first click. Only an exact fresh unfollowed label permits a retry.
@@ -1029,7 +1072,7 @@ ReplyCommentHandler._followUser = function () {
         try { retryDesc = String(retryTarget.desc() || "").replace(/\s/g, ""); } catch (descError) {}
         if (/已关注|互相关注|取消关注/.test(retryText + retryDesc)) break;
         if (!/^[+＋]?关注$/.test(retryText) && !/^[+＋]?关注$/.test(retryDesc)) break;
-        if (!uiOperator.clickElement(retryTarget)) break;
+        if (taskCancellation.isCancelled() || !uiOperator.clickElement(retryTarget)) break;
       }
       sleep(Math.floor(Math.random() * 1000 + 1000));
       if (uiOperator.findElement("is_follow", 2000)) { followed = true; break; }
@@ -1061,6 +1104,7 @@ ReplyCommentHandler._collectProfileData = function () {
  */
 ReplyCommentHandler._sendDM = function (content) {
   this._lastSendOutcome = "not_attempted";
+  if (taskCancellation.isCancelled()) return false;
   // 1. 进入私信页：点 dm_entry_btn
   var messageClicked = this.safeClick("dm_entry_btn", 5);
   if (!messageClicked) {
@@ -1087,6 +1131,7 @@ ReplyCommentHandler._sendDM = function (content) {
   }
 
   // 3. 清空+拟人输入
+  if (taskCancellation.isCancelled()) return false;
   var pasted = false;
   try {
     // 用无障碍直接清空输入框（不依赖焦点，不要 shell 键）

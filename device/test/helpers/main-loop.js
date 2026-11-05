@@ -28,6 +28,7 @@ module.exports = function mainLoop(options = {}) {
     pollInterval: 30000, heartbeatInterval: 60000, ai: {}, decision: options.previousDecision || { enabled: false } };
   const api = {
     setAuthFailureHandler(fn) { authFailure = fn; },
+    captureSession() { return {}; },
     register() {
       events.push('register');
       return options.register ? options.register() : { device_id: 'unit-device', config: {} };
@@ -73,7 +74,7 @@ module.exports = function mainLoop(options = {}) {
   const modules = {
     './config': config,
     './core/task-timeout': require('../../core/task-timeout'),
-    './core/task-executor': {
+    './core/task-executor': options.executor || {
       execute(task) {
         executed.push({ ...task, decision: JSON.parse(JSON.stringify(config.decision)), selectorsReady, templatesReady });
         events.push('execute:' + task.id);

@@ -8,6 +8,8 @@ import LoadingSpinner from '../components/LoadingSpinner.vue'
 const toast = useToastStore()
 const loading = ref(false)
 const saving = ref(false)
+const settingsLoaded = ref(false)
+const loadError = ref('')
 const decisionKeyConfigured = ref(false)
 const decisionConfigError = ref('')
 
@@ -31,6 +33,8 @@ const pixelleTesting = ref(false)
 
 async function fetchSettings() {
   loading.value = true
+  settingsLoaded.value = false
+  loadError.value = ''
   try {
     const res = await getSettings()
     const data = res.data
@@ -50,7 +54,9 @@ async function fetchSettings() {
     form.decision_min_probability = thresholdOrDefault(data.decision_min_probability, 0.75)
     form.pixelle_video_url = data.pixelle_video_url || 'http://localhost:8500'
     form.pixelle_video_timeout = parseInt(data.pixelle_video_timeout) || 600
+    settingsLoaded.value = true
   } catch {
+    loadError.value = '加载设置失败，请重试后再修改。'
     toast.error('加载设置失败')
   } finally {
     loading.value = false
@@ -63,6 +69,7 @@ function thresholdOrDefault(value, fallback) {
 }
 
 async function handleSave() {
+  if (!settingsLoaded.value || saving.value) return
   const thresholds = [form.decision_min_confidence, form.decision_min_probability]
   if (thresholds.some(value => typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1)) {
     toast.error('决策门槛必须是 0 到 1 之间的数字')
@@ -119,6 +126,11 @@ onMounted(fetchSettings)
     <h1 class="text-2xl font-bold gradient-text mb-6">AI 配置</h1>
 
     <LoadingSpinner v-if="loading" />
+
+    <div v-else-if="loadError" role="alert" class="glass-card p-6 text-slate-300">
+      <p>{{ loadError }}</p>
+      <button type="button" @click="fetchSettings" class="btn-aurora mt-4 px-4 py-2 rounded-xl text-white">重试加载</button>
+    </div>
 
     <template v-else>
       <!-- AI Configuration -->
@@ -304,7 +316,7 @@ onMounted(fetchSettings)
         <div class="mt-6 flex justify-end">
           <button
             @click="handleSave"
-            :disabled="saving"
+            :disabled="saving || !settingsLoaded"
             class="btn-aurora px-6 py-2.5 rounded-xl font-medium text-white disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <span v-if="saving">保存中...</span>

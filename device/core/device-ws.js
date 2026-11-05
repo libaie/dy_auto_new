@@ -11,6 +11,7 @@ var deviceWs = {
   _client: null,         // 复用同一个 OkHttpClient，避免线程池泄漏
   _connected: false,
   _stopped: false,
+  _generation: 0,
   _reconnectTimer: null,
   _reconnectDelay: 3000,
   _pingTimer: null,
@@ -64,6 +65,7 @@ var deviceWs = {
    */
   stop: function () {
     this._stopped = true;
+    this._generation++;
     if (this._reconnectTimer) {
       clearTimeout(this._reconnectTimer);
       this._reconnectTimer = null;
@@ -154,8 +156,16 @@ var deviceWs = {
     }
 
     var self = this;
+    var generation = ++this._generation;
+    var serverUrl = config.serverUrl;
+    var deviceSecret = config.deviceSecret;
+    var deviceId = config.deviceId;
+    function isCurrentConnection() {
+      return !self._stopped && self._generation === generation &&
+        config.serverUrl === serverUrl && config.deviceSecret === deviceSecret;
+    }
     // Secret NOT in URL — sent as first auth message after connect
-    var wsUrl = config.serverUrl.replace("http://", "ws://") + "/api/device/ws/status";
+    var wsUrl = serverUrl.replace("http://", "ws://") + "/api/device/ws/status";
 
     logger.info(TAG, "连接: " + wsUrl);
 
@@ -177,6 +187,10 @@ var deviceWs = {
 
       var listener = new JavaAdapter(WebSocketListener, {
         onOpen: function (ws, response) {
+          if (!isCurrentConnection()) {
+            try { ws.close(1000, "retired"); } catch (e) {}
+            return;
+          }
           logger.info(TAG, "已连接，发送认证消息");
           self._ws = ws;
           self._connected = true;
@@ -185,8 +199,8 @@ var deviceWs = {
           // Send auth as first message (not in URL)
           var authMsg = JSON.stringify({
             type: "auth",
-            device_id: config.deviceId,
-            secret: config.deviceSecret,
+            device_id: deviceId,
+            secret: deviceSecret,
           });
           try { ws.send(authMsg); } catch (e) {
             logger.error(TAG, "发送认证消息失败: " + e.message);
@@ -202,6 +216,7 @@ var deviceWs = {
           }
         },
         onMessage: function (ws, text) {
+          if (!isCurrentConnection()) return;
           var str = String(text);
           // 服务端 pong 响应 — 忽略
           if (str === "pong" || str === "ping") {
@@ -216,6 +231,7 @@ var deviceWs = {
         onClosing: function (ws, code, reason) {
           logger.info(TAG, "连接关闭: code=" + code + " reason=" + reason);
           try { ws.close(1000, null); } catch (e) { /* already closed */ }
+          if (!isCurrentConnection()) return;
           self._cleanup();
 
           if (code === 4001) {
@@ -232,6 +248,7 @@ var deviceWs = {
           self._scheduleReconnect();
         },
         onFailure: function (ws, t, response) {
+          if (!isCurrentConnection()) return;
           var msg = t.getMessage() || "";
           var code = response ? response.code() : 0;
           logger.warn(TAG, "连接失败: code=" + code + " err=" + msg);
@@ -242,6 +259,7 @@ var deviceWs = {
 
       client.newWebSocket(request, listener);
     } catch (e) {
+      if (!isCurrentConnection()) return;
       logger.error(TAG, "创建 WS 失败: " + e.message);
       this._scheduleReconnect();
     }
@@ -249,12 +267,15 @@ var deviceWs = {
 
   _startPing: function () {
     var self = this;
+    var generation = this._generation;
     if (this._pingTimer) clearInterval(this._pingTimer);
     this._pingTimer = setInterval(function () {
+      if (self._stopped || self._generation !== generation) return;
       if (self._ws) {
         try {
           self._ws.send("ping");
         } catch (e) {
+          if (self._generation !== generation) return;
           logger.warn(TAG, "发送 ping 失败: " + e.message);
           self._cleanup();
           self._scheduleReconnect();
@@ -274,10 +295,12 @@ var deviceWs = {
 
   _scheduleReconnect: function () {
     var self = this;
+    var generation = this._generation;
     if (this._stopped) return;
     if (this._reconnectTimer) return;
     logger.info(TAG, this._reconnectDelay / 1000 + " 秒后重连...");
     this._reconnectTimer = setTimeout(function () {
+      if (self._stopped || self._generation !== generation) return;
       self._reconnectTimer = null;
       self._connect();
     }, this._reconnectDelay);

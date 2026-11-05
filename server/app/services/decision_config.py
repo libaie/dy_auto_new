@@ -69,17 +69,22 @@ def validate_decision_settings(updates):
             _api_key(value)
 
 
-def _read_configuration(db):
+def _read_configuration(db, *, settings_snapshot=None):
     raw = {field: os.getenv("DECISION_" + field.upper(), default) for field, default in _DEFAULTS.items()}
     encrypted_key = False
-    if db is not None:
+    if db is not None or settings_snapshot is not None:
         try:
-            rows = db.query(SystemSetting).filter(SystemSetting.key.in_(_SETTING_KEYS)).all()
+            stored_values = settings_snapshot
+            if stored_values is None:
+                rows = db.query(SystemSetting).filter(SystemSetting.key.in_(_SETTING_KEYS)).all()
+                stored_values = {row.key: row.value for row in rows}
         except SQLAlchemyError:
             raise ValueError(_INVALID) from None
-        for row in rows:
-            field = row.key[len("decision_"):]
-            raw[field] = row.value
+        for key in _SETTING_KEYS:
+            if key not in stored_values:
+                continue
+            field = key[len("decision_"):]
+            raw[field] = stored_values[key]
             if field == "api_key":
                 encrypted_key = True
     return raw, encrypted_key
@@ -111,11 +116,11 @@ def resolve_decision_config(db=None):
     return {**config, "api_key": key, "api_url": raw["api_url"]}
 
 
-def get_public_decision_config(db=None):
+def get_public_decision_config(db=None, *, settings_snapshot=None):
     """Never publish credentials; invalid enabled settings remain fail closed."""
     raw = None
     try:
-        raw, _ = _read_configuration(db)
+        raw, _ = _read_configuration(db, settings_snapshot=settings_snapshot)
         return _public_values(raw)
     except ValueError:
         enabled = True
@@ -132,9 +137,9 @@ def get_public_decision_config(db=None):
         }
 
 
-def get_decision_settings(db=None):
+def get_decision_settings(db=None, *, settings_snapshot=None):
     """Return effective admin strings; unreadable stored keys can still be replaced."""
-    raw, _ = _read_configuration(db)
+    raw, _ = _read_configuration(db, settings_snapshot=settings_snapshot)
     public = _public_values(raw)
     return {
         "decision_enabled": "true" if public["enabled"] else "false",

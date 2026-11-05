@@ -3,6 +3,7 @@ var apiClient = require("./api-client");
 var logger = require("../utils/logger");
 var geometry = require("./screen-context");
 var imageLocator = require("./image-locator");
+var taskCancellation = require("./task-cancellation");
 
 var TAG = "界面操作";
 
@@ -128,6 +129,19 @@ var uiOperator = {
   _appendDistinctNode: function (list, node) {
     for (var i = 0; i < list.length; i++) if (this._sameNode(list[i],node)) return;
     list.push(node);
+  },
+
+  _isWithinParent: function (node, parentNode) {
+    var current = node;
+    for (var depth = 0; current && depth < 128; depth++) {
+      if (this._sameNode(current, parentNode)) return true;
+      try {
+        var next = current.parent();
+        if (this._sameNode(current, next)) return false;
+        current = next;
+      } catch (e) { return false; }
+    }
+    return false;
   },
 
   _nodeScopeRecord: function (node) {
@@ -338,24 +352,10 @@ var uiOperator = {
   /**
    * 按条件查找元素（支持 text/id/desc/className 类型 + match_mode）
    */
-  _findByCondition: function (cond) {
-    var matchMode = cond.match_mode || "exact";
-    if (matchMode === "contains") {
-      switch (cond.type) {
-        case "text": return textContains(cond.value).find();
-        case "desc": return descContains(cond.value).find();
-        case "id": return idContains(cond.value).find();
-        case "className": return classNameContains(cond.value).find();
-        default: return null;
-      }
-    }
-    switch (cond.type) {
-      case "text": return text(cond.value).find();
-      case "desc": return desc(cond.value).find();
-      case "id": return id(cond.value).find();
-      case "className": return className(cond.value).find();
-      default: return null;
-    }
+  _findByCondition: function (cond, parentNode) {
+    var selector = this._makeSelector(cond);
+    if (!selector) return null;
+    return parentNode ? parentNode.find(selector) : selector.find();
   },
 
   /**
@@ -469,14 +469,14 @@ var uiOperator = {
     return null;
   },
 
-  _findManyByStrategy: function (strategy, ctx, scope) {
+  _findManyByStrategy: function (strategy, ctx, scope, parentNode) {
     ctx = ctx || geometry.read();
     scope = scope || this._strategyScope(strategy,ctx);
     if (!scope) return [];
     var all;
-    if (strategy.conditions && strategy.conditions.length) all = this._findManyByConditions(strategy);
-    else if (strategy.type === "chain") all = this._findByChainAll(strategy.steps || []);
-    else all = this._findByCondition(strategy);
+    if (strategy.conditions && strategy.conditions.length) all = this._findManyByConditions(strategy, parentNode);
+    else if (strategy.type === "chain") all = this._findByChainAll(strategy.steps || [], parentNode);
+    else all = this._findByCondition(strategy, parentNode);
     var visible = [];
     if (all) for (var i = 0; i < all.length; i++) if (this._isOnScreen(all[i],ctx,scope.region) && this._rememberNodeScope(all[i],strategy)) this._appendDistinctNode(visible,all[i]);
     return visible;
@@ -485,14 +485,14 @@ var uiOperator = {
   /**
    * 多条件组合查找多个控件（AND/OR）
    */
-  _findManyByConditions: function (strategy) {
+  _findManyByConditions: function (strategy, parentNode) {
     var conditions = strategy.conditions;
     var logic = strategy.logic || "and";
 
     if (logic === "or") {
       var results = [];
       for (var j = 0; j < conditions.length; j++) {
-        var candidates = this._findByCondition(conditions[j]);
+        var candidates = this._findByCondition(conditions[j], parentNode);
         if (!candidates) continue;
         for (var k = 0; k < candidates.length; k++) {
           var el = candidates[k];
@@ -503,7 +503,7 @@ var uiOperator = {
     }
 
     // AND: find all elements that match ALL conditions
-    var candidates = this._findByCondition(conditions[0]);
+    var candidates = this._findByCondition(conditions[0], parentNode);
     if (!candidates || candidates.length === 0) return [];
 
     var results = [];
@@ -521,7 +521,7 @@ var uiOperator = {
     return results;
   },
 
-  _findByChainAll: function (steps) {
+  _findByChainAll: function (steps, parentNode) {
     if (!steps || !steps.length) return [];
     var selector = null, navStart = steps.length, i;
     for (i = 0; i < steps.length; i++) {
@@ -530,7 +530,10 @@ var uiOperator = {
       if (!selector) return [];
     }
     var current = [], initial;
-    try { initial = selector ? selector.find() : className("android.widget.FrameLayout").find(); } catch (e) { return []; }
+    try {
+      initial = selector ? (parentNode ? parentNode.find(selector) : selector.find()) :
+        (parentNode ? [parentNode] : className("android.widget.FrameLayout").find());
+    } catch (e) { return []; }
     for (i = 0; initial && i < initial.length; i++) if (this._isOnScreen(initial[i])) current.push(initial[i]);
     for (var n = navStart; n < steps.length; n++) {
       var step = steps[n], nav = step.nav || "filter", next = [];
@@ -543,6 +546,7 @@ var uiOperator = {
             var source = nav === "sibling" ? element.parent() : element;
             var childSelector = this._makeSelector(step);
             if (!source || !childSelector) continue;
+            if (parentNode && !this._isWithinParent(source, parentNode)) continue;
             var children = source.find(childSelector), visible = [];
             for (var ch = 0; children && ch < children.length; ch++) {
               if (nav === "sibling" && children[ch] === element) continue;
@@ -551,6 +555,7 @@ var uiOperator = {
             choices = step.index == null ? visible : (visible[step.index] ? [visible[step.index]] : []);
           }
           for (var j = 0; j < choices.length; j++) {
+            if (parentNode && !this._isWithinParent(choices[j], parentNode)) continue;
             if (!this._isOnScreen(choices[j])) continue;
             this._appendDistinctNode(next,choices[j]);
           }
@@ -741,10 +746,12 @@ var uiOperator = {
   },
 
   _clickElementResolved: function (element, resolution) {
+    if (taskCancellation.isCancelled()) return false;
     if (!element || element.isPackage) return false;
     var ctx = geometry.read();
     var liveScope = this._liveScopeForElement(element,ctx,resolution);
     if (!liveScope || !this._isOnScreen(element,ctx,liveScope.region)) return false;
+    if (taskCancellation.isCancelled()) return false;
     var isPoint = element.isPress || element.isCoordinate || element.isImage;
     if (isPoint) {
       if (!this._pointIsFresh(element,ctx)) return false;
@@ -754,26 +761,30 @@ var uiOperator = {
       } catch (e) { return false; }
     }
     try {
-      if (element.clickable()) return element.click() === true;
+      if (element.clickable()) return !taskCancellation.isCancelled() && element.click() === true;
       var point = this._nodePoint(element);
       var fresh = geometry.read(), freshScope = this._liveScopeForElement(element,fresh,resolution);
       if (!freshScope || !geometry.isUsablePoint(point,fresh,freshScope.region)) return false;
+      if (taskCancellation.isCancelled()) return false;
       return click(point.x,point.y) === true;
     } catch (e2) { return false; }
   },
 
   inputText: function (element, value) {
+    if (taskCancellation.isCancelled()) return false;
     if (!element || typeof value !== "string" || !value || !this.clickElement(element)) return false;
     sleep(500);
+    if (taskCancellation.isCancelled()) return false;
     var pointType = element.isImage || element.isCoordinate || element.isPress;
     var fresh = geometry.read(), freshScope = this._liveScopeForElement(element,fresh);
     if (!freshScope || !this._isOnScreen(element,fresh,freshScope.region)) return false;
     try {
-      if (!pointType && this._isOnScreen(element) && element.setText(value) === true) return true;
+      if (!pointType && this._isOnScreen(element) && !taskCancellation.isCancelled() && element.setText(value) === true) return true;
     } catch (e) {}
     try {
       var candidates = className("EditText").find();
       for (var i = 0; candidates && i < candidates.length; i++) {
+        if (taskCancellation.isCancelled()) return false;
         var input = candidates[i];
         if (!this._isOnScreen(input)) continue;
         if (typeof input.focused === "function" && !input.focused()) continue;
@@ -781,7 +792,7 @@ var uiOperator = {
       }
     } catch (e2) {}
     try {
-      if (!geometry.read().canInteract) return false;
+      if (!geometry.read().canInteract || taskCancellation.isCancelled()) return false;
       setClip(value);
       var result = shell("input keyevent 279",false);
       return !!result && Number(result.code) === 0;
@@ -794,11 +805,12 @@ var uiOperator = {
    * @returns {boolean}
    */
   submitViaKeyboard: function (submitActionName) {
+    if (taskCancellation.isCancelled()) return false;
     // 尝试键盘回车
     try { var dispatched = shell("input keyevent 66", false); if (dispatched && Number(dispatched.code) === 0) { sleep(300); return true; } } catch (e1) { /* ignore */ }
 
     // 回退: 点击提交按钮
-    if (submitActionName) {
+    if (submitActionName && !taskCancellation.isCancelled()) {
       try {
         var selectorLoader = require("./selector-loader");
         var selector = selectorLoader.get(submitActionName);

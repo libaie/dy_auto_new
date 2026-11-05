@@ -4,6 +4,7 @@ var antiDetect = require("../core/anti-detect");
 var selectorLoader = require("../core/selector-loader");
 var selectorResolver = require("../core/selector-resolver");
 var humanInput = require("../core/human-input");
+var taskCancellation = require("../core/task-cancellation");
 var logger = require("../utils/logger");
 
 var TAG = "处理器";
@@ -26,6 +27,7 @@ var BaseHandler = {
    * @returns {boolean}
    */
   ensureAppActive: function () {
+    if (taskCancellation.isCancelled()) return false;
     if (!uiOperator.isAppActive()) {
       return uiOperator.openApp();
     }
@@ -41,9 +43,11 @@ var BaseHandler = {
   safeClick: function (actionName, retries) {
     retries = retries || 3;
     for (var i = 0; i < retries; i++) {
+      if (taskCancellation.isCancelled()) return false;
       var element = uiOperator.findElement(actionName, 3000);
       if (element) {
         return antiDetect.wrapAction(actionName, function () {
+          if (taskCancellation.isCancelled()) return false;
           return uiOperator.clickElement(element);
         });
       }
@@ -61,12 +65,15 @@ var BaseHandler = {
    * @returns {boolean}
    */
   safeInput: function (actionName, text) {
+    if (taskCancellation.isCancelled()) return false;
     var element = uiOperator.findElement(actionName, 5000);
     if (element) {
       return antiDetect.wrapAction("input_text", function () {
+        if (taskCancellation.isCancelled()) return false;
         if (actionName === "dm_input") {
           if (!uiOperator.clickElement(element)) return false;
           sleep(500);
+          if (taskCancellation.isCancelled()) return false;
           return humanInput.typeFocusedText(text, { requireVerification: true });
         }
         return uiOperator.inputText(element, text);
@@ -80,6 +87,7 @@ var BaseHandler = {
    * @param {string} submitActionName - 提交按钮的动作名（回退方案）
    */
   submitViaKeyboard: function (submitActionName) {
+    if (taskCancellation.isCancelled()) return false;
     return uiOperator.submitViaKeyboard(submitActionName);
   },
 

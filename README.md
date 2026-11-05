@@ -186,10 +186,12 @@ npm run dev
 如需重新打包设备脚本：
 
 ```powershell
-python .\_pack_device.py
+python .\tools\pack_device.py
 ```
 
-输出文件为根目录 `device-script.zip`。
+输出文件为根目录 `device-script.zip`，也可用 `--output` 指定路径。打包入口会包含新增核心模块，排除测试和运行缓存，校验所有静态本地 `require()` 依赖，并生成带文件大小和 SHA-256 的 `device-update.json`。上传端拒绝不完整、路径不安全或校验不符的 ZIP；请上传此命令的输出，不要再上传手工拼装的增量包。
+
+更新器先在项目内准备并校验完整版本，再原子切换 `main.js` 入口；复制失败时保持原有脚本和版本。配对信息仍由 AutoJS 本地存储保存，模板、日志等运行缓存不在更新包中。更新成功后仍需按原流程重启脚本，新版本才开始执行。
 
 ## 关键环境变量
 

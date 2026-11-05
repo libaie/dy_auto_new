@@ -165,9 +165,7 @@ function buildParams() {
     else if (form.content) { params.content = form.content }
   }
 
-  if (['search_comment', 'search_dm', 'reply_comment', 'nurture'].includes(form.type)) {
-    if (selectedPromptTemplateId.value) params.prompt_template_id = selectedPromptTemplateId.value
-  }
+  if (selectedPromptTemplateId.value) params.prompt_template_id = selectedPromptTemplateId.value
 
   if (['reply_comment', 'search_comment', 'collect'].includes(form.type)) {
     params.video_count = form.video_count
@@ -455,7 +453,7 @@ watch(() => props.open, async (val) => {
                     <div>
                       <span class="text-sm font-medium" :class="skipReply ? 'text-amber-300' : 'text-slate-300'">跳过回复</span>
                       <p class="text-xs text-slate-500 mt-0.5">
-                        {{ skipReply ? '仅关注+私信，不回复评论。每视频评论数=-1 直接跳过，每视频评论数>0 先完成指定回复' : '正常回复+关注+私信' }}
+                        {{ skipReply ? '仅关注+私信，不发布评论回复' : '正常回复+关注+私信' }}
                       </p>
                     </div>
                     <button type="button"

@@ -3,6 +3,7 @@ import pytest
 import io
 from pathlib import Path
 from app.services.script_service import script_service
+from tests.script_package_fixture import script_package
 
 
 def test_get_version_returns_string():
@@ -16,7 +17,7 @@ def test_get_version_increments(tmp_path, monkeypatch):
     monkeypatch.setattr(script_service, "_script_dir", tmp_path / "scripts")
     monkeypatch.setattr(script_service, "_version_file", tmp_path / "version.txt")
     v1 = script_service.get_version()
-    script_service.upload_script(io.BytesIO(b"fake zip"))
+    script_service.upload_script(io.BytesIO(script_package()))
     v2 = script_service.get_version()
     assert v2 != v1
 
@@ -25,11 +26,12 @@ def test_download_script_returns_bytes(tmp_path, monkeypatch):
     """After upload, download returns valid content."""
     monkeypatch.setattr(script_service, "_script_dir", tmp_path / "scripts")
     monkeypatch.setattr(script_service, "_version_file", tmp_path / "scripts" / "version.txt")
-    script_service.upload_script(io.BytesIO(b"fake zip content"))
+    content = script_package()
+    script_service.upload_script(io.BytesIO(content))
     result = script_service.download_script()
     assert result is not None
     assert len(result) > 0
-    assert result == b"fake zip content"
+    assert result == content
 
 
 def test_download_script_no_version_returns_none(tmp_path, monkeypatch):

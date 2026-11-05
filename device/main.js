@@ -191,6 +191,12 @@ function startMainLoop(serverUrl, secret, initialConfig) {
     return;
   }
 
+  // A replacement pairing retires the old session, but its worker keeps the
+  // shared execution slot until it actually exits.
+  if (_mainLoopRuntime.retire) _mainLoopRuntime.retire();
+  var session = {};
+  var apiSession = null;
+
   logger.info(TAG, "Device ID: " + config.deviceId);
   logger.info(TAG, "Server: " + config.serverUrl);
   logger.info(TAG, "Secret: " + config.deviceSecret.substring(0, 8) + "...");
@@ -217,10 +223,29 @@ function startMainLoop(serverUrl, secret, initialConfig) {
   var _hasCancellation = false;
   var MAX_RECENT = 20;
   _mainLoopRuntime.isIdle = function () {
-    return !authFailed && _initialized && _configReady && !_taskBusy && _taskQueue.length === 0 && !_needsRestart;
+    return !authFailed && _initialized && _configReady && !_taskBusy && !_mainLoopRuntime.activeRun && _taskQueue.length === 0 && !_needsRestart;
   };
   _mainLoopRuntime.needsConfig = function () { return !authFailed && _initialized && !_configReady && !_needsRestart; };
   _mainLoopRuntime.catchUpPoll = function () { catchUpPoll(); };
+  _mainLoopRuntime.retire = retireSession;
+  _mainLoopRuntime.resumeTasks = function () {
+    if (authFailed || _needsRestart) return;
+    processTaskQueue();
+    if (!_taskBusy && _taskQueue.length === 0) catchUpPoll();
+  };
+
+  function retireSession() {
+    authFailed = true;
+    _taskQueue = [];
+    _knownTaskIds = {};
+    var run = _mainLoopRuntime.activeRun;
+    if (run && run.session === session) {
+      run.cancelled = true;
+      taskExecutor.cancel(run.task.id, run.task.lease_id);
+    }
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
+    deviceWs.stop();
+  }
 
   function applyRuntimeConfig(serverConfig, fullConfig) {
     if (authFailed || !serverConfig || typeof serverConfig !== "object" || Array.isArray(serverConfig)) return;
@@ -263,10 +288,12 @@ function startMainLoop(serverUrl, secret, initialConfig) {
   }
 
   function processTaskQueue() {
-    if (authFailed || !_initialized || !_configReady || _needsRestart || _taskBusy || _taskQueue.length === 0) return;
+    if (authFailed || !_initialized || !_configReady || _needsRestart || _taskBusy || _mainLoopRuntime.activeRun || _taskQueue.length === 0) return;
     _taskBusy = true;
     _idleTicks = 0;
     var task = _taskQueue.shift();
+    var run = { task: task, session: session, apiSession: apiSession, cancelled: false };
+    _mainLoopRuntime.activeRun = run;
 
     // Watchdog: 10min 超时 → 取消任务，进入维护状态
     // 不释放 busy 锁 → 旧线程最终退出后 finally 块释放 → 防止双任务并发操作 UI
@@ -275,20 +302,25 @@ function startMainLoop(serverUrl, secret, initialConfig) {
     var _watchdog = setTimeout(function () {
       if (!_completed) {
         logger.error(TAG, "任务超时 (" + (TASK_TIMEOUT_MS / 60000) + "min): " + task.id + "，取消任务，设备进入维护状态");
-        taskExecutor.cancel(task.id);
+        run.cancelled = true;
+        taskExecutor.cancel(task.id, task.lease_id);
         _needsRestart = true;
       }
     }, TASK_TIMEOUT_MS);
 
     threads.start(function () {
       try {
+        if (authFailed) return;
         logger.info(TAG, "执行任务: " + task.id + " (" + task.type + ")");
         floatingWindow.setStatus("running");
 
         var flowContext = require("./core/flow-context");
         flowContext.reset();
 
-        var result = taskExecutor.execute(task);
+        var result = run.cancelled
+          ? { status: "cancelled", result: { error: "Task cancelled before execution" } }
+          : taskExecutor.execute(task, run);
+        if (authFailed) return;
 
         // 上报结果
         var uiSnapshot = null;
@@ -301,13 +333,14 @@ function startMainLoop(serverUrl, secret, initialConfig) {
           }
         }
 
-        var reportResult = apiClient.report(task.id, result.status, result.result, uiSnapshot, task.lease_id);
+        if (authFailed) return;
+        var reportResult = apiClient.report(task.id, result.status, result.result, uiSnapshot, task.lease_id, apiSession);
         if (reportResult) {
           logger.info(TAG, "任务结果已上报: " + result.status);
         } else {
-          logger.warn(TAG, "任务结果上报失败，已加入离线队列重试: " + result.status);
+          logger.warn(TAG, "任务结果上报失败: " + result.status);
         }
-        floatingWindow.setStatus(result.status === "completed" ? "success" : "error");
+        if (!authFailed) floatingWindow.setStatus(result.status === "completed" ? "success" : "error");
       } catch (e) {
         logger.error(TAG, "任务执行异常: " + e.message);
       } finally {
@@ -319,13 +352,11 @@ function startMainLoop(serverUrl, secret, initialConfig) {
         if (!_completed) {
           _completed = true;
           _taskBusy = false;
-          if (!_needsRestart) {
-            processTaskQueue();
-            if (_taskQueue.length === 0 && !_taskBusy) {
-              catchUpPoll();
-            }
-          } else {
+          if (_mainLoopRuntime.activeRun === run) _mainLoopRuntime.activeRun = null;
+          if (_needsRestart && !authFailed) {
             logger.error(TAG, "任务 " + task.id + " 被 watchdog 强杀后线程退出，设备状态不可靠，拒绝新任务，建议重启设备");
+          } else if (_mainLoopRuntime.resumeTasks) {
+            _mainLoopRuntime.resumeTasks();
           }
         }
       }
@@ -354,14 +385,12 @@ function startMainLoop(serverUrl, secret, initialConfig) {
   // 认证失败处理
   function handleAuthFailure() {
     if (authFailed) return;
-    authFailed = true;
+    retireSession();
     logger.error(TAG, "设备认证失败，清除配对信息，重新配对");
 
     config.deviceSecret = "";
     config.serverUrl = "";
 
-    deviceWs.stop();
-    if (heartbeatTimer) clearInterval(heartbeatTimer);
     pairing.clear();
 
     global.__paired = false;
@@ -383,6 +412,7 @@ function startMainLoop(serverUrl, secret, initialConfig) {
     });
   }
   apiClient.setAuthFailureHandler(handleAuthFailure);
+  apiSession = apiClient.captureSession();
   deviceWs.setAuthFailureHandler(handleAuthFailure);
 
   // WS 重连后重新 poll 捕获离线期间的任务
@@ -395,6 +425,7 @@ function startMainLoop(serverUrl, secret, initialConfig) {
   // 注册 WS 推送回调
   deviceWs.setCallbacks({
     onTask: function (task) {
+      if (authFailed) return;
       syncDMSequences();
       handleTask(task);
     },
@@ -402,10 +433,12 @@ function startMainLoop(serverUrl, secret, initialConfig) {
       _handleCancelledTask(taskId);
     },
     onSelectorsUpdated: function (version) {
+      if (authFailed) return;
       logger.info(TAG, "选择器更新: v" + version);
       selectorLoader.checkAndUpdate(version);
     },
     onPromptTemplatesUpdated: function (version) {
+      if (authFailed) return;
       logger.info(TAG, "提示词模板更新: v" + version);
       promptTemplateLoader.checkAndUpdate(version);
     },
@@ -419,10 +452,9 @@ function startMainLoop(serverUrl, secret, initialConfig) {
       catchUpPoll();
     },
     onDeviceRemoved: function () {
-      authFailed = true;
+      if (authFailed) return;
+      retireSession();
       logger.error(TAG, "设备已被服务端移除，返回配对界面");
-      deviceWs.stop();
-      if (heartbeatTimer) clearInterval(heartbeatTimer);
       pairing.clear();
       config.deviceSecret = "";
       config.serverUrl = "";
@@ -517,19 +549,24 @@ function startMainLoop(serverUrl, secret, initialConfig) {
    * check_cancelled_running 会持续投递，设备卡在取消循环拿不到新任务。
    */
   function _handleCancelledTask(taskId) {
+    if (authFailed) return;
     _hasCancellation = true;
     for (var p = 0; p < _activePolls.length; p++) {
       _activePolls[p].cancelled[taskId] = true;
     }
     logger.info(TAG, "收到服务端取消任务: " + taskId);
-    var currentTaskId = taskExecutor.getCurrentTaskId();
-    if (currentTaskId === taskId) {
-      // Task is running — flag it; handler will exit via isCancelled() and report
-      taskExecutor.cancel(taskId);
+    var run = _mainLoopRuntime.activeRun;
+    if (run && run.session === session && run.task.id === taskId) {
+      // The reservation includes workers not yet inside taskExecutor.execute.
+      // Its token stays with this lease, including across executor initialization.
+      run.cancelled = true;
+      taskExecutor.cancel(taskId, run.task.lease_id);
     } else {
       // 配置未就绪时任务也可能已排队；取消后不能在配置恢复时执行它。
+      var cancelledLease;
       for (var i = _taskQueue.length - 1; i >= 0; i--) {
         if (_taskQueue[i].id === taskId) {
+          cancelledLease = _taskQueue[i].lease_id;
           _taskQueue.splice(i, 1);
           delete _knownTaskIds[taskId];
         }
@@ -537,7 +574,7 @@ function startMainLoop(serverUrl, secret, initialConfig) {
       // Task not running — ack immediately so server clears device_id
       logger.info(TAG, "任务未在运行，直接确认取消: " + taskId);
       try {
-        apiClient.report(taskId, "cancelled", { error: "Ack server cancel (task not running)" });
+        apiClient.report(taskId, "cancelled", { error: "Ack server cancel (task not running)" }, null, cancelledLease, apiSession);
       } catch (e) {
         logger.warn(TAG, "确认取消上报失败: " + e.message);
       }

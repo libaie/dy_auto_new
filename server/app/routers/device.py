@@ -36,6 +36,50 @@ router = APIRouter(prefix="/api/device", tags=["device"])
 _pair_rate_limits: dict[str, list] = {}  # IP → [timestamps]
 
 
+def _require_device_account_access(db: Session, account, device_id: Optional[str]) -> None:
+    """Keep per-device reports in their owner's accounts; retain legacy master access."""
+    if not device_id:
+        return
+    device = db.get(EventDevice, device_id)
+    if not device or not account or (account.user_id and account.user_id != device.user_id):
+        raise HTTPException(status_code=403, detail="账号不属于此设备的用户")
+
+
+def _require_device_task_access(db: Session, task_id: str, device_id: Optional[str]) -> None:
+    if not task_id or not device_id:
+        return
+    task = db.get(EventTask, task_id)
+    if not task or task.device_id != device_id:
+        raise HTTPException(status_code=403, detail="任务不属于此设备")
+
+
+def _can_update_collected_user(db: Session, record, device_id: Optional[str]) -> bool:
+    """The legacy globally unique lead must never change tenant through an upsert."""
+    if not device_id:
+        return True
+    device = db.get(EventDevice, device_id)
+    if not device:
+        return False
+    source_task = db.get(EventTask, record.task_id) if record.task_id else None
+    if source_task:
+        from app.db_models import Account
+        account = db.get(Account, source_task.account_id)
+        owner = source_task.user_id or (account.user_id if account else None)
+        if owner:
+            return owner == device.user_id
+    source_device = db.get(EventDevice, record.device_id) if record.device_id else None
+    # A hardware ID can be deleted and paired to another owner. Older server
+    # versions left historical rows attached to that ID, so only a profile
+    # demonstrably created in this device instance may use the device fallback.
+    # Equal timestamps are ambiguous on databases with second precision.
+    if (not source_device or not record.created_at or not source_device.created_at
+            or record.created_at <= source_device.created_at):
+        return False
+    if source_device.user_id:
+        return source_device.user_id == device.user_id
+    return source_device.id == device_id
+
+
 async def _notify_pending_tasks(db: Session, device_id: str):
     """Check if there are pending tasks for this device and notify it via WS."""
     import logging
@@ -869,13 +913,16 @@ async def script_upload(
     file: UploadFile = FastAPIFile(...),
     user = Depends(verify_admin_token),
 ):
-    from app.services.script_service import script_service
+    from app.services.script_service import InvalidScriptArchive, script_service
     if not file.filename.endswith(".zip"):
         raise HTTPException(status_code=400, detail="Only .zip files accepted")
     content = await file.read()
     if len(content) > 10 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="File too large (max 10MB)")
-    new_version = script_service.upload_script(io.BytesIO(content))
+    try:
+        new_version = script_service.upload_script(io.BytesIO(content))
+    except InvalidScriptArchive as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"version": new_version, "size": len(content)}
 
 
@@ -883,13 +930,14 @@ async def script_upload(
 async def report_risk(
     report: RiskReport,
     db: Session = Depends(get_db),
-    _: None = Depends(verify_device_secret),
+    authed_device_id: Optional[str] = Depends(verify_device_secret),
 ):
     """Device reports risk control detection. Marks account as risk_controlled."""
     from app.db_models import Account
     account = db.query(Account).filter(Account.id == report.account_id).first()
     if not account:
         return {"status": "ignored", "account_status": "unknown"}
+    _require_device_account_access(db, account, authed_device_id)
     if account.status == "active":
         account.status = "risk_controlled"
         # Skip pending channel items for this account
@@ -988,7 +1036,7 @@ def device_list_templates(
     Filters by device resolution profile when available."""
     from app.services.template_service import template_service
     if not resolution and device_id:
-        device = db.query(Device).filter(Device.id == device_id).first()
+        device = db.query(EventDevice).filter(EventDevice.id == device_id).first()
         if device and device.screen_resolution:
             resolution = device.screen_resolution
     templates = template_service.list_templates(resolution=resolution)
@@ -1179,6 +1227,8 @@ async def collect_report(
     from app.db_models import CollectedComment, CollectedUser
     from sqlalchemy.exc import IntegrityError
 
+    _require_device_task_access(db, request.task_id, device_id)
+
     # 1. 解析目的地（设备端未传时服务端兜底，仅旅游行业任务触发）
     _is_travel = False
     has_dest = (request.comment.intended_province or request.comment.intended_city or request.comment.intended_attraction)
@@ -1226,31 +1276,35 @@ async def collect_report(
 
     # 2. 保存用户（存在则更新，不存在则新建）
     user_new = False
+    user_conflict = False
     if request.user and request.user.douyin_id:
         existing = db.query(CollectedUser).filter(
             CollectedUser.douyin_id == request.user.douyin_id
         ).first()
         if existing:
-            existing.nickname = request.user.nickname
-            existing.likes_count = request.user.likes_count
-            existing.follow_count = request.user.follow_count
-            existing.fans_count = request.user.fans_count
-            existing.works_count = request.user.works_count
-            existing.gender = request.user.gender
-            existing.age = request.user.age
-            existing.ip_location = request.user.ip_location
-            existing.is_private = request.user.is_private
-            existing.data_source_type = request.data_source_type
-            existing.keyword = request.keyword
-            existing.task_id = request.task_id
-            existing.device_id = device_id
-            if request.comment.intended_province:
-                existing.intended_province = request.comment.intended_province
-            if request.comment.intended_city:
-                existing.intended_city = request.comment.intended_city
-            if request.comment.intended_attraction:
-                existing.intended_attraction = request.comment.intended_attraction
-            db.commit()
+            if not _can_update_collected_user(db, existing, device_id):
+                user_conflict = True
+            else:
+                existing.nickname = request.user.nickname
+                existing.likes_count = request.user.likes_count
+                existing.follow_count = request.user.follow_count
+                existing.fans_count = request.user.fans_count
+                existing.works_count = request.user.works_count
+                existing.gender = request.user.gender
+                existing.age = request.user.age
+                existing.ip_location = request.user.ip_location
+                existing.is_private = request.user.is_private
+                existing.data_source_type = request.data_source_type
+                existing.keyword = request.keyword
+                existing.task_id = request.task_id
+                existing.device_id = device_id
+                if request.comment.intended_province:
+                    existing.intended_province = request.comment.intended_province
+                if request.comment.intended_city:
+                    existing.intended_city = request.comment.intended_city
+                if request.comment.intended_attraction:
+                    existing.intended_attraction = request.comment.intended_attraction
+                db.commit()
         else:
             db.add(CollectedUser(
                 task_id=request.task_id,
@@ -1280,27 +1334,30 @@ async def collect_report(
                     CollectedUser.douyin_id == request.user.douyin_id
                 ).first()
                 if existing2:
-                    existing2.nickname = request.user.nickname
-                    existing2.likes_count = request.user.likes_count
-                    existing2.follow_count = request.user.follow_count
-                    existing2.fans_count = request.user.fans_count
-                    existing2.works_count = request.user.works_count
-                    existing2.gender = request.user.gender
-                    existing2.age = request.user.age
-                    existing2.ip_location = request.user.ip_location
-                    existing2.is_private = request.user.is_private
-                    existing2.data_source_type = request.data_source_type
-                    existing2.keyword = request.keyword
-                    existing2.task_id = request.task_id
-                    existing2.device_id = device_id
-                    db.commit()
+                    if not _can_update_collected_user(db, existing2, device_id):
+                        user_conflict = True
+                    else:
+                        existing2.nickname = request.user.nickname
+                        existing2.likes_count = request.user.likes_count
+                        existing2.follow_count = request.user.follow_count
+                        existing2.fans_count = request.user.fans_count
+                        existing2.works_count = request.user.works_count
+                        existing2.gender = request.user.gender
+                        existing2.age = request.user.age
+                        existing2.ip_location = request.user.ip_location
+                        existing2.is_private = request.user.is_private
+                        existing2.data_source_type = request.data_source_type
+                        existing2.keyword = request.keyword
+                        existing2.task_id = request.task_id
+                        existing2.device_id = device_id
+                        db.commit()
 
     # WS 实时推送
     await pair_ws_manager.broadcast_to_admins({"event": "data_changed", "type": "comment", "id": comment.id}, user_ids=resource_user_ids(db, EventTask, request.task_id))
     if user_new:
         await pair_ws_manager.broadcast_to_admins({"event": "data_changed", "type": "user", "id": request.user.douyin_id}, user_ids=resource_user_ids(db, EventTask, request.task_id))
 
-    return {"comment_saved": True, "user_new": user_new}
+    return {"comment_saved": True, "user_new": user_new, "user_conflict": user_conflict}
 
 
 # --- DM conversation endpoints ---
@@ -1313,15 +1370,21 @@ def dm_claim_recipient(
 ):
     """原子占用：insert conversation where not exists (account_id, douyin_id).
     SQLite WAL 竞态：并发 SELECT 可能同时通过 → IntegrityError → claimed=false."""
-    from app.db_models import Conversation
+    from app.db_models import Account, Conversation
     from sqlalchemy.exc import IntegrityError
     from datetime import datetime, timezone, timedelta
+
+    account = db.get(Account, request.account_id)
+    if not account:
+        raise HTTPException(status_code=404, detail="账号不存在")
+    _require_device_account_access(db, account, authed_device_id)
 
     now = bj_now()
 
     # 清理孤儿 claim（超 30min 未发送）
     orphan_threshold = now - timedelta(minutes=30)
     db.query(Conversation).filter(
+        Conversation.account_id == request.account_id,
         Conversation.claimed_at.isnot(None),
         Conversation.claimed_at < orphan_threshold,
         Conversation.status == "active",
@@ -1366,7 +1429,7 @@ async def dm_send_report(
     authed_device_id: str = Depends(verify_device_secret),
 ):
     """DM 发送成功后上报：更新 stage、content、计数"""
-    from app.db_models import Conversation
+    from app.db_models import Account, Conversation
 
     now = bj_now()
     conv = db.query(Conversation).filter(Conversation.id == request.conversation_id).first()
@@ -1374,6 +1437,7 @@ async def dm_send_report(
         raise HTTPException(status_code=404, detail="会话不存在")
     if conv.device_id != authed_device_id:
         raise HTTPException(status_code=403, detail="会话不属于此设备")
+    _require_device_account_access(db, db.get(Account, conv.account_id), authed_device_id)
 
     conv.current_stage = request.stage
     conv.intent = request.intent
@@ -1400,7 +1464,7 @@ def dm_release_recipient(
     authed_device_id: str = Depends(verify_device_secret),
 ):
     """DM 发送失败时释放占用。仅允许 claim 设备释放，防止误删其他设备的成功会话。"""
-    from app.db_models import Conversation
+    from app.db_models import Account, Conversation
 
     conv = db.query(Conversation).filter(
         Conversation.id == request.conversation_id,
@@ -1408,6 +1472,7 @@ def dm_release_recipient(
         Conversation.last_dm_at.is_(None),  # 尚未成功发送过
     ).first()
     if conv:
+        _require_device_account_access(db, db.get(Account, conv.account_id), authed_device_id)
         db.delete(conv)
         db.commit()
         return DMReleaseRecipientResponse(released=True)
@@ -1428,15 +1493,28 @@ class CommentAIReplyRequest(BaseModel):
 def save_comment_ai_reply(
     request: CommentAIReplyRequest,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_device_secret),
+    authed_device_id: Optional[str] = Depends(verify_device_secret),
 ):
     """保存 AI 生成的回复到采集的评论记录（按昵称+内容+task_id 匹配，避免跨视频错配）"""
-    from app.db_models import CollectedComment
+    from app.db_models import Account, CollectedComment
+    from sqlalchemy import func
     query = db.query(CollectedComment).filter(
         CollectedComment.nickname == request.nickname,
         CollectedComment.content == request.text,
         CollectedComment.ai_reply.is_(None),
     )
+    if authed_device_id:
+        device = db.get(EventDevice, authed_device_id)
+        if not device:
+            raise HTTPException(status_code=403, detail="设备不存在")
+        # device_id alone is reusable; the task/account preserves the original
+        # owner even for historical rows left by older delete implementations.
+        query = query.join(EventTask, CollectedComment.task_id == EventTask.id).join(
+            Account, EventTask.account_id == Account.id
+        ).filter(
+            CollectedComment.device_id == authed_device_id,
+            func.coalesce(func.nullif(EventTask.user_id, ""), func.nullif(Account.user_id, "")) == (device.user_id or None),
+        )
     if request.task_id:
         query = query.filter(CollectedComment.task_id == request.task_id)
     comment = query.order_by(CollectedComment.created_at.desc()).first()
@@ -1482,12 +1560,16 @@ def save_user_profile(
     from app.db_models import CollectedUser
     from sqlalchemy.exc import IntegrityError
 
+    _require_device_task_access(db, request.task_id, authed_device_id)
+
     douyin_id = request.douyin_id.strip()
     if not douyin_id:
         return {"saved": False, "reason": "empty douyin_id"}
 
     existing = db.query(CollectedUser).filter(CollectedUser.douyin_id == douyin_id).first()
     if existing:
+        if not _can_update_collected_user(db, existing, authed_device_id):
+            return {"saved": False, "reason": "profile belongs to another user"}
         # Update fields if they changed
         changed = False
         for field in ("nickname", "fans_count", "likes_count", "follow_count",
@@ -1538,11 +1620,17 @@ class UserAvatarRequest(BaseModel):
     image_base64: str  # base64-encoded JPEG/PNG
 
 
+def _avatar_filename(douyin_id: str) -> str:
+    if not douyin_id or len(douyin_id) > 100 or any(char in douyin_id for char in ("/", "\\", ":", "\x00")):
+        raise HTTPException(status_code=400, detail="Invalid avatar ID")
+    return f"{douyin_id}.jpg"
+
+
 @router.post("/user-avatar")
 def upload_user_avatar(
     request: UserAvatarRequest,
     db: Session = Depends(get_db),
-    _: str = Depends(verify_device_secret),
+    authed_device_id: Optional[str] = Depends(verify_device_secret),
 ):
     """上传用户头像裁剪图，保存到本地并关联 CollectedUser."""
     import base64
@@ -1552,10 +1640,13 @@ def upload_user_avatar(
     douyin_id = request.douyin_id.strip()
     if not douyin_id:
         return {"saved": False, "reason": "empty douyin_id"}
+    filename = _avatar_filename(douyin_id)
 
     user = db.query(CollectedUser).filter(CollectedUser.douyin_id == douyin_id).first()
     if not user:
         return {"saved": False, "reason": "user not found"}
+    if not _can_update_collected_user(db, user, authed_device_id):
+        raise HTTPException(status_code=403, detail="用户资料不属于此设备的用户")
 
     try:
         img_data = base64.b64decode(request.image_base64)
@@ -1567,7 +1658,6 @@ def upload_user_avatar(
 
     avatar_dir = os.path.join(os.path.dirname(__file__), "..", "..", "data", "avatars")
     os.makedirs(avatar_dir, exist_ok=True)
-    filename = f"{douyin_id}.jpg"
     filepath = os.path.join(avatar_dir, filename)
     with open(filepath, "wb") as f:
         f.write(img_data)
@@ -1583,7 +1673,7 @@ def get_user_avatar(douyin_id: str):
     import os
     from fastapi.responses import FileResponse
     avatar_dir = os.path.join(os.path.dirname(__file__), "..", "..", "data", "avatars")
-    filepath = os.path.join(avatar_dir, f"{douyin_id}.jpg")
+    filepath = os.path.join(avatar_dir, _avatar_filename(douyin_id))
     if not os.path.exists(filepath):
         raise HTTPException(status_code=404, detail="Avatar not found")
     return FileResponse(filepath, media_type="image/jpeg")

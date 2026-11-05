@@ -27,8 +27,9 @@ var taskExecutor = {
    * 标记当前任务为已取消
    * @param {string} taskId
    */
-  cancel: function (taskId) {
-    if (this._currentTaskId === taskId) {
+  cancel: function (taskId, leaseId) {
+    if (this._currentTaskId === taskId &&
+        (arguments.length < 2 || this._currentLeaseId === (leaseId || null))) {
       taskCancellation.cancel();
       logger.info(TAG, "任务取消标记已设置: " + taskId);
     }
@@ -69,7 +70,7 @@ var taskExecutor = {
     return this._currentAccountId;
   },
 
-  execute: function (task) {
+  execute: function (task, cancellationToken) {
     logger.info(TAG, "执行任务: " + task.id + " 类型=" + task.type);
 
     var handler = handlers[task.type];
@@ -82,7 +83,8 @@ var taskExecutor = {
     this._currentLeaseId = task.lease_id || null;
     this._currentAccountId = task.account_id || null;
     this._nextOpIndex = 0;
-    taskCancellation.reset();
+    var execution = taskCancellation.reset(cancellationToken);
+    var requestSession = apiClient.beginTaskSession(execution.apiSession);
     task.params.task_id = task.id;  // 注入任务 ID 供 handler 上报进度
     task.params.account_id = task.account_id;  // 注入账号 ID 供 handler 使用
 
@@ -90,33 +92,28 @@ var taskExecutor = {
     var TASK_TIMEOUT = taskTimeout.getTaskTimeoutMs(task);
     var startTime = Date.now();
     var timedOut = false;
-    var self = this;
-
     var watchdog = setInterval(function () {
-      if (self.isCancelled()) {
+      if (execution.cancelled) {
         logger.info(TAG, "任务 " + task.id + " 已被取消");
         return;
       }
       if (Date.now() - startTime > TASK_TIMEOUT) {
         logger.error(TAG, "任务 " + task.id + " 执行超时（" + (TASK_TIMEOUT / 60000) + "分钟）");
         timedOut = true;
-        taskCancellation.cancel();
+        execution.cancelled = true;
       }
     }, 10000);
 
     try {
+      if (this.isCancelled() || !apiClient.isCurrentSession(requestSession)) {
+        return { status: "cancelled", result: { error: "Task cancelled before execution" } };
+      }
       var crashRecovery = require("./crash-recovery");
       if (task.account_id) {
         crashRecovery.setAccountId(task.account_id);
       }
 
       var result = handler.execute(task.params);
-      clearInterval(watchdog);
-
-      this._currentTaskId = null;
-      this._currentLeaseId = null;
-      this._currentAccountId = null;
-      this._nextOpIndex = 0;
 
       if (timedOut || Date.now() - startTime > TASK_TIMEOUT) {
         return { status: "failed", result: { error: "Task execution timed out (" + (TASK_TIMEOUT / 60000) + " min)" } };
@@ -134,13 +131,18 @@ var taskExecutor = {
         return { status: "failed", result: { error: result.error } };
       }
     } catch (e) {
+      if (this.isCancelled()) {
+        return { status: "cancelled", result: { error: "Task cancelled by server" } };
+      }
+      logger.error(TAG, "任务 " + task.id + " 异常: " + e.message);
+      return { status: "failed", result: { error: e.message } };
+    } finally {
       clearInterval(watchdog);
+      apiClient.endTaskSession(requestSession);
       this._currentTaskId = null;
       this._currentLeaseId = null;
       this._currentAccountId = null;
       this._nextOpIndex = 0;
-      logger.error(TAG, "任务 " + task.id + " 异常: " + e.message);
-      return { status: "failed", result: { error: e.message } };
     }
   },
 

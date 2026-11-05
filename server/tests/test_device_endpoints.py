@@ -3,6 +3,7 @@ import io
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app
+from tests.script_package_fixture import script_package
 
 client = TestClient(app)
 SECRET = "change-me-to-a-random-string"
@@ -36,7 +37,7 @@ def test_script_download_no_script():
 
 def test_script_upload_and_download():
     """Upload a script, then download it."""
-    zip_content = b"PK\x03\x04fake zip content"
+    zip_content = script_package()
     resp = client.post("/api/device/script-upload",
         files={"file": ("device.zip", io.BytesIO(zip_content), "application/zip")},
         headers=HEADERS)
@@ -45,6 +46,18 @@ def test_script_upload_and_download():
     dl_resp = client.get("/api/device/script-download", headers=HEADERS)
     assert dl_resp.status_code == 200
     assert len(dl_resp.content) > 0
+
+
+def test_script_upload_rejects_incomplete_zip_without_advancing_version():
+    transport = TestClient(app, raise_server_exceptions=False)
+    old_version = transport.get("/api/device/script-version", headers=HEADERS).json()["version"]
+    resp = transport.post("/api/device/script-upload",
+        files={"file": ("device.zip", io.BytesIO(b"PK\x03\x04broken archive"), "application/zip")},
+        headers=HEADERS)
+    assert resp.status_code == 400
+    assert resp.json()["detail"]
+    assert transport.get("/api/device/script-version", headers=HEADERS).json()["version"] == old_version
+    assert transport.get("/api/device/script-download", headers=HEADERS).status_code == 404
 
 
 def test_script_upload_rejects_non_zip():

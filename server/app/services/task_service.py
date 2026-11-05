@@ -11,6 +11,16 @@ from app.models import TaskType, TaskStatus, Task as PydanticTask
 from app.services.stats_service import stats_service
 
 MAX_RETRIES = 3
+TASK_TARGET_DEVICE_PARAM = "_target_device_id"
+
+
+def _task_params_with_target(params, device_id=None) -> dict:
+    """Copy business params and set only the server's explicit routing target."""
+    copied = dict(params or {})
+    copied.pop(TASK_TARGET_DEVICE_PARAM, None)
+    if device_id:
+        copied[TASK_TARGET_DEVICE_PARAM] = device_id
+    return copied
 
 
 def _db_task_to_pydantic(task: DBTask, params_override: Optional[dict] = None) -> PydanticTask:
@@ -20,7 +30,8 @@ def _db_task_to_pydantic(task: DBTask, params_override: Optional[dict] = None) -
         type=TaskType(task.type),
         account_id=task.account_id,
         device_id=task.device_id or "",
-        params=params_override if params_override is not None else (task.params or {}),
+        # The routing reservation is server state, never a device parameter.
+        params=_task_params_with_target(params_override if params_override is not None else task.params),
         status=TaskStatus(task.status),
         created_at=task.created_at,
         scheduled_at=task.scheduled_at,
@@ -70,7 +81,11 @@ class TaskService:
             task.lease_id = None
         else:
             task.status = "pending"
-            task.device_id = None
+            target_id = (task.params or {}).get(TASK_TARGET_DEVICE_PARAM)
+            target = db.get(DBDevice, target_id) if isinstance(target_id, str) and target_id else None
+            task.device_id = target.id if target else None
+            if not target:
+                task.params = _task_params_with_target(task.params)
             task.started_at = None
             task.completed_at = None
             task.lease_id = None
@@ -127,7 +142,7 @@ class TaskService:
             account_id=account_id,
             device_id=device_id,
             user_id=user_id,
-            params=params,
+            params=_task_params_with_target(params, device_id),
             status=TaskStatus.PENDING.value,
             scheduled_at=scheduled_at,
         )
@@ -215,6 +230,10 @@ class TaskService:
             # Atomic claim: only succeeds if no other task for this account is RUNNING
             import uuid
             _lease_id = str(uuid.uuid4())
+            # Capture the pending routing choice before device_id becomes the
+            # executor. This also handles existing directed pending records;
+            # automatically routed tasks must never reserve their first worker.
+            dispatch_params = _task_params_with_target(db_task.params, db_task.device_id)
             result = db.execute(
                 update(DBTask)
                 .where(
@@ -223,7 +242,8 @@ class TaskService:
                     DBTask.account_id.in_(select(Account.id).where(Account.status == "active")),
                     ~DBTask.account_id.in_(busy_account_ids),
                 )
-                .values(status=TaskStatus.RUNNING.value, device_id=device_id, started_at=bj_now(), lease_id=_lease_id)
+                .values(status=TaskStatus.RUNNING.value, device_id=device_id,
+                        started_at=bj_now(), lease_id=_lease_id, params=dispatch_params)
             )
             db.commit()
 

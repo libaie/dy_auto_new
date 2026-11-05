@@ -144,11 +144,19 @@ SearchBaseHandler.execute = function (params) {
       }
     }
 
+    if (taskCancellation.isCancelled()) break;
+    this._lastSendOutcome = "not_attempted";
     var interactResult = this._interactWithVideo(content, stats);
     if (interactResult) {
       stats.success_count++;
     } else {
       stats.fail_count++;
+    }
+
+    if (this._lastSendOutcome === "unknown") {
+      logger.warn(TAG, "发送结果无法确认，停止当前搜索以避免继续或重复发送");
+      stats.details.push("send_unconfirmed at video " + (i + 1));
+      break;
     }
 
     antiDetect.maybePause();
@@ -652,6 +660,7 @@ SearchBaseHandler._getDMCachedSequence = function (seqId) {
  * 支持变体轮替: cached.variants 存在时轮替选取，设备重启后从 KV 恢复索引
  */
 SearchBaseHandler.resolveMessages = function (params) {
+  if (taskCancellation.isCancelled()) return [];
   // 1. dm_sequence_id — 查 poll 缓存 (含 variants, 优先于内联 dm_messages)
   if (params.dm_sequence_id) {
     var cached = this._getDMCachedSequence(params.dm_sequence_id);
@@ -725,10 +734,12 @@ SearchBaseHandler._sendMessageSequence = function (messages, stats, keyword) {
   antiDetect._skipDisabled = true;
   try {
     for (var i = 0; i < messages.length; i++) {
+      if (taskCancellation.isCancelled()) break;
       var msg = messages[i];
       var content = this.applyVariables(msg.content, { keyword: keyword || "" });
       if (!this.safeInput("dm_input", content)) break;
       sleep(500);
+      if (taskCancellation.isCancelled()) break;
       this._lastSendOutcome = commentUtils.submitAndObserve("dm_send", "dm_input", content, "dm_send_failed");
       if (this._lastSendOutcome !== "confirmed") {
         logger.warn(TAG, "DM发送未确认: " + this._lastSendOutcome + "，停止序列");
@@ -736,6 +747,7 @@ SearchBaseHandler._sendMessageSequence = function (messages, stats, keyword) {
       }
       sentCount++;
       stats.details.push("dm_sent[" + (i + 1) + "/" + messages.length + "]: " + content.substring(0, 30));
+      if (taskCancellation.isCancelled()) break;
       sleep(msg.delay_ms != null ? msg.delay_ms : (Math.floor(Math.random() * 3000) + 2000));
     }
   } finally {

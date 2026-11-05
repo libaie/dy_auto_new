@@ -37,7 +37,7 @@ function harness(configs, nodes, options = {}) {
     }
   };
   const selector = value => ({find:()=>nodes && nodes[value] || [],findOne:()=>nodes && nodes[value] && nodes[value][0] || null});
-  const sandbox = {module:{exports:{}}, require:name=>name==='./selector-loader'?{get:name=>configs[name],_cache:configs}:name==='./screen-context'?geometry:name==='./image-locator'?{find:()=>null}:{info(){},warn(){},error(){},debug(){}}, device:state, Date:{now:()=>now},sleep:ms=>{now+=ms;},currentPackage:()=> 'com.ss.android.ugc.aweme',click:(x,y)=>{ops.push(['click',x,y]);return sandbox.actuationResult;},press:(x,y,d)=>{ops.push(['press',x,y,d]);return sandbox.actuationResult;},text:selector,id:selector,desc:selector,className:selector,textContains:selector,idContains:selector,descContains:selector,classNameContains:selector,actuationResult:true, shell:()=>({code:1}),setClip(){}};
+  const sandbox = {module:{exports:{}}, require:name=>name==='./task-cancellation'?{isCancelled:()=>false}:name==='./selector-loader'?{get:name=>configs[name],_cache:configs}:name==='./screen-context'?geometry:name==='./image-locator'?{find:()=>null}:{info(){},warn(){},error(){},debug(){}}, device:state, Date:{now:()=>now},sleep:ms=>{now+=ms;},currentPackage:()=> 'com.ss.android.ugc.aweme',click:(x,y)=>{ops.push(['click',x,y]);return sandbox.actuationResult;},press:(x,y,d)=>{ops.push(['press',x,y,d]);return sandbox.actuationResult;},text:selector,id:selector,desc:selector,className:selector,textContains:selector,idContains:selector,descContains:selector,classNameContains:selector,actuationResult:true, shell:()=>({code:1}),setClip(){}};
   Object.assign(sandbox,options.globals || {});
   if (options.realGeometry) {
     sandbox.context = {getResources:()=>({getDisplayMetrics:()=>({density:state.density}),getConfiguration:()=>({fontScale:1})})};
@@ -54,6 +54,79 @@ function harness(configs, nodes, options = {}) {
   vm.runInNewContext(fs.readFileSync(require.resolve('../core/ui-operator'),'utf8'),sandbox);
   return {ui:sandbox.module.exports,state,ops,sandbox,geometry};
 }
+
+function parentResolver(h) {
+  const sandbox = Object.assign({}, h.sandbox, { module: { exports: {} } });
+  const originalRequire = sandbox.require;
+  sandbox.require = name => name === './ui-operator' ? h.ui : originalRequire(name);
+  vm.runInNewContext(fs.readFileSync(require.resolve('../core/selector-resolver'), 'utf8'), sandbox);
+  return sandbox.module.exports;
+}
+
+test('parent lookup filters every candidate by the configured region and keeps its scope until click', () => {
+  let y = 100;
+  const outside = node(100, 1000);
+  const inside = node(100, 100, { bounds: () => ({ left:90,top:y-10,right:110,bottom:y+10 }) });
+  const h = harness({avatar:{strategies:[{type:'id',value:'avatar',priority:1,region:{space:'screen_normalized',left:0,top:0,right:1,bottom:0.2}}]}});
+  const parent = {find:()=>[outside,inside],findOne:()=>outside};
+  const resolved = parentResolver(h).findChildBySelector(parent, 'avatar');
+  assert.equal(resolved, inside);
+  y = 1000;
+  assert.equal(h.ui.clickElement(resolved), false);
+  assert.deepEqual(h.ops, []);
+});
+
+test('parent conditions retain the outer scope for AND and OR alternatives', () => {
+  for (const logic of ['and', 'or']) {
+    const outside=node(100,1000,{id:()=> 'avatar',desc:()=> 'person'});
+    const inside=node(100,100,{id:()=> 'avatar',desc:()=> 'person'});
+    const h=harness({});
+    const strategy={conditions:[{type:'id',value:'avatar'},{type:'desc',value:'person'}],logic,region:{space:'screen_normalized',left:0,top:0,right:1,bottom:0.2}};
+    const resolved=parentResolver(h).findByConditionsInParent({find:()=>[outside,inside],findOne:()=>outside},strategy);
+    assert.equal(resolved,inside);
+    h.state.blockedBounds=[{left:0,top:0,right:720,bottom:300}];
+    assert.equal(h.ui.clickElement(resolved),false);
+  }
+});
+
+test('parent chain lookup considers later candidates inside the final scope', () => {
+  const outside=node(100,1000),inside=node(100,100);
+  const h=harness({});
+  const strategy={type:'chain',steps:[{type:'id',value:'avatar'}],region:{space:'screen_normalized',left:0,top:0,right:1,bottom:0.2}};
+  assert.equal(parentResolver(h).findByStrategyInParent({find:()=>[outside,inside]},strategy),inside);
+});
+
+test('parent lookup enforces anchors and fails when the anchor is missing', () => {
+  const outside=node(500,500),inside=node(100,100),anchor=node(100,100);
+  const h=harness({}, {container:[anchor]});
+  const resolver=parentResolver(h);
+  const parent={find:()=>[outside,inside],findOne:()=>outside};
+  assert.equal(resolver.findByStrategyInParent(parent,{type:'id',value:'avatar',anchor:{type:'text',value:'container'}}),inside);
+  assert.equal(resolver.findByStrategyInParent(parent,{type:'id',value:'avatar',anchor:{type:'text',value:'missing'}}),null);
+});
+
+test('parent-scoped chains cannot climb above their container while global chains still can', () => {
+  const outside = node(100,100);
+  const container = node(100,100,{parent:()=>outside});
+  const child = node(100,100,{parent:()=>container});
+  container.find = () => [child];
+  const h=harness({}, {seed:[child]});
+  const strategy={type:'chain',steps:[{type:'id',value:'seed'},{nav:'parent'},{nav:'parent'}]};
+  assert.equal(parentResolver(h).findByStrategyInParent(container,strategy),null);
+  assert.equal(h.ui._findByStrategy(strategy),outside);
+});
+
+test('parent-scoped chains cannot select siblings of their container', () => {
+  const sibling=node(100,100);
+  const outside=node(100,100,{find:()=>[sibling]});
+  sibling.parent=()=>outside;
+  const container=node(100,100,{parent:()=>outside});
+  const child=node(100,100,{parent:()=>container});
+  container.find=()=>[child];
+  const h=harness({});
+  const strategy={type:'chain',steps:[{type:'id',value:'seed'},{nav:'parent'},{nav:'sibling',type:'id',value:'elsewhere'}]};
+  assert.equal(parentResolver(h).findByStrategyInParent(container,strategy),null);
+});
 
 test('coordinate press uses legacy screen fraction once, including zero edge',()=>{
   const h=harness({target:{strategies:[{type:'coordinate',x_percent:0,y_percent:0.5,click_mode:'press'}]}});

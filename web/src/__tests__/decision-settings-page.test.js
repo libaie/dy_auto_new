@@ -34,6 +34,27 @@ async function save(wrapper) {
 }
 
 describe('Jev decision settings', () => {
+  it('does not offer to save default values after the initial settings load fails', async () => {
+    api.getSettings.mockRejectedValueOnce(new Error('temporary network failure'))
+    const wrapper = await page()
+    const saveButton = wrapper.findAll('button').find(button => button.text() === '保存设置')
+    if (saveButton && !saveButton.attributes('disabled')) await saveButton.trigger('click')
+    await flushPromises()
+
+    expect(api.updateSettings).not.toHaveBeenCalled()
+    expect(wrapper.find('[role="alert"]').exists()).toBe(true)
+    const retry = wrapper.findAll('button').find(button => button.text().includes('重试'))
+    expect(retry).toBeDefined()
+    await retry.trigger('click')
+    await flushPromises()
+    expect(wrapper.find('#decision-enabled').element.checked).toBe(true)
+    await save(wrapper)
+    expect(api.updateSettings).toHaveBeenCalledWith(expect.objectContaining({
+      decision_enabled: 'true', decision_min_probability: '0.75',
+    }))
+    wrapper.unmount()
+  })
+
   it('loads enabled state and preserves a stored credential when saving a blank input', async () => {
     const wrapper = await page()
     expect(wrapper.find('#decision-enabled').element.checked).toBe(true)

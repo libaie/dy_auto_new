@@ -49,7 +49,7 @@ function setup(overrides = {}) {
       for (const [service, value] of Object.entries(overrides.services || {})) { if (target.endsWith('/'+service)) return value; }
       if(target.endsWith('/core/screen-context'))return geometry;
       if(target.endsWith('/core/ui-operator'))return ui;
-      if(target.endsWith('/core/ocr-locator') || target.endsWith('/handlers/comment-utils'))return load(path.relative(path.resolve(__dirname,'..'),target));
+      if(target.endsWith('/core/ocr-locator') || target.endsWith('/handlers/comment-utils') || target.endsWith('/core/task-cancellation'))return load(path.relative(path.resolve(__dirname,'..'),target));
       if(target.endsWith('/handlers/base-handler')||target.endsWith('/handlers/comment-base'))return {safeClick(a){return ui.clickAction(a);},safeInput(){return true;}};
       if(target.endsWith('/utils/logger'))return {info(){},warn(){},debug(){},error(){}};
       if(target.endsWith('/core/anti-detect'))return {};

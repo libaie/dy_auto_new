@@ -2,6 +2,7 @@
 var config = global.__config || require("../config");
 var apiClient = require("./api-client");
 var logger = require("../utils/logger");
+var taskCancellation = require("./task-cancellation");
 var TAG = "Decision";
 var REQUEST_TIMEOUT = 25000;
 var own = Object.prototype.hasOwnProperty;
@@ -102,6 +103,7 @@ var decisionClient = {
   },
 
   decide: function (state, questions) {
+    if (taskCancellation.isCancelled()) return null;
     if (!this.isEnabled() || !config.serverUrl || !config.deviceSecret) return null;
     if (!isObject(state) || !isObject(questions)) return null;
     var ids = Object.keys(questions);
@@ -115,9 +117,16 @@ var decisionClient = {
     }
     var settings = this.getSettings();
     var started = Date.now();
+    var serverUrl = config.serverUrl;
+    var deviceSecret = config.deviceSecret;
+    var authFailure = apiClient._onAuthFailure;
+    function isCurrentRequest() {
+      return !taskCancellation.isCancelled() && config.serverUrl === serverUrl &&
+        config.deviceSecret === deviceSecret && apiClient._onAuthFailure === authFailure;
+    }
     try {
       var options = {
-        headers: { "X-Device-Secret": config.deviceSecret },
+        headers: { "X-Device-Secret": deviceSecret },
         timeout: REQUEST_TIMEOUT
       };
       var proxyOptions = apiClient._getProxyOptions();
@@ -125,19 +134,20 @@ var decisionClient = {
         if (own.call(proxyOptions, name)) options[name] = proxyOptions[name];
       }
       // apiClient.post 会自动重试。决策采用一次请求，避免重复分类与超过执行预算。
-      var response = http.postJson(config.serverUrl + "/api/device/decision-proxy", {
+      var response = http.postJson(serverUrl + "/api/device/decision-proxy", {
         state: state,
         questions: questions
       }, options);
-      if (response && response.statusCode === 401 && apiClient._onAuthFailure) {
-        apiClient._onAuthFailure();
+      if (!isCurrentRequest()) return null;
+      if (response && response.statusCode === 401 && authFailure) {
+        authFailure();
       }
       if (!response || response.statusCode !== 200 || Date.now() - started > REQUEST_TIMEOUT) {
         logger.warn(TAG, "决策请求未成功，跳过当前内容");
         return null;
       }
       var result = JSON.parse(apiClient._readBody(response));
-      if (Date.now() - started > REQUEST_TIMEOUT || !isObject(result) || !isDescription(result.model) ||
+      if (!isCurrentRequest() || Date.now() - started > REQUEST_TIMEOUT || !isObject(result) || !isDescription(result.model) ||
         !hasKeys(result.answers, ids)) return null;
       for (i = 0; i < ids.length; i++) {
         var id = ids[i];

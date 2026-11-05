@@ -241,12 +241,14 @@ class ChainService:
 
 
 def _task_to_push_dict(task: DBTask) -> dict:
+    from app.services.task_service import _task_params_with_target
+
     return {
         "id": task.id,
         "type": task.type,
         "account_id": task.account_id,
         "device_id": task.device_id or "",
-        "params": task.params or {},
+        "params": _task_params_with_target(task.params),
         "status": task.status,
         "chain_instance_id": task.chain_instance_id,
         "step_order": task.step_order,

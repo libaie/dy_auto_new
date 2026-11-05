@@ -9,6 +9,7 @@ from app.database import get_db
 from app.db_models import ChainTemplate, ChainInstance, Task as DBTask, Account, Device, AccountGroupMember
 from app.deps import verify_admin_token, require_role
 from app.models import ChainTemplateCreate, ChainTemplateUpdate, ChainInstanceCreateRequest
+from app.services.task_service import _task_params_with_target
 from app.ws_manager import pair_ws_manager
 
 router = APIRouter(prefix="/api/chains", tags=["chains"])
@@ -268,7 +269,7 @@ def get_instance(
             "step_order": t.step_order,
             "type": t.type,
             "status": t.status,
-            "params": t.params,
+            "params": _task_params_with_target(t.params),
             "result": t.result,
             "started_at": str(t.started_at) if t.started_at else None,
             "completed_at": str(t.completed_at) if t.completed_at else None,

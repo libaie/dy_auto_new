@@ -20,11 +20,33 @@ function getTaskExecutor() {
 var offlineQueue = [];
 var isOnline = true;
 var _lastRequestWas4xx = false;  // 兼容诊断标志；是否重试由具体状态码决定
-var _lastRequestStatus = 0;
 var _flushingOfflineQueue = false;
+var _sessionGeneration = 0;
+var _activeTaskSession = null;
+
+function _isCurrentSession(client, session) {
+  return !!session && session.generation === _sessionGeneration &&
+    session.serverUrl === config.serverUrl && session.deviceSecret === config.deviceSecret &&
+    session.deviceId === config.deviceId && session.authFailure === client._onAuthFailure;
+}
+
+function _newRequestState(client, session) {
+  // Status belongs to this request, including nested/concurrent heartbeat and
+  // offline replay requests. A shared last-status flag cannot decide retries.
+  return { session: session || client.captureSession(), status: 0 };
+}
+
+function _discardRetiredOfflineItems(client) {
+  for (var i = offlineQueue.length - 1; i >= 0; i--) {
+    if (!_isCurrentSession(client, offlineQueue[i].session)) {
+      logger.warn(TAG, "离线项所属配对已失效，丢弃: " + offlineQueue[i].path);
+      offlineQueue.splice(i, 1);
+    }
+  }
+}
 
 function _isPermanentClientError(status) {
-  // Authentication may recover after pairing; timeouts/rate limits are transient.
+  // Retry transient failures only within their original pairing session.
   return status >= 400 && status < 500 && status !== 401 && status !== 408 && status !== 429;
 }
 
@@ -49,6 +71,35 @@ var apiClient = {
    */
   setAuthFailureHandler: function (callback) {
     this._onAuthFailure = callback;
+    _sessionGeneration++;
+    _discardRetiredOfflineItems(this);
+  },
+
+  captureSession: function () {
+    return {
+      serverUrl: config.serverUrl, deviceSecret: config.deviceSecret,
+      deviceId: config.deviceId, authFailure: this._onAuthFailure,
+      generation: _sessionGeneration,
+    };
+  },
+
+  isCurrentSession: function (session) {
+    return _isCurrentSession(this, session);
+  },
+
+  // The executor owns this binding until its worker exits. Control traffic
+  // uses fresh sessions; only task side effects inherit the attempt's origin.
+  beginTaskSession: function (session) {
+    _activeTaskSession = session || this.captureSession();
+    return _activeTaskSession;
+  },
+
+  endTaskSession: function (session) {
+    if (_activeTaskSession === session) _activeTaskSession = null;
+  },
+
+  _postTask: function (path, body, timeout, requestState) {
+    return this.post(path, body, timeout, requestState || _newRequestState(this, _activeTaskSession));
   },
 
   /**
@@ -133,16 +184,25 @@ var apiClient = {
 
   _requestWithRetry: function (method, url, opts) {
     _lastRequestWas4xx = false;
-    _lastRequestStatus = 0;
+    var requestState = opts.requestState || _newRequestState(this);
+    requestState.status = 0;
     var body = opts.body || null;
     var timeout = opts.timeout || netConfig.requestTimeout;
     var parseJson = opts.parseJson !== false;
     var label = opts.label || method;
+    var session = requestState.session;
+    var deviceSecret = session.deviceSecret;
+    var authFailure = session.authFailure;
+    var self = this;
+    function isCurrentSession() {
+      return _isCurrentSession(self, session);
+    }
 
     for (var attempt = 0; attempt <= netConfig.maxRetries; attempt++) {
+      if (!isCurrentSession()) return null;
       try {
         var reqOpts = {
-          headers: { "X-Device-Secret": config.deviceSecret },
+          headers: { "X-Device-Secret": deviceSecret },
           timeout: timeout,
         };
         // 合并代理配置
@@ -158,20 +218,23 @@ var apiClient = {
           response = http.get(url, reqOpts);
         }
 
-        _lastRequestStatus = response.statusCode;
+        // A retired request must neither apply old side data nor invalidate a
+        // replacement pairing, even when the server URL has not changed.
+        if (!isCurrentSession()) return null;
+        requestState.status = response.statusCode;
         if (response.statusCode === 200) {
           var result = parseJson ? JSON.parse(this._readBody(response)) : this._readBodyBytes(response);
+          if (!isCurrentSession()) return null;
           this._markOnline();
-          // A replay triggered above must not leak its status into this request.
-          _lastRequestStatus = 200;
+          if (!isCurrentSession()) return null;
           _lastRequestWas4xx = false;
           return result;
         }
 
         if (response.statusCode === 401) {
           logger.error(TAG, label + " 认证失败(401)，设备可能已被删除");
-          if (this._onAuthFailure) {
-            this._onAuthFailure();
+          if (authFailure) {
+            authFailure();
           }
           return null;
         }
@@ -192,6 +255,7 @@ var apiClient = {
           " (第 " + (attempt + 1) + "/" + (netConfig.maxRetries + 1) + " 次尝试)");
       }
 
+      if (!isCurrentSession()) return null;
       if (attempt < netConfig.maxRetries) {
         var delay = this._retryDelay(attempt);
         logger.debug(TAG, "将在 " + Math.round(delay) + "ms 后重试...");
@@ -199,6 +263,7 @@ var apiClient = {
       }
     }
 
+    if (!isCurrentSession()) return null;
     this._markOffline();
     logger.error(TAG, label + " 所有重试均失败");
     return null;
@@ -208,11 +273,12 @@ var apiClient = {
    * 带重试的 HTTP GET
    */
   get: function (path, params) {
-    if (!config.serverUrl) {
+    var requestState = _newRequestState(this);
+    if (!requestState.session.serverUrl) {
       logger.error(TAG, "serverUrl 未设置，无法请求: " + path);
       return null;
     }
-    var url = config.serverUrl + path;
+    var url = requestState.session.serverUrl + path;
     if (params) {
       var queryParts = [];
       for (var key in params) {
@@ -220,21 +286,23 @@ var apiClient = {
       }
       url += "?" + queryParts.join("&");
     }
-    return this._requestWithRetry("GET", url, { label: "GET " + path });
+    return this._requestWithRetry("GET", url, { label: "GET " + path, requestState: requestState });
   },
 
   /**
    * 带重试的 HTTP POST
    */
-  post: function (path, body, timeout) {
-    _lastRequestStatus = 0;
+  post: function (path, body, timeout, requestState) {
+    requestState = requestState || _newRequestState(this);
+    requestState.status = 0;
     _lastRequestWas4xx = false;
-    if (!config.serverUrl) {
+    if (!_isCurrentSession(this, requestState.session)) return null;
+    if (!requestState.session.serverUrl) {
       logger.error(TAG, "serverUrl 未设置，无法请求: " + path);
       return null;
     }
-    var url = config.serverUrl + path;
-    return this._requestWithRetry("POST", url, { body: body, label: "POST " + path, timeout: timeout });
+    var url = requestState.session.serverUrl + path;
+    return this._requestWithRetry("POST", url, { body: body, label: "POST " + path, timeout: timeout, requestState: requestState });
   },
 
   /**
@@ -278,13 +346,18 @@ var apiClient = {
     if (_flushingOfflineQueue) return;
     _flushingOfflineQueue = true;
     try {
-      while (offlineQueue.length > 0) {
+      var flushSession = this.captureSession();
+      _discardRetiredOfflineItems(this);
+      while (offlineQueue.length > 0 && _isCurrentSession(this, flushSession)) {
         var item = offlineQueue.shift();
+        if (!_isCurrentSession(this, item.session)) continue;
         logger.info(TAG, "刷新离线项: " + item.path);
-        var result = this.post(item.path, item.body);
+        var requestState = _newRequestState(this, item.session);
+        var result = this.post(item.path, item.body, null, requestState);
+        if (!_isCurrentSession(this, item.session)) continue;
         if (!result) {
-          if (_isPermanentClientError(_lastRequestStatus)) {
-            logger.error(TAG, "离线项永久失败(" + _lastRequestStatus + ")，跳过: " + item.path);
+          if (_isPermanentClientError(requestState.status)) {
+            logger.error(TAG, "离线项永久失败(" + requestState.status + ")，跳过: " + item.path);
             continue;
           }
           item.retries = (item.retries || 0) + 1;
@@ -340,7 +413,9 @@ var apiClient = {
     return this._downloadWithRetry(url);
   },
 
-  _pushToOfflineQueue: function (path, body, label, critical) {
+  _pushToOfflineQueue: function (path, body, label, critical, session) {
+    if (!_isCurrentSession(this, session)) return;
+    _discardRetiredOfflineItems(this);
     if (offlineQueue.length >= netConfig.offlineQueueMax) {
       // Prefer evicting non-critical items (stats) over critical (task reports, collect)
       var evicted = false;
@@ -358,11 +433,12 @@ var apiClient = {
       }
     }
     logger.info(TAG, label + "加入离线队列");
-    offlineQueue.push({ path: path, body: body, retries: 0, critical: !!critical });
+    offlineQueue.push({ path: path, body: body, retries: 0, critical: !!critical, session: session });
   },
 
-  report: function (taskId, status, result, uiSnapshot, leaseId) {
+  report: function (taskId, status, result, uiSnapshot, leaseId, session) {
     _lastRequestWas4xx = false;
+    var requestState = _newRequestState(this, session || _activeTaskSession);
     var body = {
       task_id: taskId,
       status: status,
@@ -370,18 +446,22 @@ var apiClient = {
       ui_snapshot: uiSnapshot || null,
     };
     if (leaseId) body.lease_id = leaseId;
-    var response = this.post("/api/device/report", body);
-    if (!response && !_isPermanentClientError(_lastRequestStatus)) {
+    var response = this._postTask("/api/device/report", body, null, requestState);
+    if (!response && _isCurrentSession(this, requestState.session) && !_isPermanentClientError(requestState.status)) {
       logger.warn(TAG, "任务结果上报失败(status=" + status + ")，加入离线队列重试");
-      this._pushToOfflineQueue("/api/device/report", body, "任务结果", true);
+      this._pushToOfflineQueue("/api/device/report", body, "任务结果", true, requestState.session);
     }
     return response;
   },
 
   collectReport: function (payload) {
     _lastRequestWas4xx = false;
-    var response = this.post("/api/device/collect-report", payload);
-    if (!response && !_isPermanentClientError(_lastRequestStatus)) this._pushToOfflineQueue("/api/device/collect-report", payload, "采集数据", true);
+    var requestState = _newRequestState(this, _activeTaskSession);
+    var response = this._postTask("/api/device/collect-report", payload, null, requestState);
+    if (response && response.user_conflict === true) {
+      logger.warn(TAG, "评论已保存，用户资料与其他用户的既有记录冲突，未覆盖");
+    }
+    if (!response && _isCurrentSession(this, requestState.session) && !_isPermanentClientError(requestState.status)) this._pushToOfflineQueue("/api/device/collect-report", payload, "采集数据", true, requestState.session);
     return response;
   },
 
@@ -399,7 +479,7 @@ var apiClient = {
     var taskExecutor = getTaskExecutor();
     var leaseId = taskExecutor.getCurrentLeaseId();
     if (leaseId) body.lease_id = leaseId;
-    return this.post("/api/device/progress", body);
+    return this._postTask("/api/device/progress", body);
   },
 
   fetchSelectors: function (currentVersion, resolution) {
@@ -469,21 +549,21 @@ var apiClient = {
    * @param {Object} detail - 风控详情
    */
   claimCommentReply: function (author, text) {
-    return this.post("/api/device/comment-claim-reply", {
+    return this._postTask("/api/device/comment-claim-reply", {
       author: author,
       text: text,
     });
   },
 
   releaseCommentReply: function (author, text) {
-    return this.post("/api/device/comment-claim-release", {
+    return this._postTask("/api/device/comment-claim-release", {
       author: author,
       text: text,
     });
   },
 
   reportRiskControl: function (accountId, riskType, detail) {
-    return this.post("/api/device/risk-report", {
+    return this._postTask("/api/device/risk-report", {
       account_id: accountId,
       risk_type: riskType,
       detail: detail || {},
@@ -508,15 +588,15 @@ var apiClient = {
       if (Object.prototype.hasOwnProperty.call(data, key)) body[key] = data[key];
     }
     body.preserve_on_unknown = true;
-    return this.post("/api/device/dm-claim-recipient", body);
+    return this._postTask("/api/device/dm-claim-recipient", body);
   },
 
   reportDMSend: function (data) {
-    return this.post("/api/device/dm-send-report", data);
+    return this._postTask("/api/device/dm-send-report", data);
   },
 
   releaseDMRecipient: function (data) {
-    return this.post("/api/device/dm-release-recipient", data);
+    return this._postTask("/api/device/dm-release-recipient", data);
   },
 
   saveCommentAIReply: function (nickname, text, aiReply, taskId, intendedProvince, intendedCity, intendedAttraction) {
@@ -526,7 +606,7 @@ var apiClient = {
     if (intendedProvince != null) data.intended_province = intendedProvince;
     if (intendedCity != null) data.intended_city = intendedCity;
     if (intendedAttraction != null) data.intended_attraction = intendedAttraction;
-    return this.post("/api/device/comment-ai-reply", data);
+    return this._postTask("/api/device/comment-ai-reply", data);
   },
 
   saveUserProfile: function (data) {
@@ -547,11 +627,11 @@ var apiClient = {
     if (data._intended_province) payload.intended_province = data._intended_province;
     if (data._intended_city) payload.intended_city = data._intended_city;
     if (data._intended_attraction) payload.intended_attraction = data._intended_attraction;
-    return this.post("/api/device/user-profile", payload);
+    return this._postTask("/api/device/user-profile", payload);
   },
 
   uploadUserAvatar: function (douyinId, imageBase64) {
-    return this.post("/api/device/user-avatar", { douyin_id: douyinId, image_base64: imageBase64 });
+    return this._postTask("/api/device/user-avatar", { douyin_id: douyinId, image_base64: imageBase64 });
   },
 
   /**
@@ -562,6 +642,7 @@ var apiClient = {
    * @param {number} count — 操作次数，默认 1
    */
   incrementStats: function (accountId, taskType, targetId, count) {
+    var requestState = _newRequestState(this, _activeTaskSession);
     var taskExecutor = getTaskExecutor();
     var tid = taskExecutor.getCurrentTaskId();
     if (!tid) return null;  // 无活跃任务，拒绝上报
@@ -575,10 +656,10 @@ var apiClient = {
       op_index: taskExecutor.getNextOpIndex(),
       count: count || 1,
     };
-    var resp = this.post("/api/device/stats/increment", body);
-    if (!resp && !_isPermanentClientError(_lastRequestStatus)) {
+    var resp = this._postTask("/api/device/stats/increment", body, null, requestState);
+    if (!resp && _isCurrentSession(this, requestState.session) && !_isPermanentClientError(requestState.status)) {
       logger.warn(TAG, "增量统计上报失败: " + taskType + " #" + (body.op_index) + " target=" + (targetId || "") + " → 加入离线队列");
-      this._pushToOfflineQueue("/api/device/stats/increment", body, "统计(" + taskType + ")", false);
+      this._pushToOfflineQueue("/api/device/stats/increment", body, "统计(" + taskType + ")", false, requestState.session);
     }
     return resp;
   },

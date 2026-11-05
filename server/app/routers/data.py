@@ -11,7 +11,7 @@ from openpyxl import Workbook
 from app.database import get_db
 from app.deps import verify_admin_token
 from app.config import bj_now
-from app.db_models import CollectedComment, CollectedUser, Conversation, Device, Task
+from app.db_models import Account, CollectedComment, CollectedUser, Conversation, Device, Task
 
 router = APIRouter(prefix="/api/data", tags=["data"])
 
@@ -177,7 +177,8 @@ def list_conversations(
         query = query.filter(Conversation.task_id == task_id)
     user_id, role = user
     if role != 'admin':
-        query = query.join(Task, Conversation.task_id == Task.id).filter(Task.user_id == user_id)
+        # Device claims have an account even when no task FK was recorded.
+        query = query.join(Account, Conversation.account_id == Account.id).filter(Account.user_id == user_id)
     query = query.order_by(Conversation.updated_at.desc(), Conversation.id.asc())
     return _paginate(query, skip, limit)
 
@@ -391,7 +392,7 @@ def export_conversations(
 
     user_id, role = user
     if role != 'admin':
-        query = query.join(Task, Conversation.task_id == Task.id).filter(Task.user_id == user_id)
+        query = query.join(Account, Conversation.account_id == Account.id).filter(Account.user_id == user_id)
 
     query = query.order_by(Conversation.updated_at.desc(), Conversation.id.asc())
     is_paged = limit is not None

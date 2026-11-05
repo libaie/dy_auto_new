@@ -472,6 +472,7 @@ NurtureHandler._commentOnVideo = function (templateId, templateContent) {
   }
   // 1. AI 生成评论
   var content = templateContent || aiAnalyzer.generateVideoComment(videoText);
+  if (taskCancellation.isCancelled()) return false;
   if (!content) {
     logger.warn(TAG, "AI 生成评论失败，跳过评论");
     return false;

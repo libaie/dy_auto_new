@@ -82,7 +82,7 @@ test('successful replay does not recursively flush or duplicate queued results',
   assert.equal(api.getOfflineQueueSize(), 0);
 });
 
-test('authentication failure retains queued reports for re-pairing', t => {
+test('transient authentication failure retains queued reports while the pairing session is unchanged', t => {
   const { api, responses, reconnect } = client(t);
   api.report('auth', 'completed', {});
   responses.set('auth', 401);

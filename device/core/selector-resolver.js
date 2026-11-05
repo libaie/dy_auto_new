@@ -22,163 +22,31 @@ var selectorResolver = {
   },
 
   findByStrategyInParent: function (parent, strategy) {
-    if (strategy.conditions && strategy.conditions.length > 0) {
-      return selectorResolver.findByConditionsInParent(parent, strategy);
-    }
-    if (strategy.type === "chain") {
-      return selectorResolver.findByChainInParent(parent, strategy.steps || []);
-    }
-    return selectorResolver.findByCondInParent(parent, strategy);
+    if (!parent || !strategy) return null;
+    try {
+      // Reuse the same live region/anchor checks as top-level semantic lookups.
+      // Keep native nodes so extraction and image calibration remain compatible.
+      var candidates = uiOperator._findManyByStrategy(strategy, null, null, parent);
+      return candidates.length ? candidates[0] : null;
+    } catch (e) { return null; }
   },
 
   findByCondInParent: function (parent, cond) {
-    var matchMode = cond.match_mode || "exact";
-    try {
-      if (matchMode === "contains") {
-        switch (cond.type) {
-          case "text": return parent.findOne(textContains(cond.value));
-          case "desc": return parent.findOne(descContains(cond.value));
-          case "id": return parent.findOne(idContains(cond.value));
-          case "className": return parent.findOne(classNameContains(cond.value));
-        }
-      } else {
-        switch (cond.type) {
-          case "text": return parent.findOne(text(cond.value));
-          case "desc": return parent.findOne(desc(cond.value));
-          case "id": return parent.findOne(id(cond.value));
-          case "className": return parent.findOne(className(cond.value));
-        }
-      }
-    } catch (e) {}
-    return null;
+    return selectorResolver.findByStrategyInParent(parent, cond);
   },
 
   findAllByCondInParent: function (parent, cond) {
-    var matchMode = cond.match_mode || "exact";
-    try {
-      if (matchMode === "contains") {
-        switch (cond.type) {
-          case "text": return parent.find(textContains(cond.value));
-          case "desc": return parent.find(descContains(cond.value));
-          case "id": return parent.find(idContains(cond.value));
-          case "className": return parent.find(classNameContains(cond.value));
-        }
-      } else {
-        switch (cond.type) {
-          case "text": return parent.find(text(cond.value));
-          case "desc": return parent.find(desc(cond.value));
-          case "id": return parent.find(id(cond.value));
-          case "className": return parent.find(className(cond.value));
-        }
-      }
-    } catch (e) {}
-    return [];
+    if (!parent || !cond) return [];
+    try { return uiOperator._findManyByStrategy(cond, null, null, parent); }
+    catch (e) { return []; }
   },
 
   findByConditionsInParent: function (parent, strategy) {
-    var conditions = strategy.conditions;
-    var logic = strategy.logic || "and";
-
-    if (conditions.length === 1) {
-      return selectorResolver.findByCondInParent(parent, conditions[0]);
-    }
-
-    if (logic === "or") {
-      for (var j = 0; j < conditions.length; j++) {
-        var el = selectorResolver.findByCondInParent(parent, conditions[j]);
-        if (el) return el;
-      }
-      return null;
-    }
-
-    var candidates = selectorResolver.findAllByCondInParent(parent, conditions[0]);
-    for (var m = 0; m < candidates.length; m++) {
-      var allMatch = true;
-      for (var n = 1; n < conditions.length; n++) {
-        if (!uiOperator._elementMatchesCondition(candidates[m], conditions[n])) {
-          allMatch = false;
-          break;
-        }
-      }
-      if (allMatch) return candidates[m];
-    }
-    return null;
+    return selectorResolver.findByStrategyInParent(parent, strategy);
   },
 
   findByChainInParent: function (parent, steps) {
-    if (!steps || steps.length === 0) return null;
-
-    // Phase 1: build selector chain from filter steps
-    var sel = null;
-    var navStartIdx = steps.length;
-    for (var i = 0; i < steps.length; i++) {
-      var nav = steps[i].nav || "filter";
-      if (nav !== "filter") { navStartIdx = i; break; }
-      if (!sel) { sel = uiOperator._makeSelector(steps[i]); }
-      else { sel = uiOperator._chainSelector(sel, steps[i]); }
-      if (!sel) return null;
-    }
-
-    // Phase 2: find first matching element within parent
-    var el = null;
-    if (sel) {
-      var candidates = parent.find(sel);
-      if (candidates && candidates.length > 0) {
-        for (var k = 0; k < candidates.length; k++) {
-          if (uiOperator._isOnScreen(candidates[k])) { el = candidates[k]; break; }
-        }
-      }
-    } else {
-      el = parent;
-    }
-    if (!el) return null;
-
-    // Phase 3: walk the tree with nav steps
-    for (var m = navStartIdx; m < steps.length; m++) {
-      var navStep = steps[m];
-      var navAction = navStep.nav || "filter";
-      if (navAction === "parent") {
-        try { el = el.parent(); } catch (e) { return null; }
-        if (!el) return null;
-      } else if (navAction === "child") {
-        var childSel = uiOperator._makeSelector(navStep);
-        if (!childSel) return null;
-        try {
-          var children = el.find(childSel);
-          if (!children || children.length === 0) return null;
-          var idx = navStep.index || 0;
-          var found = 0; el = null;
-          for (var c = 0; c < children.length; c++) {
-            if (uiOperator._isOnScreen(children[c])) {
-              if (found === idx) { el = children[c]; break; }
-              found++;
-            }
-          }
-          if (!el) return null;
-        } catch (e) { return null; }
-      } else if (navAction === "sibling") {
-        var siblingSel = uiOperator._makeSelector(navStep);
-        if (!siblingSel) return null;
-        try {
-          var p = el.parent();
-          if (!p) return null;
-          var siblings = p.find(siblingSel);
-          if (!siblings || siblings.length === 0) return null;
-          var sibIdx = navStep.index || 0;
-          var sf = 0; el = null;
-          for (var s = 0; s < siblings.length; s++) {
-            if (uiOperator._isOnScreen(siblings[s])) {
-              if (sf === sibIdx) { el = siblings[s]; break; }
-              sf++;
-            }
-          }
-          if (!el) return null;
-        } catch (e) { return null; }
-      } else {
-        if (!uiOperator._elementMatchesStep(el, navStep)) return null;
-      }
-    }
-    return el;
+    return selectorResolver.findByStrategyInParent(parent, { type: "chain", steps: steps || [] });
   },
 
   /**

@@ -7,6 +7,7 @@ var selectorLoader = require("../core/selector-loader");
 var selectorResolver = require("../core/selector-resolver");
 var logger = require("../utils/logger");
 var screenContext = require("../core/screen-context");
+var taskCancellation = require("../core/task-cancellation");
 
 var TAG = "评论工具";
 
@@ -49,6 +50,7 @@ var commentUtils = {
   },
 
   clickWithin: function (node, region) {
+    if (taskCancellation.isCancelled()) return false;
     var ctx = screenContext.read();
     if (!commentUtils.visibleNode(node, ctx, region)) return false;
     return uiOperator.clickElement(node);
@@ -95,6 +97,7 @@ var commentUtils = {
   },
 
   swipeList: function (action, downward) {
+    if (taskCancellation.isCancelled()) return false;
     // Reacquire the list and window for each gesture, including every retry.
     var container = commentUtils.findListContainer(action);
     if (!container) return false;
@@ -106,6 +109,7 @@ var commentUtils = {
     var low = Math.floor(b.top + (b.bottom - b.top) * 0.8);
     var high = Math.floor(b.top + (b.bottom - b.top) * 0.25);
     if (!screenContext.isUsablePoint({ x: x, y: low }, ctx, b) || !screenContext.isUsablePoint({ x: x, y: high }, ctx, b)) return false;
+    if (taskCancellation.isCancelled()) return false;
     return gestures([0, Math.floor(Math.random() * 150 + 400), [x, downward ? high : low], [x, downward ? low : high]]) !== false;
   },
 
@@ -125,10 +129,11 @@ var commentUtils = {
   // One submission maximum. A click return value is actuation, not delivery.
   // Only a new exact text node plus cleared input confirms an observed send.
   submitAndObserve: function (sendAction, inputAction, content, failureAction) {
+    if (taskCancellation.isCancelled()) return "not_attempted";
     var before = commentUtils._visibleTextCount(content);
     var alreadyFailed = failureAction ? !!uiOperator.findElement(failureAction, 300, true) : false;
     var target = uiOperator.findElement(sendAction, 3000);
-    if (!target) return "not_attempted";
+    if (!target || taskCancellation.isCancelled()) return "not_attempted";
     try {
       if (!uiOperator.clickAction(sendAction, 1000)) return "unknown";
       for (var attempt = 0; attempt < 3; attempt++) {
@@ -149,6 +154,7 @@ var commentUtils = {
    * @returns {boolean}
    */
   openComments: function () {
+    if (taskCancellation.isCancelled()) return false;
     // 1. 先检测评论区是否已打开
     var items = uiOperator.findElements("comment_list", 500);
     if (items && items.length > 0) {
@@ -158,6 +164,7 @@ var commentUtils = {
 
     // 2. 点击视频评论按钮，指数退避重试
     for (var retry = 0; retry < 3; retry++) {
+      if (taskCancellation.isCancelled()) return false;
       var commentBtn = uiOperator.findElement("video_comment_btn", 2000);
       if (commentBtn) {
         uiOperator.clickElement(commentBtn);

@@ -62,7 +62,7 @@ var promptTemplateLoader = global.__promptTemplateLoader || {
    * @returns {Object|null} { id, name, industry, content }
    */
   get: function (id) {
-    if (id && this._cache[id]) return this._cache[id];
+    if (id) return Object.prototype.hasOwnProperty.call(this._cache, id) ? this._cache[id] : null;
     // 查找默认模板
     if (this._defaultId && this._cache[this._defaultId]) return this._cache[this._defaultId];
     // 取第一个可用模板
@@ -90,11 +90,16 @@ var promptTemplateLoader = global.__promptTemplateLoader || {
   },
 
   _applyTemplates: function (templates) {
+    // The service returns a complete snapshot, including removals/disables.
+    var nextCache = {};
+    var firstId = null;
     for (var i = 0; i < templates.length; i++) {
       var t = templates[i];
-      this._cache[t.id] = t;
-      if (!this._defaultId) this._defaultId = t.id;
+      nextCache[t.id] = t;
+      if (!firstId) firstId = t.id;
     }
+    this._defaultId = this._defaultId && nextCache[this._defaultId] ? this._defaultId : firstId;
+    this._cache = nextCache;
     logger.debug(TAG, "已应用模板，当前缓存 " + Object.keys(this._cache).length + " 个");
   },
 

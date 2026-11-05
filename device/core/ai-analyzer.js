@@ -4,6 +4,7 @@ var apiClient = require("./api-client");
 var decisionClient = require("./decision-client");
 var promptsConfig = require("./prompts-config");
 var logger = require("../utils/logger");
+var taskCancellation = require("./task-cancellation");
 
 var TAG = "AI";
 
@@ -97,6 +98,7 @@ var aiAnalyzer = {
    * 调用服务端 AI 代理
    */
   _callAI: function (prompt, maxTokens, temperature) {
+    if (taskCancellation.isCancelled()) return null;
     if (!config.serverUrl || !config.deviceSecret) {
       logger.error(TAG, "设备未配对，无法调用 AI");
       return null;
@@ -109,6 +111,7 @@ var aiAnalyzer = {
         temperature: temperature != null ? temperature : 0.7,
       }, 120000);  // AI 生成最长等 2 分钟
 
+      if (taskCancellation.isCancelled()) return null;
       if (!result || !result.content) {
         logger.error(TAG, "AI 代理返回空内容");
         return null;

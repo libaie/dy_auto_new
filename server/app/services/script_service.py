@@ -1,7 +1,10 @@
 """Device script version management — upload, version, download."""
 from pathlib import Path
+import os
+import tempfile
 
 from app.config import SERVER_DIR
+from app.services.script_archive import InvalidScriptArchive, validate_script_archive
 
 
 class ScriptService:
@@ -31,11 +34,21 @@ class ScriptService:
         return new_version
 
     def upload_script(self, fileobj) -> str:
-        """Upload a new script zip, bump version, return new version string."""
+        """Validate a complete runtime package before publishing or bumping version."""
+        content = fileobj.read() if hasattr(fileobj, "read") else fileobj
+        validate_script_archive(content)
         self._ensure_dir()
         script_path = self._script_dir / "device-script.zip"
-        content = fileobj.read() if hasattr(fileobj, "read") else fileobj
-        script_path.write_bytes(content)
+        fd, temporary = tempfile.mkstemp(prefix="device-script-", suffix=".zip", dir=self._script_dir)
+        try:
+            with os.fdopen(fd, "wb") as handle:
+                handle.write(content)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temporary, script_path)
+        finally:
+            if os.path.exists(temporary):
+                os.unlink(temporary)
         return self._bump_version()
 
     def download_script(self) -> bytes | None:

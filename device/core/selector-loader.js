@@ -16,6 +16,44 @@ function ensureDirPath(dir) {
   }
 }
 
+function templateMatches(filename, metadata) {
+  var file = new java.io.File(String(filename));
+  if (!file.exists() || file.isDirectory() || Number(file.length()) <= 0) return false;
+  if (typeof metadata.size === "number" && Number(file.length()) !== metadata.size) return false;
+  if (!metadata.md5) return true;
+  var input = new java.io.FileInputStream(String(filename));
+  var digest = java.security.MessageDigest.getInstance("MD5");
+  var buffer = java.lang.reflect.Array.newInstance(java.lang.Byte.TYPE, 8192);
+  try {
+    var count;
+    while ((count = input.read(buffer)) > 0) digest.update(buffer, 0, count);
+  } finally { input.close(); }
+  var bytes = digest.digest(), value = "";
+  for (var i = 0; i < bytes.length; i++) {
+    var hex = (bytes[i] & 255).toString(16);
+    value += hex.length === 1 ? "0" + hex : hex;
+  }
+  return value === metadata.md5;
+}
+
+function saveTemplate(filename, data, metadata) {
+  var temporary = filename + ".download-" + Date.now() + "-" + Math.floor(Math.random() * 1000000);
+  var output = null;
+  try {
+    // AutoJS HTTP bytes are Java byte[]; use the same Java stream boundary as
+    // script downloads, then publish only a verified complete image.
+    output = new java.io.FileOutputStream(temporary);
+    output.write(data);
+    output.close(); output = null;
+    if (!templateMatches(temporary, metadata)) throw new Error("模板大小或 MD5 不符");
+    if (!new java.io.File(temporary).renameTo(new java.io.File(filename))) throw new Error("模板原子保存失败");
+  } finally {
+    try { if (output) output.close(); } finally {
+      try { new java.io.File(temporary).delete(); } catch (ignore) {}
+    }
+  }
+}
+
 // 使用 global 确保所有 require 路径拿到同一个实例（和 config 一样的模式）
 var selectorLoader = global.__selectorLoader || {
 
@@ -27,6 +65,9 @@ var selectorLoader = global.__selectorLoader || {
   _resolution: "",  // live physical display size; refreshed before each lookup
   _pendingGeometryRefresh: false,
   _geometryRequestAt: 0,
+  _pendingTemplateSync: false,
+  _templateSyncAt: null,
+  _templateSyncing: false,
 
   _calibrationActions: function () {
     var missing = [];
@@ -130,6 +171,7 @@ var selectorLoader = global.__selectorLoader || {
         this.syncTemplates();
       }
     }
+    this._retryTemplateSync();
   },
 
   /**
@@ -139,6 +181,7 @@ var selectorLoader = global.__selectorLoader || {
    */
   get: function (actionName) {
     this._refreshGeometry();
+    this._retryTemplateSync();
     var selector = this._cache[actionName];
     if (selector) return selector;
 
@@ -154,6 +197,7 @@ var selectorLoader = global.__selectorLoader || {
         if (response && response.selectors) {
           this._applySelectors(response.selectors);
           this._version = response.version;
+          this._retryTemplateSync();
           logger.info(TAG, "重新加载完成，当前 " + Object.keys(this._cache).length + " 个选择器");
           return this._cache[actionName] || null;
         }
@@ -211,6 +255,7 @@ var selectorLoader = global.__selectorLoader || {
    * @param {Array} selectors
    */
   _applySelectors: function (selectors) {
+    this._pendingTemplateSync = true;
     this._allSelectors = selectors.slice();
     var douyinVersion = this._douyinVersion;
     if (douyinVersion === undefined) {
@@ -355,109 +400,103 @@ var selectorLoader = global.__selectorLoader || {
   /**
    * 同步模板图片 — 从服务端下载缺失的模板，清理多余的
    */
+  _retryTemplateSync: function () {
+    if (!this._pendingTemplateSync || this._templateSyncing) return false;
+    var elapsed = Date.now() - this._templateSyncAt;
+    if (this._templateSyncAt !== null && elapsed >= 0 && elapsed < 10000) return false;
+    return this.syncTemplates();
+  },
+
   syncTemplates: function () {
+    if (this._templateSyncing) return false;
+    this._templateSyncing = true;
+    this._pendingTemplateSync = true;
+    this._templateSyncAt = Date.now();
+    var resolution = this._resolution, version = this._version, complete = false;
     try {
-      var response = apiClient.fetchTemplateList(this._resolution);
-      if (!response || !response.templates) {
-        logger.warn(TAG, "获取模板列表失败");
-        return;
+      var response = apiClient.fetchTemplateList(resolution);
+      if (!response || !Array.isArray(response.templates)) {
+        logger.warn(TAG, "获取模板列表失败，将独立重试");
+        return false;
+      }
+      var remoteList = response.templates, baseDir = "/sdcard/dy_auto/templates/";
+      if (!ensureDirPath(baseDir)) throw new Error("无法创建模板目录");
+      var byResolution = {}, i, res, fn;
+      for (i = 0; i < remoteList.length; i++) {
+        var item = remoteList[i], profile = item && (item.resolution || "default");
+        if (!item || !/^(default|[1-9][0-9]{0,4}x[1-9][0-9]{0,4})$/.test(profile) ||
+            typeof item.filename !== "string" || !item.filename || item.filename.charAt(0) === "." ||
+            /[\/\\\x00]/.test(item.filename) || !/\.(png|jpe?g)$/i.test(item.filename) ||
+            (item.md5 !== undefined && !/^[0-9a-f]{32}$/.test(item.md5)) ||
+            (item.size !== undefined && (typeof item.size !== "number" || !isFinite(item.size) || item.size <= 0 || Math.floor(item.size) !== item.size))) throw new Error("模板列表包含无效路径或校验信息");
+        if (!byResolution[profile]) byResolution[profile] = {};
+        byResolution[profile][item.filename] = item;
       }
 
-      var remoteList = response.templates;
-      var baseDir = "/sdcard/dy_auto/templates/";
-      ensureDirPath(baseDir);
-
-      // Group remote templates by resolution
-      var byResolution = {};
-      for (var i = 0; i < remoteList.length; i++) {
-        var t = remoteList[i];
-        var res = t.resolution || "default";
-        if (!byResolution[res]) byResolution[res] = {};
-        byResolution[res][t.filename] = t;
-      }
-
-      // Sync each resolution group
-      var downloaded = 0;
-      var cleaned = 0;
-      for (var res in byResolution) {
-        if (!byResolution.hasOwnProperty(res)) continue;
+      var downloaded = 0, cleaned = 0, failed = 0;
+      // Keep each successful asset for the next attempt. Do not delete any
+      // fallback cache while another asset or resolution is still unavailable.
+      for (res in byResolution) {
+        if (!Object.prototype.hasOwnProperty.call(byResolution, res)) continue;
         var resDir = baseDir + res + "/";
-        ensureDirPath(resDir);
+        if (!ensureDirPath(resDir)) { failed++; continue; }
         var resFiles = byResolution[res];
-        var failed = 0;
-
-        // Download missing templates for this resolution
-        for (var fn in resFiles) {
-          if (!resFiles.hasOwnProperty(fn)) continue;
-          var tpl = resFiles[fn];
-          var localPath = resDir + fn;
-          if (!files.exists(localPath)) {
+        for (fn in resFiles) {
+          if (!Object.prototype.hasOwnProperty.call(resFiles, fn)) continue;
+          var metadata = resFiles[fn], localPath = resDir + fn;
+          try {
+            if (templateMatches(localPath, metadata)) continue;
             var data = apiClient.downloadTemplate(fn, res);
-            if (data) {
-              files.writeBytes(localPath, data);
-              downloaded++;
-              logger.info(TAG, "模板已下载: " + res + "/" + fn + " (" + data.length + " bytes)");
-            } else {
-              failed++;
-              logger.warn(TAG, "模板下载失败: " + fn);
-            }
-          }
-        }
-
-        if (failed > 0) {
-          logger.warn(TAG, "模板下载未完成，跳过清理旧模板: " + res + " failed=" + failed);
-          continue;
-        }
-
-        // Clean stale local templates for this resolution
-        if (files.isDir(resDir)) {
-          var localFiles = files.listDir(resDir);
-          for (var k = 0; k < localFiles.length; k++) {
-            if (!resFiles[localFiles[k]]) {
-              try {
-                files.remove(resDir + localFiles[k]);
-                cleaned++;
-                logger.info(TAG, "清理过期模板: " + res + "/" + localFiles[k]);
-              } catch (e) {
-                logger.warn(TAG, "清理模板失败: " + localFiles[k] + " - " + e.message);
-              }
-            }
+            if (!data || !data.length) throw new Error("模板下载失败");
+            saveTemplate(localPath, data, metadata);
+            downloaded++;
+          } catch (downloadError) {
+            failed++;
+            logger.warn(TAG, "模板尚未就绪: " + res + "/" + fn + " - " + downloadError.message);
           }
         }
       }
+      if (failed || resolution !== this._resolution || version !== this._version) {
+        logger.warn(TAG, "模板同步未完成，保留缓存并稍后重试");
+        return false;
+      }
 
-      // Clean resolution directories that are no longer in the server manifest.
-      // The loop above only visits resolutions the server returned; a previously-
-      // synced resolution (e.g. 1080x2340) that the server no longer lists would
-      // otherwise persist and be used by _findByImage before the default fallback.
-      try {
-        if (files.isDir(baseDir)) {
-          var allResDirs = files.listDir(baseDir);
-          for (var di = 0; di < allResDirs.length; di++) {
-            var dn = allResDirs[di];
-            if (dn === "default" || byResolution[dn]) continue;
-            var staleDir = baseDir + dn;
-            if (!files.isDir(staleDir)) continue;
-            var staleFiles = files.listDir(staleDir);
-            for (var sf = 0; sf < staleFiles.length; sf++) {
-              try {
-                files.remove(staleDir + "/" + staleFiles[sf]);
-                cleaned++;
-                logger.info(TAG, "清理过期分辨率模板: " + dn + "/" + staleFiles[sf]);
-              } catch (e2) {}
-            }
-            try { files.remove(staleDir); } catch (e3) {}
+      for (res in byResolution) {
+        if (!Object.prototype.hasOwnProperty.call(byResolution, res)) continue;
+        var localDir = baseDir + res + "/";
+        if (!files.isDir(localDir)) continue;
+        var localFiles = files.listDir(localDir);
+        for (i = 0; i < localFiles.length; i++) {
+          if (!Object.prototype.hasOwnProperty.call(byResolution[res], localFiles[i])) {
+            if (files.remove(localDir + localFiles[i]) === false) throw new Error("无法清理旧模板: " + localFiles[i]);
+            cleaned++;
           }
         }
-      } catch (e4) {
-        logger.warn(TAG, "清理过期分辨率目录失败: " + e4.message);
       }
-
-      if (downloaded > 0 || cleaned > 0) {
-        logger.info(TAG, "模板同步完成: 下载 " + downloaded + ", 清理 " + cleaned);
+      if (files.isDir(baseDir)) {
+        var allResDirs = files.listDir(baseDir);
+        for (var di = 0; di < allResDirs.length; di++) {
+          var name = allResDirs[di];
+          if (name === "default" || Object.prototype.hasOwnProperty.call(byResolution, name)) continue;
+          var staleDir = baseDir + name;
+          if (!files.isDir(staleDir)) continue;
+          var staleFiles = files.listDir(staleDir);
+          for (var sf = 0; sf < staleFiles.length; sf++) {
+            if (files.remove(staleDir + "/" + staleFiles[sf]) === false) throw new Error("无法清理旧分辨率模板");
+            cleaned++;
+          }
+          if (files.remove(staleDir) === false) throw new Error("无法清理旧分辨率目录");
+        }
       }
+      complete = true;
+      if (downloaded || cleaned) logger.info(TAG, "模板同步完成: 下载 " + downloaded + ", 清理 " + cleaned);
+      return true;
     } catch (e) {
-      logger.warn(TAG, "模板同步失败: " + e.message);
+      logger.warn(TAG, "模板同步失败，将独立重试: " + e.message);
+      return false;
+    } finally {
+      this._pendingTemplateSync = !complete || resolution !== this._resolution || version !== this._version;
+      this._templateSyncing = false;
     }
   },
 

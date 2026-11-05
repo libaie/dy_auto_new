@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import ipaddress
 import shutil
+import uuid
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -12,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.config import bj_now
 from app.db_models import VideoProductionAsset
 from app.services.production_errors import ProductionErrorCode, ProductionRepairableError
+from app.services.production_lease_service import ProductionLeaseLostError, ensure_worker_lease_for_write
 
 ALLOWED_PROVIDER_SCHEMES = {"https"}
 ALLOWED_IMAGE_MAGIC = (b"\x89PNG", b"\xff\xd8\xff", b"RIFF")
@@ -31,6 +33,7 @@ def _storage_failed(asset: VideoProductionAsset, cause: str, message: str) -> Pr
 
 
 def _mark_storage_failed(db: Session, asset: VideoProductionAsset, error: ProductionRepairableError) -> None:
+    ensure_worker_lease_for_write(db)
     asset.copy_status = "storage_failed"
     asset.status = "storage_failed"
     asset.storage_error_json = {
@@ -120,7 +123,7 @@ def persist_provider_asset(
         local_suffix = Path(local_parsed.path if local_parsed.scheme in {"http", "https"} else asset.local_path).suffix
         suffix = local_suffix or suffix
     suffix = suffix or (".png" if asset.asset_type == "image" else ".mp4")
-    tmp_path = output_root / f"{asset.id}.tmp{suffix}"
+    tmp_path = output_root / f"{asset.id}.{uuid.uuid4().hex}.tmp{suffix}"
     final_path = output_root / f"{asset.id}{suffix}"
 
     try:
@@ -135,6 +138,7 @@ def persist_provider_asset(
             raise _storage_failed(asset, "mime_type_mismatch", "Asset content does not match the expected type.")
 
         checksum = _checksum(tmp_path)
+        ensure_worker_lease_for_write(db)
         tmp_path.replace(final_path)
         asset.storage_path = str(final_path)
         asset.local_path = str(final_path)
@@ -148,6 +152,9 @@ def persist_provider_asset(
         db.commit()
         db.refresh(asset)
         return asset
+    except ProductionLeaseLostError:
+        tmp_path.unlink(missing_ok=True)
+        raise
     except ProductionRepairableError as exc:
         tmp_path.unlink(missing_ok=True)
         _mark_storage_failed(db, asset, exc)

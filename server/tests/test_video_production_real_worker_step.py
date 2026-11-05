@@ -127,7 +127,7 @@ def test_real_worker_step_claims_limited_batch_and_returns_visible_summary(db, m
 
     run = _run_with_jobs(db, job_count=3)
 
-    async def fake_execute_job(db, run, job):
+    async def fake_execute_job(db, run, job, *, worker_lease=None):
         job.status = "completed"
         db.commit()
         return {"job_id": job.id, "status": job.status}
@@ -174,7 +174,7 @@ def test_real_worker_step_does_not_process_more_than_batch_size_and_reports_rema
     run = _run_with_jobs(db, job_count=5)
     processed = []
 
-    async def fake_execute_job(db, run, job):
+    async def fake_execute_job(db, run, job, *, worker_lease=None):
         processed.append(job.id)
         job.status = "completed"
         db.commit()
@@ -219,7 +219,7 @@ def test_real_worker_step_records_repairable_failure_and_continues(db, monkeypat
     run = _run_with_jobs(db, job_count=2)
     calls = {"count": 0}
 
-    async def fake_execute_job(db, run, job):
+    async def fake_execute_job(db, run, job, *, worker_lease=None):
         calls["count"] += 1
         if calls["count"] == 1:
             raise ProductionRepairableError(
@@ -257,7 +257,7 @@ def test_real_worker_step_sync_required_does_not_consume_attempt(db, monkeypatch
 
     run = _run_with_jobs(db, job_count=1)
 
-    async def fake_execute_job(db, run, job):
+    async def fake_execute_job(db, run, job, *, worker_lease=None):
         return ProductionActionResult.blocked(
             ProductionErrorCode.PROVIDER_STAGE_TASK_SYNC_REQUIRED,
             "Provider stage task still requires sync.",
@@ -344,7 +344,7 @@ def test_real_worker_step_captures_job_exceptions_and_clears_lease(db, monkeypat
 
     run = _run_with_jobs(db, job_count=1)
 
-    async def fake_execute_job(db, run, job):
+    async def fake_execute_job(db, run, job, *, worker_lease=None):
         raise raised
 
     monkeypatch.setattr("app.services.production_worker_service.execute_real_job", fake_execute_job)

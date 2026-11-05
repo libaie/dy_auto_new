@@ -114,11 +114,13 @@ def claim_next_job(
             update_query = update_query.filter(ProductionJob.plan_id == plan_id)
         if stage:
             update_query = update_query.filter(ProductionJob.stage == stage)
+        # Persist the exact claim token at MySQL DATETIME's supported precision.
+        claim_lease = (lease_id, (now + timedelta(seconds=lease_seconds)).replace(microsecond=0))
         updated = update_query.update(
             {
                 "status": JOB_LEASED,
                 "lease_id": lease_id,
-                "leased_until": now + timedelta(seconds=lease_seconds),
+                "leased_until": claim_lease[1],
                 "updated_at": now,
             },
             synchronize_session=False,
@@ -129,6 +131,8 @@ def claim_next_job(
             continue
 
         db.refresh(job)
+        # ORM refresh may already see a replacement; it must not redefine ownership.
+        job._production_claim_lease = claim_lease
         return job
 
 
@@ -201,7 +205,7 @@ def mark_job_completed(
     job = db.query(ProductionJob).filter(ProductionJob.id == job_id).first()
     if not job:
         raise ValueError("Production job not found")
-    if job.status == JOB_COMPLETED:
+    if job.status == JOB_COMPLETED and expected_lease_id is None:
         return job
     if job.status in (JOB_BLOCKED, JOB_FAILED, JOB_CANCELLED):
         raise ValueError("Production job cannot be completed from terminal or blocked status")

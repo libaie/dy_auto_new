@@ -193,7 +193,7 @@ def test_recovered_worker_reuses_already_submitted_provider_id(sessions, monkeyp
 
 @pytest.mark.parametrize("outcome", ["running", "failed", "exception", "completed"])
 def test_real_worker_late_provider_result_cannot_mutate_new_lease(sessions, monkeypatch, outcome):
-    from app.db_models import ProductionSegment, VideoProductionAsset
+    from app.db_models import ProductionSegment, VideoProductionAsset, ProviderStageTask, ProviderCostReservation, ProductionPlan
     from app.services import video_production_service as video
     with sessions() as db:
         run, segment = _real_provider_run(db, monkeypatch)
@@ -207,6 +207,9 @@ def test_real_worker_late_provider_result_cannot_mutate_new_lease(sessions, monk
                 replacement.query(ProductionJob).filter_by(id=job_id).update({
                     "lease_id": "worker", "leased_until": bj_now() + timedelta(minutes=10)})
                 replacement.query(ProductionSegment).filter_by(id=segment_id).update({"status": "video_running"})
+                replacement.query(ProviderStageTask).filter_by(job_id=job_id).update({
+                    "status": "sync_required", "response_summary_json": {"message": "new worker state"}})
+                replacement.query(ProviderCostReservation).update({"status": "submitted"})
                 replacement.commit()
             if outcome == "exception":
                 raise httpx.ReadTimeout("late error")
@@ -227,6 +230,13 @@ def test_real_worker_late_provider_result_cannot_mutate_new_lease(sessions, monk
         assert current.provider_task_id is None
         assert db.get(ProductionSegment, segment_id).status == "video_running"
         assert db.query(VideoProductionAsset).count() == 0
+        provider_task = db.query(ProviderStageTask).filter_by(job_id=job_id).one()
+        assert provider_task.status == "sync_required"
+        assert provider_task.response_summary_json == {"message": "new worker state"}
+        reservation = db.query(ProviderCostReservation).one()
+        assert reservation.status == "submitted"
+        assert reservation.actual_cost is None
+        assert db.get(ProductionPlan, run.production_plan_id).current_cost == 0
 
 
 @pytest.mark.asyncio
@@ -265,3 +275,353 @@ async def test_image_submit_without_provider_id_requires_reconciliation(sessions
         assert task.external_task_id == "stable-external"
         assert task.pixelle_task_id is None
         assert "Reconcile" in task.repair_action
+
+
+@pytest.mark.parametrize("outcome", ["accepted", "exception", "missing_id"])
+@pytest.mark.parametrize("reconciled", [False, True])
+def test_real_worker_stale_submit_preserves_shared_provider_state(sessions, monkeypatch, outcome, reconciled):
+    from app.db_models import ProviderStageTask, ProviderCostReservation, ProductionPlan
+    from app.services import video_production_service as video
+    with sessions() as db:
+        run, segment = _real_provider_run(db, monkeypatch)
+        job = db.query(ProductionJob).filter_by(plan_id=run.production_plan_id).one()
+        job_id = job.id
+        async def submit(**kwargs):
+            with sessions() as replacement:
+                replacement.query(ProductionJob).filter_by(id=job_id).update({
+                    "lease_id": "new", "leased_until": bj_now() + timedelta(minutes=10)})
+                task = replacement.query(ProviderStageTask).filter_by(job_id=job_id).one()
+                # The submission identity is durable even if the accepted response is lost.
+                assert task.external_task_id == kwargs["template_config"]["external_task_id"]
+                if reconciled:
+                    task.status = "sync_required"
+                    task.provider_task_id = "replacement-provider"
+                    task.response_summary_json = {"message": "new worker state"}
+                    replacement.query(ProviderCostReservation).update({"status": "submitted"})
+                replacement.commit()
+            if outcome == "exception":
+                raise httpx.ReadTimeout("accepted request, response lost")
+            if outcome == "missing_id":
+                return {"ok": True}
+            return {"stage_task_id": "late-provider"}
+        async def unexpected_sync(*args, **kwargs):
+            pytest.fail("A stale submit owner must not continue querying the provider")
+        monkeypatch.setattr(video, "submit_image_batch", submit)
+        monkeypatch.setattr(video, "get_stage_task", unexpected_sync)
+        run_real_worker_step(db, run.id, lease_id="old")
+        db.expire_all()
+        current = db.get(ProductionJob, job_id)
+        assert current.lease_id == "new"
+        assert current.status == "leased"
+        task = db.query(ProviderStageTask).filter_by(job_id=job_id).one()
+        reservation = db.query(ProviderCostReservation).one()
+        assert task.external_task_id == task.id
+        assert task.status == ("sync_required" if reconciled else "submitted")
+        assert task.provider_task_id == ("replacement-provider" if reconciled else None)
+        assert task.response_summary_json == ({"message": "new worker state"} if reconciled else {})
+        assert reservation.status == ("submitted" if reconciled else "active_unsubmitted")
+        assert reservation.actual_cost is None
+        assert db.get(ProductionPlan, run.production_plan_id).current_cost == 0
+
+
+def test_worker_provider_result_and_cost_become_visible_atomically(sessions, monkeypatch):
+    from sqlalchemy import event, select
+    from app.db_models import ProviderStageTask, ProviderCostReservation, ProductionPlan
+    from app.services.provider_stage_executor import ProviderStageExecutor
+    from tests.test_provider_stage_executor import _capability, TransactionAssertingProviderClient
+    monkeypatch.setenv("DY_AUTO_PROVIDER_SUBMIT_WORKER_COUNT", "1")
+    with sessions() as db:
+        run = _run_with_jobs(db, job_count=1)
+        job = claim_next_job(db, "worker", plan_id=run.production_plan_id)
+        run_id, plan_id, job_id = run.id, job.plan_id, job.id
+        lease = (job.lease_id, job.leased_until)
+        client = TransactionAssertingProviderClient(db)
+        engine = db.get_bind()
+        observed = []
+        inspecting = False
+        def observe_visibility(conn, cursor, statement, parameters, context, executemany):
+            nonlocal inspecting
+            if inspecting:
+                return
+            inspecting = True
+            try:
+                with engine.connect() as observer:
+                    state = observer.execute(select(ProviderStageTask.status).where(ProviderStageTask.job_id == job_id)).scalar()
+                    if state == "succeeded":
+                        reservation = observer.execute(select(ProviderCostReservation.status)).scalar()
+                        cost = observer.execute(select(ProductionPlan.current_cost).where(ProductionPlan.id == plan_id)).scalar()
+                        observed.append((state, reservation, cost))
+            finally:
+                inspecting = False
+        event.listen(engine, "after_cursor_execute", observe_visibility)
+        try:
+            result = asyncio.run(ProviderStageExecutor(client).execute(
+                db, run_id=run_id, plan_id=plan_id, job_id=job_id,
+                target_type=job.target_type, target_id=job.target_id, stage=job.stage,
+                provider="test", model_name="test", estimated_cost=.5,
+                payload={"prompt": "atomic"}, capability=_capability(), worker_lease=lease,
+            ))
+            assert result.status == "success"
+            db.expire_all()
+            assert db.query(ProviderStageTask).filter_by(job_id=job_id).one().status == "succeeded"
+            assert observed
+            assert all(state == ("succeeded", "settled", .37) for state in observed)
+        finally:
+            event.remove(engine, "after_cursor_execute", observe_visibility)
+
+
+@pytest.mark.parametrize("boundary", ["download", "download_failure", "audit", "audit_second"])
+def test_real_worker_late_asset_io_preserves_replacement_state(sessions, monkeypatch, tmp_path, boundary):
+    from app.db_models import VideoProductionAsset, VideoReviewRecord, VideoProductionRun
+    from app.services import video_production_service as video
+    from app.services import asset_storage_guard as storage
+    from app.routers import audit
+    monkeypatch.chdir(tmp_path)
+    with sessions() as db:
+        run, segment = _real_provider_run(db, monkeypatch)
+        if boundary.startswith("audit"):
+            _seed_model(db, name_prefix="audit", config_extra={"scene_key": "quality_audit", "scene_keys": ["quality_audit"]})
+        job = db.query(ProductionJob).filter_by(plan_id=run.production_plan_id).one()
+        job_id, run_id, segment_id = job.id, run.id, segment.id
+        called = []
+        audit_calls = []
+        def replace_lease():
+            with sessions() as replacement:
+                replacement.query(ProductionJob).filter_by(id=job_id).update({
+                    "lease_id": "replacement", "leased_until": bj_now() + timedelta(minutes=10)})
+                replacement.query(VideoProductionAsset).filter_by(run_id=run_id).update({
+                    "status": "approved", "copy_status": "persisted", "storage_path": "replacement.png",
+                    "checksum": "replacement-checksum"})
+                replacement.query(VideoProductionRun).filter_by(id=run_id).update({"status": "completed", "current_stage": "final_review"})
+                replacement.commit()
+            called.append(boundary)
+        async def submit(**kwargs):
+            return {"stage_task_id": "asset-provider"}
+        async def sync(*args):
+            item = {"frame_id": segment_id, "production_segment_id": segment_id, "url": "https://cdn.test/image.png"}
+            if boundary.startswith("audit"):
+                item.update(storage_path="existing.png", checksum="existing", copy_status="persisted")
+            items = [item, dict(item)] if boundary == "audit_second" else [item]
+            return {"status": "completed", "usage": {"cost": .01}, "assets": items}
+        def download(asset, target):
+            assert target.name != f"{asset.id}.tmp.png"
+            replace_lease()
+            if boundary == "download_failure":
+                raise httpx.ReadTimeout("late download error")
+            target.write_bytes(b"\x89PNGtest")
+        def do_audit(*args, **kwargs):
+            audit_calls.append(True)
+            if boundary == "audit_second" and len(audit_calls) == 1:
+                # A writer can proceed during every audit, including the first.
+                with sessions() as observer:
+                    observer.query(ProductionJob).filter_by(id=job_id).update({"error_message": "audit in flight"})
+                    observer.commit()
+            else:
+                replace_lease()
+            return {"score": .1, "pass_fail": False, "issues": ["late audit"]}
+        monkeypatch.setattr(video, "submit_image_batch", submit)
+        monkeypatch.setattr(video, "get_stage_task", sync)
+        monkeypatch.setattr(storage, "_download_provider_url", download)
+        monkeypatch.setattr(audit, "_do_audit", do_audit)
+        run_real_worker_step(db, run_id, lease_id="old")
+        assert called == [boundary]
+        db.expire_all()
+        assets = db.query(VideoProductionAsset).filter_by(run_id=run_id).all()
+        assert len(assets) == (2 if boundary == "audit_second" else 1)
+        assert all(asset.status == "approved" for asset in assets)
+        assert all(asset.storage_path == "replacement.png" for asset in assets)
+        assert all(asset.checksum == "replacement-checksum" for asset in assets)
+        assert db.query(VideoReviewRecord).filter_by(run_id=run_id).count() == (1 if boundary == "audit_second" else 0)
+        assert db.get(VideoProductionRun, run_id).status == "completed"
+        assert db.get(ProductionJob, job_id).lease_id == "replacement"
+
+
+@pytest.mark.parametrize("late_error", [False, True])
+def test_stale_worker_cannot_recompute_run_after_replacement_completed(sessions, monkeypatch, late_error):
+    from app.db_models import VideoProductionRun
+    from app.services import video_production_service as video
+    with sessions() as db:
+        run, segment = _real_provider_run(db, monkeypatch)
+        run_id = run.id
+        job_id = db.query(ProductionJob).filter_by(plan_id=run.production_plan_id).one().id
+        async def submit(**kwargs):
+            return {"stage_task_id": "provider"}
+        async def sync(*args):
+            with sessions() as replacement:
+                replacement.query(ProductionJob).filter_by(id=job_id).update({
+                    "status": "completed", "lease_id": None, "leased_until": None,
+                    "completed_at": bj_now(), "updated_at": bj_now()})
+                replacement.query(VideoProductionRun).filter_by(id=run_id).update({
+                    "status": "completed", "current_stage": "final_review"})
+                replacement.commit()
+            if late_error:
+                raise httpx.ReadTimeout("old query failed")
+            return {"status": "failed", "error": "old provider response"}
+        monkeypatch.setattr(video, "submit_image_batch", submit)
+        monkeypatch.setattr(video, "get_stage_task", sync)
+        run_real_worker_step(db, run_id, lease_id="old")
+        db.expire_all()
+        assert db.get(VideoProductionRun, run_id).status == "completed"
+        assert db.get(VideoProductionRun, run_id).current_stage == "final_review"
+
+
+@pytest.mark.parametrize("review_outcome", ["blocked", "timeout"])
+def test_late_deferred_review_cannot_overwrite_replacement_run(sessions, monkeypatch, review_outcome):
+    from app.db_models import VideoProductionRun
+    from app.services import video_production_service as video
+    with sessions() as db:
+        run, segment = _real_provider_run(db, monkeypatch)
+        model = _seed_model(db, name_prefix="agency", config_extra={
+            "scene_key": "llm_agency_expert_review", "scene_keys": ["llm_agency_expert_review"]})
+        model.model_type = "llm"
+        db.commit()
+        run_id = run.id
+        job_id = db.query(ProductionJob).filter_by(plan_id=run.production_plan_id).one().id
+        called = []
+        async def review(*args, **kwargs):
+            with sessions() as replacement:
+                replacement.query(ProductionJob).filter_by(id=job_id).update({
+                    "lease_id": "replacement", "leased_until": bj_now() + timedelta(minutes=10)})
+                replacement.query(VideoProductionRun).filter_by(id=run_id).update({
+                    "status": "completed", "current_stage": "final_review", "model_trace_json": {"newer": "replacement"}})
+                replacement.commit()
+            called.append(review_outcome)
+            if review_outcome == "timeout":
+                raise asyncio.TimeoutError()
+            return {"stage_status": "blocked", "error_code": "REVIEW_BLOCKED", "invocation_ids": []}
+        async def unexpected_submit(**kwargs):
+            pytest.fail("A stale review owner must not submit provider work")
+        # Keep the real guard, trace storage, block, timeout, and worker code.
+        monkeypatch.setattr(video, "_run_agency_stage_review", review)
+        monkeypatch.setattr(video, "submit_image_batch", unexpected_submit)
+        run_real_worker_step(db, run_id, lease_id="old")
+        assert called == [review_outcome]
+        db.expire_all()
+        saved = db.get(VideoProductionRun, run_id)
+        assert saved.status == "completed"
+        assert saved.current_stage == "final_review"
+        assert saved.model_trace_json == {"newer": "replacement"}
+        assert db.get(ProductionJob, job_id).lease_id == "replacement"
+
+
+@pytest.mark.parametrize("transition", ["retry_wait", "failed", "completed", "blocked"])
+def test_transition_handoff_cannot_recompute_replacement_state(sessions, monkeypatch, transition):
+    from app.db_models import VideoProductionRun
+    from app.services import video_production_service as video
+    with sessions() as db:
+        run, segment = _real_provider_run(db, monkeypatch)
+        run_id, segment_id = run.id, segment.id
+        job_id = db.query(ProductionJob).filter_by(plan_id=run.production_plan_id).one().id
+        if transition == "blocked":
+            model = _seed_model(db, name_prefix="agency", config_extra={
+                "scene_key": "llm_agency_expert_review", "scene_keys": ["llm_agency_expert_review"]})
+            model.model_type = "llm"
+            db.commit()
+            async def review(*args, **kwargs):
+                return {"stage_status": "blocked", "invocation_ids": []}
+            monkeypatch.setattr(video, "_run_agency_stage_review", review)
+        async def submit(**kwargs):
+            return {"stage_task_id": "provider"}
+        async def sync(*args):
+            if transition == "completed":
+                return {"status": "completed", "usage": {"cost": .01}, "assets": [{
+                    "frame_id": segment_id, "production_segment_id": segment_id,
+                    "url": "https://cdn.test/image.png", "storage_path": "image.png",
+                    "checksum": "saved", "copy_status": "persisted"}]}
+            return {"status": "running" if transition == "retry_wait" else "failed"}
+        monkeypatch.setattr(video, "submit_image_batch", submit)
+        monkeypatch.setattr(video, "get_stage_task", sync)
+        original_refresh = db.refresh
+        fired = []
+        def refresh(instance, *args, **kwargs):
+            # Observe durable DB state, not an expired or refreshed ORM snapshot.
+            # Replacement may advance immediately after the transition is exposed.
+            if isinstance(instance, ProductionJob) and not fired:
+                with sessions() as replacement:
+                    current = replacement.get(ProductionJob, job_id)
+                    if current.status == transition:
+                        current.status = "completed"
+                        current.lease_id = None
+                        current.leased_until = None
+                        current.updated_at = bj_now()
+                        replacement.query(VideoProductionRun).filter_by(id=run_id).update({
+                            "status": "completed", "current_stage": "final_review"})
+                        replacement.commit()
+                        fired.append(True)
+            return original_refresh(instance, *args, **kwargs)
+        monkeypatch.setattr(db, "refresh", refresh)
+        run_real_worker_step(db, run_id, lease_id="old")
+        assert fired, "Transition handoff was not exercised"
+        db.expire_all()
+        assert db.get(VideoProductionRun, run_id).status == "completed"
+        assert db.get(VideoProductionRun, run_id).current_stage == "final_review"
+
+
+def test_execute_entry_does_not_adopt_replacement_lease(sessions, monkeypatch):
+    from app.db_models import ProviderStageTask
+    from app.services import video_production_service as video
+    from app.services import production_worker_service as worker
+    with sessions() as db:
+        run, segment = _real_provider_run(db, monkeypatch)
+        job_id = db.query(ProductionJob).filter_by(plan_id=run.production_plan_id).one().id
+        calls = []
+        original = worker.execute_real_job
+        async def replace_at_entry(db_arg, run_arg, job_arg, **kwargs):
+            with sessions() as replacement:
+                replacement.query(ProductionJob).filter_by(id=job_id).update({
+                    "lease_id": "replacement", "leased_until": bj_now() + timedelta(minutes=10)})
+                replacement.commit()
+            return await original(db_arg, run_arg, job_arg, **kwargs)
+        async def submit(**kwargs):
+            calls.append("old worker submitted")
+            return {"stage_task_id": "old-provider"}
+        async def sync(*args):
+            return {"status": "running"}
+        monkeypatch.setattr(worker, "execute_real_job", replace_at_entry)
+        monkeypatch.setattr(video, "submit_image_batch", submit)
+        monkeypatch.setattr(video, "get_stage_task", sync)
+        worker.run_real_worker_step(db, run.id, lease_id="old")
+        db.expire_all()
+        assert calls == []
+        assert db.query(ProviderStageTask).count() == 0
+        assert db.get(ProductionJob, job_id).lease_id == "replacement"
+
+
+@pytest.mark.parametrize("replacement_name", ["replacement", "worker"])
+def test_claim_refresh_preserves_original_claim_authority(sessions, monkeypatch, replacement_name):
+    from app.db_models import ProviderStageTask, ProductionSegment, VideoProductionRun
+    from app.services import video_production_service as video
+    with sessions() as db:
+        run, segment = _real_provider_run(db, monkeypatch)
+        run_id, segment_id = run.id, segment.id
+        job_id = db.query(ProductionJob).filter_by(plan_id=run.production_plan_id).one().id
+        original_refresh = db.refresh
+        fired, calls = [], []
+        def refresh(instance, *args, **kwargs):
+            if isinstance(instance, ProductionJob) and not fired:
+                with sessions() as replacement:
+                    current = replacement.get(ProductionJob, job_id)
+                    if current.status == "leased":
+                        current.lease_id = replacement_name
+                        current.leased_until = bj_now() + timedelta(minutes=10)
+                        replacement.query(ProductionSegment).filter_by(id=segment_id).update({"status": "video_running"})
+                        replacement.query(VideoProductionRun).filter_by(id=run_id).update({"status": "completed"})
+                        replacement.commit()
+                        fired.append(True)
+            return original_refresh(instance, *args, **kwargs)
+        async def submit(**kwargs):
+            calls.append("old worker submitted")
+            return {"stage_task_id": "old-provider"}
+        async def sync(*args):
+            return {"status": "running"}
+        monkeypatch.setattr(db, "refresh", refresh)
+        monkeypatch.setattr(video, "submit_image_batch", submit)
+        monkeypatch.setattr(video, "get_stage_task", sync)
+        run_real_worker_step(db, run_id, lease_id="worker")
+        assert fired
+        db.expire_all()
+        assert calls == []
+        assert db.query(ProviderStageTask).count() == 0
+        assert db.get(ProductionJob, job_id).lease_id == replacement_name
+        assert db.get(ProductionSegment, segment_id).status == "video_running"
+        assert db.get(VideoProductionRun, run_id).status == "completed"
